@@ -11,7 +11,7 @@ import {
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getCollaborators, getStudents, getManagers, deleteUser, toggleUserActive } from '../../services/authService';
+import { getCollaborators, getStudents, getManagers, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
 import { Collaborator, Student, Manager } from '../../types';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
@@ -87,6 +87,11 @@ export const ManageUsersScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Se è uno studente, rimuovilo dalla lista del collaboratore
+              const student = students.find((s) => s.id === userId);
+              if (student && student.assignedCollaboratorId) {
+                await removeStudentFromCollaborator(student.assignedCollaboratorId, userId);
+              }
               await deleteUser(userId);
               await loadData();
               Alert.alert('Fatto', `${name} eliminato`);

@@ -22,7 +22,7 @@ import {
   Student,
 } from '../../types';
 import { uploadPosturalImage, analyzePosture, createAssessment, getStudentAssessments } from '../../services/posturalService';
-import { analyzePostureWithAI, AIPosturalAnalysis, getAIApiKey } from '../../services/aiService';
+import { analyzePostureWithAI, AIPosturalAnalysis, ensureAIApiKey } from '../../services/aiService';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 
@@ -167,7 +167,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
       Alert.alert('Errore', 'Carica almeno una foto per l\'analisi AI');
       return;
     }
-    if (!getAIApiKey()) {
+    if (!(await ensureAIApiKey())) {
       Alert.alert(
         'API Key mancante',
         'Inserisci la chiave API Anthropic nelle impostazioni per usare l\'analisi AI.'

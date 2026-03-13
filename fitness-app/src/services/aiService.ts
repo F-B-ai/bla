@@ -3,13 +3,16 @@
 // Analisi posturale con visione + Progressioni allenamento
 // ============================================================
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PosturalFinding, Exercise, WorkoutPlan } from '../types';
 
 // La chiave API va impostata in config. In produzione usare un backend proxy.
 // MAI esporre la chiave in un'app client in produzione.
 const API_URL = 'https://api.anthropic.com/v1/messages';
+const AI_KEY_STORAGE = '@essère_ai_key';
 
 let API_KEY = '';
+let _keyLoaded = false;
 
 export const setAIApiKey = (key: string) => {
   API_KEY = key;
@@ -17,12 +20,42 @@ export const setAIApiKey = (key: string) => {
 
 export const getAIApiKey = () => API_KEY;
 
+export const ensureAIApiKey = async (): Promise<string> => {
+  if (!API_KEY) {
+    await loadAIApiKey();
+  }
+  return API_KEY;
+};
+
+// Carica la chiave API da AsyncStorage all'avvio
+export const loadAIApiKey = async (): Promise<string> => {
+  if (_keyLoaded) return API_KEY;
+  try {
+    const key = await AsyncStorage.getItem(AI_KEY_STORAGE);
+    if (key) {
+      API_KEY = key;
+    }
+  } catch {
+    // ignore
+  }
+  _keyLoaded = true;
+  return API_KEY;
+};
+
+// Caricamento automatico all'import del modulo
+loadAIApiKey();
+
 // --- Helper per chiamata Claude ---
 const callClaude = async (
   messages: Array<{ role: string; content: any }>,
   systemPrompt: string,
   maxTokens: number = 2000
 ): Promise<string> => {
+  // Assicurati che la chiave sia caricata da AsyncStorage
+  if (!API_KEY) {
+    await loadAIApiKey();
+  }
+
   if (!API_KEY) {
     throw new Error('API key Anthropic non configurata. Vai in Impostazioni AI per inserirla.');
   }

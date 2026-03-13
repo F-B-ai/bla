@@ -25,7 +25,7 @@ import {
   suggestWorkoutProgression,
   suggestExercises,
   AIProgressionSuggestion,
-  getAIApiKey,
+  ensureAIApiKey,
 } from '../../services/aiService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -89,7 +89,7 @@ export const WorkoutPlanScreen: React.FC = () => {
   const pickAndUploadVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ['videos'],
         quality: 0.7,
         videoMaxDuration: 120,
       });
@@ -121,7 +121,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       Alert.alert('Errore', 'Seleziona prima un allievo');
       return;
     }
-    if (!getAIApiKey()) {
+    if (!(await ensureAIApiKey())) {
       Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }
@@ -192,7 +192,7 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   // AI: suggerisci esercizi per categoria
   const handleAIExerciseSuggestion = async () => {
-    if (!getAIApiKey()) {
+    if (!(await ensureAIApiKey())) {
       Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }

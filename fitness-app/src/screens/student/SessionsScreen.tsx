@@ -58,6 +58,7 @@ export const SessionsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               const result = await cancelSession(session.id, sessionDate);
+              await loadSessions();
               if (result.isLate) {
                 Alert.alert(
                   'Sessione annullata',
@@ -80,6 +81,7 @@ export const SessionsScreen: React.FC = () => {
           text: 'Sì, annulla',
           onPress: async () => {
             await cancelSession(session.id, sessionDate);
+            await loadSessions();
             Alert.alert('Fatto', 'Sessione annullata con successo');
           },
         },
