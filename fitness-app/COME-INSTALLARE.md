@@ -93,6 +93,40 @@ Dopo aver installato l'app:
 
 Le funzionalita' AI (analisi posturale, progressioni, suggerimenti esercizi) saranno attive.
 
+## Installazione Ibrida (TestFlight + APK)
+
+Il metodo ibrido lancia in parallelo la distribuzione iOS via TestFlight e Android via APK diretto, tutto con un solo click.
+
+### Come usare
+
+1. Vai su GitHub > il tuo repository > tab **Actions**
+2. Clicca su **"Installazione Ibrida (TestFlight + APK)"**
+3. Clicca **"Run workflow"**
+4. Opzioni disponibili:
+   - **Salta build iOS/TestFlight**: per generare solo l'APK Android
+   - **Salta build Android/APK**: per inviare solo a TestFlight
+   - **Invia automaticamente a TestFlight**: se attivo, dopo la build iOS viene inviata direttamente a TestFlight
+5. Clicca **"Run workflow"**
+
+### Cosa succede
+
+| Piattaforma | Metodo | Requisiti |
+|-------------|--------|-----------|
+| iOS | TestFlight (beta) | Apple Developer Account + credenziali in `eas.json` |
+| Android | APK diretto (download) | Solo `EXPO_TOKEN` nei secrets GitHub |
+
+### Dopo il workflow
+
+- **iPhone**: apri l'app TestFlight e troverai ESSERE nella lista dei beta test
+- **Android**: vai su [expo.dev](https://expo.dev) > Builds, scarica l'APK e installalo
+
+### Prerequisiti
+
+Per TestFlight, assicurati di aver configurato in `eas.json` → `submit.testflight`:
+- `appleId`: la tua email Apple Developer
+- `ascAppId`: ID dell'app su App Store Connect
+- `appleTeamId`: il tuo Team ID
+
 ## Supporto
 
 Per problemi con le build, controlla i log su https://expo.dev > Builds.
