@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../config/firebase';
@@ -107,9 +107,9 @@ export const WorkoutPlanScreen: React.FC = () => {
       const downloadUrl = await getDownloadURL(videoRef);
 
       setExVideoUrl(downloadUrl);
-      Alert.alert('Video caricato!');
+      crossAlert('Successo', 'Video caricato!');
     } catch {
-      Alert.alert('Errore', 'Impossibile caricare il video');
+      crossAlert('Errore', 'Impossibile caricare il video');
     } finally {
       setUploadingVideo(false);
     }
@@ -118,11 +118,11 @@ export const WorkoutPlanScreen: React.FC = () => {
   // AI: genera progressione dalla scheda attuale
   const handleAIProgression = async () => {
     if (!selectedStudentId) {
-      Alert.alert('Errore', 'Seleziona prima un allievo');
+      crossAlert('Errore', 'Seleziona prima un allievo');
       return;
     }
     if (!(await ensureAIApiKey())) {
-      Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }
 
@@ -130,7 +130,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     try {
       const activePlan = await getActiveWorkoutPlan(selectedStudentId);
       if (!activePlan) {
-        Alert.alert('Nessuna scheda', 'L\'allievo non ha una scheda attiva da cui generare la progressione.');
+        crossAlert('Nessuna scheda', 'L\'allievo non ha una scheda attiva da cui generare la progressione.');
         return;
       }
 
@@ -154,7 +154,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       setShowAiModal(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore AI';
-      Alert.alert('Errore', msg);
+      crossAlert('Errore', msg);
     } finally {
       setAiLoading(false);
     }
@@ -187,13 +187,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExercises(newExercises);
     setPlanTitle(aiSuggestion.title);
     setShowAiModal(false);
-    Alert.alert('Applicata!', 'La progressione AI è stata applicata. Puoi modificarla prima di salvare.');
+    crossAlert('Applicata!', 'La progressione AI è stata applicata. Puoi modificarla prima di salvare.');
   };
 
   // AI: suggerisci esercizi per categoria
   const handleAIExerciseSuggestion = async () => {
     if (!(await ensureAIApiKey())) {
-      Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }
 
@@ -204,13 +204,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     try {
       const suggestions = await suggestExercises(exCategory, goal);
       if (suggestions.length === 0) {
-        Alert.alert('Nessun suggerimento', 'L\'AI non ha generato suggerimenti');
+        crossAlert('Nessun suggerimento', 'L\'AI non ha generato suggerimenti');
         return;
       }
 
       // Mostra i suggerimenti e lascia scegliere
       const firstSuggestion = suggestions[0];
-      Alert.alert(
+      crossAlert(
         'Suggerimento AI',
         `${firstSuggestion.name}\n${firstSuggestion.sets}x${firstSuggestion.reps} (rec ${firstSuggestion.restSeconds}s)\n\n${firstSuggestion.description}`,
         [
@@ -228,7 +228,7 @@ export const WorkoutPlanScreen: React.FC = () => {
         ]
       );
     } catch {
-      Alert.alert('Errore', 'Impossibile ottenere suggerimenti AI');
+      crossAlert('Errore', 'Impossibile ottenere suggerimenti AI');
     } finally {
       setAiExercisesLoading(false);
     }
@@ -236,7 +236,7 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   const addExercise = () => {
     if (!exName || !exSets || !exReps) {
-      Alert.alert('Errore', 'Compila nome, serie e ripetizioni');
+      crossAlert('Errore', 'Compila nome, serie e ripetizioni');
       return;
     }
 
@@ -276,17 +276,17 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   const savePlan = async () => {
     if (!planTitle || !user) {
-      Alert.alert('Errore', 'Inserisci un titolo per la programmazione');
+      crossAlert('Errore', 'Inserisci un titolo per la programmazione');
       return;
     }
     if (!selectedStudentId) {
-      Alert.alert('Errore', 'Seleziona un allievo');
+      crossAlert('Errore', 'Seleziona un allievo');
       return;
     }
 
     const totalExercises = Object.values(exercises).reduce((sum, exs) => sum + exs.length, 0);
     if (totalExercises === 0) {
-      Alert.alert('Errore', 'Aggiungi almeno un esercizio');
+      crossAlert('Errore', 'Aggiungi almeno un esercizio');
       return;
     }
 
@@ -313,12 +313,12 @@ export const WorkoutPlanScreen: React.FC = () => {
         isActive: true,
       });
 
-      Alert.alert('Successo', 'Programmazione salvata e inviata all\'allievo!');
+      crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
       setPlanTitle('');
       setExercises({});
       setSelectedStudentId('');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la programmazione');
+      crossAlert('Errore', 'Impossibile salvare la programmazione');
     } finally {
       setSaving(false);
     }

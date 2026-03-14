@@ -6,8 +6,8 @@ import {
   FlatList,
   Modal,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -49,7 +49,7 @@ export const DiaryScreen: React.FC = () => {
 
   const handleAddEntry = async () => {
     if (!newContent.trim() || !user) {
-      Alert.alert('Errore', 'Scrivi qualcosa nel diario');
+      crossAlert('Errore', 'Scrivi qualcosa nel diario');
       return;
     }
 
@@ -68,14 +68,14 @@ export const DiaryScreen: React.FC = () => {
       setNewMood('good');
       setNewPainLevel(0);
       await loadEntries();
-      Alert.alert('Fatto', 'Nota aggiunta al diario');
+      crossAlert('Fatto', 'Nota aggiunta al diario');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la nota');
+      crossAlert('Errore', 'Impossibile salvare la nota');
     }
   };
 
   const handleDeleteEntry = (entryId: string) => {
-    Alert.alert(
+    crossAlert(
       'Elimina Nota',
       'Vuoi eliminare questa nota dal diario?',
       [
@@ -88,7 +88,7 @@ export const DiaryScreen: React.FC = () => {
               await deleteDiaryEntry(entryId);
               await loadEntries();
             } catch {
-              Alert.alert('Errore', 'Impossibile eliminare la nota');
+              crossAlert('Errore', 'Impossibile eliminare la nota');
             }
           },
         },

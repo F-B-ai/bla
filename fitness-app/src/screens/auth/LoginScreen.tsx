@@ -6,10 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -29,33 +29,33 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Errore', 'Inserisci email e password');
+      crossAlert('Errore', 'Inserisci email e password');
       return;
     }
     try {
       await login(email.trim(), password);
     } catch {
-      Alert.alert('Errore di accesso', 'Credenziali non valide. Riprova.');
+      crossAlert('Errore di accesso', 'Credenziali non valide. Riprova.');
     }
   };
 
   const handleResetPassword = async () => {
     const target = resetEmail.trim() || email.trim();
     if (!target) {
-      Alert.alert('Errore', 'Inserisci la tua email per recuperare la password');
+      crossAlert('Errore', 'Inserisci la tua email per recuperare la password');
       return;
     }
     setResetLoading(true);
     try {
       await resetPassword(target);
-      Alert.alert(
+      crossAlert(
         'Email inviata',
         `Abbiamo inviato un link per reimpostare la password a ${target}. Controlla la tua casella di posta.`
       );
       setShowForgotPassword(false);
       setResetEmail('');
     } catch {
-      Alert.alert(
+      crossAlert(
         'Errore',
         'Impossibile inviare l\'email di recupero. Verifica che l\'indirizzo sia corretto.'
       );

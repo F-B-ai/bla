@@ -6,9 +6,9 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -48,7 +48,7 @@ export const SessionsScreen: React.FC = () => {
     const hoursLeft = (sessionDate.getTime() - Date.now()) / (1000 * 60 * 60);
 
     if (hoursLeft < CANCELLATION_HOURS) {
-      Alert.alert(
+      crossAlert(
         'Attenzione',
         `Non puoi annullare la sessione meno di ${CANCELLATION_HOURS} ore prima. La sessione sarà considerata come eseguita e verrà addebitata.`,
         [
@@ -60,7 +60,7 @@ export const SessionsScreen: React.FC = () => {
               const result = await cancelSession(session.id, sessionDate);
               await loadSessions();
               if (result.isLate) {
-                Alert.alert(
+                crossAlert(
                   'Sessione annullata',
                   'La sessione è stata annullata ma sarà conteggiata e addebitata poiché annullata con meno di 10 ore di preavviso.'
                 );
@@ -72,7 +72,7 @@ export const SessionsScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
+    crossAlert(
       'Conferma annullamento',
       'Sei sicuro di voler annullare questa sessione?',
       [
@@ -82,7 +82,7 @@ export const SessionsScreen: React.FC = () => {
           onPress: async () => {
             await cancelSession(session.id, sessionDate);
             await loadSessions();
-            Alert.alert('Fatto', 'Sessione annullata con successo');
+            crossAlert('Fatto', 'Sessione annullata con successo');
           },
         },
       ]

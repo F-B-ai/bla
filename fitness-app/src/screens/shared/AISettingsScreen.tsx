@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -31,16 +31,16 @@ export const AISettingsScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!apiKey.startsWith('sk-ant-') && !apiKey.startsWith('sk-')) {
-      Alert.alert('Formato non valido', 'La chiave API Anthropic deve iniziare con "sk-ant-" o "sk-"');
+      crossAlert('Formato non valido', 'La chiave API Anthropic deve iniziare con "sk-ant-" o "sk-"');
       return;
     }
     try {
       await AsyncStorage.setItem(AI_KEY_STORAGE, apiKey);
       setAIApiKey(apiKey);
       setSaved(true);
-      Alert.alert('Salvato', 'Chiave API configurata con successo!');
+      crossAlert('Salvato', 'Chiave API configurata con successo!');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la chiave');
+      crossAlert('Errore', 'Impossibile salvare la chiave');
     }
   };
 
@@ -49,7 +49,7 @@ export const AISettingsScreen: React.FC = () => {
     setAIApiKey('');
     setApiKey('');
     setSaved(false);
-    Alert.alert('Rimossa', 'Chiave API rimossa');
+    crossAlert('Rimossa', 'Chiave API rimossa');
   };
 
   return (

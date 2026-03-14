@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -71,7 +71,7 @@ export const MyProgramScreen: React.FC = () => {
           style={styles.videoButton}
           onPress={() => {
             Linking.openURL(exercise.videoUrl!).catch(() =>
-              Alert.alert('Errore', 'Impossibile aprire il video')
+              crossAlert('Errore', 'Impossibile aprire il video')
             );
           }}
         >

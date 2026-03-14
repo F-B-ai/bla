@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
@@ -74,7 +74,7 @@ export const ContentManagementScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!title || !url || !user) {
-      Alert.alert('Errore', 'Inserisci titolo e URL');
+      crossAlert('Errore', 'Inserisci titolo e URL');
       return;
     }
 
@@ -90,19 +90,19 @@ export const ContentManagementScreen: React.FC = () => {
         assignedTo: selectedStudentIds,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       });
-      Alert.alert('Successo', 'Contenuto pubblicato!');
+      crossAlert('Successo', 'Contenuto pubblicato!');
       resetForm();
       setShowModal(false);
       loadData();
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare il contenuto');
+      crossAlert('Errore', 'Impossibile salvare il contenuto');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (id: string) => {
-    Alert.alert(
+    crossAlert(
       'Conferma',
       'Sei sicuro di voler eliminare questo contenuto?',
       [
@@ -115,7 +115,7 @@ export const ContentManagementScreen: React.FC = () => {
               await deleteContent(id);
               await loadData();
             } catch {
-              Alert.alert('Errore', 'Impossibile eliminare');
+              crossAlert('Errore', 'Impossibile eliminare');
             }
           },
         },

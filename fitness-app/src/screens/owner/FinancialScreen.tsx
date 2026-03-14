@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -61,13 +61,13 @@ export const FinancialScreen: React.FC = () => {
 
   const handleAddTransaction = async () => {
     if (!newAmount || !newDescription) {
-      Alert.alert('Errore', 'Compila tutti i campi');
+      crossAlert('Errore', 'Compila tutti i campi');
       return;
     }
 
     const amount = parseFloat(newAmount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Errore', 'Importo non valido');
+      crossAlert('Errore', 'Importo non valido');
       return;
     }
 
@@ -84,14 +84,14 @@ export const FinancialScreen: React.FC = () => {
       setNewAmount('');
       setNewDescription('');
       await loadData();
-      Alert.alert('Successo', 'Transazione aggiunta');
+      crossAlert('Successo', 'Transazione aggiunta');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la transazione');
+      crossAlert('Errore', 'Impossibile salvare la transazione');
     }
   };
 
   const handleDeleteTransaction = (txId: string, description: string) => {
-    Alert.alert(
+    crossAlert(
       'Elimina Transazione',
       `Eliminare "${description}"?`,
       [
@@ -104,7 +104,7 @@ export const FinancialScreen: React.FC = () => {
               await deleteTransaction(txId);
               await loadData();
             } catch {
-              Alert.alert('Errore', 'Impossibile eliminare la transazione');
+              crossAlert('Errore', 'Impossibile eliminare la transazione');
             }
           },
         },

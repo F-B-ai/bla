@@ -3,10 +3,10 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -27,11 +27,11 @@ export const AddManagerScreen: React.FC<Props> = ({ onBack }) => {
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
 
@@ -44,12 +44,12 @@ export const AddManagerScreen: React.FC<Props> = ({ onBack }) => {
         surname.trim(),
         phone.trim()
       );
-      Alert.alert('Successo', `Manager ${name} ${surname} registrato!`, [
+      crossAlert('Successo', `Manager ${name} ${surname} registrato!`, [
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', message);
     } finally {
       setLoading(false);
     }

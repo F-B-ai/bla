@@ -6,9 +6,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -30,15 +30,15 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Errore', 'Le password non corrispondono');
+      crossAlert('Errore', 'Le password non corrispondono');
       return;
     }
 
@@ -55,7 +55,7 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
       // Dopo la registrazione l'utente e' automaticamente loggato via onAuthStateChanged
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', message);
     } finally {
       setLoading(false);
     }

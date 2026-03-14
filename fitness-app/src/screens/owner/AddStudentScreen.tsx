@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -44,21 +44,21 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
         setSelectedCollaboratorId(collabs[0].id);
       }
     } catch {
-      Alert.alert('Errore', 'Impossibile caricare i collaboratori');
+      crossAlert('Errore', 'Impossibile caricare i collaboratori');
     }
   };
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
     if (!selectedCollaboratorId) {
-      Alert.alert('Errore', 'Seleziona un collaboratore da assegnare');
+      crossAlert('Errore', 'Seleziona un collaboratore da assegnare');
       return;
     }
 
@@ -74,12 +74,12 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
         goals.trim(),
         medicalNotes.trim() || undefined
       );
-      Alert.alert('Successo', `Allievo ${name} ${surname} registrato!`, [
+      crossAlert('Successo', `Allievo ${name} ${surname} registrato!`, [
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', message);
     } finally {
       setLoading(false);
     }

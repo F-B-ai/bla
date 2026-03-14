@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -53,7 +53,7 @@ export const MyStudentsScreen: React.FC = () => {
 
   const handleCreateProgram = async () => {
     if (!selectedStudent || !programTitle || !user) {
-      Alert.alert('Errore', 'Seleziona un allievo e inserisci il titolo');
+      crossAlert('Errore', 'Seleziona un allievo e inserisci il titolo');
       return;
     }
     try {
@@ -67,13 +67,13 @@ export const MyStudentsScreen: React.FC = () => {
         progressNotes: sessionNotes,
         createdAt: new Date(),
       });
-      Alert.alert('Successo', 'Programma creato con successo');
+      crossAlert('Successo', 'Programma creato con successo');
       setShowProgramModal(false);
       setProgramTitle('');
       setProgramDescription('');
       setSessionNotes('');
     } catch {
-      Alert.alert('Errore', 'Impossibile creare il programma');
+      crossAlert('Errore', 'Impossibile creare il programma');
     }
   };
 
@@ -90,11 +90,11 @@ export const MyStudentsScreen: React.FC = () => {
         progressNotes,
         createdAt: new Date(),
       });
-      Alert.alert('Successo', 'Note salvate');
+      crossAlert('Successo', 'Note salvate');
       setShowNotesModal(false);
       setProgressNotes('');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare le note');
+      crossAlert('Errore', 'Impossibile salvare le note');
     }
   };
 

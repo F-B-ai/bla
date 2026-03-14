@@ -6,9 +6,9 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -129,7 +129,7 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const handleResetAllData = () => {
-    Alert.alert(
+    crossAlert(
       'Reset Tutti i Dati',
       'ATTENZIONE: Questa azione eliminerà TUTTI i dati dell\'app (sessioni, pagamenti, programmi, transazioni, valutazioni, diario, contenuti). Gli account utente NON verranno eliminati.\n\nSei sicuro?',
       [
@@ -138,7 +138,7 @@ export const DashboardScreen: React.FC = () => {
           text: 'Conferma Reset',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
+            crossAlert(
               'Ultima Conferma',
               'I dati eliminati NON potranno essere recuperati. Continuare?',
               [
@@ -168,9 +168,9 @@ export const DashboardScreen: React.FC = () => {
                         totalDeleted += await deleteCollection(col);
                       }
                       await loadData();
-                      Alert.alert('Reset Completato', `${totalDeleted} documenti eliminati.`);
+                      crossAlert('Reset Completato', `${totalDeleted} documenti eliminati.`);
                     } catch {
-                      Alert.alert('Errore', 'Impossibile completare il reset. Alcuni dati potrebbero essere stati eliminati.');
+                      crossAlert('Errore', 'Impossibile completare il reset. Alcuni dati potrebbero essere stati eliminati.');
                     } finally {
                       setResetting(false);
                     }

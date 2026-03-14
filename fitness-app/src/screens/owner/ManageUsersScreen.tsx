@@ -6,9 +6,9 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { getCollaborators, getStudents, getManagers, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
@@ -55,7 +55,7 @@ export const ManageUsersScreen: React.FC = () => {
 
   const handleToggleActive = async (userId: string, currentActive: boolean, name: string) => {
     const action = currentActive ? 'disattivare' : 'riattivare';
-    Alert.alert(
+    crossAlert(
       'Conferma',
       `Vuoi ${action} ${name}?`,
       [
@@ -68,7 +68,7 @@ export const ManageUsersScreen: React.FC = () => {
               await toggleUserActive(userId, !currentActive);
               await loadData();
             } catch {
-              Alert.alert('Errore', 'Impossibile aggiornare lo stato');
+              crossAlert('Errore', 'Impossibile aggiornare lo stato');
             }
           },
         },
@@ -77,7 +77,7 @@ export const ManageUsersScreen: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string, name: string) => {
-    Alert.alert(
+    crossAlert(
       'Elimina Utente',
       `Sei sicuro di voler eliminare ${name}? Questa azione non può essere annullata.`,
       [
@@ -94,9 +94,9 @@ export const ManageUsersScreen: React.FC = () => {
               }
               await deleteUser(userId);
               await loadData();
-              Alert.alert('Fatto', `${name} eliminato`);
+              crossAlert('Fatto', `${name} eliminato`);
             } catch {
-              Alert.alert('Errore', 'Impossibile eliminare l\'utente');
+              crossAlert('Errore', 'Impossibile eliminare l\'utente');
             }
           },
         },
