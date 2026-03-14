@@ -127,6 +127,55 @@ Per TestFlight, assicurati di aver configurato in `eas.json` → `submit.testfli
 - `ascAppId`: ID dell'app su App Store Connect
 - `appleTeamId`: il tuo Team ID
 
+## Rilascio Produzione (App Store + Google Play)
+
+Quando l'app e' pronta per il rilascio ufficiale, usa il workflow di produzione per pubblicare su entrambi gli store.
+
+### Prerequisiti
+
+1. **iOS (App Store)**:
+   - Account Apple Developer ($99/anno)
+   - App creata su [App Store Connect](https://appstoreconnect.apple.com)
+   - Credenziali configurate in `eas.json` → `submit.production.ios`:
+     - `appleId`: la tua email Apple Developer
+     - `ascAppId`: ID dell'app su App Store Connect
+     - `appleTeamId`: il tuo Team ID
+
+2. **Android (Google Play)**:
+   - Account Google Play Developer ($25 una tantum)
+   - App creata su [Google Play Console](https://play.google.com/console)
+   - Service Account JSON per l'upload automatico:
+     1. Crea un Service Account su Google Cloud Console
+     2. Abilita Google Play Android Developer API
+     3. Scarica il file JSON
+     4. Codificalo in base64: `base64 -w 0 google-service-account.json`
+     5. Aggiungi il risultato come secret `GOOGLE_SERVICE_ACCOUNT_JSON` nel repository GitHub
+
+### Come lanciare il rilascio
+
+1. Vai su GitHub > il tuo repository > tab **Actions**
+2. Clicca su **"Rilascio Produzione (App Store + Google Play)"**
+3. Clicca **"Run workflow"**
+4. Opzioni disponibili:
+   - **Salta build iOS**: per pubblicare solo su Google Play
+   - **Salta build Android**: per pubblicare solo su App Store
+   - **Invia automaticamente agli store**: se attivo, dopo la build viene inviata direttamente agli store per la review
+5. Clicca **"Run workflow"**
+
+### Dopo il rilascio
+
+| Piattaforma | Cosa fare |
+|-------------|-----------|
+| iOS | Vai su [App Store Connect](https://appstoreconnect.apple.com) per gestire la review e scegliere il tipo di distribuzione (pubblica, unlisted, o B2B) |
+| Android | Vai su [Google Play Console](https://play.google.com/console) per gestire il rilascio (produzione, closed testing, o managed) |
+
+### Opzioni di distribuzione privata
+
+- **iOS Unlisted**: l'app non appare nei risultati di ricerca, accessibile solo con link diretto
+- **iOS Business Manager**: distribuzione B2B a organizzazioni specifiche
+- **Android Closed Testing**: solo utenti invitati
+- **Android Managed Google Play**: distribuzione enterprise
+
 ## Supporto
 
 Per problemi con le build, controlla i log su https://expo.dev > Builds.
