@@ -39,6 +39,14 @@
       "expo-dev-client",
       "expo-image-picker",
       "expo-notifications"
-    ]
+    ],
+    "updates": {
+      "url": "https://u.expo.dev/YOUR_PROJECT_ID"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_PROJECT_ID"
+      }
+    }
   }
 }

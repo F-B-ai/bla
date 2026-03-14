@@ -14,8 +14,9 @@
         "buildType": "apk"
       }
     },
-    "preview": {
+    "internal": {
       "distribution": "internal",
+      "channel": "internal",
       "ios": {
         "simulator": false
       },
@@ -23,16 +24,57 @@
         "buildType": "apk"
       }
     },
+    "testflight": {
+      "distribution": "store",
+      "channel": "testflight",
+      "autoIncrement": true,
+      "ios": {
+        "autoIncrement": true
+      }
+    },
+    "android-internal": {
+      "distribution": "store",
+      "channel": "android-internal",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
     "production": {
-      "autoIncrement": true
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true,
+      "ios": {
+        "autoIncrement": true
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
     }
   },
   "submit": {
+    "testflight": {
+      "ios": {
+        "appleId": "YOUR_APPLE_ID@email.com",
+        "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      }
+    },
+    "android-internal": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
+      }
+    },
     "production": {
       "ios": {
         "appleId": "YOUR_APPLE_ID@email.com",
         "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
         "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
       }
     }
   }
