@@ -36,10 +36,12 @@ const StudentTab = createBottomTabNavigator();
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
+const TAB_ICON_SIZE = 26;
+
 const TabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
   <Ionicons
     name={name}
-    size={20}
+    size={TAB_ICON_SIZE}
     color={focused ? colors.accent : colors.textLight}
   />
 );
@@ -72,7 +74,7 @@ const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
             style={styles.scrollableTab}
             onPress={onPress}
           >
-            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: 20 })}
+            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: TAB_ICON_SIZE })}
             <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
               {label}
             </Text>
@@ -427,14 +429,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.divider,
     borderTopWidth: 1,
-    paddingTop: 3,
+    paddingTop: 4,
     paddingBottom: 4,
-    height: 56,
+    height: 62,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 3,
   },
   scrollableTabBarContainer: {
     backgroundColor: colors.surface,
@@ -455,9 +457,9 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   scrollableTabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 3,
   },
   loading: {
     flex: 1,
