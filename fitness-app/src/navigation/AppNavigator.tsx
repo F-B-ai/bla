@@ -179,11 +179,10 @@ const OwnerTabs = () => (
 // --- Manager Tabs ---
 const ManagerTabs = () => (
   <ManagerTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
       headerShown: false,
     }}
   >
@@ -204,11 +203,27 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Programmi"
+      component={WorkoutPlanScreen}
+      options={{
+        tabBarLabel: 'Programmi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Sessions"
       component={ScheduleSessionScreen}
       options={{
         tabBarLabel: 'Sessioni',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Postura"
+      component={PosturalAssessmentScreen}
+      options={{
+        tabBarLabel: 'Postura',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen

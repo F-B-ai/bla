@@ -54,6 +54,19 @@ export const updateProgram = async (
 export const createWorkoutPlan = async (
   plan: Omit<WorkoutPlan, 'id'>
 ): Promise<string> => {
+  // Disattiva tutti i piani attivi precedenti per lo stesso studente
+  if (plan.isActive && plan.studentId) {
+    const activeQuery = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', plan.studentId),
+      where('isActive', '==', true)
+    );
+    const activeSnapshot = await getDocs(activeQuery);
+    for (const activeDoc of activeSnapshot.docs) {
+      await updateDoc(doc(db, PLANS_COLLECTION, activeDoc.id), { isActive: false });
+    }
+  }
+
   const docRef = await addDoc(collection(db, PLANS_COLLECTION), {
     ...plan,
     startDate: Timestamp.fromDate(plan.startDate),

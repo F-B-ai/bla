@@ -7,35 +7,46 @@ import {
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
-import { deleteApp } from 'firebase/app';
 import { auth, db } from '../config/firebase';
 import { User, UserRole, Collaborator, Student, Manager } from '../types';
 
 /**
- * Crea un utente su Firebase Auth usando un'app secondaria temporanea
- * per evitare il logout dell'utente corrente (owner/manager).
+ * Crea un utente su Firebase Auth usando la REST API di Firebase
+ * per evitare il logout dell'utente corrente (owner/manager/coach).
  */
-const createUserWithSecondaryApp = async (email: string, password: string): Promise<string> => {
-  const { initializeApp } = await import('firebase/app');
-  const { getAuth, createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
+const createUserWithRestApi = async (email: string, password: string): Promise<string> => {
+  const apiKey = auth.app.options.apiKey;
+  if (!apiKey) throw new Error('Firebase API key non trovata');
 
-  const appName = 'secondary-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-  const secondaryApp = initializeApp(auth.app.options, appName);
-  const secondaryAuth = getAuth(secondaryApp);
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: false,
+      }),
+    }
+  );
 
-  try {
-    const credential = await createUser(secondaryAuth, email, password);
-    const uid = credential.user.uid;
-    await secondaryAuth.signOut();
-    await deleteApp(secondaryApp);
-    return uid;
-  } catch (error) {
-    try {
-      await secondaryAuth.signOut();
-      await deleteApp(secondaryApp);
-    } catch { /* ignore cleanup errors */ }
-    throw error;
+  const data = await response.json();
+
+  if (!response.ok) {
+    // Traduci errori Firebase REST API
+    const errorCode = data?.error?.message || '';
+    if (errorCode === 'EMAIL_EXISTS') {
+      throw { code: 'auth/email-already-in-use' };
+    } else if (errorCode === 'WEAK_PASSWORD') {
+      throw { code: 'auth/weak-password' };
+    } else if (errorCode === 'INVALID_EMAIL') {
+      throw { code: 'auth/invalid-email' };
+    }
+    throw new Error(data?.error?.message || 'Errore durante la creazione dell\'utente');
   }
+
+  return data.localId; // UID dell'utente creato
 };
 
 export const signIn = async (email: string, password: string): Promise<User> => {
@@ -87,7 +98,7 @@ export const registerManager = async (
   surname: string,
   phone: string
 ): Promise<Manager> => {
-  const uid = await createUserWithSecondaryApp(email, password);
+  const uid = await createUserWithRestApi(email, password);
 
   const managerData: Omit<Manager, 'id'> = {
     email,
@@ -146,7 +157,7 @@ export const registerCollaborator = async (
   commissionPercentage: number,
   specializations: string[]
 ): Promise<Collaborator> => {
-  const uid = await createUserWithSecondaryApp(email, password);
+  const uid = await createUserWithRestApi(email, password);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -179,7 +190,7 @@ export const registerStudent = async (
   goals: string,
   medicalNotes?: string
 ): Promise<Student> => {
-  const uid = await createUserWithSecondaryApp(email, password);
+  const uid = await createUserWithRestApi(email, password);
 
   const studentData: Omit<Student, 'id'> = {
     email,

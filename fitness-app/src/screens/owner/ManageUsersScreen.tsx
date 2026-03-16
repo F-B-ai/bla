@@ -13,6 +13,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { getCollaborators, getStudents, getManagers, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
 import { Collaborator, Student, Manager } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
@@ -21,23 +22,40 @@ import { InviteStudentScreen } from './InviteStudentScreen';
 type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addStudent' | 'inviteStudent';
 
 export const ManageUsersScreen: React.FC = () => {
+  const { isOwner, isManager, isCollaborator, user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [managers, setManagers] = useState<Manager[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>('collaborators');
+  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>(
+    isCollaborator ? 'students' : 'collaborators'
+  );
+
+  // Gerarchia permessi:
+  // Owner: crea manager, coach, allievi
+  // Manager: crea coach, allievi
+  // Coach: crea allievi (solo i propri)
+  const canCreateManager = isOwner;
+  const canCreateCoach = isOwner || isManager;
+  const canCreateStudent = isOwner || isManager || isCollaborator;
+  const canDeleteUsers = isOwner || isManager;
 
   const loadData = useCallback(async () => {
     try {
       const [mgrs, collabs, studs] = await Promise.all([getManagers(), getCollaborators(), getStudents()]);
       setManagers(mgrs);
       setCollaborators(collabs);
-      setStudents(studs);
+      // Coach vede solo i propri allievi
+      if (isCollaborator && user) {
+        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+      } else {
+        setStudents(studs);
+      }
     } catch {
       // Silently handle - data will show empty
     }
-  }, []);
+  }, [isCollaborator, user]);
 
   useEffect(() => {
     loadData();
@@ -133,51 +151,61 @@ export const ManageUsersScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* Pulsanti azione */}
+      {/* Pulsanti azione in base al ruolo */}
       <View style={styles.actions}>
-        <Button
-          title="+ Manager"
-          onPress={() => setViewMode('addManager')}
-          style={styles.actionButton}
-        />
-        <Button
-          title="+ Coach"
-          onPress={() => setViewMode('addCollaborator')}
-          style={styles.actionButton}
-        />
+        {canCreateManager && (
+          <Button
+            title="+ Manager"
+            onPress={() => setViewMode('addManager')}
+            style={styles.actionButton}
+          />
+        )}
+        {canCreateCoach && (
+          <Button
+            title="+ Coach"
+            onPress={() => setViewMode('addCollaborator')}
+            style={styles.actionButton}
+          />
+        )}
       </View>
-      <View style={styles.actions}>
-        <Button
-          title="+ Allievo"
-          onPress={() => setViewMode('addStudent')}
-          style={styles.actionButton}
-        />
-        <Button
-          title="Invita Allievo"
-          onPress={() => setViewMode('inviteStudent')}
-          variant="outline"
-          style={styles.actionButton}
-        />
-      </View>
+      {canCreateStudent && (
+        <View style={styles.actions}>
+          <Button
+            title="+ Allievo"
+            onPress={() => setViewMode('addStudent')}
+            style={styles.actionButton}
+          />
+          <Button
+            title="Invita Allievo"
+            onPress={() => setViewMode('inviteStudent')}
+            variant="outline"
+            style={styles.actionButton}
+          />
+        </View>
+      )}
 
       {/* Tab switch */}
       <View style={styles.tabSwitch}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'managers' && styles.tabActive]}
-          onPress={() => setActiveTab('managers')}
-        >
-          <Text style={[styles.tabText, activeTab === 'managers' && styles.tabTextActive]}>
-            Manager ({managers.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'collaborators' && styles.tabActive]}
-          onPress={() => setActiveTab('collaborators')}
-        >
-          <Text style={[styles.tabText, activeTab === 'collaborators' && styles.tabTextActive]}>
-            Coach ({collaborators.length})
-          </Text>
-        </TouchableOpacity>
+        {(isOwner || isManager) && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'managers' && styles.tabActive]}
+            onPress={() => setActiveTab('managers')}
+          >
+            <Text style={[styles.tabText, activeTab === 'managers' && styles.tabTextActive]}>
+              Manager ({managers.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+        {(isOwner || isManager) && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'collaborators' && styles.tabActive]}
+            onPress={() => setActiveTab('collaborators')}
+          >
+            <Text style={[styles.tabText, activeTab === 'collaborators' && styles.tabTextActive]}>
+              Coach ({collaborators.length})
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.tab, activeTab === 'students' && styles.tabActive]}
           onPress={() => setActiveTab('students')}
@@ -217,22 +245,24 @@ export const ManageUsersScreen: React.FC = () => {
                   </View>
                   <View style={[styles.statusDot, mgr.isActive ? styles.statusActive : styles.statusInactive]} />
                 </View>
-                <View style={styles.userActions}>
-                  <TouchableOpacity
-                    style={styles.userActionBtn}
-                    onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
-                  >
-                    <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
-                      {mgr.isActive ? 'Disattiva' : 'Riattiva'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.userActionBtn}
-                    onPress={() => handleDeleteUser(mgr.id, `${mgr.name} ${mgr.surname}`)}
-                  >
-                    <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
-                  </TouchableOpacity>
-                </View>
+                {canDeleteUsers && (
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
+                    >
+                      <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
+                        {mgr.isActive ? 'Disattiva' : 'Riattiva'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleDeleteUser(mgr.id, `${mgr.name} ${mgr.surname}`)}
+                    >
+                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </Card>
             ))
           )}
@@ -271,22 +301,24 @@ export const ManageUsersScreen: React.FC = () => {
                   </View>
                   <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
                 </View>
-                <View style={styles.userActions}>
-                  <TouchableOpacity
-                    style={styles.userActionBtn}
-                    onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
-                  >
-                    <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
-                      {collab.isActive ? 'Disattiva' : 'Riattiva'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.userActionBtn}
-                    onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
-                  >
-                    <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
-                  </TouchableOpacity>
-                </View>
+                {canDeleteUsers && (
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
+                    >
+                      <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
+                        {collab.isActive ? 'Disattiva' : 'Riattiva'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
+                    >
+                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </Card>
             ))
           )}
@@ -329,6 +361,7 @@ export const ManageUsersScreen: React.FC = () => {
                     </View>
                     <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
+                  {canDeleteUsers && (
                   <View style={styles.userActions}>
                     <TouchableOpacity
                       style={styles.userActionBtn}
@@ -345,6 +378,7 @@ export const ManageUsersScreen: React.FC = () => {
                       <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
                     </TouchableOpacity>
                   </View>
+                  )}
                 </Card>
               );
             })
