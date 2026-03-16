@@ -44,13 +44,16 @@ function App() {
       Font.loadAsync(Ionicons.font)
         .then(() => setFontsLoaded(true))
         .catch(() => {
-          // Fallback: register via FontFace API with local file
+          // Fallback: register via FontFace API with local file (both cases)
           if (typeof FontFace !== 'undefined') {
-            const font = new FontFace('Ionicons', `url(${localUrl})`);
-            font.load().then((loaded) => {
-              document.fonts.add(loaded);
-              setFontsLoaded(true);
-            }).catch(() => setFontsLoaded(true));
+            Promise.all(
+              ['Ionicons', 'ionicons'].map((name) => {
+                const f = new FontFace(name, `url(${localUrl})`);
+                return f.load().then((loaded) => document.fonts.add(loaded));
+              })
+            )
+              .then(() => setFontsLoaded(true))
+              .catch(() => setFontsLoaded(true));
           } else {
             setFontsLoaded(true);
           }

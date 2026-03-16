@@ -17,8 +17,16 @@
     html, body, #root { margin: 0; padding: 0; height: 100%; background: #0D0D0D; }
 
     /* Ionicons font - served locally to avoid CDN/CORS issues on iOS Safari */
+    /* Expo/react-native-vector-icons uses lowercase 'ionicons' as font-family */
     @font-face {
       font-family: 'Ionicons';
+      src: url('/Ionicons.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+    @font-face {
+      font-family: 'ionicons';
       src: url('/Ionicons.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
@@ -27,14 +35,17 @@
   </style>
   <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
   <script>
-    // Force-load Ionicons font for iOS Safari
+    // Force-load Ionicons font for iOS Safari (both cases for compatibility)
     (function() {
       if (typeof FontFace !== 'undefined') {
-        var font = new FontFace('Ionicons', 'url(/Ionicons.ttf)');
-        font.load().then(function(loaded) {
-          document.fonts.add(loaded);
-        }).catch(function(err) {
-          console.warn('Ionicons font load failed:', err);
+        var names = ['Ionicons', 'ionicons'];
+        names.forEach(function(name) {
+          var font = new FontFace(name, 'url(/Ionicons.ttf)');
+          font.load().then(function(loaded) {
+            document.fonts.add(loaded);
+          }).catch(function(err) {
+            console.warn(name + ' font load failed:', err);
+          });
         });
       }
     })();
