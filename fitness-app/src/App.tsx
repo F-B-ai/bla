@@ -1,10 +1,12 @@
 import 'react-native-gesture-handler';
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { registerRootComponent } from 'expo';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
+import { Ionicons } from '@expo/vector-icons';
+import * as Font from 'expo-font';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -30,6 +32,25 @@ class ErrorBoundary extends React.Component<
 }
 
 function App() {
+  const [fontsLoaded, setFontsLoaded] = useState(Platform.OS !== 'web');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      Font.loadAsync({
+        ...Ionicons.font,
+      }).then(() => setFontsLoaded(true))
+        .catch(() => setFontsLoaded(true));
+    }
+  }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.errorContainer}>
+        <ActivityIndicator size="large" color="#D40000" />
+      </View>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
