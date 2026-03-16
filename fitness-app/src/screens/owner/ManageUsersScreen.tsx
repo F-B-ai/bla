@@ -361,7 +361,6 @@ export const ManageUsersScreen: React.FC = () => {
                     </View>
                     <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
-                  {canDeleteUsers && (
                   <View style={styles.userActions}>
                     <TouchableOpacity
                       style={styles.userActionBtn}
@@ -378,7 +377,6 @@ export const ManageUsersScreen: React.FC = () => {
                       <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
                     </TouchableOpacity>
                   </View>
-                  )}
                 </Card>
               );
             })
