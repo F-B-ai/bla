@@ -43,3 +43,8 @@ bin/
 
 ### Credentials ###
 google-service-account.json
+
+### Node ###
+node_modules/
+fitness-app/node_modules/
+fitness-app/dist/
