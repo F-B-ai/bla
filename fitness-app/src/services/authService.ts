@@ -369,7 +369,13 @@ export const getStudents = async (): Promise<Student[]> => {
 // --- Disattiva / Elimina utenti ---
 
 export const toggleUserActive = async (userId: string, isActive: boolean): Promise<void> => {
-  await updateDoc(doc(db, 'users', userId), { isActive });
+  const userRef = doc(db, 'users', userId);
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists()) {
+    await updateDoc(userRef, { isActive });
+  } else {
+    await setDoc(userRef, { isActive }, { merge: true });
+  }
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
@@ -382,7 +388,11 @@ export const removeStudentFromCollaborator = async (
   collaboratorId: string,
   studentId: string
 ): Promise<void> => {
-  await updateDoc(doc(db, 'users', collaboratorId), {
-    assignedStudents: arrayRemove(studentId),
-  });
+  const collabRef = doc(db, 'users', collaboratorId);
+  const collabSnap = await getDoc(collabRef);
+  if (collabSnap.exists()) {
+    await updateDoc(collabRef, {
+      assignedStudents: arrayRemove(studentId),
+    });
+  }
 };
