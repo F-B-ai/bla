@@ -26,9 +26,9 @@ if (fs.existsSync(fontsDir)) {
   const ioniconsFile = fs.readdirSync(fontsDir).find(f => f.startsWith('Ionicons') && f.endsWith('.ttf'));
   if (ioniconsFile) {
     const fontPath = `/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/${ioniconsFile}`;
-    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'ionicons'; src: url('${fontPath}') format('truetype'); font-display: block; }</style>`;
-    // Also add FontFace API script - must use lowercase 'ionicons' to match @expo/vector-icons
-    const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var f=new FontFace('ionicons','url(${fontPath})');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
+    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'ionicons'; src: url('${fontPath}') format('truetype'); font-display: swap; } .ionicons-preload { font-family: 'ionicons'; position: absolute; visibility: hidden; }</style>`;
+    // FontFace API + hidden element to force iOS Safari to load the font
+    const fontScript = `\n    <script>(function(){var el=document.createElement('span');el.className='ionicons-preload';el.textContent='.';el.setAttribute('aria-hidden','true');document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(el)});if(typeof FontFace!=='undefined'){var f=new FontFace('ionicons','url(${fontPath})');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
     html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
   }
 }

@@ -50,10 +50,15 @@ function App() {
               src: url('${url}') format('truetype');
               font-weight: normal;
               font-style: normal;
-              font-display: block;
+              font-display: swap;
             }
           `;
           document.head.appendChild(style);
+          // Force iOS Safari to trigger font download with a hidden element
+          const el = document.createElement('span');
+          el.style.cssText = 'font-family:ionicons;position:absolute;visibility:hidden';
+          el.textContent = '.';
+          document.body?.appendChild(el);
         }
       };
 

@@ -13,10 +13,16 @@ const server = http.createServer((req, res) => {
   const types = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.ico':'image/x-icon','.ttf':'font/ttf','.woff2':'font/woff2'};
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
-    res.writeHead(200, {
+    const headers = {
       'Content-Type': types[ext] || 'application/octet-stream',
       'Bypass-Tunnel-Reminder': 'true'
-    });
+    };
+    // iOS Safari requires CORS headers for font files
+    if (ext === '.ttf' || ext === '.woff2' || ext === '.woff') {
+      headers['Access-Control-Allow-Origin'] = '*';
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 });

@@ -16,19 +16,30 @@
   <style>
     html, body, #root { margin: 0; padding: 0; height: 100%; background: #0D0D0D; }
 
-    /* Preload Ionicons font - must use lowercase 'ionicons' to match @expo/vector-icons fontFamily */
+    /* Ionicons font - lowercase 'ionicons' to match @expo/vector-icons fontFamily */
     @font-face {
       font-family: 'ionicons';
       src: url('https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
-      font-display: block;
+      font-display: swap;
     }
+    /* Hidden element to force iOS Safari to load the font early */
+    .ionicons-preload { font-family: 'ionicons'; position: absolute; visibility: hidden; }
   </style>
-  <link rel="preload" href="https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf" as="font" type="font/ttf" crossorigin />
+  <link rel="preload" href="https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
   <script>
-    // Force-load Ionicons font via FontFace API (lowercase to match @expo/vector-icons)
+    // Force-load Ionicons font via FontFace API for iOS Safari
     (function() {
+      // Create a hidden element that uses the font to trigger download on iOS Safari
+      var el = document.createElement('span');
+      el.className = 'ionicons-preload';
+      el.textContent = '.';
+      el.setAttribute('aria-hidden', 'true');
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.appendChild(el);
+      });
+      // Also use FontFace API as backup
       if (typeof FontFace !== 'undefined') {
         var font = new FontFace('ionicons',
           'url(https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf)');
