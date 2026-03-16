@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funzione helper: verifica se l'utente è autenticato
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Funzione helper: ottieni il ruolo dell'utente dal documento
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Funzione helper: verifica se è owner
+    function isOwner() {
+      return isAuthenticated() && getUserRole() == 'owner';
+    }
+
+    // Funzione helper: verifica se è owner o manager
+    function isOwnerOrManager() {
+      return isAuthenticated() && (getUserRole() == 'owner' || getUserRole() == 'manager');
+    }
+
+    // Funzione helper: verifica se è owner, manager o collaborator
+    function isStaff() {
+      return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId || isOwnerOrManager()
+      );
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Student invites
+    match /studentInvites/{inviteId} {
+      allow read: if true; // Necessario per validare codice invito prima del login
+      allow create: if isStaff();
+      allow update: if isAuthenticated();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Training programs
+    match /trainingPrograms/{programId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Workout plans
+    match /workoutPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Exercise library
+    match /exerciseLibrary/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Sessions
+    match /sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
+
+    // Payment plans
+    match /paymentPlans/{planId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isAuthenticated();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Collaborator earnings
+    match /collaboratorEarnings/{earningId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwner();
+    }
+
+    // Financial transactions
+    match /financialTransactions/{transactionId} {
+      allow read: if isOwnerOrManager();
+      allow create: if isOwnerOrManager();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwner();
+    }
+
+    // Chat rooms
+    match /chatRooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Chat messages
+    match /chatMessages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Special content
+    match /specialContent/{contentId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Diary entries
+    match /diaryEntries/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // Postural assessments
+    match /posturalAssessments/{assessmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Nutritional consultations
+    match /nutritionalConsultations/{consultationId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+  }
+}
