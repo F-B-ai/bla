@@ -28,8 +28,9 @@ export const SessionsScreen: React.FC = () => {
     try {
       const data = await getStudentSessions(user.id);
       setSessions(data);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento sessioni:', err);
+      crossAlert('Errore', 'Impossibile caricare le sessioni. Riprova più tardi.');
     }
   }, [user]);
 

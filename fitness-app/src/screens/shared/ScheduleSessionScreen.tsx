@@ -74,8 +74,9 @@ export const ScheduleSessionScreen: React.FC = () => {
         return dateB - dateA;
       });
       setSessions(allSessions);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento sessioni:', err);
+      crossAlert('Errore', 'Impossibile caricare le sessioni. Riprova più tardi.');
     }
   }, [user, isOwner, isCollaborator]);
 

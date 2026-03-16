@@ -46,8 +46,9 @@ export const MyProgramScreen: React.FC = () => {
       setAllPlans(plans);
       setCompletedSessions(sessionsCount);
       setNutritionalConsultations(student?.nutritionalConsultations ?? consultations.length);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento programma:', err);
+      crossAlert('Errore', 'Impossibile caricare il programma. Riprova più tardi.');
     }
   }, [user, student]);
 

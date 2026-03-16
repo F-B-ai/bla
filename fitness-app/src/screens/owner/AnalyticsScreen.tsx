@@ -45,8 +45,8 @@ export const AnalyticsScreen: React.FC = () => {
       setTransactions(txs);
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento analytics:', err);
     }
   }, []);
 

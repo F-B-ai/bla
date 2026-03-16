@@ -60,8 +60,8 @@ export const DashboardScreen: React.FC = () => {
         return d >= today && d < tomorrow;
       });
       setTodaySessions(todayOnly);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento dashboard:', err);
     }
   }, []);
 
