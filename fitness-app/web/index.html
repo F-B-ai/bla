@@ -18,7 +18,7 @@
 
     /* Ionicons font - served locally to avoid CDN/CORS issues on iOS Safari */
     @font-face {
-      font-family: 'ionicons';
+      font-family: 'Ionicons';
       src: url('/Ionicons.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
@@ -30,7 +30,7 @@
     // Force-load Ionicons font for iOS Safari
     (function() {
       if (typeof FontFace !== 'undefined') {
-        var font = new FontFace('ionicons', 'url(/Ionicons.ttf)');
+        var font = new FontFace('Ionicons', 'url(/Ionicons.ttf)');
         font.load().then(function(loaded) {
           document.fonts.add(loaded);
         }).catch(function(err) {
