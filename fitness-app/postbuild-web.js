@@ -26,8 +26,10 @@ if (fs.existsSync(fontsDir)) {
   const ioniconsFile = fs.readdirSync(fontsDir).find(f => f.startsWith('Ionicons') && f.endsWith('.ttf'));
   if (ioniconsFile) {
     const fontPath = `/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/${ioniconsFile}`;
-    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('${fontPath}') format('truetype'); }</style>`;
-    html = html.replace('</head>', fontPreload + '\n  </head>');
+    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('${fontPath}') format('truetype'); font-display: block; }</style>`;
+    // Also add FontFace API script for iOS Safari
+    const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var f=new FontFace('Ionicons','url(${fontPath})');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
+    html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
   }
 }
 
