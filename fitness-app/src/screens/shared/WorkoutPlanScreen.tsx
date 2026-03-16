@@ -27,6 +27,7 @@ import {
   AIProgressionSuggestion,
   ensureAIApiKey,
 } from '../../services/aiService';
+import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -61,6 +62,10 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
+  // Template State
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'male' | 'female'>('all');
+
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AIProgressionSuggestion | null>(null);
@@ -84,6 +89,25 @@ export const WorkoutPlanScreen: React.FC = () => {
   useEffect(() => {
     loadStudents();
   }, [loadStudents]);
+
+  // Applica un template alla scheda corrente
+  const applyTemplate = (template: WorkoutTemplate) => {
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of template.weeklySchedule) {
+      newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+        ...ex,
+        id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+      }));
+    }
+    setExercises(newExercises);
+    setPlanTitle(template.name);
+    setShowTemplateModal(false);
+    crossAlert('Template Applicato', `"${template.name}" caricato. Puoi modificare gli esercizi prima di salvare.`);
+  };
+
+  const filteredTemplates = allTemplates.filter((t) =>
+    templateFilter === 'all' ? true : t.gender === templateFilter
+  );
 
   // Upload video esercizio su Firebase Storage
   const pickAndUploadVideo = async () => {
@@ -369,6 +393,14 @@ export const WorkoutPlanScreen: React.FC = () => {
           value={planTitle}
           onChangeText={setPlanTitle}
           placeholder="Es: Scheda Ipertrofia - Fase 1"
+        />
+
+        {/* Template Button */}
+        <Button
+          title="Carica da Template"
+          onPress={() => setShowTemplateModal(true)}
+          variant="outline"
+          style={{ marginBottom: spacing.sm }}
         />
 
         {/* AI Progression Button */}
@@ -660,6 +692,55 @@ export const WorkoutPlanScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modale Template */}
+      <Modal visible={showTemplateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader title="Scegli Template" onClose={() => setShowTemplateModal(false)} />
+
+            {/* Filtro genere */}
+            <View style={styles.templateFilterRow}>
+              {(['all', 'male', 'female'] as const).map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.templateFilterBtn, templateFilter === f && styles.templateFilterBtnActive]}
+                  onPress={() => setTemplateFilter(f)}
+                >
+                  <Text style={[styles.templateFilterText, templateFilter === f && styles.templateFilterTextActive]}>
+                    {f === 'all' ? 'Tutti' : f === 'male' ? 'Uomo' : 'Donna'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {filteredTemplates.map((tpl) => (
+              <TouchableOpacity
+                key={tpl.id}
+                onPress={() => applyTemplate(tpl)}
+              >
+                <Card variant="outlined">
+                  <View style={styles.templateRow}>
+                    <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
+                      <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
+                    </View>
+                    <View style={styles.templateInfo}>
+                      <Text style={styles.templateName}>{tpl.name}</Text>
+                      <Text style={styles.templateCategory}>{tpl.category}</Text>
+                      <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
+                      <Text style={styles.templateDays}>
+                        {tpl.weeklySchedule.length} giorni/settimana
+                      </Text>
+                    </View>
+                  </View>
+                </Card>
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -933,6 +1014,72 @@ const styles = StyleSheet.create({
     color: colors.info,
     fontStyle: 'italic',
     lineHeight: 20,
+  },
+  templateFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  templateFilterBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  templateFilterBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  templateFilterText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  templateFilterTextActive: {
+    color: colors.textOnAccent,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  templateGenderBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  templateGenderText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  templateInfo: {
+    flex: 1,
+  },
+  templateName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  templateCategory: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  templateDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  templateDays: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginTop: 4,
   },
   bottomSpacer: {
     height: spacing.xxl * 2,

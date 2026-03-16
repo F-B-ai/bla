@@ -16,8 +16,9 @@ import { Collaborator, Student, Manager } from '../../types';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
+import { InviteStudentScreen } from './InviteStudentScreen';
 
-type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addStudent';
+type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addStudent' | 'inviteStudent';
 
 export const ManageUsersScreen: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -116,6 +117,10 @@ export const ManageUsersScreen: React.FC = () => {
     return <AddStudentScreen onBack={handleBack} />;
   }
 
+  if (viewMode === 'inviteStudent') {
+    return <InviteStudentScreen onBack={handleBack} />;
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -140,9 +145,17 @@ export const ManageUsersScreen: React.FC = () => {
           onPress={() => setViewMode('addCollaborator')}
           style={styles.actionButton}
         />
+      </View>
+      <View style={styles.actions}>
         <Button
           title="+ Allievo"
           onPress={() => setViewMode('addStudent')}
+          style={styles.actionButton}
+        />
+        <Button
+          title="Invita Allievo"
+          onPress={() => setViewMode('inviteStudent')}
+          variant="outline"
           style={styles.actionButton}
         />
       </View>

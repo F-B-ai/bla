@@ -125,11 +125,11 @@ export const LoginScreen: React.FC = () => {
           onPress={() => setShowRegister(true)}
           style={styles.registerLink}
         >
-          <Text style={styles.registerText}>Sei un nuovo allievo? Registrati</Text>
+          <Text style={styles.registerText}>Hai un codice invito? Registrati</Text>
         </TouchableOpacity>
 
         <Text style={styles.footer}>
-          Coach e Manager: contattare l'amministratore per le credenziali
+          Per registrarti come allievo hai bisogno di un codice invito dal tuo coach o manager
         </Text>
       </ScrollView>
 

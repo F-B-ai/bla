@@ -6,9 +6,37 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
+import { deleteApp } from 'firebase/app';
 import { auth, db } from '../config/firebase';
 import { User, UserRole, Collaborator, Student, Manager } from '../types';
+
+/**
+ * Crea un utente su Firebase Auth usando un'app secondaria temporanea
+ * per evitare il logout dell'utente corrente (owner/manager).
+ */
+const createUserWithSecondaryApp = async (email: string, password: string): Promise<string> => {
+  const { initializeApp } = await import('firebase/app');
+  const { getAuth, createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
+
+  const appName = 'secondary-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+  const secondaryApp = initializeApp(auth.app.options, appName);
+  const secondaryAuth = getAuth(secondaryApp);
+
+  try {
+    const credential = await createUser(secondaryAuth, email, password);
+    const uid = credential.user.uid;
+    await secondaryAuth.signOut();
+    await deleteApp(secondaryApp);
+    return uid;
+  } catch (error) {
+    try {
+      await secondaryAuth.signOut();
+      await deleteApp(secondaryApp);
+    } catch { /* ignore cleanup errors */ }
+    throw error;
+  }
+};
 
 export const signIn = async (email: string, password: string): Promise<User> => {
   const credential = await signInWithEmailAndPassword(auth, email, password);
@@ -59,45 +87,26 @@ export const registerManager = async (
   surname: string,
   phone: string
 ): Promise<Manager> => {
-  const { createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
-  const { initializeApp } = await import('firebase/app');
-  const { getAuth } = await import('firebase/auth');
+  const uid = await createUserWithSecondaryApp(email, password);
 
-  const secondaryApp = initializeApp(auth.app.options, 'secondary-' + Date.now());
-  const secondaryAuth = getAuth(secondaryApp);
+  const managerData: Omit<Manager, 'id'> = {
+    email,
+    name,
+    surname,
+    phone,
+    role: 'manager',
+    assignedCollaborators: [],
+    assignedStudents: [],
+    createdAt: new Date(),
+    isActive: true,
+  };
 
-  try {
-    const credential = await createUser(secondaryAuth, email, password);
-    const uid = credential.user.uid;
+  await setDoc(doc(db, 'users', uid), {
+    ...managerData,
+    createdAt: Timestamp.now(),
+  });
 
-    const managerData: Omit<Manager, 'id'> = {
-      email,
-      name,
-      surname,
-      phone,
-      role: 'manager',
-      assignedCollaborators: [],
-      assignedStudents: [],
-      createdAt: new Date(),
-      isActive: true,
-    };
-
-    await setDoc(doc(db, 'users', uid), {
-      ...managerData,
-      createdAt: Timestamp.now(),
-    });
-
-    await secondaryAuth.signOut();
-    await (secondaryApp as any).delete();
-
-    return { id: uid, ...managerData };
-  } catch (error) {
-    try {
-      await secondaryAuth.signOut();
-      await (secondaryApp as any).delete();
-    } catch { /* ignore cleanup errors */ }
-    throw error;
-  }
+  return { id: uid, ...managerData };
 };
 
 export const signOut = async (): Promise<void> => {
@@ -137,51 +146,27 @@ export const registerCollaborator = async (
   commissionPercentage: number,
   specializations: string[]
 ): Promise<Collaborator> => {
-  // Crea l'utente in Firebase Auth usando la Firebase Admin REST API secondaria
-  // Per evitare il logout dell'owner, usiamo un approccio con seconda istanza auth
-  const { createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
-  const { initializeApp } = await import('firebase/app');
-  const { getAuth } = await import('firebase/auth');
+  const uid = await createUserWithSecondaryApp(email, password);
 
-  // Crea un'app secondaria temporanea per non interferire con la sessione corrente
-  const secondaryApp = initializeApp(auth.app.options, 'secondary-' + Date.now());
-  const secondaryAuth = getAuth(secondaryApp);
+  const collaboratorData: Omit<Collaborator, 'id'> = {
+    email,
+    name,
+    surname,
+    phone,
+    role: 'collaborator',
+    commissionPercentage,
+    specializations,
+    assignedStudents: [],
+    createdAt: new Date(),
+    isActive: true,
+  };
 
-  try {
-    const credential = await createUser(secondaryAuth, email, password);
-    const uid = credential.user.uid;
+  await setDoc(doc(db, 'users', uid), {
+    ...collaboratorData,
+    createdAt: Timestamp.now(),
+  });
 
-    const collaboratorData: Omit<Collaborator, 'id'> = {
-      email,
-      name,
-      surname,
-      phone,
-      role: 'collaborator',
-      commissionPercentage,
-      specializations,
-      assignedStudents: [],
-      createdAt: new Date(),
-      isActive: true,
-    };
-
-    await setDoc(doc(db, 'users', uid), {
-      ...collaboratorData,
-      createdAt: Timestamp.now(),
-    });
-
-    // Esci dall'app secondaria e cancellala
-    await secondaryAuth.signOut();
-    await (secondaryApp as any).delete();
-
-    return { id: uid, ...collaboratorData };
-  } catch (error) {
-    // Cleanup in caso di errore
-    try {
-      await secondaryAuth.signOut();
-      await (secondaryApp as any).delete();
-    } catch { /* ignore cleanup errors */ }
-    throw error;
-  }
+  return { id: uid, ...collaboratorData };
 };
 
 export const registerStudent = async (
@@ -194,69 +179,7 @@ export const registerStudent = async (
   goals: string,
   medicalNotes?: string
 ): Promise<Student> => {
-  const { createUserWithEmailAndPassword: createUser } = await import('firebase/auth');
-  const { initializeApp } = await import('firebase/app');
-  const { getAuth } = await import('firebase/auth');
-
-  const secondaryApp = initializeApp(auth.app.options, 'secondary-' + Date.now());
-  const secondaryAuth = getAuth(secondaryApp);
-
-  try {
-    const credential = await createUser(secondaryAuth, email, password);
-    const uid = credential.user.uid;
-
-    const studentData: Omit<Student, 'id'> = {
-      email,
-      name,
-      surname,
-      phone,
-      role: 'student',
-      assignedCollaboratorId,
-      startDate: new Date(),
-      goals,
-      medicalNotes: medicalNotes || '',
-      nutritionalConsultations: 0,
-      createdAt: new Date(),
-      isActive: true,
-    };
-
-    await setDoc(doc(db, 'users', uid), {
-      ...studentData,
-      createdAt: Timestamp.now(),
-      startDate: Timestamp.now(),
-    });
-
-    // Aggiorna la lista allievi del collaboratore
-    if (assignedCollaboratorId) {
-      await updateDoc(doc(db, 'users', assignedCollaboratorId), {
-        assignedStudents: arrayUnion(uid),
-      });
-    }
-
-    await secondaryAuth.signOut();
-    await (secondaryApp as any).delete();
-
-    return { id: uid, ...studentData };
-  } catch (error) {
-    try {
-      await secondaryAuth.signOut();
-      await (secondaryApp as any).delete();
-    } catch { /* ignore cleanup errors */ }
-    throw error;
-  }
-};
-
-export const registerStudentSelf = async (
-  email: string,
-  password: string,
-  name: string,
-  surname: string,
-  phone: string,
-  goals: string
-): Promise<Student> => {
-  // L'allievo si registra da solo - usa createUserWithEmailAndPassword direttamente
-  const credential = await createUserWithEmailAndPassword(auth, email, password);
-  const uid = credential.user.uid;
+  const uid = await createUserWithSecondaryApp(email, password);
 
   const studentData: Omit<Student, 'id'> = {
     email,
@@ -264,7 +187,126 @@ export const registerStudentSelf = async (
     surname,
     phone,
     role: 'student',
-    assignedCollaboratorId: '', // Sara' assegnato dal manager/owner
+    assignedCollaboratorId,
+    startDate: new Date(),
+    goals,
+    medicalNotes: medicalNotes || '',
+    nutritionalConsultations: 0,
+    createdAt: new Date(),
+    isActive: true,
+  };
+
+  await setDoc(doc(db, 'users', uid), {
+    ...studentData,
+    createdAt: Timestamp.now(),
+    startDate: Timestamp.now(),
+  });
+
+  // Aggiorna la lista allievi del collaboratore
+  if (assignedCollaboratorId) {
+    await updateDoc(doc(db, 'users', assignedCollaboratorId), {
+      assignedStudents: arrayUnion(uid),
+    });
+  }
+
+  return { id: uid, ...studentData };
+};
+
+// --- Sistema inviti allievi ---
+
+export interface StudentInvite {
+  id: string;
+  inviteCode: string;
+  email: string;
+  name: string;
+  surname: string;
+  assignedCollaboratorId: string;
+  assignedCollaboratorName: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: Date;
+  usedAt?: Date;
+  isUsed: boolean;
+}
+
+const generateInviteCode = (): string => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+};
+
+export const createStudentInvite = async (
+  email: string,
+  name: string,
+  surname: string,
+  assignedCollaboratorId: string,
+  assignedCollaboratorName: string,
+  createdBy: string,
+  createdByName: string
+): Promise<StudentInvite> => {
+  const inviteCode = generateInviteCode();
+
+  const inviteData = {
+    inviteCode,
+    email,
+    name,
+    surname,
+    assignedCollaboratorId,
+    assignedCollaboratorName,
+    createdBy,
+    createdByName,
+    createdAt: Timestamp.now(),
+    isUsed: false,
+  };
+
+  const docRef = await addDoc(collection(db, 'studentInvites'), inviteData);
+  return { id: docRef.id, ...inviteData, createdAt: new Date() } as StudentInvite;
+};
+
+export const validateInviteCode = async (inviteCode: string): Promise<StudentInvite | null> => {
+  const q = query(
+    collection(db, 'studentInvites'),
+    where('inviteCode', '==', inviteCode.toUpperCase()),
+    where('isUsed', '==', false)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const d = snapshot.docs[0];
+  return { ...d.data(), id: d.id } as StudentInvite;
+};
+
+export const getStudentInvites = async (): Promise<StudentInvite[]> => {
+  const snapshot = await getDocs(collection(db, 'studentInvites'));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as StudentInvite));
+};
+
+export const registerStudentWithInvite = async (
+  inviteCode: string,
+  email: string,
+  password: string,
+  phone: string,
+  goals: string
+): Promise<Student> => {
+  // Valida il codice invito
+  const invite = await validateInviteCode(inviteCode);
+  if (!invite) {
+    throw new Error('Codice invito non valido o già utilizzato');
+  }
+
+  // L'allievo si registra - usa createUserWithEmailAndPassword direttamente
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  const uid = credential.user.uid;
+
+  const studentData: Omit<Student, 'id'> = {
+    email,
+    name: invite.name,
+    surname: invite.surname,
+    phone,
+    role: 'student',
+    assignedCollaboratorId: invite.assignedCollaboratorId,
     startDate: new Date(),
     goals,
     medicalNotes: '',
@@ -277,6 +319,19 @@ export const registerStudentSelf = async (
     ...studentData,
     createdAt: Timestamp.now(),
     startDate: Timestamp.now(),
+  });
+
+  // Aggiorna la lista allievi del collaboratore
+  if (invite.assignedCollaboratorId) {
+    await updateDoc(doc(db, 'users', invite.assignedCollaboratorId), {
+      assignedStudents: arrayUnion(uid),
+    });
+  }
+
+  // Segna l'invito come usato
+  await updateDoc(doc(db, 'studentInvites', invite.id), {
+    isUsed: true,
+    usedAt: Timestamp.now(),
   });
 
   return { id: uid, ...studentData };
