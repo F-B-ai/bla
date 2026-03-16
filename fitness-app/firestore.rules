@@ -33,7 +33,7 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         request.auth.uid == userId || isOwnerOrManager()
       );
-      allow delete: if isOwnerOrManager();
+      allow delete: if isStaff();
     }
 
     // Student invites
