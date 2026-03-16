@@ -36,15 +36,49 @@ function App() {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
+      const cdnUrl = 'https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf';
+
+      // Inject @font-face CSS directly into the document
+      const injectFontCSS = (url: string) => {
+        if (!document.getElementById('ionicons-font-style')) {
+          const style = document.createElement('style');
+          style.id = 'ionicons-font-style';
+          style.textContent = `
+            @font-face {
+              font-family: 'Ionicons';
+              src: url('${url}') format('truetype');
+              font-weight: normal;
+              font-style: normal;
+              font-display: block;
+            }
+          `;
+          document.head.appendChild(style);
+        }
+      };
+
+      // Try loading with expo-font first
       Font.loadAsync({
         ...Ionicons.font,
       }).then(() => setFontsLoaded(true))
         .catch(() => {
-          // Fallback: try loading from CDN for iOS Safari
-          Font.loadAsync({
-            'Ionicons': 'https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf',
-          }).then(() => setFontsLoaded(true))
-            .catch(() => setFontsLoaded(true));
+          // Fallback: inject CSS + use FontFace API + expo-font from CDN
+          injectFontCSS(cdnUrl);
+          if (typeof FontFace !== 'undefined') {
+            const font = new FontFace('Ionicons', `url(${cdnUrl})`);
+            font.load().then((loaded) => {
+              document.fonts.add(loaded);
+              setFontsLoaded(true);
+            }).catch(() => {
+              // Last resort: try expo-font with CDN
+              Font.loadAsync({ 'Ionicons': cdnUrl })
+                .then(() => setFontsLoaded(true))
+                .catch(() => setFontsLoaded(true));
+            });
+          } else {
+            Font.loadAsync({ 'Ionicons': cdnUrl })
+              .then(() => setFontsLoaded(true))
+              .catch(() => setFontsLoaded(true));
+          }
         });
     }
   }, []);

@@ -19,19 +19,19 @@
     /* Preload Ionicons font for Safari/iOS */
     @font-face {
       font-family: 'Ionicons';
-      src: url('https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+      src: url('https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
       font-weight: normal;
       font-style: normal;
       font-display: block;
     }
   </style>
-  <link rel="preload" href="https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf" as="font" type="font/ttf" crossorigin />
+  <link rel="preload" href="https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf" as="font" type="font/ttf" crossorigin />
   <script>
     // Force-load Ionicons font for iOS Safari via FontFace API
     (function() {
       if (typeof FontFace !== 'undefined') {
         var font = new FontFace('Ionicons',
-          'url(https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf)');
+          'url(https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf)');
         font.load().then(function(loaded) {
           document.fonts.add(loaded);
         }).catch(function(err) {
