@@ -41,12 +41,10 @@
       "expo-notifications"
     ],
     "updates": {
-      "url": "https://u.expo.dev/YOUR_PROJECT_ID"
+      "url": "https://u.expo.dev/"
     },
     "extra": {
-      "eas": {
-        "projectId": "YOUR_PROJECT_ID"
-      }
+      "eas": {}
     }
   }
 }
