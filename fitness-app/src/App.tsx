@@ -46,7 +46,7 @@ function App() {
         .catch(() => {
           // Fallback: register via FontFace API with local file
           if (typeof FontFace !== 'undefined') {
-            const font = new FontFace('ionicons', `url(${localUrl})`);
+            const font = new FontFace('Ionicons', `url(${localUrl})`);
             font.load().then((loaded) => {
               document.fonts.add(loaded);
               setFontsLoaded(true);

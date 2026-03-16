@@ -28,8 +28,8 @@ if (fs.existsSync(localFontSrc)) {
 }
 
 // Inject local Ionicons font preload + @font-face
-const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
-const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var f=new FontFace('ionicons','url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
+const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
+const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var f=new FontFace('Ionicons','url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
 html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
 
 // Fix lang to Italian
