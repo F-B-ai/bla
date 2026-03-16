@@ -19,6 +19,18 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   html = html.replace('</title>', '</title>' + pwaMeta);
 }
 
+// Preload Ionicons font for instant icon rendering
+const distAssets = path.join(__dirname, 'dist', 'assets');
+const fontsDir = path.join(distAssets, 'node_modules', '@expo', 'vector-icons', 'build', 'vendor', 'react-native-vector-icons', 'Fonts');
+if (fs.existsSync(fontsDir)) {
+  const ioniconsFile = fs.readdirSync(fontsDir).find(f => f.startsWith('Ionicons') && f.endsWith('.ttf'));
+  if (ioniconsFile) {
+    const fontPath = `/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/${ioniconsFile}`;
+    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('${fontPath}') format('truetype'); }</style>`;
+    html = html.replace('</head>', fontPreload + '\n  </head>');
+  }
+}
+
 // Fix lang to Italian
 html = html.replace('lang="en"', 'lang="it"');
 
