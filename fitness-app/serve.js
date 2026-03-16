@@ -17,6 +17,14 @@ const server = http.createServer((req, res) => {
       'Content-Type': types[ext] || 'application/octet-stream',
       'Bypass-Tunnel-Reminder': 'true'
     };
+    // HTML: no cache (sempre aggiornato)
+    if (ext === '.html') {
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    }
+    // JS/CSS: cache lunga (file hanno hash nel nome)
+    if (ext === '.js' || ext === '.css') {
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+    }
     // iOS Safari requires CORS headers for font files
     if (ext === '.ttf' || ext === '.woff2' || ext === '.woff') {
       headers['Access-Control-Allow-Origin'] = '*';
