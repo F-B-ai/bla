@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
+import { getFirebaseErrorMessage } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -78,8 +79,7 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      crossAlert('Errore', message);
+      crossAlert('Errore', getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
