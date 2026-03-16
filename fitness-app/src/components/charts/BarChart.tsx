@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: '55%',
+    maxWidth: 80,
     minHeight: 2,
     borderTopLeftRadius: borderRadius.md,
     borderTopRightRadius: borderRadius.md,

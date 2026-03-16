@@ -15,7 +15,26 @@
   <title>ESSĒRE</title>
   <style>
     html, body, #root { margin: 0; padding: 0; height: 100%; background: #0D0D0D; }
+
+    /* Preload Ionicons font for Safari/iOS */
+    @font-face {
+      font-family: 'Ionicons';
+      src: url('https://unpkg.com/ionicons@7.4.0/dist/ionicons/svg') format('truetype');
+    }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf" as="font" crossorigin />
+  <script>
+    // Force-load Ionicons font for iOS Safari
+    (function() {
+      var font = new FontFace('Ionicons',
+        'url(https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf)');
+      font.load().then(function(loaded) {
+        document.fonts.add(loaded);
+      }).catch(function(err) {
+        console.warn('Failed to load Ionicons:', err);
+      });
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

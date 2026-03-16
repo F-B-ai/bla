@@ -39,7 +39,13 @@ function App() {
       Font.loadAsync({
         ...Ionicons.font,
       }).then(() => setFontsLoaded(true))
-        .catch(() => setFontsLoaded(true));
+        .catch(() => {
+          // Fallback: try loading from CDN for iOS Safari
+          Font.loadAsync({
+            'Ionicons': 'https://unpkg.com/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf',
+          }).then(() => setFontsLoaded(true))
+            .catch(() => setFontsLoaded(true));
+        });
     }
   }, []);
 

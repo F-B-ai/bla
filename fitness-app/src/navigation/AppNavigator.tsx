@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
@@ -39,19 +39,51 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 const TabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
   <Ionicons
     name={name}
-    size={22}
+    size={20}
     color={focused ? colors.accent : colors.textLight}
   />
+);
+
+// Custom scrollable tab bar for navigators with many tabs
+const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
+  <View style={styles.scrollableTabBarContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollableTabBarContent}
+    >
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel ?? route.name;
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <View key={route.key} style={styles.scrollableTab} onTouchEnd={onPress}>
+            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: 20 })}
+            <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
+              {label}
+            </Text>
+          </View>
+        );
+      })}
+    </ScrollView>
+  </View>
 );
 
 // --- Owner Tabs ---
 const OwnerTabs = () => (
   <OwnerTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
       headerShown: false,
     }}
   >
@@ -195,11 +227,10 @@ const ManagerTabs = () => (
 // --- Collaborator Tabs ---
 const CollaboratorTabs = () => (
   <CollaboratorTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
       headerShown: false,
     }}
   >
@@ -380,6 +411,27 @@ const styles = StyleSheet.create({
     height: 56,
   },
   tabLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  scrollableTabBarContainer: {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.divider,
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'web' ? 8 : 20,
+  },
+  scrollableTabBarContent: {
+    paddingHorizontal: 4,
+  },
+  scrollableTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    minWidth: 60,
+  },
+  scrollableTabLabel: {
     fontSize: 10,
     fontWeight: '600',
     marginTop: 2,
