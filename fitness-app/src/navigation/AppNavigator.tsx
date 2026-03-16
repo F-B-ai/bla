@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
@@ -65,12 +65,12 @@ const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
         };
 
         return (
-          <View key={route.key} style={styles.scrollableTab} onTouchEnd={onPress}>
+          <Pressable key={route.key} style={styles.scrollableTab} onPress={onPress}>
             {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: 20 })}
             <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
               {label}
             </Text>
-          </View>
+          </Pressable>
         );
       })}
     </ScrollView>
