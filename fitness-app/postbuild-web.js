@@ -19,19 +19,18 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   html = html.replace('</title>', '</title>' + pwaMeta);
 }
 
-// Preload Ionicons font for instant icon rendering
-const distAssets = path.join(__dirname, 'dist', 'assets');
-const fontsDir = path.join(distAssets, 'node_modules', '@expo', 'vector-icons', 'build', 'vendor', 'react-native-vector-icons', 'Fonts');
-if (fs.existsSync(fontsDir)) {
-  const ioniconsFile = fs.readdirSync(fontsDir).find(f => f.startsWith('Ionicons') && f.endsWith('.ttf'));
-  if (ioniconsFile) {
-    const fontPath = `/assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/${ioniconsFile}`;
-    const fontPreload = `\n    <link rel="preload" href="${fontPath}" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'ionicons'; src: url('${fontPath}') format('truetype'); font-display: swap; } .ionicons-preload { font-family: 'ionicons'; position: absolute; visibility: hidden; }</style>`;
-    // FontFace API + hidden element to force iOS Safari to load the font
-    const fontScript = `\n    <script>(function(){var el=document.createElement('span');el.className='ionicons-preload';el.textContent='.';el.setAttribute('aria-hidden','true');document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(el)});if(typeof FontFace!=='undefined'){var f=new FontFace('ionicons','url(${fontPath})');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
-    html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
-  }
+// Copy Ionicons.ttf to dist root for reliable local serving
+const localFontSrc = path.join(__dirname, 'web', 'Ionicons.ttf');
+const localFontDst = path.join(__dirname, 'dist', 'Ionicons.ttf');
+if (fs.existsSync(localFontSrc)) {
+  fs.copyFileSync(localFontSrc, localFontDst);
+  console.log('✓ Ionicons.ttf copied to dist/');
 }
+
+// Inject local Ionicons font preload + @font-face
+const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
+const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var f=new FontFace('ionicons','url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn('Ionicons load failed:',e)})}})();</script>`;
+html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
 
 // Fix lang to Italian
 html = html.replace('lang="en"', 'lang="it"');

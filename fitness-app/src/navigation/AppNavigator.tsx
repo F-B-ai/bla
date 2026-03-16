@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
@@ -65,12 +65,18 @@ const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
         };
 
         return (
-          <Pressable key={route.key} style={styles.scrollableTab} onPress={onPress}>
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={styles.scrollableTab}
+            onPress={onPress}
+          >
             {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: 20 })}
             <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
               {label}
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         );
       })}
     </ScrollView>
@@ -427,9 +433,11 @@ const styles = StyleSheet.create({
   scrollableTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    minWidth: 60,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 64,
+    minHeight: 48,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   scrollableTabLabel: {
     fontSize: 10,

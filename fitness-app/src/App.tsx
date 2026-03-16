@@ -36,52 +36,23 @@ function App() {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      // The icon component uses fontFamily 'ionicons' (lowercase).
-      // We must ensure the @font-face matches that exact name.
-      const cdnUrl = 'https://unpkg.com/@expo/vector-icons@14.0.4/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf';
+      // Font is preloaded via index.html @font-face with local /Ionicons.ttf.
+      // We still call Font.loadAsync so expo-font registers the family for
+      // the <Ionicons> component, but fall back gracefully if it errors.
+      const localUrl = '/Ionicons.ttf';
 
-      const injectFontCSS = (url: string) => {
-        if (!document.getElementById('ionicons-font-style')) {
-          const style = document.createElement('style');
-          style.id = 'ionicons-font-style';
-          style.textContent = `
-            @font-face {
-              font-family: 'ionicons';
-              src: url('${url}') format('truetype');
-              font-weight: normal;
-              font-style: normal;
-              font-display: swap;
-            }
-          `;
-          document.head.appendChild(style);
-          // Force iOS Safari to trigger font download with a hidden element
-          const el = document.createElement('span');
-          el.style.cssText = 'font-family:ionicons;position:absolute;visibility:hidden';
-          el.textContent = '.';
-          document.body?.appendChild(el);
-        }
-      };
-
-      // Try loading with expo-font first (Ionicons.font = { 'ionicons': asset })
       Font.loadAsync(Ionicons.font)
         .then(() => setFontsLoaded(true))
         .catch(() => {
-          // Fallback: inject CSS @font-face + FontFace API with correct lowercase name
-          injectFontCSS(cdnUrl);
+          // Fallback: register via FontFace API with local file
           if (typeof FontFace !== 'undefined') {
-            const font = new FontFace('ionicons', `url(${cdnUrl})`);
+            const font = new FontFace('ionicons', `url(${localUrl})`);
             font.load().then((loaded) => {
               document.fonts.add(loaded);
               setFontsLoaded(true);
-            }).catch(() => {
-              Font.loadAsync({ 'ionicons': cdnUrl })
-                .then(() => setFontsLoaded(true))
-                .catch(() => setFontsLoaded(true));
-            });
+            }).catch(() => setFontsLoaded(true));
           } else {
-            Font.loadAsync({ 'ionicons': cdnUrl })
-              .then(() => setFontsLoaded(true))
-              .catch(() => setFontsLoaded(true));
+            setFontsLoaded(true);
           }
         });
     }
