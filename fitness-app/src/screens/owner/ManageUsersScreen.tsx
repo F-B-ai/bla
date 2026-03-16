@@ -114,8 +114,9 @@ export const ManageUsersScreen: React.FC = () => {
               await deleteUser(userId);
               await loadData();
               crossAlert('Fatto', `${name} eliminato`);
-            } catch {
-              crossAlert('Errore', 'Impossibile eliminare l\'utente');
+            } catch (err: any) {
+              console.error('Errore eliminazione utente:', err);
+              crossAlert('Errore', `Impossibile eliminare l'utente: ${err?.message || err?.code || JSON.stringify(err)}`);
             }
           },
         },
