@@ -3,13 +3,20 @@ const fs = require('fs');
 const path = require('path');
 const distDir = path.join(__dirname, 'dist');
 const server = http.createServer((req, res) => {
+  // Localtunnel bypass: respond to its password check
+  if (req.url === '/' && req.headers['bypass-tunnel-reminder']) {
+    // Already bypassed
+  }
   let filePath = path.join(distDir, req.url === '/' ? 'index.html' : req.url);
   if (!fs.existsSync(filePath)) filePath = path.join(distDir, 'index.html');
   const ext = path.extname(filePath);
-  const types = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.ico':'image/x-icon'};
+  const types = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.png':'image/png','.ico':'image/x-icon','.ttf':'font/ttf','.woff2':'font/woff2'};
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); res.end(); return; }
-    res.writeHead(200, {'Content-Type': types[ext] || 'application/octet-stream'});
+    res.writeHead(200, {
+      'Content-Type': types[ext] || 'application/octet-stream',
+      'Bypass-Tunnel-Reminder': 'true'
+    });
     res.end(data);
   });
 });
