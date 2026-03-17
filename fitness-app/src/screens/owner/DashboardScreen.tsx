@@ -18,8 +18,8 @@ import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { BarChart, BarData } from '../../components/charts/BarChart';
-import { Collaborator, TrainingSession, FinancialTransaction } from '../../types';
-import { getCollaborators, getStudents } from '../../services/authService';
+import { Collaborator, Manager, TrainingSession, FinancialTransaction } from '../../types';
+import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,6 +29,7 @@ export const DashboardScreen: React.FC = () => {
   const { logout, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [allSessions, setAllSessions] = useState<TrainingSession[]>([]);
   const [todaySessions, setTodaySessions] = useState<TrainingSession[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -39,14 +40,16 @@ export const DashboardScreen: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [collabs, studs, sessions, txs, summary] = await Promise.all([
+      const [collabs, mgrs, studs, sessions, txs, summary] = await Promise.all([
         getCollaborators(),
+        getManagers(),
         getStudents(),
         getAllSessions(),
         getTransactions(),
         getFinancialSummary(),
       ]);
       setCollaborators(collabs);
+      setManagers(mgrs);
       setTotalStudents(studs.length);
       setAllSessions(sessions);
       setTransactions(txs);
@@ -263,14 +266,27 @@ export const DashboardScreen: React.FC = () => {
 
       <View style={styles.statsRow}>
         <StatCard
-          title="Sessioni Oggi"
-          value={todaySessions.length}
-          color={colors.accent}
+          title="Manager"
+          value={managers.length}
+          color={colors.managerBadge}
         />
         <StatCard
           title="Collaboratori"
           value={collaborators.length}
           color={colors.collaboratorBadge}
+        />
+      </View>
+
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Sessioni Oggi"
+          value={todaySessions.length}
+          color={colors.accent}
+        />
+        <StatCard
+          title="Totale Sessioni"
+          value={allSessions.length}
+          color={colors.info}
         />
       </View>
 
@@ -352,6 +368,35 @@ export const DashboardScreen: React.FC = () => {
                 </Text>
               </View>
               <Badge status={session.status} />
+            </View>
+          </Card>
+        ))
+      )}
+
+      {/* Rendimento Manager */}
+      <Text style={styles.sectionTitle}>Rendimento Manager</Text>
+      {managers.length === 0 ? (
+        <Card>
+          <Text style={styles.emptyText}>Nessun manager registrato</Text>
+        </Card>
+      ) : (
+        managers.map((mgr) => (
+          <Card key={mgr.id} variant="elevated">
+            <View style={styles.collabRow}>
+              <View style={styles.collabInfo}>
+                <Text style={styles.collabName}>
+                  {mgr.name} {mgr.surname}
+                </Text>
+                <Text style={styles.collabStudents}>
+                  {mgr.assignedCollaborators.length} collaboratori · {mgr.assignedStudents.length} allievi diretti
+                </Text>
+              </View>
+              <View style={styles.collabEarnings}>
+                <Text style={[styles.collabAmount, { color: colors.managerBadge }]}>
+                  {mgr.commissionPercentage}%
+                </Text>
+                <Text style={styles.collabLabel}>commissione</Text>
+              </View>
             </View>
           </Card>
         ))
