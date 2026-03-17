@@ -1,5 +1,5 @@
 // Service Worker for ESSERE PWA - auto-update on new deploy
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = 'essere-' + CACHE_VERSION;
 
 // Assets to pre-cache on install (fonts excluded - handled by browser @font-face)
