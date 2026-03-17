@@ -33,7 +33,7 @@ const TIME_SLOTS = [
 ];
 
 export const ScheduleSessionScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator } = useAuth();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -59,6 +59,9 @@ export const ScheduleSessionScreen: React.FC = () => {
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+      } else if (isManager) {
+        // Manager vede allievi assegnati direttamente o tramite assignedManagerId
+        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }
@@ -78,7 +81,7 @@ export const ScheduleSessionScreen: React.FC = () => {
       console.error('Errore caricamento sessioni:', err);
       crossAlert('Errore', 'Impossibile caricare le sessioni. Riprova più tardi.');
     }
-  }, [user, isOwner, isCollaborator]);
+  }, [user, isOwner, isManager, isCollaborator]);
 
   useEffect(() => {
     loadData();

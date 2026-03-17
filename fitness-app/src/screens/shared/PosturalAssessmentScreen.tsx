@@ -45,7 +45,7 @@ const SEVERITY_OPTIONS = [
 ];
 
 export const PosturalAssessmentScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [frontImage, setFrontImage] = useState<string | null>(null);
@@ -69,13 +69,15 @@ export const PosturalAssessmentScreen: React.FC = () => {
       const allStudents = await getStudents();
       if (isOwner) {
         setStudents(allStudents);
+      } else if (isManager) {
+        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
         setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
       }
     } catch {
       // Silently handle
     }
-  }, [user, isOwner, isCollaborator]);
+  }, [user, isOwner, isManager, isCollaborator]);
 
   useEffect(() => {
     loadStudents();

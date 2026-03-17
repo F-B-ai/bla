@@ -21,7 +21,7 @@ import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
 
 export const ChatListScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator, isStudent } = useAuth();
+  const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [participants, setParticipants] = useState<Record<string, User>>({});
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -72,11 +72,11 @@ export const ChatListScreen: React.FC = () => {
   const handleNewChat = async () => {
     if (!user) return;
     try {
-      if (isCollaborator) {
-        // Collaboratore: mostra i suoi allievi
+      if (isCollaborator || isManager) {
+        // Collaboratore/Manager: mostra i propri allievi
         const allStudents = await getStudents();
         const myStudents = allStudents.filter(
-          (s) => s.assignedCollaboratorId === user.id && s.isActive
+          (s) => (s.assignedCollaboratorId === user.id || (isManager && s.assignedManagerId === user.id)) && s.isActive
         );
         setAvailableContacts(myStudents);
       } else if (isStudent) {

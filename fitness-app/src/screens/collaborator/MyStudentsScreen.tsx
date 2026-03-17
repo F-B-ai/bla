@@ -23,7 +23,7 @@ import { createProgram } from '../../services/programService';
 
 export const MyStudentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, isOwner, isManager } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -39,15 +39,19 @@ export const MyStudentsScreen: React.FC = () => {
     if (!user) return;
     try {
       const allStudents = await getStudents();
-      // Filtra allievi assegnati a questo collaboratore O manager
+      // Owner: vede allievi assegnati direttamente a sé
+      // Manager: vede allievi assegnati direttamente O tramite assignedManagerId
+      // Collaborator: vede solo i propri allievi
       const myStudents = allStudents.filter(
-        (s) => s.assignedCollaboratorId === user.id
+        (s) =>
+          s.assignedCollaboratorId === user.id ||
+          (isManager && s.assignedManagerId === user.id)
       );
       setStudents(myStudents);
     } catch {
       // Silently handle
     }
-  }, [user]);
+  }, [user, isOwner, isManager]);
 
   useEffect(() => {
     loadStudents();
