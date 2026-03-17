@@ -37,7 +37,7 @@ export const MyStudentsScreen: React.FC = () => {
     if (!user) return;
     try {
       const allStudents = await getStudents();
-      // Filtra solo gli allievi assegnati a questo collaboratore
+      // Filtra allievi assegnati a questo collaboratore O manager
       const myStudents = allStudents.filter(
         (s) => s.assignedCollaboratorId === user.id
       );

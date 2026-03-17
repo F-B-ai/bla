@@ -197,6 +197,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="MyStudents"
+      component={MyStudentsScreen}
+      options={{
+        tabBarLabel: 'Allievi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Team"
       component={ManageUsersScreen}
       options={{
@@ -226,6 +234,14 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Earnings"
+      component={EarningsScreen}
+      options={{
+        tabBarLabel: 'Guadagni',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen

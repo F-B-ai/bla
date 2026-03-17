@@ -27,7 +27,9 @@ export interface Owner extends User {
 export interface Manager extends User {
   role: 'manager';
   assignedCollaborators: string[]; // collaborator IDs gestiti dal manager
-  assignedStudents: string[]; // student IDs
+  assignedStudents: string[]; // student IDs (allievi diretti del manager)
+  commissionPercentage: number; // % commissione manager per allievi dei suoi coach
+  specializations: string[];
 }
 
 // --- Collaboratore ---
@@ -41,7 +43,10 @@ export interface Collaborator extends User {
 // --- Allievo ---
 export interface Student extends User {
   role: 'student';
-  assignedCollaboratorId: string;
+  assignedCollaboratorId: string; // coach o manager che lo segue direttamente
+  assignedManagerId?: string; // manager responsabile (se assegnato a un coach sotto un manager)
+  managerCommissionPercentage?: number; // % commissione per il manager
+  coachCommissionPercentage?: number; // % commissione per il coach
   startDate: Date;
   goals: string;
   medicalNotes?: string;
@@ -280,6 +285,9 @@ export interface NutritionalConsultation {
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'
+  | 'payment_reminder_week'
+  | 'payment_reminder_3days'
+  | 'payment_reminder_1day'
   | 'session_reminder'
   | 'new_program'
   | 'new_message'

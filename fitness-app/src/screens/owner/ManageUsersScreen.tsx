@@ -241,7 +241,7 @@ export const ManageUsersScreen: React.FC = () => {
                     </Text>
                     <Text style={styles.userEmail}>{mgr.email}</Text>
                     <Text style={styles.userDetail}>
-                      {mgr.assignedCollaborators.length} coach · {mgr.assignedStudents.length} allievi
+                      {mgr.assignedCollaborators.length} coach · {mgr.assignedStudents.length} allievi · {mgr.commissionPercentage ?? 0}% comm.
                     </Text>
                   </View>
                   <View style={[styles.statusDot, mgr.isActive ? styles.statusActive : styles.statusInactive]} />
@@ -359,6 +359,12 @@ export const ManageUsersScreen: React.FC = () => {
                           Seguito da: {collab.name} {collab.surname}
                         </Text>
                       )}
+                      {(student.coachCommissionPercentage || student.managerCommissionPercentage) ? (
+                        <Text style={styles.userDetail}>
+                          Coach: {student.coachCommissionPercentage ?? 0}%
+                          {student.managerCommissionPercentage ? ` · Manager: ${student.managerCommissionPercentage}%` : ''}
+                        </Text>
+                      ) : null}
                     </View>
                     <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>

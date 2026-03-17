@@ -22,6 +22,7 @@ const CANCELLATION_HOURS = 10;
 export const SessionsScreen: React.FC = () => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
+  const [activeSection, setActiveSection] = useState<'upcoming' | 'completed' | 'all'>('upcoming');
 
   const loadSessions = useCallback(async () => {
     if (!user) return;
@@ -37,6 +38,19 @@ export const SessionsScreen: React.FC = () => {
   useEffect(() => {
     loadSessions();
   }, [loadSessions]);
+
+  const now = new Date();
+  const upcomingSessions = sessions.filter(
+    (s) => new Date(s.date) > now && s.status === 'scheduled'
+  );
+  const completedSessions = sessions.filter(
+    (s) => s.status === 'completed' || s.isCountedAsCompleted
+  );
+  const filteredSessions = activeSection === 'upcoming'
+    ? upcomingSessions
+    : activeSection === 'completed'
+    ? completedSessions
+    : sessions;
 
   const canCancel = (sessionDate: Date): boolean => {
     const now = new Date();
@@ -146,21 +160,54 @@ export const SessionsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Le Mie Sessioni</Text>
+        <Text style={styles.title}>Il Mio Percorso</Text>
         <Text style={styles.subtitle}>
-          Puoi annullare solo {CANCELLATION_HOURS}+ ore prima
+          {completedSessions.length} completate · {upcomingSessions.length} in programma
+        </Text>
+        <Text style={styles.cancelHint}>
+          Disdetta gratuita entro {CANCELLATION_HOURS} ore prima
         </Text>
       </View>
 
+      {/* Filtri sezione */}
+      <View style={styles.sectionTabs}>
+        <TouchableOpacity
+          style={[styles.sectionTab, activeSection === 'upcoming' && styles.sectionTabActive]}
+          onPress={() => setActiveSection('upcoming')}
+        >
+          <Text style={[styles.sectionTabText, activeSection === 'upcoming' && styles.sectionTabTextActive]}>
+            Da fare ({upcomingSessions.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTab, activeSection === 'completed' && styles.sectionTabActive]}
+          onPress={() => setActiveSection('completed')}
+        >
+          <Text style={[styles.sectionTabText, activeSection === 'completed' && styles.sectionTabTextActive]}>
+            Fatte ({completedSessions.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.sectionTab, activeSection === 'all' && styles.sectionTabActive]}
+          onPress={() => setActiveSection('all')}
+        >
+          <Text style={[styles.sectionTabText, activeSection === 'all' && styles.sectionTabTextActive]}>
+            Tutte ({sessions.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
-        data={sessions}
+        data={filteredSessions}
         renderItem={renderSession}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              Nessuna sessione programmata
+              {activeSection === 'upcoming' ? 'Nessuna sessione in programma' :
+               activeSection === 'completed' ? 'Nessuna sessione completata' :
+               'Nessuna sessione'}
             </Text>
           </Card>
         }
@@ -185,9 +232,41 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
   },
   subtitle: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
+    color: colors.textLight,
+    marginTop: spacing.xs,
+  },
+  cancelHint: {
+    fontSize: fontSize.xs,
     color: colors.warning,
     marginTop: spacing.xs,
+  },
+  sectionTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  sectionTab: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionTabActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  sectionTabText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  sectionTabTextActive: {
+    color: colors.textOnAccent,
   },
   list: {
     padding: spacing.md,

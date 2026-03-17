@@ -96,7 +96,9 @@ export const registerManager = async (
   password: string,
   name: string,
   surname: string,
-  phone: string
+  phone: string,
+  commissionPercentage: number = 10,
+  specializations: string[] = []
 ): Promise<Manager> => {
   const uid = await createUserWithRestApi(email, password);
 
@@ -108,6 +110,8 @@ export const registerManager = async (
     role: 'manager',
     assignedCollaborators: [],
     assignedStudents: [],
+    commissionPercentage,
+    specializations,
     createdAt: new Date(),
     isActive: true,
   };
@@ -188,7 +192,10 @@ export const registerStudent = async (
   phone: string,
   assignedCollaboratorId: string,
   goals: string,
-  medicalNotes?: string
+  medicalNotes?: string,
+  assignedManagerId?: string,
+  managerCommissionPercentage?: number,
+  coachCommissionPercentage?: number
 ): Promise<Student> => {
   const uid = await createUserWithRestApi(email, password);
 
@@ -199,6 +206,9 @@ export const registerStudent = async (
     phone,
     role: 'student',
     assignedCollaboratorId,
+    assignedManagerId: assignedManagerId || '',
+    managerCommissionPercentage: managerCommissionPercentage ?? 0,
+    coachCommissionPercentage: coachCommissionPercentage ?? 0,
     startDate: new Date(),
     goals,
     medicalNotes: medicalNotes || '',
@@ -213,7 +223,7 @@ export const registerStudent = async (
     startDate: Timestamp.now(),
   });
 
-  // Aggiorna la lista allievi del collaboratore
+  // Aggiorna la lista allievi del collaboratore/manager
   if (assignedCollaboratorId) {
     await updateDoc(doc(db, 'users', assignedCollaboratorId), {
       assignedStudents: arrayUnion(uid),

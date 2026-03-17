@@ -53,7 +53,7 @@ export const markInstallmentPaid = async (
   });
 };
 
-// --- Calcolo commissioni collaboratore ---
+// --- Calcolo commissioni collaboratore e manager ---
 
 export const calculateCollaboratorEarnings = (
   totalPaid: number,
@@ -62,6 +62,17 @@ export const calculateCollaboratorEarnings = (
   const collaboratorShare = (totalPaid * commissionPercentage) / 100;
   const ownerShare = totalPaid - collaboratorShare;
   return { collaboratorShare, ownerShare };
+};
+
+export const calculateFullEarnings = (
+  totalPaid: number,
+  coachCommissionPercentage: number,
+  managerCommissionPercentage: number
+): { coachShare: number; managerShare: number; ownerShare: number } => {
+  const coachShare = (totalPaid * coachCommissionPercentage) / 100;
+  const managerShare = (totalPaid * managerCommissionPercentage) / 100;
+  const ownerShare = totalPaid - coachShare - managerShare;
+  return { coachShare, managerShare, ownerShare };
 };
 
 export const getCollaboratorEarnings = async (

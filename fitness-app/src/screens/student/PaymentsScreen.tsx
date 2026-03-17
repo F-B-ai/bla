@@ -9,19 +9,35 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
-import { PaymentPlan, Installment } from '../../types';
+import { PaymentPlan, Installment, AppNotification } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudentPaymentPlans } from '../../services/paymentService';
+import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
 
 export const PaymentsScreen: React.FC = () => {
   const { user } = useAuth();
   const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
+  const [reminders, setReminders] = useState<AppNotification[]>([]);
 
   const loadPayments = useCallback(async () => {
     if (!user) return;
     try {
       const plans = await getStudentPaymentPlans(user.id);
       setPaymentPlans(plans);
+
+      // Genera e invia reminder automatici
+      const generatedReminders = await generatePaymentReminders(
+        user.id,
+        user.name,
+        plans
+      );
+      setReminders(generatedReminders);
+
+      // Invia i reminder a Firestore (evita duplicati)
+      for (const reminder of generatedReminders) {
+        const { id, ...reminderData } = reminder;
+        await sendPaymentReminder(reminderData);
+      }
     } catch {
       // Silently handle
     }
@@ -46,6 +62,18 @@ export const PaymentsScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>I Miei Pagamenti</Text>
       </View>
+
+      {/* Reminder motivazionali */}
+      {reminders.length > 0 && (
+        <View style={styles.remindersContainer}>
+          {reminders.map((reminder, idx) => (
+            <Card key={idx} variant="elevated" style={styles.reminderCard}>
+              <Text style={styles.reminderTitle}>{reminder.title}</Text>
+              <Text style={styles.reminderBody}>{reminder.body}</Text>
+            </Card>
+          ))}
+        </View>
+      )}
 
       {paymentPlans.length === 0 ? (
         <Card style={styles.emptyCard}>
@@ -261,6 +289,27 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
     color: colors.text,
+  },
+  remindersContainer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  reminderCard: {
+    marginBottom: spacing.sm,
+    backgroundColor: colors.warning + '15',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  reminderTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.warning,
+    marginBottom: spacing.xs,
+  },
+  reminderBody: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
   },
   bottomSpacer: {
     height: spacing.xxl,
