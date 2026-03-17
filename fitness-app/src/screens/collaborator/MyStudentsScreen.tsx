@@ -9,6 +9,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -21,6 +22,7 @@ import { getStudents } from '../../services/authService';
 import { createProgram } from '../../services/programService';
 
 export const MyStudentsScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -142,7 +144,7 @@ export const MyStudentsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.title}>I Miei Allievi</Text>

@@ -11,6 +11,7 @@ import {
 import { crossAlert } from '../../utils/alert';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -24,6 +25,7 @@ import { getFinancialSummary, getTransactions } from '../../services/financialSe
 import { useAuth } from '../../hooks/useAuth';
 
 export const DashboardScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -201,7 +203,7 @@ export const DashboardScreen: React.FC = () => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Buongiorno{user?.name ? `, ${user.name}` : ''}!</Text>

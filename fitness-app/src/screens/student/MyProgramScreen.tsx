@@ -9,6 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -22,6 +23,7 @@ import { getStudentNutritionalConsultations } from '../../services/contentServic
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 export const MyProgramScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const student = user as Student | null;
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
@@ -104,7 +106,7 @@ export const MyProgramScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Il Mio Programma</Text>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
