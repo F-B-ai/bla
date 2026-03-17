@@ -42,22 +42,13 @@ function App() {
       const localUrl = '/Ionicons.ttf';
 
       Font.loadAsync(Ionicons.font)
+        .catch(() =>
+          // Fallback: load from local file but still through expo-font
+          // so Font.isLoaded('Ionicons') returns true for <Ionicons> component
+          Font.loadAsync({ Ionicons: localUrl, ionicons: localUrl })
+        )
         .then(() => setFontsLoaded(true))
-        .catch(() => {
-          // Fallback: register via FontFace API with local file (both cases)
-          if (typeof FontFace !== 'undefined') {
-            Promise.all(
-              ['Ionicons', 'ionicons'].map((name) => {
-                const f = new FontFace(name, `url(${localUrl})`);
-                return f.load().then((loaded) => document.fonts.add(loaded));
-              })
-            )
-              .then(() => setFontsLoaded(true))
-              .catch(() => setFontsLoaded(true));
-          } else {
-            setFontsLoaded(true);
-          }
-        });
+        .catch(() => setFontsLoaded(true));
     }
   }, []);
 
