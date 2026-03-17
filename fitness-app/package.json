@@ -12,7 +12,7 @@
     "build:preview": "eas build --profile preview --platform ios",
     "build:dev": "eas build --profile development --platform ios",
     "build:prod": "eas build --profile production --platform ios",
-    "build:web": "expo export --platform web && cp web/manifest.json web/icon-192.png web/icon-512.png web/Ionicons.ttf dist/ && node postbuild-web.js",
+    "build:web": "expo export --platform web && cp web/manifest.json web/icon-192.png web/icon-512.png web/Ionicons.ttf web/sw.js dist/ && node postbuild-web.js",
     "serve": "node serve.js",
     "serve:80": "PORT=80 node serve.js"
   },

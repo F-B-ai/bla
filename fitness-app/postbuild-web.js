@@ -19,6 +19,14 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   html = html.replace('</title>', '</title>' + pwaMeta);
 }
 
+// Copy service worker to dist root (must be at root scope)
+const swSrc = path.join(__dirname, 'web', 'sw.js');
+const swDst = path.join(__dirname, 'dist', 'sw.js');
+if (fs.existsSync(swSrc)) {
+  fs.copyFileSync(swSrc, swDst);
+  console.log('✓ sw.js copied to dist/');
+}
+
 // Copy Ionicons.ttf to dist root for reliable local serving
 const localFontSrc = path.join(__dirname, 'web', 'Ionicons.ttf');
 const localFontDst = path.join(__dirname, 'dist', 'Ionicons.ttf');
@@ -41,5 +49,11 @@ html = html.replace(
   'width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no'
 );
 
+// Inject service worker registration script before </body>
+const swScript = `\n    <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(reg){setInterval(function(){reg.update()},60000);reg.addEventListener('updatefound',function(){var nw=reg.installing;nw.addEventListener('statechange',function(){if(nw.state==='activated'){window.location.reload()}})})})})}</script>`;
+if (!html.includes("register('/sw.js')")) {
+  html = html.replace('</body>', swScript + '\n  </body>');
+}
+
 fs.writeFileSync(indexPath, html);
-console.log('✓ PWA meta tags injected into dist/index.html');
+console.log('✓ PWA meta tags and service worker injected into dist/index.html');
