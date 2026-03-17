@@ -27,6 +27,7 @@ import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
+import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -198,7 +199,7 @@ const ManagerTabs = () => (
   >
     <ManagerTab.Screen
       name="Dashboard"
-      component={DashboardScreen}
+      component={ManagerDashboardScreen}
       options={{
         tabBarLabel: 'Home',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
