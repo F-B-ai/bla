@@ -8,9 +8,6 @@ import { AppNavigator } from './navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 
-// Direct require so Metro/webpack resolves the .ttf asset at build time
-const ioniconsFont = require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');
-
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: string }
@@ -35,22 +32,17 @@ class ErrorBoundary extends React.Component<
 }
 
 function App() {
-  const [fontsLoaded, setFontsLoaded] = useState(Platform.OS !== 'web');
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      // Register Ionicons with expo-font so Font.isLoaded('ionicons') returns true.
-      // Without this the <Ionicons> component renders an empty <Text/>.
-      // Use require()'d asset so the bundler resolves the real URL.
-      Font.loadAsync({ ionicons: ioniconsFont })
-        .then(() => setFontsLoaded(true))
-        .catch(() => {
-          // Last resort: try with the local copy served from /Ionicons.ttf
-          Font.loadAsync({ ionicons: { uri: '/Ionicons.ttf', display: Font.FontDisplay.BLOCK } })
-            .then(() => setFontsLoaded(true))
-            .catch(() => setFontsLoaded(true));
-        });
-    }
+    Font.loadAsync({
+      ...Ionicons.font,
+    })
+      .then(() => setFontsLoaded(true))
+      .catch(() => {
+        // If font loading fails, proceed anyway to avoid blank screen
+        setFontsLoaded(true);
+      });
   }, []);
 
   if (!fontsLoaded) {
