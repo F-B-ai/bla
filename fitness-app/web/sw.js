@@ -1,14 +1,13 @@
 // Service Worker for ESSERE PWA - auto-update on new deploy
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = 'essere-' + CACHE_VERSION;
 
-// Assets to pre-cache on install
+// Assets to pre-cache on install (fonts excluded - handled by browser @font-face)
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png',
-  '/Ionicons.ttf'
+  '/icon-512.png'
 ];
 
 // Install: pre-cache shell, skip waiting immediately
@@ -40,6 +39,11 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle same-origin requests
   if (url.origin !== location.origin) return;
+
+  // Let font files pass through directly to the browser (avoid interfering with @font-face)
+  if (request.url.endsWith('.ttf') || request.url.endsWith('.woff') || request.url.endsWith('.woff2') || request.destination === 'font') {
+    return;
+  }
 
   // Navigation requests (HTML): network-first
   if (request.mode === 'navigate' || request.destination === 'document') {

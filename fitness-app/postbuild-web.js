@@ -50,7 +50,7 @@ html = html.replace(
 );
 
 // Inject service worker registration script before </body>
-const swScript = `\n    <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(reg){setInterval(function(){reg.update()},60000);reg.addEventListener('updatefound',function(){var nw=reg.installing;nw.addEventListener('statechange',function(){if(nw.state==='activated'){window.location.reload()}})})})})}</script>`;
+const swScript = `\n    <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').then(function(reg){var hasController=!!navigator.serviceWorker.controller;setInterval(function(){reg.update()},60000);reg.addEventListener('updatefound',function(){var nw=reg.installing;nw.addEventListener('statechange',function(){if(nw.state==='activated'&&hasController){window.location.reload()}})})})})}</script>`;
 if (!html.includes("register('/sw.js')")) {
   html = html.replace('</body>', swScript + '\n  </body>');
 }
