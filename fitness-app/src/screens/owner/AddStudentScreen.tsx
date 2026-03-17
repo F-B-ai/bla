@@ -14,14 +14,16 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { registerStudent, getCollaborators, getManagers } from '../../services/authService';
-import { Collaborator, Manager } from '../../types';
+import { registerStudent, getCollaborators, getManagers, getOwner } from '../../services/authService';
+import { Collaborator, Manager, Owner } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface Props {
   onBack: () => void;
 }
 
 export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
+  const { user: currentUser, isOwner } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -31,6 +33,7 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
   const [medicalNotes, setMedicalNotes] = useState('');
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
+  const [owner, setOwner] = useState<Owner | null>(null);
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState('');
   const [selectedManagerId, setSelectedManagerId] = useState('');
   const [managerCommission, setManagerCommission] = useState('');
@@ -43,9 +46,10 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
 
   const loadData = async () => {
     try {
-      const [collabs, mgrs] = await Promise.all([getCollaborators(), getManagers()]);
+      const [collabs, mgrs, ownerData] = await Promise.all([getCollaborators(), getManagers(), getOwner()]);
       setCollaborators(collabs);
       setManagers(mgrs);
+      setOwner(ownerData);
       // Include anche i manager come possibili assegnatari diretti
       if (collabs.length > 0) {
         setSelectedCollaboratorId(collabs[0].id);
@@ -192,12 +196,35 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
 
           {/* Selezione coach o manager diretto */}
           <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
-          {collaborators.length === 0 && managers.length === 0 ? (
+          {collaborators.length === 0 && managers.length === 0 && !owner ? (
             <Text style={styles.noCollabText}>
               Nessun coach o manager disponibile. Registrane uno prima.
             </Text>
           ) : (
             <View style={styles.collabList}>
+              {/* Owner come coach diretto */}
+              {owner && (
+                <TouchableOpacity
+                  key={`owner-${owner.id}`}
+                  style={[
+                    styles.collabOption,
+                    selectedCollaboratorId === owner.id && styles.collabOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedCollaboratorId(owner.id);
+                    setCoachCommission('100');
+                    setSelectedManagerId('');
+                    setManagerCommission('0');
+                  }}
+                >
+                  <Text style={[styles.collabOptionText, selectedCollaboratorId === owner.id && styles.collabOptionTextSelected]}>
+                    {owner.name} {owner.surname} (Titolare - diretto)
+                  </Text>
+                  <Text style={styles.collabSpecText}>
+                    {(owner.specializations || []).join(', ')} 100%
+                  </Text>
+                </TouchableOpacity>
+              )}
               {/* Manager come coach diretto */}
               {managers.map((mgr) => (
                 <TouchableOpacity

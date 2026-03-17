@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { User, UserRole, Collaborator, Student, Manager } from '../types';
+import { User, UserRole, Collaborator, Student, Manager, Owner } from '../types';
 
 /**
  * Crea un utente su Firebase Auth usando la REST API di Firebase
@@ -73,12 +73,14 @@ export const registerOwner = async (
   }
 
   const credential = await createUserWithEmailAndPassword(auth, email, password);
-  const userData: Omit<User, 'id'> = {
+  const userData: Omit<Owner, 'id'> = {
     email,
     name,
     surname,
     phone,
     role: 'owner',
+    assignedStudents: [],
+    specializations: [],
     createdAt: new Date(),
     isActive: true,
   };
@@ -356,6 +358,14 @@ export const registerStudentWithInvite = async (
   });
 
   return { id: uid, ...studentData };
+};
+
+export const getOwner = async (): Promise<Owner | null> => {
+  const q = query(collection(db, 'users'), where('role', '==', 'owner'));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const d = snapshot.docs[0];
+  return { ...d.data(), id: d.id } as Owner;
 };
 
 export const getManagers = async (): Promise<Manager[]> => {

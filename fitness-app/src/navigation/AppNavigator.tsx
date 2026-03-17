@@ -104,6 +104,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="MyStudents"
+      component={MyStudentsScreen}
+      options={{
+        tabBarLabel: 'Allievi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Team"
       component={ManageUsersScreen}
       options={{

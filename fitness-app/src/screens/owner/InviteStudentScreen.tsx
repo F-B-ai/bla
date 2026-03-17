@@ -14,8 +14,8 @@ import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { Card } from '../../components/common/Card';
-import { createStudentInvite, getCollaborators, getStudentInvites, StudentInvite } from '../../services/authService';
-import { Collaborator } from '../../types';
+import { createStudentInvite, getCollaborators, getManagers, getOwner, getStudentInvites, StudentInvite } from '../../services/authService';
+import { Collaborator, Manager, Owner } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
 interface Props {
@@ -28,10 +28,19 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [owner, setOwner] = useState<Owner | null>(null);
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatedCode, setGeneratedCode] = useState('');
   const [invites, setInvites] = useState<StudentInvite[]>([]);
+
+  // Unisce tutti i possibili assegnatari (owner, manager, coach)
+  const allAssignees = [
+    ...(owner ? [{ id: owner.id, name: owner.name, surname: owner.surname, label: 'Titolare' }] : []),
+    ...managers.map((m) => ({ id: m.id, name: m.name, surname: m.surname, label: 'Manager' })),
+    ...collaborators.map((c) => ({ id: c.id, name: c.name, surname: c.surname, label: 'Coach' })),
+  ];
 
   useEffect(() => {
     loadData();
@@ -39,13 +48,22 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
 
   const loadData = async () => {
     try {
-      const [collabs, allInvites] = await Promise.all([
+      const [collabs, mgrs, ownerData, allInvites] = await Promise.all([
         getCollaborators(),
+        getManagers(),
+        getOwner(),
         getStudentInvites(),
       ]);
       setCollaborators(collabs);
+      setManagers(mgrs);
+      setOwner(ownerData);
       setInvites(allInvites.filter((inv) => !inv.isUsed));
-      if (collabs.length > 0) {
+      // Pre-seleziona il primo disponibile
+      if (ownerData) {
+        setSelectedCollaboratorId(ownerData.id);
+      } else if (mgrs.length > 0) {
+        setSelectedCollaboratorId(mgrs[0].id);
+      } else if (collabs.length > 0) {
         setSelectedCollaboratorId(collabs[0].id);
       }
     } catch {
@@ -65,8 +83,8 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
 
     setLoading(true);
     try {
-      const selectedCollab = collaborators.find((c) => c.id === selectedCollaboratorId);
-      const collabName = selectedCollab ? `${selectedCollab.name} ${selectedCollab.surname}` : '';
+      const selectedAssignee = allAssignees.find((a) => a.id === selectedCollaboratorId);
+      const collabName = selectedAssignee ? `${selectedAssignee.name} ${selectedAssignee.surname}` : '';
 
       const invite = await createStudentInvite(
         email.trim(),
@@ -129,32 +147,29 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="email dell'allievo"
           />
 
-          <Text style={styles.fieldLabel}>Coach assegnato *</Text>
-          {collaborators.length === 0 ? (
+          <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
+          {allAssignees.length === 0 ? (
             <Text style={styles.noCollabText}>
-              Nessun coach disponibile. Registra prima un coach.
+              Nessun coach o manager disponibile. Registrane uno prima.
             </Text>
           ) : (
             <View style={styles.collabList}>
-              {collaborators.map((collab) => (
+              {allAssignees.map((assignee) => (
                 <TouchableOpacity
-                  key={collab.id}
+                  key={assignee.id}
                   style={[
                     styles.collabOption,
-                    selectedCollaboratorId === collab.id && styles.collabOptionSelected,
+                    selectedCollaboratorId === assignee.id && styles.collabOptionSelected,
                   ]}
-                  onPress={() => setSelectedCollaboratorId(collab.id)}
+                  onPress={() => setSelectedCollaboratorId(assignee.id)}
                 >
                   <Text
                     style={[
                       styles.collabOptionText,
-                      selectedCollaboratorId === collab.id && styles.collabOptionTextSelected,
+                      selectedCollaboratorId === assignee.id && styles.collabOptionTextSelected,
                     ]}
                   >
-                    {collab.name} {collab.surname}
-                  </Text>
-                  <Text style={styles.collabSpecText}>
-                    {collab.specializations.join(', ')}
+                    {assignee.name} {assignee.surname} ({assignee.label})
                   </Text>
                 </TouchableOpacity>
               ))}

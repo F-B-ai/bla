@@ -21,6 +21,8 @@ export interface User {
 // --- Titolare (Owner) ---
 export interface Owner extends User {
   role: 'owner';
+  assignedStudents: string[]; // allievi diretti seguiti dall'owner come Personal
+  specializations: string[];
 }
 
 // --- Manager ---

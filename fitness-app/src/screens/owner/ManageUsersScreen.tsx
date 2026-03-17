@@ -11,8 +11,8 @@ import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/t
 import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getCollaborators, getStudents, getManagers, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
-import { Collaborator, Student, Manager } from '../../types';
+import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
+import { Collaborator, Student, Manager, Owner } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
@@ -27,6 +27,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [owner, setOwner] = useState<Owner | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>(
     isCollaborator ? 'students' : 'collaborators'
@@ -43,9 +44,10 @@ export const ManageUsersScreen: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [mgrs, collabs, studs] = await Promise.all([getManagers(), getCollaborators(), getStudents()]);
+      const [mgrs, collabs, studs, ownerData] = await Promise.all([getManagers(), getCollaborators(), getStudents(), getOwner()]);
       setManagers(mgrs);
       setCollaborators(collabs);
+      setOwner(ownerData);
       // Coach vede solo i propri allievi
       if (isCollaborator && user) {
         setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
@@ -338,6 +340,15 @@ export const ManageUsersScreen: React.FC = () => {
           ) : (
             students.map((student) => {
               const collab = collaborators.find((c) => c.id === student.assignedCollaboratorId);
+              const mgr = managers.find((m) => m.id === student.assignedCollaboratorId);
+              const isOwnerCoach = owner && owner.id === student.assignedCollaboratorId;
+              const coachName = collab
+                ? `${collab.name} ${collab.surname} (Coach)`
+                : mgr
+                ? `${mgr.name} ${mgr.surname} (Manager)`
+                : isOwnerCoach
+                ? `${owner.name} ${owner.surname} (Titolare)`
+                : null;
               return (
                 <Card key={student.id} variant="elevated">
                   <View style={styles.userRow}>
@@ -354,9 +365,9 @@ export const ManageUsersScreen: React.FC = () => {
                       {student.goals && (
                         <Text style={styles.userDetail}>Obiettivi: {student.goals}</Text>
                       )}
-                      {collab && (
+                      {coachName && (
                         <Text style={styles.userCollab}>
-                          Seguito da: {collab.name} {collab.surname}
+                          Seguito da: {coachName}
                         </Text>
                       )}
                       {(student.coachCommissionPercentage || student.managerCommissionPercentage) ? (
