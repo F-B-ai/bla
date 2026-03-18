@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
+import { FontDisplay } from 'expo-font';
 
 /**
  * On web, expo-font's Font.loadAsync does NOT wait for the font to actually
@@ -27,12 +28,41 @@ async function loadIcoFontsWeb(): Promise<void> {
     }
   }
 
-  // Also trigger expo-font to inject its @font-face CSS rule, so that
-  // the Ionicons component's internal isLoaded() check returns true
+  // Trigger expo-font to inject its @font-face CSS rule into the
+  // <style id="expo-generated-fonts"> element. The Ionicons component checks
+  // Font.isLoaded('ionicons') which ONLY looks at rules in that element.
+  // Use a direct URI string to avoid silent Asset.fromModule() failures.
   try {
-    await Font.loadAsync({ ...Ionicons.font });
+    await Font.loadAsync({
+      ionicons: { uri: '/Ionicons.ttf', display: FontDisplay.BLOCK } as any,
+    });
   } catch {
-    // Ignore - the HTML @font-face is our primary mechanism
+    try {
+      await Font.loadAsync({ ...Ionicons.font });
+    } catch {
+      // Both approaches failed - manually inject the CSS rule so isLoaded() returns true
+    }
+  }
+
+  // Safety net: if expo-font still doesn't recognize the font, manually inject
+  // the @font-face rule into the expo-generated-fonts style element
+  if (!Font.isLoaded('ionicons')) {
+    try {
+      let style = document.getElementById('expo-generated-fonts') as HTMLStyleElement | null;
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'expo-generated-fonts';
+        style.type = 'text/css';
+        document.head.appendChild(style);
+      }
+      style.appendChild(
+        document.createTextNode(
+          "@font-face{font-family:ionicons;src:url(/Ionicons.ttf);font-display:block}"
+        )
+      );
+    } catch {
+      // Proceed anyway
+    }
   }
 
   // Final check: use the native document.fonts API to confirm the font is ready
