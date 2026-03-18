@@ -38,18 +38,30 @@
   </style>
   <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
   <script>
-    // Force-load Ionicons font for iOS Safari (both cases for compatibility)
+    // Force-load Ionicons font via FontFace API for all browsers (including iOS Safari)
+    // This ensures the font is registered and downloading before JS bundle executes
     (function() {
       if (typeof FontFace !== 'undefined') {
         var names = ['Ionicons', 'ionicons'];
+        var promises = [];
         names.forEach(function(name) {
-          var font = new FontFace(name, 'url(/Ionicons.ttf)');
-          font.load().then(function(loaded) {
-            document.fonts.add(loaded);
-          }).catch(function(err) {
-            console.warn(name + ' font load failed:', err);
+          var font = new FontFace(name, 'url(/Ionicons.ttf)', {
+            weight: 'normal',
+            style: 'normal',
+            display: 'block'
           });
+          promises.push(
+            font.load().then(function(loaded) {
+              document.fonts.add(loaded);
+            }).catch(function(err) {
+              console.warn(name + ' font load failed:', err);
+            })
+          );
         });
+        // Store promise globally so App.tsx can await it
+        window.__ioniconsReady = Promise.all(promises);
+      } else {
+        window.__ioniconsReady = Promise.resolve();
       }
     })();
   </script>

@@ -45,7 +45,7 @@ webAssets.forEach((file) => {
 // Inject local Ionicons font preload + @font-face (both cases for Expo compatibility)
 if (!html.includes("preload\" href=\"/Ionicons.ttf\"")) {
   const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; } @font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
-  const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){['Ionicons','ionicons'].forEach(function(n){var f=new FontFace(n,'url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn(n+' load failed:',e)})})}})();</script>`;
+  const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){var p=[];['Ionicons','ionicons'].forEach(function(n){var f=new FontFace(n,'url(/Ionicons.ttf)',{weight:'normal',style:'normal',display:'block'});p.push(f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn(n+' load failed:',e)}))});window.__ioniconsReady=Promise.all(p)}else{window.__ioniconsReady=Promise.resolve()}})();</script>`;
   html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
 }
 
