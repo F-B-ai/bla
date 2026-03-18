@@ -1,6 +1,7 @@
 const sharp = require('sharp');
 
 const sizes = [
+  { name: 'web/icon-180.png', size: 180 },
   { name: 'web/icon-192.png', size: 192 },
   { name: 'web/icon-512.png', size: 512 },
   { name: 'src/assets/icon.png', size: 1024 },

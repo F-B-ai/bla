@@ -11,7 +11,10 @@ const pwaMeta = `
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ESSĒRE" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
     <link rel="manifest" href="/manifest.json" />`;
 
 // Add PWA meta after <title>
@@ -19,26 +22,32 @@ if (!html.includes('apple-mobile-web-app-capable')) {
   html = html.replace('</title>', '</title>' + pwaMeta);
 }
 
-// Copy service worker to dist root (must be at root scope)
-const swSrc = path.join(__dirname, 'web', 'sw.js');
-const swDst = path.join(__dirname, 'dist', 'sw.js');
-if (fs.existsSync(swSrc)) {
-  fs.copyFileSync(swSrc, swDst);
-  console.log('✓ sw.js copied to dist/');
-}
+// Copy all web static assets to dist
+const webAssets = [
+  'sw.js',
+  'Ionicons.ttf',
+  'manifest.json',
+  'icon-192.png',
+  'icon-512.png',
+  'icon-180.png',
+  'favicon.ico'
+];
 
-// Copy Ionicons.ttf to dist root for reliable local serving
-const localFontSrc = path.join(__dirname, 'web', 'Ionicons.ttf');
-const localFontDst = path.join(__dirname, 'dist', 'Ionicons.ttf');
-if (fs.existsSync(localFontSrc)) {
-  fs.copyFileSync(localFontSrc, localFontDst);
-  console.log('✓ Ionicons.ttf copied to dist/');
-}
+webAssets.forEach((file) => {
+  const src = path.join(__dirname, 'web', file);
+  const dst = path.join(__dirname, 'dist', file);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, dst);
+    console.log(`✓ ${file} copied to dist/`);
+  }
+});
 
 // Inject local Ionicons font preload + @font-face (both cases for Expo compatibility)
-const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; } @font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
-const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){['Ionicons','ionicons'].forEach(function(n){var f=new FontFace(n,'url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn(n+' load failed:',e)})})}})();</script>`;
-html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
+if (!html.includes("preload\" href=\"/Ionicons.ttf\"")) {
+  const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; } @font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
+  const fontScript = `\n    <script>(function(){if(typeof FontFace!=='undefined'){['Ionicons','ionicons'].forEach(function(n){var f=new FontFace(n,'url(/Ionicons.ttf)');f.load().then(function(l){document.fonts.add(l)}).catch(function(e){console.warn(n+' load failed:',e)})})}})();</script>`;
+  html = html.replace('</head>', fontPreload + fontScript + '\n  </head>');
+}
 
 // Fix lang to Italian
 html = html.replace('lang="en"', 'lang="it"');
