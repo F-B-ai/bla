@@ -17,9 +17,9 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
-import { Exercise, ExerciseCategory, WeeklyDay, Student } from '../../types';
+import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { createWorkoutPlan, getActiveWorkoutPlan } from '../../services/programService';
+import { createWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getStudents } from '../../services/authService';
 import {
   suggestWorkoutProgression,
@@ -66,6 +66,13 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateFilter, setTemplateFilter] = useState<'all' | 'male' | 'female'>('all');
 
+  // History State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [studentPlans, setStudentPlans] = useState<WorkoutPlan[]>([]);
+  const [viewingPlan, setViewingPlan] = useState<WorkoutPlan | null>(null);
+  const [historySelectedDay, setHistorySelectedDay] = useState(0);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AIProgressionSuggestion | null>(null);
@@ -92,6 +99,29 @@ export const WorkoutPlanScreen: React.FC = () => {
   useEffect(() => {
     loadStudents();
   }, [loadStudents]);
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const handleViewStudentHistory = async () => {
+    if (!selectedStudentId) {
+      crossAlert('Errore', 'Seleziona prima un allievo');
+      return;
+    }
+    setLoadingHistory(true);
+    setShowHistoryModal(true);
+    try {
+      const plans = await getStudentWorkoutPlans(selectedStudentId);
+      setStudentPlans(plans);
+    } catch {
+      crossAlert('Errore', 'Impossibile caricare le programmazioni');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   // Applica un template alla scheda corrente
   const applyTemplate = (template: WorkoutTemplate) => {
@@ -389,6 +419,16 @@ export const WorkoutPlanScreen: React.FC = () => {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        )}
+
+        {/* Vedi storico programmazioni allievo */}
+        {selectedStudentId && (
+          <Button
+            title="Vedi Programmazioni Precedenti"
+            onPress={handleViewStudentHistory}
+            variant="outline"
+            style={{ marginBottom: spacing.md }}
+          />
         )}
 
         <InputField
@@ -744,6 +784,121 @@ export const WorkoutPlanScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modale Storico Programmazioni */}
+      <Modal visible={showHistoryModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title={`Programmazioni Precedenti`}
+              onClose={() => { setShowHistoryModal(false); setViewingPlan(null); }}
+            />
+
+            {loadingHistory ? (
+              <Card>
+                <Text style={styles.historyEmptyText}>Caricamento...</Text>
+              </Card>
+            ) : !viewingPlan ? (
+              <>
+                {studentPlans.length === 0 ? (
+                  <Card>
+                    <Text style={styles.historyEmptyText}>
+                      Nessuna programmazione trovata per questo allievo.
+                    </Text>
+                  </Card>
+                ) : (
+                  studentPlans.map((plan) => (
+                    <TouchableOpacity
+                      key={plan.id}
+                      onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}
+                    >
+                      <Card variant={plan.isActive ? 'elevated' : 'outlined'}>
+                        <View style={styles.historyRow}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyName}>{plan.title}</Text>
+                            <Text style={styles.historyDate}>
+                              {formatDate(plan.startDate)} - {formatDate(plan.endDate)}
+                            </Text>
+                          </View>
+                          {plan.isActive && (
+                            <View style={styles.activeBadge}>
+                              <Text style={styles.activeBadgeText}>ATTIVO</Text>
+                            </View>
+                          )}
+                        </View>
+                      </Card>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <Card variant="elevated">
+                  <Text style={styles.historyPlanTitle}>{viewingPlan.title}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatDate(viewingPlan.startDate)} - {formatDate(viewingPlan.endDate)}
+                  </Text>
+                  {viewingPlan.isActive && (
+                    <View style={[styles.activeBadge, { marginTop: spacing.xs }]}>
+                      <Text style={styles.activeBadgeText}>ATTIVO</Text>
+                    </View>
+                  )}
+                </Card>
+
+                <TouchableOpacity
+                  style={styles.historyBackBtn}
+                  onPress={() => setViewingPlan(null)}
+                >
+                  <Text style={styles.historyBackText}>Torna alla lista</Text>
+                </TouchableOpacity>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll}>
+                  {DAYS.map((day, index) => (
+                    <TouchableOpacity
+                      key={`hist-${day}`}
+                      style={[styles.dayButton, historySelectedDay === index && styles.dayButtonActive]}
+                      onPress={() => setHistorySelectedDay(index)}
+                    >
+                      <Text style={[styles.dayText, historySelectedDay === index && styles.dayTextActive]}>
+                        {day.substring(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.sectionTitle}>{DAYS[historySelectedDay]}</Text>
+                {viewingPlan.weeklySchedule[historySelectedDay]?.exercises.length === 0 ? (
+                  <Card><Text style={styles.historyEmptyText}>Riposo</Text></Card>
+                ) : (
+                  viewingPlan.weeklySchedule[historySelectedDay]?.exercises.map((ex, i) => (
+                    <Card key={ex.id || i} variant="outlined">
+                      <View style={styles.exerciseRow}>
+                        <View style={styles.exerciseNumber}>
+                          <Text style={styles.exerciseNumberText}>{i + 1}</Text>
+                        </View>
+                        <View style={styles.exerciseInfo}>
+                          <Text style={styles.exerciseName}>{ex.name}</Text>
+                          <Text style={styles.exerciseDetails}>
+                            {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
+                          </Text>
+                          {ex.description ? (
+                            <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                          ) : null}
+                          {ex.notes ? (
+                            <Text style={styles.exerciseNotes}>Note: {ex.notes}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </Card>
+                  ))
+                )}
+              </>
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -1086,5 +1241,54 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing.xxl * 2,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyDate: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  historyPlanTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyEmptyText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    padding: spacing.lg,
+    lineHeight: 22,
+  },
+  historyBackBtn: {
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  historyBackText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  activeBadge: {
+    backgroundColor: colors.success,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  activeBadgeText: {
+    color: '#FFF',
+    fontSize: fontSize.xs,
+    fontWeight: '800',
   },
 });
