@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
@@ -208,15 +209,21 @@ export const DashboardScreen: React.FC = () => {
     >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>Buongiorno{user?.name ? `, ${user.name}` : ''}!</Text>
-            <Text style={styles.date}>
-              {new Date().toLocaleDateString('it-IT', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
-            </Text>
+          <View style={styles.headerLeft}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.headerIcon}
+            />
+            <View>
+              <Text style={styles.greeting}>Buongiorno{user?.name ? `, ${user.name}` : ''}!</Text>
+              <Text style={styles.date}>
+                {new Date().toLocaleDateString('it-IT', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Text style={styles.logoutText}>Esci</Text>
@@ -471,6 +478,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
   },
   logoutButton: {
     backgroundColor: colors.surfaceLight,
