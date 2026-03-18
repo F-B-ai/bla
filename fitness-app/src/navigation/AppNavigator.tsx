@@ -49,7 +49,7 @@ const TabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) =>
 
 // Custom scrollable tab bar for navigators with many tabs
 const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
-  <View style={styles.scrollableTabBarContainer}>
+  <View nativeID="tab-bar-bottom" style={styles.scrollableTabBarContainer}>
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -344,11 +344,10 @@ const CollaboratorTabs = () => (
 // --- Student Tabs ---
 const StudentTabs = () => (
   <StudentTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
       headerShown: false,
     }}
   >
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.divider,
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'web' ? 8 : 20,
+    paddingBottom: Platform.OS === 'web' ? 0 : 20,
   },
   scrollableTabBarContent: {
     paddingHorizontal: 4,

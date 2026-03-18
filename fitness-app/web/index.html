@@ -20,6 +20,13 @@
   <style>
     html, body, #root { margin: 0; padding: 0; height: 100%; background: #0D0D0D; }
 
+    /* Safe area padding for PWA standalone on notched iPhones */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      #tab-bar-bottom {
+        padding-bottom: env(safe-area-inset-bottom) !important;
+      }
+    }
+
     /* Ionicons font - served locally to avoid CDN/CORS issues on iOS Safari */
     /* Expo/react-native-vector-icons uses lowercase 'ionicons' as font-family */
     @font-face {

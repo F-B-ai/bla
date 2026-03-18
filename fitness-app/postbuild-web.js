@@ -43,6 +43,12 @@ webAssets.forEach((file) => {
   }
 });
 
+// Inject safe area CSS for PWA standalone on notched iPhones
+if (!html.includes('tab-bar-bottom')) {
+  const safeAreaCss = `\n    <style>@supports(padding-bottom:env(safe-area-inset-bottom)){#tab-bar-bottom{padding-bottom:env(safe-area-inset-bottom)!important}}</style>`;
+  html = html.replace('</head>', safeAreaCss + '\n  </head>');
+}
+
 // Inject local Ionicons font preload + @font-face (both cases for Expo compatibility)
 if (!html.includes("preload\" href=\"/Ionicons.ttf\"")) {
   const fontPreload = `\n    <link rel="preload" href="/Ionicons.ttf" as="font" type="font/ttf" crossorigin="anonymous" />\n    <style>@font-face { font-family: 'Ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; } @font-face { font-family: 'ionicons'; src: url('/Ionicons.ttf') format('truetype'); font-display: block; }</style>`;
