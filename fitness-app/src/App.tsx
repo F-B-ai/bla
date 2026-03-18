@@ -7,74 +7,65 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
-import { FontDisplay } from 'expo-font';
 
 /**
- * On web, expo-font's Font.loadAsync does NOT wait for the font to actually
- * download on Safari, iOS, Firefox, and Edge (isFontLoadingListenerSupported
- * returns false). This causes icons to be invisible because the app renders
- * before the font is ready. We use the browser's native document.fonts API
- * to reliably wait for the font, with a timeout fallback.
+ * On web, expo-font's Font.loadAsync has a bug: it passes the font URI as a
+ * plain string to ExpoFontLoader.loadAsync which expects an object with .uri,
+ * resulting in @font-face { src: url(undefined) }. The Ionicons component
+ * checks Font.isLoaded('ionicons') which only looks at CSS rules inside the
+ * <style id="expo-generated-fonts"> element.
+ *
+ * Fix: manually inject the correct @font-face rule into that element so
+ * Font.isLoaded('ionicons') returns true, then wait for the browser to
+ * confirm the font is ready.
  */
 async function loadIcoFontsWeb(): Promise<void> {
-  // Wait for the HTML inline script to finish loading the font via FontFace API
-  // This is set by index.html before the JS bundle runs
+  // 1. Wait for the HTML inline script to finish loading the font via FontFace API
   const globalReady = (window as any).__ioniconsReady;
   if (globalReady) {
-    try {
-      await globalReady;
-    } catch {
-      // Continue - we have fallbacks below
-    }
+    try { await globalReady; } catch {}
   }
 
-  // Trigger expo-font to inject its @font-face CSS rule into the
-  // <style id="expo-generated-fonts"> element. The Ionicons component checks
-  // Font.isLoaded('ionicons') which ONLY looks at rules in that element.
-  // Use a direct URI string to avoid silent Asset.fromModule() failures.
+  // 2. Inject the correct @font-face into the expo-generated-fonts element
+  //    BEFORE calling Font.loadAsync, so the Ionicons component's
+  //    Font.isLoaded('ionicons') check returns true.
   try {
-    await Font.loadAsync({
-      ionicons: { uri: '/Ionicons.ttf', display: FontDisplay.BLOCK } as any,
-    });
-  } catch {
-    try {
-      await Font.loadAsync({ ...Ionicons.font });
-    } catch {
-      // Both approaches failed - manually inject the CSS rule so isLoaded() returns true
+    let style = document.getElementById('expo-generated-fonts') as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'expo-generated-fonts';
+      style.type = 'text/css';
+      document.head.appendChild(style);
     }
-  }
-
-  // Safety net: if expo-font still doesn't recognize the font, manually inject
-  // the @font-face rule into the expo-generated-fonts style element
-  if (!Font.isLoaded('ionicons')) {
-    try {
-      let style = document.getElementById('expo-generated-fonts') as HTMLStyleElement | null;
-      if (!style) {
-        style = document.createElement('style');
-        style.id = 'expo-generated-fonts';
-        style.type = 'text/css';
-        document.head.appendChild(style);
+    // Check if the rule already exists
+    const sheet = style.sheet;
+    let hasRule = false;
+    if (sheet) {
+      for (let i = 0; i < sheet.cssRules.length; i++) {
+        const rule = sheet.cssRules[i];
+        if (rule instanceof CSSFontFaceRule && rule.style.fontFamily === 'ionicons') {
+          hasRule = true;
+          break;
+        }
       }
+    }
+    if (!hasRule) {
       style.appendChild(
         document.createTextNode(
           "@font-face{font-family:ionicons;src:url(/Ionicons.ttf);font-display:block}"
         )
       );
-    } catch {
-      // Proceed anyway
     }
-  }
+  } catch {}
 
-  // Final check: use the native document.fonts API to confirm the font is ready
+  // 3. Wait for the browser to confirm the font is actually ready for rendering
   if (typeof document !== 'undefined' && document.fonts) {
     try {
       await Promise.race([
         document.fonts.ready,
         new Promise<void>((resolve) => setTimeout(resolve, 5000)),
       ]);
-    } catch {
-      // Proceed anyway
-    }
+    } catch {}
   }
 }
 
