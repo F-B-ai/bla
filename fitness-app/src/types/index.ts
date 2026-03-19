@@ -284,6 +284,49 @@ export interface NutritionalConsultation {
   nextAppointment?: Date;
 }
 
+// --- Nutrizionista ---
+export type NutritionistAppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'cancelled_late';
+
+export interface NutritionistAppointment {
+  id: string;
+  studentId: string;
+  date: Date;
+  startTime: string; // "09:00"
+  endTime: string;   // "10:00"
+  status: NutritionistAppointmentStatus;
+  notes: string;
+  cancelledAt?: Date;
+  isCountedAsCompleted: boolean; // Se cancellato < 10 ore prima
+  createdAt: Date;
+}
+
+export interface BodyMeasurement {
+  id: string;
+  studentId: string;
+  date: Date;
+  weight?: number;       // kg
+  height?: number;       // cm
+  bodyFat?: number;      // %
+  muscleMass?: number;   // kg
+  waist?: number;        // cm
+  hips?: number;         // cm
+  chest?: number;        // cm
+  arms?: number;         // cm
+  thighs?: number;       // cm
+  notes: string;
+  createdAt: Date;
+}
+
+export interface BiaDocument {
+  id: string;
+  studentId: string;
+  date: Date;
+  pdfUrl: string;
+  fileName: string;
+  notes: string;
+  createdAt: Date;
+}
+
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'

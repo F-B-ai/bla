@@ -26,6 +26,7 @@ import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
 
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
+import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 
@@ -169,6 +170,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
@@ -254,6 +263,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Content"
       component={ContentManagementScreen}
       options={{
@@ -323,6 +340,14 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
@@ -389,6 +414,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
