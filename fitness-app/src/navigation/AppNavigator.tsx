@@ -27,6 +27,7 @@ import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
 import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
+import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 
@@ -178,6 +179,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
@@ -271,6 +280,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Content"
       component={ContentManagementScreen}
       options={{
@@ -345,6 +362,14 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'Nutrizione',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen

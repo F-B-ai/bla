@@ -327,6 +327,23 @@ export interface BiaDocument {
   createdAt: Date;
 }
 
+// --- Team Nutrizionisti (bacheca condivisa) ---
+export type NutritionNoteCategory = 'protocollo' | 'linea_guida' | 'aggiornamento' | 'caso_studio' | 'altro';
+
+export interface NutritionTeamNote {
+  id: string;
+  authorId: string;
+  authorName: string;
+  title: string;
+  content: string;
+  category: NutritionNoteCategory;
+  isPinned: boolean;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'
