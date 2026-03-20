@@ -30,6 +30,7 @@ export interface Manager extends User {
   role: 'manager';
   assignedCollaborators: string[]; // collaborator IDs gestiti dal manager
   assignedStudents: string[]; // student IDs (allievi diretti del manager)
+  assignedNutritionists: string[]; // nutrizionisti coach sotto il manager nutrizionista
   commissionPercentage: number; // % commissione manager per allievi dei suoi coach
   specializations: string[];
 }
@@ -47,6 +48,8 @@ export interface Student extends User {
   role: 'student';
   assignedCollaboratorId: string; // coach o manager che lo segue direttamente
   assignedManagerId?: string; // manager responsabile (se assegnato a un coach sotto un manager)
+  assignedNutritionistId?: string; // nutrizionista coach assegnato
+  assignedNutritionManagerId?: string; // manager nutrizionista responsabile
   managerCommissionPercentage?: number; // % commissione per il manager
   coachCommissionPercentage?: number; // % commissione per il coach
   startDate: Date;
@@ -190,6 +193,7 @@ export interface ChatRoom {
   id: string;
   participants: string[]; // user IDs
   type: 'direct' | 'group';
+  chatType?: 'training' | 'nutrition'; // tipo di chat: allenamento o nutrizione
   createdAt: Date;
   lastMessage?: ChatMessage;
   studentId: string;
@@ -290,6 +294,8 @@ export type NutritionistAppointmentStatus = 'scheduled' | 'completed' | 'cancell
 export interface NutritionistAppointment {
   id: string;
   studentId: string;
+  nutritionistId?: string; // nutrizionista coach che gestisce la visita
+  nutritionManagerId?: string; // manager nutrizionista responsabile
   date: Date;
   startTime: string; // "09:00"
   endTime: string;   // "10:00"
