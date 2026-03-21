@@ -1,14 +1,16 @@
 // Service Worker for ESSERE PWA - auto-update on new deploy
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = 'essere-' + CACHE_VERSION;
 
 // Assets to pre-cache on install
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
+  '/icon-32.png',
   '/icon-180.png',
   '/icon-192.png',
   '/icon-512.png',
+  '/favicon.ico',
   '/Ionicons.ttf'
 ];
 

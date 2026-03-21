@@ -14,8 +14,10 @@ const pwaMeta = `
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="manifest" href="/manifest.json" />`;
 
 // Add PWA meta after <title>
@@ -28,6 +30,7 @@ const webAssets = [
   'sw.js',
   'Ionicons.ttf',
   'manifest.json',
+  'icon-32.png',
   'icon-192.png',
   'icon-512.png',
   'icon-180.png',
