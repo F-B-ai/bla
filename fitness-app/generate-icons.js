@@ -14,9 +14,6 @@ function generateSVG(size) {
   const r = size * 0.12; // corner radius
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
   <defs>
-    <clipPath id="roundedClip">
-      <rect width="512" height="512" rx="90" ry="90"/>
-    </clipPath>
     <linearGradient id="ensoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FF1A1A"/>
       <stop offset="40%" stop-color="#E00000"/>
@@ -37,8 +34,8 @@ function generateSVG(size) {
       <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
   </defs>
-  <g clip-path="url(#roundedClip)">
-    <!-- Dark background -->
+  <g>
+    <!-- Dark background - full square, OS applies its own rounding -->
     <rect width="512" height="512" fill="#0D0D0D"/>
 
     <!-- Subtle radial glow -->
