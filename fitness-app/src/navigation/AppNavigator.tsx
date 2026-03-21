@@ -30,6 +30,7 @@ import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
 import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
+import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -163,6 +164,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Postura"
       component={PosturalAssessmentScreen}
       options={{
@@ -256,6 +265,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Postura"
       component={PosturalAssessmentScreen}
       options={{
@@ -338,6 +355,14 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'Programmi',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen

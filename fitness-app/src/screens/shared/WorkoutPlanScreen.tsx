@@ -28,6 +28,7 @@ import {
   ensureAIApiKey,
 } from '../../services/aiService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
+import { getCustomTemplates, CustomWorkoutTemplate } from '../../services/programService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -65,6 +66,8 @@ export const WorkoutPlanScreen: React.FC = () => {
   // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateFilter, setTemplateFilter] = useState<'all' | 'male' | 'female'>('all');
+  const [customTemplates, setCustomTemplates] = useState<CustomWorkoutTemplate[]>([]);
+  const [templateTab, setTemplateTab] = useState<'custom' | 'builtin'>('custom');
 
   // History State
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -96,9 +99,19 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   }, [user, isOwner, isManager, isCollaborator]);
 
+  const loadCustomTemplates = useCallback(async () => {
+    try {
+      const templates = await getCustomTemplates();
+      setCustomTemplates(templates);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   useEffect(() => {
     loadStudents();
-  }, [loadStudents]);
+    loadCustomTemplates();
+  }, [loadStudents, loadCustomTemplates]);
 
   const formatDate = (date: any) => {
     if (!date) return '';
@@ -138,7 +151,25 @@ export const WorkoutPlanScreen: React.FC = () => {
     crossAlert('Template Applicato', `"${template.name}" caricato. Puoi modificare gli esercizi prima di salvare.`);
   };
 
+  const applyCustomTemplate = (template: CustomWorkoutTemplate) => {
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of template.weeklySchedule) {
+      newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+        ...ex,
+        id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+      }));
+    }
+    setExercises(newExercises);
+    setPlanTitle(template.name);
+    setShowTemplateModal(false);
+    crossAlert('Template Applicato', `"${template.name}" caricato. Puoi modificare gli esercizi prima di salvare.`);
+  };
+
   const filteredTemplates = allTemplates.filter((t) =>
+    templateFilter === 'all' ? true : t.gender === templateFilter
+  );
+
+  const filteredCustomTemplates = customTemplates.filter((t) =>
     templateFilter === 'all' ? true : t.gender === templateFilter
   );
 
@@ -741,6 +772,26 @@ export const WorkoutPlanScreen: React.FC = () => {
           <ScrollView style={styles.modalContent}>
             <ModalHeader title="Scegli Template" onClose={() => setShowTemplateModal(false)} />
 
+            {/* Tab personalizzati / predefiniti */}
+            <View style={styles.templateFilterRow}>
+              <TouchableOpacity
+                style={[styles.templateFilterBtn, templateTab === 'custom' && styles.templateFilterBtnActive]}
+                onPress={() => setTemplateTab('custom')}
+              >
+                <Text style={[styles.templateFilterText, templateTab === 'custom' && styles.templateFilterTextActive]}>
+                  Personalizzati
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.templateFilterBtn, templateTab === 'builtin' && styles.templateFilterBtnActive]}
+                onPress={() => setTemplateTab('builtin')}
+              >
+                <Text style={[styles.templateFilterText, templateTab === 'builtin' && styles.templateFilterTextActive]}>
+                  Predefiniti
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Filtro genere */}
             <View style={styles.templateFilterRow}>
               {(['all', 'male', 'female'] as const).map((f) => (
@@ -756,28 +807,51 @@ export const WorkoutPlanScreen: React.FC = () => {
               ))}
             </View>
 
-            {filteredTemplates.map((tpl) => (
-              <TouchableOpacity
-                key={tpl.id}
-                onPress={() => applyTemplate(tpl)}
-              >
-                <Card variant="outlined">
-                  <View style={styles.templateRow}>
-                    <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
-                      <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
-                    </View>
-                    <View style={styles.templateInfo}>
-                      <Text style={styles.templateName}>{tpl.name}</Text>
-                      <Text style={styles.templateCategory}>{tpl.category}</Text>
-                      <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
-                      <Text style={styles.templateDays}>
-                        {tpl.weeklySchedule.length} giorni/settimana
-                      </Text>
-                    </View>
-                  </View>
+            {templateTab === 'custom' ? (
+              filteredCustomTemplates.length === 0 ? (
+                <Card>
+                  <Text style={styles.emptyText}>
+                    Nessun template personalizzato.{'\n'}Creane uno dalla sezione Template!
+                  </Text>
                 </Card>
-              </TouchableOpacity>
-            ))}
+              ) : (
+                filteredCustomTemplates.map((tpl) => (
+                  <TouchableOpacity key={tpl.id} onPress={() => applyCustomTemplate(tpl)}>
+                    <Card variant="outlined">
+                      <View style={styles.templateRow}>
+                        <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
+                          <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
+                        </View>
+                        <View style={styles.templateInfo}>
+                          <Text style={styles.templateName}>{tpl.name}</Text>
+                          <Text style={styles.templateCategory}>{tpl.category}</Text>
+                          <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
+                          <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
+                        </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                ))
+              )
+            ) : (
+              filteredTemplates.map((tpl) => (
+                <TouchableOpacity key={tpl.id} onPress={() => applyTemplate(tpl)}>
+                  <Card variant="outlined">
+                    <View style={styles.templateRow}>
+                      <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
+                        <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
+                      </View>
+                      <View style={styles.templateInfo}>
+                        <Text style={styles.templateName}>{tpl.name}</Text>
+                        <Text style={styles.templateCategory}>{tpl.category}</Text>
+                        <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
+                        <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
+                      </View>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))
+            )}
 
             <View style={styles.bottomSpacer} />
           </ScrollView>

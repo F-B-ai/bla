@@ -129,3 +129,58 @@ export const deleteWorkoutPlan = async (planId: string): Promise<void> => {
 export const deleteProgram = async (programId: string): Promise<void> => {
   await deleteDoc(doc(db, PROGRAMS_COLLECTION, programId));
 };
+
+// --- Template personalizzati ---
+
+const CUSTOM_TEMPLATES_COLLECTION = 'customWorkoutTemplates';
+
+export interface CustomWorkoutTemplate {
+  id: string;
+  name: string;
+  description: string;
+  gender: 'male' | 'female';
+  category: string;
+  weeklySchedule: {
+    dayOfWeek: number;
+    dayName: string;
+    exercises: Omit<Exercise, 'id'>[];
+    notes: string;
+  }[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const getCustomTemplates = async (): Promise<CustomWorkoutTemplate[]> => {
+  const q = query(
+    collection(db, CUSTOM_TEMPLATES_COLLECTION),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as CustomWorkoutTemplate));
+};
+
+export const createCustomTemplate = async (
+  template: Omit<CustomWorkoutTemplate, 'id'>
+): Promise<string> => {
+  const docRef = await addDoc(collection(db, CUSTOM_TEMPLATES_COLLECTION), {
+    ...template,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateCustomTemplate = async (
+  templateId: string,
+  data: Partial<Omit<CustomWorkoutTemplate, 'id'>>
+): Promise<void> => {
+  await updateDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteCustomTemplate = async (templateId: string): Promise<void> => {
+  await deleteDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId));
+};
