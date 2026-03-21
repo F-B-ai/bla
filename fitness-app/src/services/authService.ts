@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { User, UserRole, Collaborator, Student, Manager, Owner } from '../types';
+import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
  * Crea un utente su Firebase Auth usando la REST API di Firebase
@@ -171,6 +171,40 @@ export const registerCollaborator = async (
     surname,
     phone,
     role: 'collaborator',
+    collaboratorType: 'coach',
+    commissionPercentage,
+    specializations,
+    assignedStudents: [],
+    createdAt: new Date(),
+    isActive: true,
+  };
+
+  await setDoc(doc(db, 'users', uid), {
+    ...collaboratorData,
+    createdAt: Timestamp.now(),
+  });
+
+  return { id: uid, ...collaboratorData };
+};
+
+export const registerNutritionist = async (
+  email: string,
+  password: string,
+  name: string,
+  surname: string,
+  phone: string,
+  commissionPercentage: number,
+  specializations: string[]
+): Promise<Collaborator> => {
+  const uid = await createUserWithRestApi(email, password);
+
+  const collaboratorData: Omit<Collaborator, 'id'> = {
+    email,
+    name,
+    surname,
+    phone,
+    role: 'collaborator',
+    collaboratorType: 'nutritionist',
     commissionPercentage,
     specializations,
     assignedStudents: [],

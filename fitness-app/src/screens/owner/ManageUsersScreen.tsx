@@ -17,9 +17,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
+import { AddNutritionistScreen } from './AddNutritionistScreen';
 import { InviteStudentScreen } from './InviteStudentScreen';
 
-type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addStudent' | 'inviteStudent';
+type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent';
 
 export const ManageUsersScreen: React.FC = () => {
   const { isOwner, isManager, isCollaborator, user } = useAuth();
@@ -134,6 +135,10 @@ export const ManageUsersScreen: React.FC = () => {
     return <AddCollaboratorScreen onBack={handleBack} />;
   }
 
+  if (viewMode === 'addNutritionist') {
+    return <AddNutritionistScreen onBack={handleBack} />;
+  }
+
   if (viewMode === 'addStudent') {
     return <AddStudentScreen onBack={handleBack} />;
   }
@@ -167,6 +172,13 @@ export const ManageUsersScreen: React.FC = () => {
           <Button
             title="+ Coach"
             onPress={() => setViewMode('addCollaborator')}
+            style={styles.actionButton}
+          />
+        )}
+        {canCreateCoach && (
+          <Button
+            title="+ Nutrizionista"
+            onPress={() => setViewMode('addNutritionist')}
             style={styles.actionButton}
           />
         )}
@@ -296,7 +308,7 @@ export const ManageUsersScreen: React.FC = () => {
                     </Text>
                     <Text style={styles.userEmail}>{collab.email}</Text>
                     <Text style={styles.userDetail}>
-                      {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
+                      {collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'} · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
                     </Text>
                     <Text style={styles.userStudents}>
                       {collab.assignedStudents.length} allievi assegnati

@@ -35,9 +35,13 @@ export interface Manager extends User {
   specializations: string[];
 }
 
+// --- Tipo collaboratore ---
+export type CollaboratorType = 'coach' | 'nutritionist';
+
 // --- Collaboratore ---
 export interface Collaborator extends User {
   role: 'collaborator';
+  collaboratorType?: CollaboratorType; // default 'coach' se assente
   commissionPercentage: number; // Es: 60 = il collaboratore tiene il 60%
   specializations: string[];
   assignedStudents: string[]; // student IDs
