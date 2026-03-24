@@ -5,13 +5,13 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Linking,
   Modal,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
+import { LessonPlayerModal } from '../../components/common/LessonPlayerModal';
 import { useAuth } from '../../hooks/useAuth';
 import {
   AcademyCourse,
@@ -97,10 +97,14 @@ export const AcademyScreen: React.FC = () => {
     }
   };
 
+  const [playingLesson, setPlayingLesson] = useState<AcademyLesson | null>(null);
+
   const handleOpenLesson = (lesson: AcademyLesson) => {
-    if (lesson.contentUrl) {
-      Linking.openURL(lesson.contentUrl);
-    }
+    setPlayingLesson(lesson);
+  };
+
+  const handlePlayerComplete = async (lesson: AcademyLesson) => {
+    await handleCompleteLesson(lesson);
   };
 
   const isLessonCompleted = (lessonId: string) =>
@@ -358,6 +362,15 @@ export const AcademyScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Player lezione */}
+      <LessonPlayerModal
+        lesson={playingLesson}
+        visible={!!playingLesson}
+        onClose={() => setPlayingLesson(null)}
+        onComplete={handlePlayerComplete}
+        isCompleted={playingLesson ? isLessonCompleted(playingLesson.id) : false}
+      />
     </View>
   );
 };
