@@ -12,20 +12,23 @@ import {
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
-import { Button } from '../../components/common/Button';
 import { useAuth } from '../../hooks/useAuth';
 import { resetPassword } from '../../services/authService';
-import { RegisterStudentScreen } from './RegisterStudentScreen';
-import { EnsoLogo } from '../../components/common/EnsōLogo';
+import { AcademyLogo } from '../../components/common/AcademyLogo';
 
-interface LoginScreenProps {
-  onBack?: () => void;
+const GOLD = '#C5A55A';
+const GOLD_DARK = '#8B7335';
+const GOLD_LIGHT = '#E8D5A0';
+const ACADEMY_BG = '#0D0D0D';
+const ACADEMY_SURFACE = '#141414';
+
+interface AcademyLoginScreenProps {
+  onBack: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
+export const AcademyLoginScreen: React.FC<AcademyLoginScreenProps> = ({ onBack }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showRegister, setShowRegister] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -68,10 +71,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
     }
   };
 
-  if (showRegister) {
-    return <RegisterStudentScreen onBack={() => setShowRegister(false)} />;
-  }
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -81,16 +80,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{'← Indietro'}</Text>
-          </TouchableOpacity>
-        )}
+        {/* Back button */}
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backText}>{'← Indietro'}</Text>
+        </TouchableOpacity>
 
         <View style={styles.header}>
-          <EnsoLogo size={120} />
-          <Text style={styles.title}>Essère</Text>
-          <Text style={styles.subtitle}>Il tuo percorso di benessere</Text>
+          <AcademyLogo size={140} />
+          <Text style={styles.title}>MIND MOVEMENT</Text>
+          <Text style={styles.titleAccent}>ACADEMY</Text>
+          <View style={styles.goldLine} />
+          <Text style={styles.subtitle}>Formazione & Crescita Professionale</Text>
         </View>
 
         <View style={styles.form}>
@@ -113,12 +113,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <Button
-            title="Accedi"
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            loading={loading}
-            style={styles.loginButton}
-          />
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>
+              {loading ? 'Accesso in corso...' : 'Accedi all\'Academy'}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => {
@@ -130,17 +134,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
             <Text style={styles.forgotText}>Password dimenticata?</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          onPress={() => setShowRegister(true)}
-          style={styles.registerLink}
-        >
-          <Text style={styles.registerText}>Hai un codice invito? Registrati</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.footer}>
-          Per registrarti come allievo hai bisogno di un codice invito dal tuo coach o manager
-        </Text>
       </ScrollView>
 
       {/* Modal Password Dimenticata */}
@@ -166,12 +159,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
               placeholder="la.tua@email.com"
             />
 
-            <Button
-              title="Invia link di recupero"
+            <TouchableOpacity
+              style={[styles.loginButton, resetLoading && styles.loginButtonDisabled]}
               onPress={handleResetPassword}
-              loading={resetLoading}
-              style={styles.resetButton}
-            />
+              disabled={resetLoading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.loginButtonText}>
+                {resetLoading ? 'Invio in corso...' : 'Invia link di recupero'}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setShowForgotPassword(false)}
@@ -189,40 +186,77 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: ACADEMY_BG,
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.xl,
   },
+  backButton: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    padding: spacing.md,
+  },
+  backText: {
+    color: GOLD,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
   header: {
     alignItems: 'center',
     marginBottom: spacing.xxl,
   },
   title: {
-    fontSize: fontSize.hero,
+    fontSize: fontSize.xl,
     fontWeight: '300',
-    color: colors.textOnPrimary,
+    color: GOLD_LIGHT,
     letterSpacing: 6,
+    marginTop: spacing.lg,
+  },
+  titleAccent: {
+    fontSize: fontSize.hero,
+    fontWeight: '700',
+    color: GOLD,
+    letterSpacing: 8,
+    marginTop: spacing.xs,
+  },
+  goldLine: {
+    width: 60,
+    height: 2,
+    backgroundColor: GOLD,
     marginTop: spacing.md,
-    fontStyle: 'italic',
+    borderRadius: 1,
   },
   subtitle: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
+    fontSize: fontSize.sm,
+    color: GOLD_DARK,
+    marginTop: spacing.md,
     letterSpacing: 2,
   },
   form: {
-    backgroundColor: colors.surface,
+    backgroundColor: ACADEMY_SURFACE,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GOLD_DARK + '40',
   },
   loginButton: {
+    backgroundColor: GOLD_DARK,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md + 2,
+    alignItems: 'center',
     marginTop: spacing.md,
+  },
+  loginButtonDisabled: {
+    opacity: 0.6,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   error: {
     color: colors.error,
@@ -236,70 +270,40 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   forgotText: {
-    color: colors.textSecondary,
+    color: GOLD_DARK,
     fontSize: fontSize.sm,
     textDecorationLine: 'underline',
-  },
-  registerLink: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    padding: spacing.sm,
-  },
-  registerText: {
-    color: colors.accent,
-    fontSize: fontSize.md,
-    fontWeight: '600',
-  },
-  backButton: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    padding: spacing.md,
-  },
-  backText: {
-    color: colors.accent,
-    fontSize: fontSize.md,
-    fontWeight: '600',
-  },
-  footer: {
-    color: colors.textLight,
-    fontSize: fontSize.sm,
-    textAlign: 'center',
-    marginTop: spacing.sm,
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
   },
   modalContent: {
-    backgroundColor: colors.surface,
+    backgroundColor: ACADEMY_SURFACE,
     borderRadius: borderRadius.xl,
     padding: spacing.xl,
     width: '100%',
     maxWidth: 400,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GOLD_DARK + '40',
   },
   modalTitle: {
     fontSize: fontSize.xl,
     fontWeight: '700',
-    color: colors.text,
+    color: GOLD,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
   modalDescription: {
     fontSize: fontSize.sm,
-    color: colors.textSecondary,
+    color: GOLD_DARK,
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: 18,
-  },
-  resetButton: {
-    marginTop: spacing.md,
   },
   cancelLink: {
     alignItems: 'center',
@@ -307,7 +311,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   cancelText: {
-    color: colors.textSecondary,
+    color: GOLD_DARK,
     fontSize: fontSize.md,
   },
 });

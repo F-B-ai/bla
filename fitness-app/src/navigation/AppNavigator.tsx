@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,6 +9,8 @@ import { useAuth } from '../hooks/useAuth';
 
 // Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { LoginSelectorScreen } from '../screens/auth/LoginSelectorScreen';
+import { AcademyLoginScreen } from '../screens/auth/AcademyLoginScreen';
 import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -39,16 +41,27 @@ const OwnerTab = createBottomTabNavigator();
 const ManagerTab = createBottomTabNavigator();
 const CollaboratorTab = createBottomTabNavigator();
 const StudentTab = createBottomTabNavigator();
+const AcademyTab = createBottomTabNavigator();
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TAB_ICON_SIZE = 26;
+const GOLD = '#C5A55A';
+const GOLD_DARK = '#8B7335';
 
 const TabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
   <Ionicons
     name={name}
     size={TAB_ICON_SIZE}
     color={focused ? colors.accent : colors.textLight}
+  />
+);
+
+const AcademyTabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
+  <Ionicons
+    name={name}
+    size={TAB_ICON_SIZE}
+    color={focused ? GOLD : colors.textLight}
   />
 );
 
@@ -82,6 +95,45 @@ const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
           >
             {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: TAB_ICON_SIZE })}
             <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  </View>
+);
+
+// Academy-themed scrollable tab bar (gold accent)
+const AcademyScrollableTabBar = ({ state, descriptors, navigation }: any) => (
+  <View nativeID="tab-bar-bottom" style={styles.academyTabBarContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollableTabBarContent}
+    >
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel ?? route.name;
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={styles.scrollableTab}
+            onPress={onPress}
+          >
+            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? GOLD : colors.textLight, size: TAB_ICON_SIZE })}
+            <Text style={[styles.scrollableTabLabel, { color: isFocused ? GOLD : colors.textLight }]}>
               {label}
             </Text>
           </TouchableOpacity>
@@ -527,6 +579,72 @@ const StudentTabs = () => (
   </StudentTab.Navigator>
 );
 
+// --- Academy-Only Tabs (for Academy login) ---
+const AcademyOnlyStudentTabs = () => (
+  <AcademyTab.Navigator
+    tabBar={(props) => <AcademyScrollableTabBar {...props} />}
+    screenOptions={{
+      tabBarActiveTintColor: GOLD,
+      tabBarInactiveTintColor: colors.textLight,
+      headerShown: false,
+    }}
+  >
+    <AcademyTab.Screen
+      name="AcademyCorsi"
+      component={AcademyScreen}
+      options={{
+        tabBarLabel: 'Corsi',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyChat"
+      component={ChatListScreen}
+      options={{
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+  </AcademyTab.Navigator>
+);
+
+// Academy-Only for Owner/Manager (shows management view)
+const AcademyOnlyAdminTabs = () => (
+  <AcademyTab.Navigator
+    tabBar={(props) => <AcademyScrollableTabBar {...props} />}
+    screenOptions={{
+      tabBarActiveTintColor: GOLD,
+      tabBarInactiveTintColor: colors.textLight,
+      headerShown: false,
+    }}
+  >
+    <AcademyTab.Screen
+      name="AcademyGestione"
+      component={AcademyManagementScreen}
+      options={{
+        tabBarLabel: 'Gestione',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyCorsi"
+      component={AcademyScreen}
+      options={{
+        tabBarLabel: 'Corsi',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyChat"
+      component={ChatListScreen}
+      options={{
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+  </AcademyTab.Navigator>
+);
+
 // --- Loading screen ---
 const LoadingScreen = () => (
   <View style={styles.loading}>
@@ -537,21 +655,66 @@ const LoadingScreen = () => (
 
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading, role } = useAuth();
+  const { isAuthenticated, loading, role, logout } = useAuth();
+  // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
+  const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
+
+  const handleLogoutAndReset = useCallback(async () => {
+    await logout();
+    setLoginMode(null);
+  }, [logout]);
 
   if (loading) {
     return <LoadingScreen />;
   }
 
+  // When user logs out, reset login mode
+  const effectiveMode = isAuthenticated ? loginMode : null;
+
+  // Determine which tabs to show for Academy mode
+  const getAcademyTabs = () => {
+    if (role === 'owner' || role === 'manager') {
+      return AcademyOnlyAdminTabs;
+    }
+    return AcademyOnlyStudentTabs;
+  };
+
   return (
     <NavigationContainer
       documentTitle={{
-        formatter: () => 'ESSĒRE',
+        formatter: () => loginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
       }}
     >
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
-          <RootStack.Screen name="Login" component={LoginScreen} />
+          // Not authenticated: show login selector or specific login
+          loginMode === null ? (
+            <RootStack.Screen name="LoginSelector">
+              {() => (
+                <LoginSelectorScreen
+                  onSelectApp={() => setLoginMode('app')}
+                  onSelectAcademy={() => setLoginMode('academy')}
+                />
+              )}
+            </RootStack.Screen>
+          ) : loginMode === 'app' ? (
+            <RootStack.Screen name="Login">
+              {() => (
+                <LoginScreen onBack={() => setLoginMode(null)} />
+              )}
+            </RootStack.Screen>
+          ) : (
+            <RootStack.Screen name="AcademyLogin">
+              {() => (
+                <AcademyLoginScreen
+                  onBack={() => setLoginMode(null)}
+                />
+              )}
+            </RootStack.Screen>
+          )
+        ) : loginMode === 'academy' ? (
+          // Authenticated via Academy login: show only Academy tabs
+          <RootStack.Screen name="AcademyTabs" component={getAcademyTabs()} />
         ) : role === 'owner' ? (
           <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
         ) : role === 'manager' ? (
@@ -586,6 +749,12 @@ const styles = StyleSheet.create({
   scrollableTabBarContainer: {
     backgroundColor: colors.surface,
     borderTopColor: colors.divider,
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'web' ? 0 : 20,
+  },
+  academyTabBarContainer: {
+    backgroundColor: '#0D0D0D',
+    borderTopColor: GOLD_DARK + '40',
     borderTopWidth: 1,
     paddingBottom: Platform.OS === 'web' ? 0 : 20,
   },
