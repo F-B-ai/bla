@@ -377,6 +377,51 @@ export interface AppNotification {
   createdAt: Date;
 }
 
+// --- Academy (FB Mind Movement Academy) ---
+export type AcademyCourseCategory = 'mind' | 'movement' | 'nutrition' | 'lifestyle' | 'recovery';
+
+export type AcademyLessonType = 'video' | 'audio' | 'article' | 'exercise';
+
+export interface AcademyCourse {
+  id: string;
+  title: string;
+  description: string;
+  category: AcademyCourseCategory;
+  thumbnailUrl?: string;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isPublished: boolean;
+  assignedTo: string[]; // student IDs (vuoto = tutti)
+  tags: string[];
+  lessonsCount: number;
+  durationMinutes: number; // durata totale stimata
+  order: number; // ordine di visualizzazione
+}
+
+export interface AcademyLesson {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  type: AcademyLessonType;
+  contentUrl: string; // URL video/audio/articolo
+  thumbnailUrl?: string;
+  durationMinutes: number;
+  order: number;
+  isFree: boolean; // lezione gratuita/anteprima
+  createdAt: Date;
+}
+
+export interface AcademyProgress {
+  id: string;
+  studentId: string;
+  courseId: string;
+  lessonId: string;
+  completedAt: Date;
+  progressPercent: number; // 0-100
+}
+
 // --- Navigation types ---
 export type RootStackParamList = {
   Login: undefined;
