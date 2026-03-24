@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -420,9 +421,9 @@ export const AcademyManagementScreen: React.FC = () => {
 
       {/* Modal Corso */}
       <Modal visible={showCourseModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalContent}>
-            <ScrollView>
+            <ScrollView keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {editingCourse ? 'Modifica Corso' : 'Nuovo Corso'}
@@ -523,14 +524,14 @@ export const AcademyManagementScreen: React.FC = () => {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Modal Lezione */}
       <Modal visible={showLessonModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalContent}>
-            <ScrollView>
+            <ScrollView keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
                   {editingLesson ? 'Modifica Lezione' : 'Nuova Lezione'}
@@ -644,7 +645,7 @@ export const AcademyManagementScreen: React.FC = () => {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
