@@ -510,7 +510,11 @@ export const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      documentTitle={{
+        formatter: () => 'ESSĒRE',
+      }}
+    >
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           <RootStack.Screen name="Login" component={LoginScreen} />
