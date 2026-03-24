@@ -35,7 +35,7 @@ export const LoginSelectorScreen: React.FC<LoginSelectorScreenProps> = ({
           onPress={onSelectApp}
         >
           <View style={styles.cardContent}>
-            <EnsoLogo size={90} />
+            <EnsoLogo size={70} />
             <Text style={styles.cardTitle}>ESSĒRE</Text>
             <Text style={styles.cardDescription}>
               Fitness, Coaching{'\n'}& Benessere
@@ -54,7 +54,7 @@ export const LoginSelectorScreen: React.FC<LoginSelectorScreenProps> = ({
           onPress={onSelectAcademy}
         >
           <View style={styles.cardContent}>
-            <AcademyLogo size={90} />
+            <AcademyLogo size={70} />
             <Text style={styles.academyCardTitle}>ACADEMY</Text>
             <Text style={styles.academyCardDescription}>
               Mind Movement{'\n'}Academy
@@ -92,20 +92,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl + 8,
   },
   cardsRow: {
-    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
-    gap: spacing.lg,
+    flexDirection: 'row',
+    gap: spacing.md,
     width: '100%',
-    maxWidth: 560,
+    maxWidth: 400,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    width: Platform.OS === 'web' ? 250 : '100%',
-    maxWidth: 280,
+    flex: 1,
     overflow: 'hidden',
     ...shadows.medium,
   },
@@ -115,58 +114,59 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     alignItems: 'center',
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    flex: 1,
   },
   cardTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: fontSize.lg,
     fontWeight: '300',
     color: colors.text,
-    letterSpacing: 4,
-    marginTop: spacing.md,
+    letterSpacing: 3,
+    marginTop: spacing.sm,
     fontStyle: 'italic',
   },
   cardDescription: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 16,
-    letterSpacing: 1,
+    marginTop: spacing.xs,
+    lineHeight: 14,
+    letterSpacing: 0.5,
   },
   academyCardTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: fontSize.lg,
     fontWeight: '700',
     color: GOLD,
-    letterSpacing: 3,
-    marginTop: spacing.md,
+    letterSpacing: 2,
+    marginTop: spacing.sm,
   },
   academyCardDescription: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     color: GOLD_DARK,
     textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 16,
-    letterSpacing: 1,
+    marginTop: spacing.xs,
+    lineHeight: 14,
+    letterSpacing: 0.5,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.accent,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
   },
   cardFooterText: {
     color: '#FFFFFF',
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   cardArrow: {
     color: '#FFFFFF',
-    fontSize: fontSize.xl,
+    fontSize: fontSize.md,
     fontWeight: '700',
   },
   academyCardFooter: {
@@ -174,13 +174,13 @@ const styles = StyleSheet.create({
   },
   academyFooterText: {
     color: '#FFFFFF',
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   academyArrow: {
     color: '#FFFFFF',
-    fontSize: fontSize.xl,
+    fontSize: fontSize.md,
     fontWeight: '700',
   },
 });
