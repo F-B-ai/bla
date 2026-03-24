@@ -48,6 +48,31 @@
         { "fieldPath": "isUsed", "order": "ASCENDING" }
       ]
     }
+    ,
+    {
+      "collectionGroup": "academyLessons",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" },
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "academyProgress",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "courseId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "academyProgress",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "lessonId", "order": "ASCENDING" }
+      ]
+    }
   ],
   "fieldOverrides": []
 }

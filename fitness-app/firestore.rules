@@ -147,5 +147,29 @@ service cloud.firestore {
       allow update: if isStaff();
       allow delete: if isStaff();
     }
+
+    // Academy courses
+    match /academyCourses/{courseId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Academy lessons
+    match /academyLessons/{lessonId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Academy progress
+    match /academyProgress/{progressId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
   }
 }
