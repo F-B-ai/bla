@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -53,16 +54,23 @@ export const AcademyScreen: React.FC = () => {
   const [lessons, setLessons] = useState<AcademyLesson[]>([]);
   const [progress, setProgress] = useState<AcademyProgress[]>([]);
   const [allProgress, setAllProgress] = useState<AcademyProgress[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadCourses = useCallback(async () => {
     if (!user) return;
+    setLoadingCourses(true);
+    setLoadError(null);
     try {
       const data = await getCoursesForStudent(user.id);
       setCourses(data);
       const prog = await getStudentProgress(user.id);
       setAllProgress(prog);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Academy loadCourses error:', err);
+      setLoadError('Impossibile caricare i corsi. Controlla la connessione e riprova.');
+    } finally {
+      setLoadingCourses(false);
     }
   }, [user]);
 
@@ -70,8 +78,11 @@ export const AcademyScreen: React.FC = () => {
     loadCourses();
   }, [loadCourses]);
 
+  const [loadingLessons, setLoadingLessons] = useState(false);
+
   const openCourse = async (course: AcademyCourse) => {
     setSelectedCourse(course);
+    setLoadingLessons(true);
     try {
       const [lessonData, progressData] = await Promise.all([
         getCourseLessons(course.id),
@@ -79,8 +90,12 @@ export const AcademyScreen: React.FC = () => {
       ]);
       setLessons(lessonData);
       setProgress(progressData);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Academy openCourse error:', err);
+      setLessons([]);
+      setProgress([]);
+    } finally {
+      setLoadingLessons(false);
     }
   };
 
@@ -92,8 +107,8 @@ export const AcademyScreen: React.FC = () => {
       setProgress(updatedProgress);
       const updatedAll = await getStudentProgress(user.id);
       setAllProgress(updatedAll);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Academy markComplete error:', err);
     }
   };
 
@@ -272,17 +287,35 @@ export const AcademyScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <Card>
+          loadingCourses ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="school-outline" size={48} color={GOLD} />
-              <Text style={styles.emptyText}>
-                Nessun corso disponibile al momento
-              </Text>
-              <Text style={styles.emptySubtext}>
-                I nuovi corsi saranno disponibili a breve
-              </Text>
+              <ActivityIndicator size="large" color={GOLD} />
+              <Text style={styles.emptyText}>Caricamento corsi...</Text>
             </View>
-          </Card>
+          ) : loadError ? (
+            <Card>
+              <View style={styles.emptyContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+                <Text style={styles.emptyText}>{loadError}</Text>
+                <TouchableOpacity onPress={loadCourses} style={styles.retryBtn}>
+                  <Ionicons name="refresh" size={18} color={GOLD} />
+                  <Text style={styles.retryText}>Riprova</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+          ) : (
+            <Card>
+              <View style={styles.emptyContainer}>
+                <Ionicons name="school-outline" size={48} color={GOLD} />
+                <Text style={styles.emptyText}>
+                  Nessun corso disponibile al momento
+                </Text>
+                <Text style={styles.emptySubtext}>
+                  I nuovi corsi saranno disponibili a breve
+                </Text>
+              </View>
+            </Card>
+          )
         }
       />
 
@@ -354,7 +387,14 @@ export const AcademyScreen: React.FC = () => {
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={styles.lessonList}
                   ListEmptyComponent={
-                    <Text style={styles.emptyText}>Nessuna lezione ancora disponibile</Text>
+                    loadingLessons ? (
+                      <View style={styles.emptyContainer}>
+                        <ActivityIndicator size="small" color={GOLD} />
+                        <Text style={styles.emptyText}>Caricamento lezioni...</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.emptyText}>Nessuna lezione ancora disponibile</Text>
+                    )
                   }
                 />
               </>
@@ -554,6 +594,22 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
     fontSize: fontSize.sm,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD,
+    marginTop: spacing.sm,
+  },
+  retryText: {
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   // Modal
   modalOverlay: {

@@ -645,6 +645,19 @@ const AcademyOnlyAdminTabs = () => (
   </AcademyTab.Navigator>
 );
 
+// Logout header for Academy mode
+const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => (
+  <View style={styles.academyLogoutHeader}>
+    <View style={styles.academyLogoutBrand}>
+      <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+    </View>
+    <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+      <Ionicons name="log-out-outline" size={20} color={GOLD} />
+      <Text style={styles.logoutBtnText}>Esci</Text>
+    </TouchableOpacity>
+  </View>
+);
+
 // --- Loading screen ---
 const LoadingScreen = () => (
   <View style={styles.loading}>
@@ -668,16 +681,18 @@ export const AppNavigator: React.FC = () => {
     return <LoadingScreen />;
   }
 
-  // When user logs out, reset login mode
-  const effectiveMode = isAuthenticated ? loginMode : null;
-
   // Determine which tabs to show for Academy mode
-  const getAcademyTabs = () => {
-    if (role === 'owner' || role === 'manager') {
-      return AcademyOnlyAdminTabs;
-    }
-    return AcademyOnlyStudentTabs;
-  };
+  const AcademyTabsComponent = (role === 'owner' || role === 'manager')
+    ? AcademyOnlyAdminTabs
+    : AcademyOnlyStudentTabs;
+
+  // Wrap Academy tabs with logout header
+  const AcademyTabsWithLogout = () => (
+    <View style={{ flex: 1 }}>
+      <AcademyLogoutHeader onLogout={handleLogoutAndReset} />
+      <AcademyTabsComponent />
+    </View>
+  );
 
   return (
     <NavigationContainer
@@ -713,8 +728,8 @@ export const AppNavigator: React.FC = () => {
             </RootStack.Screen>
           )
         ) : loginMode === 'academy' ? (
-          // Authenticated via Academy login: show only Academy tabs
-          <RootStack.Screen name="AcademyTabs" component={getAcademyTabs()} />
+          // Authenticated via Academy login: show only Academy tabs with logout
+          <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
         ) : role === 'owner' ? (
           <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
         ) : role === 'manager' ? (
@@ -785,5 +800,41 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
     fontSize: fontSize.md,
     marginTop: 16,
+  },
+  academyLogoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0D0D0D',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 12 : 48,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: GOLD_DARK + '30',
+  },
+  academyLogoutBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  academyLogoutTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: GOLD_DARK,
+    letterSpacing: 1,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: GOLD_DARK + '50',
+  },
+  logoutBtnText: {
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
 });

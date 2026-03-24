@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -89,12 +90,20 @@ export const AcademyManagementScreen: React.FC = () => {
   const [lessonDuration, setLessonDuration] = useState('');
   const [lessonFree, setLessonFree] = useState(false);
 
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadCourses = useCallback(async () => {
+    setLoadingCourses(true);
+    setLoadError(null);
     try {
       const data = await getAllCourses();
       setCourses(data);
-    } catch {
-      // Handle silently
+    } catch (err) {
+      console.error('AcademyManagement loadCourses error:', err);
+      setLoadError('Impossibile caricare i corsi. Controlla la connessione.');
+    } finally {
+      setLoadingCourses(false);
     }
   }, []);
 
@@ -107,8 +116,9 @@ export const AcademyManagementScreen: React.FC = () => {
     try {
       const data = await getCourseLessons(course.id);
       setLessons(data);
-    } catch {
-      // Handle silently
+    } catch (err) {
+      console.error('AcademyManagement loadLessons error:', err);
+      showAlert('Errore', 'Impossibile caricare le lezioni del corso');
     }
   };
 
@@ -384,11 +394,25 @@ export const AcademyManagementScreen: React.FC = () => {
             renderItem={renderCourse}
             keyExtractor={(item) => item.id}
             ListEmptyComponent={
-              <Card>
-                <Text style={styles.emptyText}>
-                  Nessun corso creato. Premi "Nuovo Corso" per iniziare.
-                </Text>
-              </Card>
+              loadingCourses ? (
+                <View style={{ alignItems: 'center', padding: spacing.xl }}>
+                  <ActivityIndicator size="large" color={GOLD} />
+                  <Text style={styles.emptyText}>Caricamento corsi...</Text>
+                </View>
+              ) : loadError ? (
+                <Card>
+                  <Text style={[styles.emptyText, { color: colors.error }]}>{loadError}</Text>
+                  <TouchableOpacity onPress={loadCourses} style={{ alignItems: 'center', marginTop: spacing.sm }}>
+                    <Text style={{ color: GOLD, fontWeight: '600', fontSize: fontSize.sm }}>Riprova</Text>
+                  </TouchableOpacity>
+                </Card>
+              ) : (
+                <Card>
+                  <Text style={styles.emptyText}>
+                    Nessun corso creato. Premi "Nuovo Corso" per iniziare.
+                  </Text>
+                </Card>
+              )
             }
           />
         </View>
