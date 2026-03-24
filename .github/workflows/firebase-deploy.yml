@@ -24,7 +24,7 @@ jobs:
         working-directory: fitness-app
 
       - name: Build web app
-        run: npx expo export --platform web
+        run: npm run build:web
         working-directory: fitness-app
 
       - name: Deploy to Firebase Hosting
