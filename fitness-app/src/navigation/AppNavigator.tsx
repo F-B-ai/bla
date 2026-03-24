@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -6,6 +6,46 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, Toucha
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
+
+// --- Persist loginMode so Academy mode survives refresh ---
+const LOGIN_MODE_KEY = 'essere_login_mode';
+
+const saveLoginMode = (mode: 'app' | 'academy' | null) => {
+  try {
+    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+      if (mode === null) {
+        localStorage.removeItem(LOGIN_MODE_KEY);
+      } else {
+        localStorage.setItem(LOGIN_MODE_KEY, mode);
+      }
+    } else {
+      // Native: use AsyncStorage
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      if (mode === null) {
+        AsyncStorage.removeItem(LOGIN_MODE_KEY);
+      } else {
+        AsyncStorage.setItem(LOGIN_MODE_KEY, mode);
+      }
+    }
+  } catch {}
+};
+
+const loadLoginMode = async (): Promise<'app' | 'academy' | null> => {
+  try {
+    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+      const val = localStorage.getItem(LOGIN_MODE_KEY);
+      if (val === 'app' || val === 'academy') return val;
+      return null;
+    } else {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const val = await AsyncStorage.getItem(LOGIN_MODE_KEY);
+      if (val === 'app' || val === 'academy') return val;
+      return null;
+    }
+  } catch {
+    return null;
+  }
+};
 
 // Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -668,16 +708,36 @@ const LoadingScreen = () => (
 
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading, role, logout } = useAuth();
+  const { isAuthenticated, loading, role, user, logout } = useAuth();
   // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
+  const [loginModeLoaded, setLoginModeLoaded] = useState(false);
+
+  // Load persisted loginMode on mount
+  useEffect(() => {
+    loadLoginMode().then((mode) => {
+      setLoginMode(mode);
+      setLoginModeLoaded(true);
+    });
+  }, []);
+
+  // Persist loginMode whenever it changes
+  const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
+    setLoginMode(mode);
+    saveLoginMode(mode);
+  }, []);
 
   const handleLogoutAndReset = useCallback(async () => {
     await logout();
-    setLoginMode(null);
-  }, [logout]);
+    setLoginModeAndPersist(null);
+  }, [logout, setLoginModeAndPersist]);
 
-  if (loading) {
+  if (loading || !loginModeLoaded) {
+    return <LoadingScreen />;
+  }
+
+  // If authenticated but profile not loaded yet, show loading
+  if (isAuthenticated && !user) {
     return <LoadingScreen />;
   }
 
@@ -707,22 +767,22 @@ export const AppNavigator: React.FC = () => {
             <RootStack.Screen name="LoginSelector">
               {() => (
                 <LoginSelectorScreen
-                  onSelectApp={() => setLoginMode('app')}
-                  onSelectAcademy={() => setLoginMode('academy')}
+                  onSelectApp={() => setLoginModeAndPersist('app')}
+                  onSelectAcademy={() => setLoginModeAndPersist('academy')}
                 />
               )}
             </RootStack.Screen>
           ) : loginMode === 'app' ? (
             <RootStack.Screen name="Login">
               {() => (
-                <LoginScreen onBack={() => setLoginMode(null)} />
+                <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
               )}
             </RootStack.Screen>
           ) : (
             <RootStack.Screen name="AcademyLogin">
               {() => (
                 <AcademyLoginScreen
-                  onBack={() => setLoginMode(null)}
+                  onBack={() => setLoginModeAndPersist(null)}
                 />
               )}
             </RootStack.Screen>

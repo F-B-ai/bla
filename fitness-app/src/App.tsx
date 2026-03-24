@@ -5,6 +5,7 @@ import { registerRootComponent } from 'expo';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppNavigator } from './navigation/AppNavigator';
+import { AuthProvider } from './hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
 import * as Font from 'expo-font';
 
@@ -114,10 +115,12 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="light" />
-        <AppNavigator />
-      </SafeAreaProvider>
+      <AuthProvider>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <AppNavigator />
+        </SafeAreaProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
