@@ -23,8 +23,8 @@ echo [4/5] Login Firebase (se necessario)...
 call npx firebase login --no-localhost
 
 echo.
-echo [5/5] Deploy su Firebase Hosting...
-call npx firebase deploy --only hosting
+echo [5/5] Deploy su Firebase (Hosting + Firestore + Storage)...
+call npx firebase deploy --only hosting,firestore,storage
 
 echo.
 echo ========================================
