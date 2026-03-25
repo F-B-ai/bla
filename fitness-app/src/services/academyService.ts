@@ -12,9 +12,10 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { AcademyCourse, AcademyLesson, AcademyProgress } from '../types';
+import { AcademyCourse, AcademyModule, AcademyLesson, AcademyProgress } from '../types';
 
 const COURSES_COLLECTION = 'academyCourses';
+const MODULES_COLLECTION = 'academyModules';
 const LESSONS_COLLECTION = 'academyLessons';
 const PROGRESS_COLLECTION = 'academyProgress';
 
@@ -42,6 +43,13 @@ export const updateCourse = async (
 };
 
 export const deleteCourse = async (courseId: string): Promise<void> => {
+  // Elimina tutti i moduli del corso
+  const modulesSnap = await getDocs(
+    query(collection(db, MODULES_COLLECTION), where('courseId', '==', courseId))
+  );
+  for (const moduleDoc of modulesSnap.docs) {
+    await deleteDoc(moduleDoc.ref);
+  }
   // Elimina tutte le lezioni del corso
   const lessonsSnap = await getDocs(
     query(collection(db, LESSONS_COLLECTION), where('courseId', '==', courseId))
@@ -72,6 +80,49 @@ export const getCoursesForStudent = async (
         c.isPublished &&
         (c.assignedTo.length === 0 || c.assignedTo.includes(studentId))
     );
+};
+
+// ─── Moduli ───
+
+export const addModule = async (
+  module: Omit<AcademyModule, 'id'>
+): Promise<string> => {
+  const docRef = await addDoc(collection(db, MODULES_COLLECTION), {
+    ...module,
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateModule = async (
+  moduleId: string,
+  data: Partial<AcademyModule>
+): Promise<void> => {
+  await updateDoc(doc(db, MODULES_COLLECTION, moduleId), data);
+};
+
+export const deleteModule = async (moduleId: string): Promise<void> => {
+  // Rimuovi moduleId dalle lezioni associate
+  const lessonsSnap = await getDocs(
+    query(collection(db, LESSONS_COLLECTION), where('moduleId', '==', moduleId))
+  );
+  for (const lessonDoc of lessonsSnap.docs) {
+    await updateDoc(lessonDoc.ref, { moduleId: '' });
+  }
+  await deleteDoc(doc(db, MODULES_COLLECTION, moduleId));
+};
+
+export const getCourseModules = async (
+  courseId: string
+): Promise<AcademyModule[]> => {
+  const snapshot = await getDocs(
+    query(
+      collection(db, MODULES_COLLECTION),
+      where('courseId', '==', courseId),
+      orderBy('order', 'asc')
+    )
+  );
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as AcademyModule));
 };
 
 // ─── Lezioni ───

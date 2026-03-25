@@ -16,12 +16,14 @@ import { LessonPlayerModal } from '../../components/common/LessonPlayerModal';
 import { useAuth } from '../../hooks/useAuth';
 import {
   AcademyCourse,
+  AcademyModule,
   AcademyLesson,
   AcademyProgress,
   AcademyCourseCategory,
 } from '../../types';
 import {
   getCoursesForStudent,
+  getCourseModules,
   getCourseLessons,
   getStudentProgress,
   markLessonComplete,
@@ -51,6 +53,7 @@ export const AcademyScreen: React.FC = () => {
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<AcademyCourseCategory | 'all'>('all');
   const [selectedCourse, setSelectedCourse] = useState<AcademyCourse | null>(null);
+  const [modules, setModules] = useState<AcademyModule[]>([]);
   const [lessons, setLessons] = useState<AcademyLesson[]>([]);
   const [progress, setProgress] = useState<AcademyProgress[]>([]);
   const [allProgress, setAllProgress] = useState<AcademyProgress[]>([]);
@@ -84,14 +87,17 @@ export const AcademyScreen: React.FC = () => {
     setSelectedCourse(course);
     setLoadingLessons(true);
     try {
-      const [lessonData, progressData] = await Promise.all([
+      const [modulesData, lessonData, progressData] = await Promise.all([
+        getCourseModules(course.id),
         getCourseLessons(course.id),
         user ? getStudentProgress(user.id, course.id) : Promise.resolve([]),
       ]);
+      setModules(modulesData);
       setLessons(lessonData);
       setProgress(progressData);
     } catch (err) {
       console.error('Academy openCourse error:', err);
+      setModules([]);
       setLessons([]);
       setProgress([]);
     } finally {
@@ -381,22 +387,65 @@ export const AcademyScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <FlatList
-                  data={lessons}
-                  renderItem={renderLesson}
-                  keyExtractor={(item) => item.id}
-                  contentContainerStyle={styles.lessonList}
-                  ListEmptyComponent={
-                    loadingLessons ? (
-                      <View style={styles.emptyContainer}>
-                        <ActivityIndicator size="small" color={GOLD} />
-                        <Text style={styles.emptyText}>Caricamento lezioni...</Text>
-                      </View>
-                    ) : (
-                      <Text style={styles.emptyText}>Nessuna lezione ancora disponibile</Text>
-                    )
-                  }
-                />
+                <ScrollView contentContainerStyle={styles.lessonList}>
+                  {loadingLessons ? (
+                    <View style={styles.emptyContainer}>
+                      <ActivityIndicator size="small" color={GOLD} />
+                      <Text style={styles.emptyText}>Caricamento lezioni...</Text>
+                    </View>
+                  ) : lessons.length === 0 ? (
+                    <Text style={styles.emptyText}>Nessuna lezione ancora disponibile</Text>
+                  ) : (
+                    <>
+                      {/* Lezioni raggruppate per modulo */}
+                      {modules.map((mod) => {
+                        const moduleLessons = lessons.filter((l) => l.moduleId === mod.id);
+                        if (moduleLessons.length === 0) return null;
+                        return (
+                          <View key={mod.id} style={styles.moduleSection}>
+                            <View style={styles.moduleSectionHeader}>
+                              <Ionicons name="folder-outline" size={18} color={GOLD} />
+                              <Text style={styles.moduleSectionTitle}>{mod.title}</Text>
+                              <Text style={styles.moduleSectionCount}>
+                                {moduleLessons.length} lezioni
+                              </Text>
+                            </View>
+                            {mod.description ? (
+                              <Text style={styles.moduleSectionDesc}>{mod.description}</Text>
+                            ) : null}
+                            {moduleLessons.map((item, index) => (
+                              <View key={item.id}>
+                                {renderLesson({ item, index })}
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })}
+                      {/* Lezioni senza modulo */}
+                      {(() => {
+                        const unmoduleLessons = lessons.filter(
+                          (l) => !l.moduleId || l.moduleId === ''
+                        );
+                        if (unmoduleLessons.length === 0) return null;
+                        return (
+                          <View>
+                            {modules.length > 0 && (
+                              <View style={styles.moduleSectionHeader}>
+                                <Ionicons name="list-outline" size={18} color={colors.textLight} />
+                                <Text style={styles.moduleSectionTitle}>Altre lezioni</Text>
+                              </View>
+                            )}
+                            {unmoduleLessons.map((item, index) => (
+                              <View key={item.id}>
+                                {renderLesson({ item, index })}
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })()}
+                    </>
+                  )}
+                </ScrollView>
               </>
             )}
           </View>
@@ -673,6 +722,32 @@ const styles = StyleSheet.create({
   lessonList: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+  moduleSection: {
+    marginBottom: spacing.md,
+  },
+  moduleSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  moduleSectionTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: GOLD,
+    flex: 1,
+  },
+  moduleSectionCount: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+  },
+  moduleSectionDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.lg + spacing.sm,
   },
   lessonItem: {
     flexDirection: 'row',

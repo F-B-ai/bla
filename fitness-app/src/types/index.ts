@@ -399,9 +399,19 @@ export interface AcademyCourse {
   order: number; // ordine di visualizzazione
 }
 
+export interface AcademyModule {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  order: number;
+  createdAt: Date;
+}
+
 export interface AcademyLesson {
   id: string;
   courseId: string;
+  moduleId?: string; // opzionale per compatibilità
   title: string;
   description: string;
   type: AcademyLessonType;

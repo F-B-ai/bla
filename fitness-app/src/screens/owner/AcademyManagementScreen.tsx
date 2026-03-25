@@ -20,6 +20,7 @@ import { Button } from '../../components/common/Button';
 import { useAuth } from '../../hooks/useAuth';
 import {
   AcademyCourse,
+  AcademyModule,
   AcademyLesson,
   AcademyCourseCategory,
   AcademyLessonType,
@@ -29,6 +30,10 @@ import {
   addCourse,
   updateCourse,
   deleteCourse,
+  getCourseModules,
+  addModule,
+  updateModule,
+  deleteModule,
   getCourseLessons,
   addLesson,
   updateLesson,
@@ -71,6 +76,10 @@ export const AcademyManagementScreen: React.FC = () => {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<AcademyCourse | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<AcademyCourse | null>(null);
+  const [modules, setModules] = useState<AcademyModule[]>([]);
+  const [showModuleModal, setShowModuleModal] = useState(false);
+  const [editingModule, setEditingModule] = useState<AcademyModule | null>(null);
+  const [selectedModule, setSelectedModule] = useState<AcademyModule | null>(null);
   const [lessons, setLessons] = useState<AcademyLesson[]>([]);
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [editingLesson, setEditingLesson] = useState<AcademyLesson | null>(null);
@@ -81,6 +90,10 @@ export const AcademyManagementScreen: React.FC = () => {
   const [courseCategory, setCourseCategory] = useState<AcademyCourseCategory>('movement');
   const [courseTags, setCourseTags] = useState('');
   const [coursePublished, setCoursePublished] = useState(true);
+
+  // Module form
+  const [moduleTitle, setModuleTitle] = useState('');
+  const [moduleDesc, setModuleDesc] = useState('');
 
   // Lesson form
   const [lessonTitle, setLessonTitle] = useState('');
@@ -111,14 +124,28 @@ export const AcademyManagementScreen: React.FC = () => {
     loadCourses();
   }, [loadCourses]);
 
-  const loadLessons = async (course: AcademyCourse) => {
+  const loadCourseContent = async (course: AcademyCourse) => {
     setSelectedCourse(course);
+    setSelectedModule(null);
     try {
-      const data = await getCourseLessons(course.id);
-      setLessons(data);
+      const [modulesData, lessonsData] = await Promise.all([
+        getCourseModules(course.id),
+        getCourseLessons(course.id),
+      ]);
+      setModules(modulesData);
+      setLessons(lessonsData);
     } catch (err) {
-      console.error('AcademyManagement loadLessons error:', err);
-      showAlert('Errore', 'Impossibile caricare le lezioni del corso');
+      console.error('AcademyManagement loadCourseContent error:', err);
+      showAlert('Errore', 'Impossibile caricare i contenuti del corso');
+    }
+  };
+
+  const loadModules = async (courseId: string) => {
+    try {
+      const data = await getCourseModules(courseId);
+      setModules(data);
+    } catch (err) {
+      console.error('AcademyManagement loadModules error:', err);
     }
   };
 
@@ -204,6 +231,68 @@ export const AcademyManagementScreen: React.FC = () => {
     ]);
   };
 
+  // ─── Module CRUD ───
+
+  const openModuleModal = (mod?: AcademyModule) => {
+    if (mod) {
+      setEditingModule(mod);
+      setModuleTitle(mod.title);
+      setModuleDesc(mod.description);
+    } else {
+      setEditingModule(null);
+      setModuleTitle('');
+      setModuleDesc('');
+    }
+    setShowModuleModal(true);
+  };
+
+  const saveModule = async () => {
+    if (!moduleTitle.trim() || !selectedCourse) return;
+    try {
+      if (editingModule) {
+        await updateModule(editingModule.id, {
+          title: moduleTitle.trim(),
+          description: moduleDesc.trim(),
+        });
+      } else {
+        await addModule({
+          courseId: selectedCourse.id,
+          title: moduleTitle.trim(),
+          description: moduleDesc.trim(),
+          order: modules.length,
+          createdAt: new Date(),
+        });
+      }
+      setShowModuleModal(false);
+      loadModules(selectedCourse.id);
+    } catch {
+      showAlert('Errore', 'Impossibile salvare il modulo');
+    }
+  };
+
+  const handleDeleteModule = (mod: AcademyModule) => {
+    showAlert('Elimina modulo', `Eliminare "${mod.title}"? Le lezioni associate non verranno eliminate.`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteModule(mod.id);
+            if (selectedModule?.id === mod.id) setSelectedModule(null);
+            if (selectedCourse) {
+              loadModules(selectedCourse.id);
+              const updatedLessons = await getCourseLessons(selectedCourse.id);
+              setLessons(updatedLessons);
+            }
+          } catch {
+            showAlert('Errore', 'Impossibile eliminare il modulo');
+          }
+        },
+      },
+    ]);
+  };
+
   // ─── Lesson CRUD ───
 
   const openLessonModal = (lesson?: AcademyLesson) => {
@@ -230,6 +319,7 @@ export const AcademyManagementScreen: React.FC = () => {
   const saveLesson = async () => {
     if (!lessonTitle.trim() || !selectedCourse) return;
     try {
+      const moduleId = selectedModule?.id || '';
       if (editingLesson) {
         await updateLesson(editingLesson.id, {
           title: lessonTitle.trim(),
@@ -238,22 +328,25 @@ export const AcademyManagementScreen: React.FC = () => {
           contentUrl: lessonUrl.trim(),
           durationMinutes: parseInt(lessonDuration) || 0,
           isFree: lessonFree,
+          moduleId,
         });
       } else {
+        const moduleLessons = lessons.filter((l) => (l.moduleId || '') === moduleId);
         await addLesson({
           courseId: selectedCourse.id,
+          moduleId,
           title: lessonTitle.trim(),
           description: lessonDesc.trim(),
           type: lessonType,
           contentUrl: lessonUrl.trim(),
           durationMinutes: parseInt(lessonDuration) || 0,
-          order: lessons.length,
+          order: moduleLessons.length,
           isFree: lessonFree,
           createdAt: new Date(),
         });
       }
       setShowLessonModal(false);
-      loadLessons(selectedCourse);
+      loadCourseContent(selectedCourse);
       loadCourses();
     } catch {
       showAlert('Errore', 'Impossibile salvare la lezione');
@@ -269,7 +362,7 @@ export const AcademyManagementScreen: React.FC = () => {
         onPress: async () => {
           try {
             await deleteLesson(lesson.id);
-            if (selectedCourse) loadLessons(selectedCourse);
+            if (selectedCourse) loadCourseContent(selectedCourse);
             loadCourses();
           } catch {
             showAlert('Errore', 'Impossibile eliminare la lezione');
@@ -293,7 +386,7 @@ export const AcademyManagementScreen: React.FC = () => {
     const isSelected = selectedCourse?.id === item.id;
 
     return (
-      <TouchableOpacity onPress={() => loadLessons(item)}>
+      <TouchableOpacity onPress={() => loadCourseContent(item)}>
         <Card variant={isSelected ? 'elevated' : 'default'}>
           <View style={styles.courseRow}>
             <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
@@ -417,12 +510,63 @@ export const AcademyManagementScreen: React.FC = () => {
           />
         </View>
 
-        {/* Lezioni del corso selezionato */}
+        {/* Moduli e Lezioni del corso selezionato */}
         {selectedCourse && (
           <View style={styles.lessonsSection}>
+            {/* Moduli */}
             <View style={styles.lessonsSectionHeader}>
               <Text style={styles.sectionTitle}>
-                Lezioni: {selectedCourse.title}
+                Moduli: {selectedCourse.title}
+              </Text>
+              <TouchableOpacity style={styles.addLessonBtn} onPress={() => openModuleModal()}>
+                <Ionicons name="add" size={18} color={GOLD} />
+                <Text style={styles.addLessonText}>Nuovo Modulo</Text>
+              </TouchableOpacity>
+            </View>
+
+            {modules.length > 0 && (
+              <View style={{ marginBottom: spacing.md }}>
+                {modules.map((mod) => {
+                  const isSelected = selectedModule?.id === mod.id;
+                  const moduleLessonCount = lessons.filter((l) => l.moduleId === mod.id).length;
+                  return (
+                    <TouchableOpacity
+                      key={mod.id}
+                      onPress={() => setSelectedModule(isSelected ? null : mod)}
+                      style={[
+                        styles.moduleItem,
+                        isSelected && styles.moduleItemSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        name={isSelected ? 'folder-open' : 'folder-outline'}
+                        size={20}
+                        color={isSelected ? GOLD : colors.textSecondary}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.lessonTitle, isSelected && { color: GOLD }]}>
+                          {mod.title}
+                        </Text>
+                        <Text style={styles.lessonMetaText}>
+                          {moduleLessonCount} lezioni · {mod.description || 'Nessuna descrizione'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={() => openModuleModal(mod)} style={styles.actionBtn}>
+                        <Ionicons name="create-outline" size={16} color={GOLD} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteModule(mod)} style={styles.actionBtn}>
+                        <Ionicons name="trash-outline" size={16} color={colors.error} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Lezioni */}
+            <View style={styles.lessonsSectionHeader}>
+              <Text style={styles.sectionTitle}>
+                {selectedModule ? `Lezioni: ${selectedModule.title}` : 'Lezioni senza modulo'}
               </Text>
               <TouchableOpacity style={styles.addLessonBtn} onPress={() => openLessonModal()}>
                 <Ionicons name="add" size={18} color={GOLD} />
@@ -430,12 +574,18 @@ export const AcademyManagementScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={lessons}
+              data={lessons.filter((l) =>
+                selectedModule ? l.moduleId === selectedModule.id : !l.moduleId || l.moduleId === ''
+              )}
               renderItem={renderLesson}
               keyExtractor={(item) => item.id}
               ListEmptyComponent={
                 <Card>
-                  <Text style={styles.emptyText}>Nessuna lezione. Aggiungine una!</Text>
+                  <Text style={styles.emptyText}>
+                    {selectedModule
+                      ? `Nessuna lezione in "${selectedModule.title}". Aggiungine una!`
+                      : 'Nessuna lezione. Seleziona un modulo o aggiungine una qui.'}
+                  </Text>
                 </Card>
               }
             />
@@ -671,6 +821,59 @@ export const AcademyManagementScreen: React.FC = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Modal Modulo */}
+      <Modal visible={showModuleModal} animationType="slide" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalContent}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {editingModule ? 'Modifica Modulo' : 'Nuovo Modulo'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowModuleModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Titolo del modulo</Text>
+                <TextInput
+                  style={styles.input}
+                  value={moduleTitle}
+                  onChangeText={setModuleTitle}
+                  placeholder="Es: Introduzione, Livello Avanzato..."
+                  placeholderTextColor={colors.textLight}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Descrizione</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={moduleDesc}
+                  onChangeText={setModuleDesc}
+                  placeholder="Descrizione del modulo"
+                  placeholderTextColor={colors.textLight}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setShowModuleModal(false)}
+                >
+                  <Text style={styles.cancelBtnText}>Annulla</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={saveModule}>
+                  <Text style={styles.saveBtnText}>Salva</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
@@ -826,6 +1029,22 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
     color: GOLD,
+  },
+  moduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  moduleItemSelected: {
+    borderColor: GOLD,
+    backgroundColor: GOLD + '10',
   },
   lessonItem: {
     flexDirection: 'row',
