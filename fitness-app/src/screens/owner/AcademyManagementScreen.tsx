@@ -176,7 +176,14 @@ export const AcademyManagementScreen: React.FC = () => {
   };
 
   const saveCourse = async () => {
-    if (!courseTitle.trim() || !user) return;
+    if (!courseTitle.trim()) {
+      showAlert('Errore', 'Inserisci un titolo per il corso');
+      return;
+    }
+    if (!user) {
+      showAlert('Errore', 'Utente non autenticato. Effettua il login.');
+      return;
+    }
     try {
       const tags = courseTags
         .split(',')
@@ -209,8 +216,10 @@ export const AcademyManagementScreen: React.FC = () => {
       }
       setShowCourseModal(false);
       loadCourses();
-    } catch {
-      showAlert('Errore', 'Impossibile salvare il corso');
+    } catch (err) {
+      console.error('saveCourse error:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      showAlert('Errore nel salvataggio', `Impossibile salvare il corso.\n\nDettaglio: ${message}`);
     }
   };
 
