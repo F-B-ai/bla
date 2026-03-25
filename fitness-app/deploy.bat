@@ -16,7 +16,7 @@ call npm install --legacy-peer-deps
 
 echo.
 echo [3/5] Build web...
-call npx expo export --platform web
+call npm run build:web
 
 echo.
 echo [4/5] Login Firebase (se necessario)...

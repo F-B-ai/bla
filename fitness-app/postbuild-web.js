@@ -37,12 +37,21 @@ const webAssets = [
   'favicon.ico'
 ];
 
+const buildTs = Date.now().toString();
 webAssets.forEach((file) => {
   const src = path.join(__dirname, 'web', file);
   const dst = path.join(__dirname, 'dist', file);
   if (fs.existsSync(src)) {
-    fs.copyFileSync(src, dst);
-    console.log(`✓ ${file} copied to dist/`);
+    if (file === 'sw.js') {
+      // Inject unique build timestamp so the browser detects a new SW on every deploy
+      let sw = fs.readFileSync(src, 'utf8');
+      sw = sw.replace('__BUILD_TS__', buildTs);
+      fs.writeFileSync(dst, sw);
+      console.log(`✓ ${file} copied to dist/ (cache version: ${buildTs})`);
+    } else {
+      fs.copyFileSync(src, dst);
+      console.log(`✓ ${file} copied to dist/`);
+    }
   }
 });
 
