@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -720,6 +720,18 @@ export const AppNavigator: React.FC = () => {
       setLoginModeLoaded(true);
     });
   }, []);
+
+  // On initial load, if user is NOT authenticated, reset loginMode to null
+  // so the selector screen always shows. Persistence only matters while logged in.
+  const initialCheckDone = useRef(false);
+  useEffect(() => {
+    if (loginModeLoaded && !loading && !initialCheckDone.current) {
+      initialCheckDone.current = true;
+      if (!isAuthenticated && loginMode !== null) {
+        setLoginModeAndPersist(null);
+      }
+    }
+  }, [loginModeLoaded, loading, isAuthenticated, loginMode, setLoginModeAndPersist]);
 
   // Persist loginMode whenever it changes
   const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
