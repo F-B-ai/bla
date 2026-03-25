@@ -11,7 +11,8 @@ import {
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { AcademyCourse, AcademyModule, AcademyLesson, AcademyProgress } from '../types';
 
 const COURSES_COLLECTION = 'academyCourses';
@@ -232,4 +233,26 @@ export const getStudentProgress = async (
   }
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as AcademyProgress));
+};
+
+// ─── Upload file su Firebase Storage ───
+
+export const uploadAcademyFile = async (
+  courseId: string,
+  fileUri: string,
+  fileName: string,
+  folder: 'video' | 'audio' | 'pdf' | 'extra'
+): Promise<string> => {
+  const timestamp = Date.now();
+  const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileRef = ref(
+    storage,
+    `academy/${courseId}/${folder}/${timestamp}_${sanitizedName}`
+  );
+
+  const response = await fetch(fileUri);
+  const blob = await response.blob();
+  await uploadBytes(fileRef, blob);
+
+  return getDownloadURL(fileRef);
 };

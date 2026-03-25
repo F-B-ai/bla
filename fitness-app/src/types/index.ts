@@ -380,7 +380,7 @@ export interface AppNotification {
 // --- Academy (FB Mind Movement Academy) ---
 export type AcademyCourseCategory = 'mind' | 'movement' | 'nutrition' | 'lifestyle' | 'recovery';
 
-export type AcademyLessonType = 'video' | 'audio' | 'article' | 'exercise';
+export type AcademyLessonType = 'video' | 'audio' | 'article' | 'exercise' | 'pdf';
 
 export interface AcademyCourse {
   id: string;

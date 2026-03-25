@@ -262,6 +262,45 @@ export const LessonPlayerModal: React.FC<Props> = ({
       );
     }
 
+    // PDF — embed on web or open externally
+    if (lesson.type === 'pdf') {
+      if (Platform.OS === 'web') {
+        return (
+          <View style={styles.videoContainer}>
+            <iframe
+              src={lesson.contentUrl}
+              style={{
+                width: '100%',
+                height: VIDEO_HEIGHT + 100,
+                border: 'none',
+                borderRadius: 8,
+              }}
+              title={lesson.title}
+            />
+          </View>
+        );
+      }
+      return (
+        <View style={styles.articleContainer}>
+          <ScrollView style={styles.articleScroll}>
+            <View style={styles.articleIcon}>
+              <Ionicons name="document-attach-outline" size={48} color={GOLD} />
+            </View>
+            {lesson.description ? (
+              <Text style={styles.articleText}>{lesson.description}</Text>
+            ) : null}
+            <TouchableOpacity
+              style={styles.openExternalBtn}
+              onPress={() => Linking.openURL(lesson.contentUrl)}
+            >
+              <Ionicons name="open-outline" size={18} color={GOLD} />
+              <Text style={styles.openExternalText}>Apri PDF</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      );
+    }
+
     // Article / Exercise — show description + open link
     return (
       <View style={styles.articleContainer}>
@@ -300,6 +339,7 @@ export const LessonPlayerModal: React.FC<Props> = ({
               <Text style={styles.lessonType}>
                 {lesson.type === 'video' ? 'Video' :
                  lesson.type === 'audio' ? 'Audio' :
+                 lesson.type === 'pdf' ? 'PDF' :
                  lesson.type === 'article' ? 'Articolo' : 'Esercizio'}
                 {lesson.durationMinutes > 0 ? ` · ${lesson.durationMinutes} min` : ''}
               </Text>
@@ -314,7 +354,7 @@ export const LessonPlayerModal: React.FC<Props> = ({
           {renderPlayer()}
 
           {/* Description (for video/audio) */}
-          {(lesson.type === 'video' || lesson.type === 'audio') && lesson.description ? (
+          {(lesson.type === 'video' || lesson.type === 'audio' || lesson.type === 'pdf') && lesson.description ? (
             <ScrollView style={styles.descriptionScroll}>
               <Text style={styles.description}>{lesson.description}</Text>
             </ScrollView>

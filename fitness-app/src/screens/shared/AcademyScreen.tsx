@@ -40,6 +40,7 @@ const CATEGORY_CONFIG: Record<AcademyCourseCategory, { label: string; color: str
 const LESSON_TYPE_ICONS: Record<string, string> = {
   video: 'play-circle-outline',
   audio: 'headset-outline',
+  pdf: 'document-attach-outline',
   article: 'document-text-outline',
   exercise: 'barbell-outline',
 };

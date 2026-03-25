@@ -38,6 +38,7 @@ import {
   addLesson,
   updateLesson,
   deleteLesson,
+  uploadAcademyFile,
 } from '../../services/academyService';
 
 const showAlert = (title: string, message: string, buttons?: any[]) => {
@@ -64,6 +65,7 @@ const CATEGORY_CONFIG: Record<AcademyCourseCategory, { label: string; color: str
 const LESSON_TYPES: { value: AcademyLessonType; label: string; icon: string }[] = [
   { value: 'video', label: 'Video', icon: 'play-circle-outline' },
   { value: 'audio', label: 'Audio', icon: 'headset-outline' },
+  { value: 'pdf', label: 'PDF', icon: 'document-attach-outline' },
   { value: 'article', label: 'Articolo', icon: 'document-text-outline' },
   { value: 'exercise', label: 'Esercizio', icon: 'barbell-outline' },
 ];
@@ -102,6 +104,9 @@ export const AcademyManagementScreen: React.FC = () => {
   const [lessonUrl, setLessonUrl] = useState('');
   const [lessonDuration, setLessonDuration] = useState('');
   const [lessonFree, setLessonFree] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const [selectedFileUri, setSelectedFileUri] = useState('');
 
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -293,6 +298,77 @@ export const AcademyManagementScreen: React.FC = () => {
     ]);
   };
 
+  // ─── File Upload ───
+
+  const getAcceptTypes = (): string => {
+    switch (lessonType) {
+      case 'video': return 'video/*';
+      case 'audio': return 'audio/*';
+      case 'pdf': return 'application/pdf';
+      default: return '*/*';
+    }
+  };
+
+  const handlePickFile = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = getAcceptTypes();
+        input.onchange = (e: any) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const url = URL.createObjectURL(file);
+            setSelectedFileUri(url);
+            setSelectedFileName(file.name);
+          }
+        };
+        input.click();
+      } else {
+        const DocumentPicker = require('expo-document-picker');
+        const mimeTypes: Record<string, string[]> = {
+          video: ['video/*'],
+          audio: ['audio/*'],
+          pdf: ['application/pdf'],
+          article: ['*/*'],
+          exercise: ['*/*'],
+        };
+        const result = await DocumentPicker.getDocumentAsync({
+          type: mimeTypes[lessonType] || ['*/*'],
+        });
+        if (!result.canceled && result.assets?.[0]) {
+          setSelectedFileUri(result.assets[0].uri);
+          setSelectedFileName(result.assets[0].name || 'file');
+        }
+      }
+    } catch {
+      showAlert('Errore', 'Impossibile selezionare il file');
+    }
+  };
+
+  const handleUploadFile = async (): Promise<string | null> => {
+    if (!selectedFileUri || !selectedCourse) return null;
+    setUploading(true);
+    try {
+      const folder = lessonType === 'pdf' ? 'pdf'
+        : lessonType === 'video' ? 'video'
+        : lessonType === 'audio' ? 'audio'
+        : 'extra';
+      const url = await uploadAcademyFile(
+        selectedCourse.id,
+        selectedFileUri,
+        selectedFileName,
+        folder
+      );
+      return url;
+    } catch {
+      showAlert('Errore', 'Impossibile caricare il file. Riprova.');
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // ─── Lesson CRUD ───
 
   const openLessonModal = (lesson?: AcademyLesson) => {
@@ -313,19 +389,29 @@ export const AcademyManagementScreen: React.FC = () => {
       setLessonDuration('');
       setLessonFree(false);
     }
+    setSelectedFileUri('');
+    setSelectedFileName('');
     setShowLessonModal(true);
   };
 
   const saveLesson = async () => {
     if (!lessonTitle.trim() || !selectedCourse) return;
     try {
+      // Upload file if selected
+      let contentUrl = lessonUrl.trim();
+      if (selectedFileUri) {
+        const uploadedUrl = await handleUploadFile();
+        if (!uploadedUrl) return; // upload failed
+        contentUrl = uploadedUrl;
+      }
+
       const moduleId = selectedModule?.id || '';
       if (editingLesson) {
         await updateLesson(editingLesson.id, {
           title: lessonTitle.trim(),
           description: lessonDesc.trim(),
           type: lessonType,
-          contentUrl: lessonUrl.trim(),
+          contentUrl,
           durationMinutes: parseInt(lessonDuration) || 0,
           isFree: lessonFree,
           moduleId,
@@ -338,7 +424,7 @@ export const AcademyManagementScreen: React.FC = () => {
           title: lessonTitle.trim(),
           description: lessonDesc.trim(),
           type: lessonType,
-          contentUrl: lessonUrl.trim(),
+          contentUrl,
           durationMinutes: parseInt(lessonDuration) || 0,
           order: moduleLessons.length,
           isFree: lessonFree,
@@ -773,15 +859,52 @@ export const AcademyManagementScreen: React.FC = () => {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.label}>URL contenuto</Text>
+                <Text style={styles.label}>Contenuto</Text>
+
+                {/* Upload file button */}
+                <TouchableOpacity
+                  style={styles.uploadBtn}
+                  onPress={handlePickFile}
+                  disabled={uploading}
+                >
+                  <Ionicons
+                    name={selectedFileName ? 'checkmark-circle' : 'cloud-upload-outline'}
+                    size={20}
+                    color={selectedFileName ? colors.success : GOLD}
+                  />
+                  <Text style={styles.uploadBtnText}>
+                    {uploading
+                      ? 'Caricamento...'
+                      : selectedFileName
+                        ? selectedFileName
+                        : `Carica ${lessonType === 'pdf' ? 'PDF' : lessonType === 'video' ? 'Video' : lessonType === 'audio' ? 'Audio' : 'File'}`
+                    }
+                  </Text>
+                  {uploading && <ActivityIndicator size="small" color={GOLD} />}
+                </TouchableOpacity>
+
+                <Text style={[styles.label, { marginTop: spacing.sm, marginBottom: spacing.xs }]}>
+                  Oppure inserisci URL
+                </Text>
                 <TextInput
                   style={styles.input}
                   value={lessonUrl}
-                  onChangeText={setLessonUrl}
-                  placeholder="https://..."
+                  onChangeText={(text) => { setLessonUrl(text); if (text) { setSelectedFileUri(''); setSelectedFileName(''); } }}
+                  placeholder="https://youtube.com/... oppure link diretto"
                   placeholderTextColor={colors.textLight}
                   autoCapitalize="none"
+                  editable={!selectedFileUri}
                 />
+                {selectedFileUri ? (
+                  <TouchableOpacity
+                    onPress={() => { setSelectedFileUri(''); setSelectedFileName(''); }}
+                    style={{ marginTop: spacing.xs }}
+                  >
+                    <Text style={{ color: colors.error, fontSize: fontSize.sm }}>
+                      Rimuovi file selezionato
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
               <View style={styles.formGroup}>
@@ -1029,6 +1152,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
     color: GOLD,
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD + '50',
+    borderStyle: 'dashed',
+    marginBottom: spacing.xs,
+  },
+  uploadBtnText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   moduleItem: {
     flexDirection: 'row',
