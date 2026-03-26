@@ -3,7 +3,7 @@
 // ============================================================
 
 // --- Ruoli utente ---
-export type UserRole = 'owner' | 'manager' | 'collaborator' | 'student';
+export type UserRole = 'owner' | 'manager' | 'collaborator' | 'student' | 'academy_student';
 
 // --- Utente base ---
 export interface User {
@@ -60,6 +60,11 @@ export interface Student extends User {
   goals: string;
   medicalNotes?: string;
   nutritionalConsultations: number;
+}
+
+// --- Studente Academy ---
+export interface AcademyStudent extends User {
+  role: 'academy_student';
 }
 
 // --- Sessione di allenamento ---
