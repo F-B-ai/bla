@@ -175,6 +175,21 @@ export const AcademyManagementScreen: React.FC = () => {
     setShowCourseModal(true);
   };
 
+  const getFirebaseErrorMessage = (err: unknown): string => {
+    const raw = err instanceof Error ? err.message : String(err);
+    const code = (err as any)?.code || '';
+    if (code === 'permission-denied' || raw.includes('permission') || raw.includes('Missing or insufficient permissions')) {
+      return `Permessi insufficienti. Verifica che il tuo ruolo (${user?.role || 'sconosciuto'}) sia autorizzato e che le regole Firestore siano state distribuite con "firebase deploy --only firestore:rules".\n\nCodice: ${code || 'permission-denied'}`;
+    }
+    if (code === 'unavailable' || raw.includes('network') || raw.includes('Failed to fetch')) {
+      return 'Errore di rete. Controlla la connessione internet e riprova.';
+    }
+    if (code === 'unauthenticated' || raw.includes('unauthenticated')) {
+      return 'Sessione scaduta. Effettua nuovamente il login.';
+    }
+    return `${raw}${code ? ` (codice: ${code})` : ''}`;
+  };
+
   const saveCourse = async () => {
     if (!courseTitle.trim()) {
       showAlert('Errore', 'Inserisci un titolo per il corso');
@@ -182,6 +197,10 @@ export const AcademyManagementScreen: React.FC = () => {
     }
     if (!user) {
       showAlert('Errore', 'Utente non autenticato. Effettua il login.');
+      return;
+    }
+    if (!['owner', 'manager', 'collaborator'].includes(user.role)) {
+      showAlert('Errore', `Il tuo ruolo (${user.role}) non ha i permessi per gestire i corsi.`);
       return;
     }
     try {
@@ -218,8 +237,7 @@ export const AcademyManagementScreen: React.FC = () => {
       loadCourses();
     } catch (err) {
       console.error('saveCourse error:', err);
-      const message = err instanceof Error ? err.message : String(err);
-      showAlert('Errore nel salvataggio', `Impossibile salvare il corso.\n\nDettaglio: ${message}`);
+      showAlert('Errore', `Impossibile salvare il corso.\n\n${getFirebaseErrorMessage(err)}`);
     }
   };
 
@@ -279,8 +297,9 @@ export const AcademyManagementScreen: React.FC = () => {
       }
       setShowModuleModal(false);
       loadModules(selectedCourse.id);
-    } catch {
-      showAlert('Errore', 'Impossibile salvare il modulo');
+    } catch (err) {
+      console.error('saveModule error:', err);
+      showAlert('Errore', `Impossibile salvare il modulo.\n\n${getFirebaseErrorMessage(err)}`);
     }
   };
 
@@ -443,8 +462,9 @@ export const AcademyManagementScreen: React.FC = () => {
       setShowLessonModal(false);
       loadCourseContent(selectedCourse);
       loadCourses();
-    } catch {
-      showAlert('Errore', 'Impossibile salvare la lezione');
+    } catch (err) {
+      console.error('saveLesson error:', err);
+      showAlert('Errore', `Impossibile salvare la lezione.\n\n${getFirebaseErrorMessage(err)}`);
     }
   };
 
