@@ -27,15 +27,6 @@ jobs:
         run: npm run build:web
         working-directory: fitness-app
 
-      - name: Write Firebase service account
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > ${{ runner.temp }}/firebase-sa.json
-
-      - name: Deploy Firestore rules and indexes
-        run: npx firebase deploy --only firestore:rules,firestore:indexes --project essere-3fe6f
-        working-directory: fitness-app
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
-
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
