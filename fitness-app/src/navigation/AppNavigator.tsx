@@ -290,14 +290,6 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
-      name="Academy"
-      component={AcademyManagementScreen}
-      options={{
-        tabBarLabel: 'Academy',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
-      }}
-    />
-    <OwnerTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
@@ -415,14 +407,6 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
-      name="Academy"
-      component={AcademyManagementScreen}
-      options={{
-        tabBarLabel: 'Academy',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
-      }}
-    />
-    <ManagerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
@@ -508,14 +492,6 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
-      name="Academy"
-      component={AcademyScreen}
-      options={{
-        tabBarLabel: 'Academy',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
-      }}
-    />
-    <CollaboratorTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
@@ -598,14 +574,6 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Extra',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} />,
-      }}
-    />
-    <StudentTab.Screen
-      name="Academy"
-      component={AcademyScreen}
-      options={{
-        tabBarLabel: 'Academy',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen

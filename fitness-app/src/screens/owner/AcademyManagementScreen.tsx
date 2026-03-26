@@ -40,6 +40,8 @@ import {
   deleteLesson,
   uploadAcademyFile,
 } from '../../services/academyService';
+import { getStudents } from '../../services/authService';
+import { Student } from '../../types';
 
 const showAlert = (title: string, message: string, buttons?: any[]) => {
   if (Platform.OS === 'web') {
@@ -108,6 +110,11 @@ export const AcademyManagementScreen: React.FC = () => {
   const [selectedFileName, setSelectedFileName] = useState('');
   const [selectedFileUri, setSelectedFileUri] = useState('');
 
+  // Student assignment
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [courseAssignedTo, setCourseAssignedTo] = useState<string[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
+
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -127,6 +134,7 @@ export const AcademyManagementScreen: React.FC = () => {
 
   useEffect(() => {
     loadCourses();
+    getStudents().then(setAllStudents).catch(() => {});
   }, [loadCourses]);
 
   const loadCourseContent = async (course: AcademyCourse) => {
@@ -164,6 +172,7 @@ export const AcademyManagementScreen: React.FC = () => {
       setCourseCategory(course.category);
       setCourseTags(course.tags.join(', '));
       setCoursePublished(course.isPublished);
+      setCourseAssignedTo(course.assignedTo || []);
     } else {
       setEditingCourse(null);
       setCourseTitle('');
@@ -171,7 +180,9 @@ export const AcademyManagementScreen: React.FC = () => {
       setCourseCategory('movement');
       setCourseTags('');
       setCoursePublished(true);
+      setCourseAssignedTo([]);
     }
+    setStudentSearch('');
     setShowCourseModal(true);
   };
 
@@ -216,6 +227,7 @@ export const AcademyManagementScreen: React.FC = () => {
           category: courseCategory,
           tags,
           isPublished: coursePublished,
+          assignedTo: courseAssignedTo,
         });
       } else {
         await addCourse({
@@ -226,7 +238,7 @@ export const AcademyManagementScreen: React.FC = () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           isPublished: coursePublished,
-          assignedTo: [],
+          assignedTo: courseAssignedTo,
           tags,
           lessonsCount: 0,
           durationMinutes: 0,
@@ -516,6 +528,9 @@ export const AcademyManagementScreen: React.FC = () => {
               </View>
               <Text style={styles.courseMeta}>
                 {cat.label} · {item.lessonsCount} lezioni · {item.durationMinutes} min
+                {item.assignedTo && item.assignedTo.length > 0
+                  ? ` · ${item.assignedTo.length} studenti`
+                  : ' · Tutti'}
               </Text>
             </View>
             <View style={styles.courseActions}>
@@ -799,6 +814,89 @@ export const AcademyManagementScreen: React.FC = () => {
                   <View style={[styles.toggleDot, coursePublished && styles.toggleDotActive]} />
                 </View>
               </TouchableOpacity>
+
+              {/* Assegnazione studenti */}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>
+                  Assegna a studenti {courseAssignedTo.length > 0 ? `(${courseAssignedTo.length} selezionati)` : '(tutti)'}
+                </Text>
+                <Text style={{ fontSize: fontSize.xs, color: colors.textLight, marginBottom: spacing.sm }}>
+                  Se non selezioni nessuno, il corso sarà visibile a tutti gli studenti.
+                </Text>
+                <TextInput
+                  style={styles.input}
+                  value={studentSearch}
+                  onChangeText={setStudentSearch}
+                  placeholder="Cerca studente per nome..."
+                  placeholderTextColor={colors.textLight}
+                />
+
+                {/* Selected students chips */}
+                {courseAssignedTo.length > 0 && (
+                  <View style={[styles.categoryRow, { marginTop: spacing.sm }]}>
+                    {courseAssignedTo.map((sid) => {
+                      const s = allStudents.find((st) => st.id === sid);
+                      return (
+                        <TouchableOpacity
+                          key={sid}
+                          style={[styles.categoryChip, { backgroundColor: GOLD + '20', borderColor: GOLD }]}
+                          onPress={() => setCourseAssignedTo(courseAssignedTo.filter((id) => id !== sid))}
+                        >
+                          <Text style={[styles.categoryChipText, { color: GOLD }]}>
+                            {s ? `${s.name} ${s.surname}` : sid}
+                          </Text>
+                          <Ionicons name="close-circle" size={14} color={GOLD} />
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity
+                      style={[styles.categoryChip, { backgroundColor: colors.error + '20', borderColor: colors.error }]}
+                      onPress={() => setCourseAssignedTo([])}
+                    >
+                      <Text style={[styles.categoryChipText, { color: colors.error }]}>Rimuovi tutti</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Student list */}
+                <View style={{ maxHeight: 200, marginTop: spacing.sm }}>
+                  <ScrollView nestedScrollEnabled>
+                    {allStudents
+                      .filter((s) => {
+                        if (!studentSearch.trim()) return !courseAssignedTo.includes(s.id);
+                        const search = studentSearch.toLowerCase();
+                        return (
+                          !courseAssignedTo.includes(s.id) &&
+                          (`${s.name} ${s.surname}`.toLowerCase().includes(search) ||
+                            (s.email && s.email.toLowerCase().includes(search)))
+                        );
+                      })
+                      .map((s) => (
+                        <TouchableOpacity
+                          key={s.id}
+                          style={styles.studentListItem}
+                          onPress={() => setCourseAssignedTo([...courseAssignedTo, s.id])}
+                        >
+                          <Ionicons name="person-outline" size={16} color={colors.textSecondary} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: colors.text, fontSize: fontSize.sm, fontWeight: '600' }}>
+                              {s.name} {s.surname}
+                            </Text>
+                            {s.email ? (
+                              <Text style={{ color: colors.textLight, fontSize: fontSize.xs }}>{s.email}</Text>
+                            ) : null}
+                          </View>
+                          <Ionicons name="add-circle-outline" size={18} color={GOLD} />
+                        </TouchableOpacity>
+                      ))}
+                    {allStudents.filter((s) => !courseAssignedTo.includes(s.id)).length === 0 && (
+                      <Text style={{ color: colors.textLight, fontSize: fontSize.sm, textAlign: 'center', padding: spacing.md }}>
+                        {allStudents.length === 0 ? 'Nessuno studente trovato' : 'Tutti gli studenti sono stati assegnati'}
+                      </Text>
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
@@ -1391,5 +1489,17 @@ const styles = StyleSheet.create({
     color: colors.textOnAccent,
     fontWeight: '700',
     fontSize: fontSize.md,
+  },
+  studentListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 });
