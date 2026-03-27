@@ -115,6 +115,8 @@ export const AcademyManagementScreen: React.FC = () => {
   const [courseAssignedTo, setCourseAssignedTo] = useState<string[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
 
+  const [savingCourse, setSavingCourse] = useState(false);
+
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -214,6 +216,7 @@ export const AcademyManagementScreen: React.FC = () => {
       showAlert('Errore', `Il tuo ruolo (${user.role}) non ha i permessi per gestire i corsi.`);
       return;
     }
+    setSavingCourse(true);
     try {
       const tags = courseTags
         .split(',')
@@ -246,10 +249,12 @@ export const AcademyManagementScreen: React.FC = () => {
         });
       }
       setShowCourseModal(false);
-      loadCourses();
+      await loadCourses();
     } catch (err) {
       console.error('saveCourse error:', err);
       showAlert('Errore', `Impossibile salvare il corso.\n\n${getFirebaseErrorMessage(err)}`);
+    } finally {
+      setSavingCourse(false);
     }
   };
 
@@ -905,8 +910,16 @@ export const AcademyManagementScreen: React.FC = () => {
                 >
                   <Text style={styles.cancelBtnText}>Annulla</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={saveCourse}>
-                  <Text style={styles.saveBtnText}>Salva</Text>
+                <TouchableOpacity
+                  style={[styles.saveBtn, savingCourse && { opacity: 0.6 }]}
+                  onPress={saveCourse}
+                  disabled={savingCourse}
+                >
+                  {savingCourse ? (
+                    <ActivityIndicator size="small" color={colors.textOnAccent} />
+                  ) : (
+                    <Text style={styles.saveBtnText}>Salva</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </ScrollView>
