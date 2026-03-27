@@ -385,7 +385,7 @@ export interface AppNotification {
 // --- Academy (FB Mind Movement Academy) ---
 export type AcademyCourseCategory = 'mind' | 'movement' | 'nutrition' | 'lifestyle' | 'recovery';
 
-export type AcademyLessonType = 'video' | 'audio' | 'article' | 'exercise' | 'pdf';
+export type AcademyLessonType = 'video' | 'audio' | 'article' | 'exercise' | 'pdf' | 'quiz';
 
 export interface AcademyCourse {
   id: string;
@@ -435,6 +435,68 @@ export interface AcademyProgress {
   lessonId: string;
   completedAt: Date;
   progressPercent: number; // 0-100
+}
+
+// --- Quiz Academy ---
+export interface AcademyQuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation?: string;
+}
+
+export interface AcademyQuiz {
+  id: string;
+  lessonId: string;
+  courseId: string;
+  questions: AcademyQuizQuestion[];
+  passingScore: number; // percentuale minima per superare (es. 70)
+  createdAt: Date;
+}
+
+export interface AcademyQuizAttempt {
+  id: string;
+  studentId: string;
+  quizId: string;
+  lessonId: string;
+  courseId: string;
+  answers: number[]; // indice risposta scelta per ogni domanda
+  score: number; // percentuale corrette
+  passed: boolean;
+  completedAt: Date;
+}
+
+// --- Note studente per lezione ---
+export interface AcademyNote {
+  id: string;
+  studentId: string;
+  lessonId: string;
+  courseId: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// --- Valutazione corso ---
+export interface AcademyRating {
+  id: string;
+  studentId: string;
+  courseId: string;
+  rating: number; // 1-5
+  comment?: string;
+  createdAt: Date;
+}
+
+// --- Certificato completamento ---
+export interface AcademyCertificate {
+  id: string;
+  studentId: string;
+  studentName: string;
+  courseId: string;
+  courseTitle: string;
+  completedAt: Date;
+  certificateCode: string; // codice univoco
 }
 
 // --- Navigation types ---

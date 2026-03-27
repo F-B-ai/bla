@@ -10,11 +10,19 @@ import {
   ScrollView,
   Linking,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Video, ResizeMode, Audio, AVPlaybackStatus } from 'expo-av';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
-import { AcademyLesson } from '../../types';
+import { AcademyLesson, AcademyQuiz, AcademyNote } from '../../types';
+import {
+  getQuizForLesson,
+  submitQuizAttempt,
+  getBestQuizAttempt,
+  getNote,
+  saveNote,
+} from '../../services/academyService';
 
 const GOLD = '#C5A55A';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -42,6 +50,8 @@ interface Props {
   onClose: () => void;
   onComplete: (lesson: AcademyLesson) => void;
   isCompleted: boolean;
+  userId?: string;
+  courseId?: string;
 }
 
 export const LessonPlayerModal: React.FC<Props> = ({
@@ -50,6 +60,8 @@ export const LessonPlayerModal: React.FC<Props> = ({
   onClose,
   onComplete,
   isCompleted,
+  userId,
+  courseId,
 }) => {
   const videoRef = useRef<Video>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -58,6 +70,19 @@ export const LessonPlayerModal: React.FC<Props> = ({
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  // Quiz state
+  const [quiz, setQuiz] = useState<AcademyQuiz | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<number[]>([]);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizPassed, setQuizPassed] = useState(false);
+  const [bestScore, setBestScore] = useState<number | null>(null);
+
+  // Notes state
+  const [noteContent, setNoteContent] = useState('');
+  const [showNotes, setShowNotes] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
 
   const isYouTube = lesson?.contentUrl ? isYouTubeUrl(lesson.contentUrl) : false;
   const youtubeId = lesson?.contentUrl ? getYouTubeId(lesson.contentUrl) : null;
@@ -79,7 +104,85 @@ export const LessonPlayerModal: React.FC<Props> = ({
     setIsPlaying(false);
     setPositionMs(0);
     setDurationMs(0);
+    setQuiz(null);
+    setQuizAnswers([]);
+    setQuizSubmitted(false);
+    setQuizScore(0);
+    setBestScore(null);
+    setNoteContent('');
+    setShowNotes(false);
   }, [lesson?.id]);
+
+  // Load quiz and notes when lesson changes
+  useEffect(() => {
+    if (!lesson?.id || !visible) return;
+    if (lesson.type === 'quiz') {
+      getQuizForLesson(lesson.id).then((q) => {
+        setQuiz(q);
+        if (q) setQuizAnswers(new Array(q.questions.length).fill(-1));
+        setIsLoading(false);
+      }).catch(() => setIsLoading(false));
+    }
+    if (userId && lesson.id) {
+      getNote(userId, lesson.id).then((n) => {
+        if (n) setNoteContent(n.content);
+      }).catch(() => {});
+      if (lesson.type === 'quiz') {
+        getBestQuizAttempt(userId, lesson.id).then((a) => {
+          if (a) setBestScore(a.score);
+        }).catch(() => {});
+      }
+    }
+  }, [lesson?.id, visible, userId]);
+
+  const handleQuizSubmit = async () => {
+    if (!quiz || !userId || !lesson || !courseId) return;
+    let correct = 0;
+    quiz.questions.forEach((q, i) => {
+      if (quizAnswers[i] === q.correctOptionIndex) correct++;
+    });
+    const score = Math.round((correct / quiz.questions.length) * 100);
+    const passed = score >= quiz.passingScore;
+    setQuizScore(score);
+    setQuizPassed(passed);
+    setQuizSubmitted(true);
+    try {
+      await submitQuizAttempt({
+        studentId: userId,
+        quizId: quiz.id,
+        lessonId: lesson.id,
+        courseId,
+        answers: quizAnswers,
+        score,
+        passed,
+        completedAt: new Date(),
+      });
+      if (passed) {
+        onComplete(lesson);
+      }
+    } catch (err) {
+      console.error('Quiz submit error:', err);
+    }
+  };
+
+  const handleSaveNote = async () => {
+    if (!userId || !lesson || !courseId) return;
+    setSavingNote(true);
+    try {
+      await saveNote({
+        studentId: userId,
+        lessonId: lesson.id,
+        courseId,
+        content: noteContent,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    } catch (err) {
+      console.error('Save note error:', err);
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   const onVideoStatusUpdate = useCallback((status: AVPlaybackStatus) => {
     if (status.isLoaded) {
@@ -301,6 +404,124 @@ export const LessonPlayerModal: React.FC<Props> = ({
       );
     }
 
+    // Quiz
+    if (lesson.type === 'quiz' && quiz) {
+      return (
+        <ScrollView style={styles.quizContainer}>
+          {bestScore !== null && !quizSubmitted && (
+            <View style={styles.bestScoreBadge}>
+              <Ionicons name="trophy-outline" size={16} color={GOLD} />
+              <Text style={styles.bestScoreText}>Miglior punteggio: {bestScore}%</Text>
+            </View>
+          )}
+          {quiz.questions.map((q, qIdx) => (
+            <View key={q.id || qIdx} style={styles.quizQuestion}>
+              <Text style={styles.quizQuestionText}>
+                {qIdx + 1}. {q.question}
+              </Text>
+              {q.options.map((opt, oIdx) => {
+                const selected = quizAnswers[qIdx] === oIdx;
+                const isCorrect = quizSubmitted && oIdx === q.correctOptionIndex;
+                const isWrong = quizSubmitted && selected && oIdx !== q.correctOptionIndex;
+                return (
+                  <TouchableOpacity
+                    key={oIdx}
+                    style={[
+                      styles.quizOption,
+                      selected && !quizSubmitted && styles.quizOptionSelected,
+                      isCorrect && styles.quizOptionCorrect,
+                      isWrong && styles.quizOptionWrong,
+                    ]}
+                    onPress={() => {
+                      if (quizSubmitted) return;
+                      const newAnswers = [...quizAnswers];
+                      newAnswers[qIdx] = oIdx;
+                      setQuizAnswers(newAnswers);
+                    }}
+                    disabled={quizSubmitted}
+                  >
+                    <View style={[
+                      styles.quizOptionRadio,
+                      selected && !quizSubmitted && styles.quizOptionRadioSelected,
+                      isCorrect && { backgroundColor: colors.success, borderColor: colors.success },
+                      isWrong && { backgroundColor: colors.error, borderColor: colors.error },
+                    ]}>
+                      {(selected || isCorrect) && (
+                        <Ionicons
+                          name={isCorrect ? 'checkmark' : isWrong ? 'close' : 'ellipse'}
+                          size={12}
+                          color="#FFF"
+                        />
+                      )}
+                    </View>
+                    <Text style={[
+                      styles.quizOptionText,
+                      isCorrect && { color: colors.success, fontWeight: '700' },
+                      isWrong && { color: colors.error },
+                    ]}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {quizSubmitted && q.explanation && (
+                <View style={styles.quizExplanation}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+                  <Text style={styles.quizExplanationText}>{q.explanation}</Text>
+                </View>
+              )}
+            </View>
+          ))}
+
+          {quizSubmitted ? (
+            <View style={styles.quizResult}>
+              <Ionicons
+                name={quizPassed ? 'checkmark-circle' : 'close-circle'}
+                size={48}
+                color={quizPassed ? colors.success : colors.error}
+              />
+              <Text style={[styles.quizResultText, { color: quizPassed ? colors.success : colors.error }]}>
+                {quizScore}% — {quizPassed ? 'Superato!' : `Non superato (min. ${quiz.passingScore}%)`}
+              </Text>
+              {!quizPassed && (
+                <TouchableOpacity
+                  style={styles.quizRetryBtn}
+                  onPress={() => {
+                    setQuizSubmitted(false);
+                    setQuizAnswers(new Array(quiz.questions.length).fill(-1));
+                    setQuizScore(0);
+                  }}
+                >
+                  <Ionicons name="refresh" size={18} color={GOLD} />
+                  <Text style={styles.quizRetryText}>Riprova</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.quizSubmitBtn,
+                quizAnswers.includes(-1) && styles.quizSubmitBtnDisabled,
+              ]}
+              onPress={handleQuizSubmit}
+              disabled={quizAnswers.includes(-1)}
+            >
+              <Text style={styles.quizSubmitText}>Invia risposte</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      );
+    }
+
+    if (lesson.type === 'quiz' && !quiz) {
+      return (
+        <View style={styles.noContent}>
+          <Ionicons name="help-circle-outline" size={48} color={colors.textLight} />
+          <Text style={styles.noContentText}>Quiz non ancora configurato</Text>
+        </View>
+      );
+    }
+
     // Article / Exercise — show description + open link
     return (
       <View style={styles.articleContainer}>
@@ -340,7 +561,8 @@ export const LessonPlayerModal: React.FC<Props> = ({
                 {lesson.type === 'video' ? 'Video' :
                  lesson.type === 'audio' ? 'Audio' :
                  lesson.type === 'pdf' ? 'PDF' :
-                 lesson.type === 'article' ? 'Articolo' : 'Esercizio'}
+                 lesson.type === 'article' ? 'Articolo' :
+                 lesson.type === 'quiz' ? 'Quiz' : 'Esercizio'}
                 {lesson.durationMinutes > 0 ? ` · ${lesson.durationMinutes} min` : ''}
               </Text>
               <Text style={styles.title} numberOfLines={2}>{lesson.title}</Text>
@@ -359,6 +581,49 @@ export const LessonPlayerModal: React.FC<Props> = ({
               <Text style={styles.description}>{lesson.description}</Text>
             </ScrollView>
           ) : null}
+
+          {/* Notes section */}
+          {userId && lesson.type !== 'quiz' && (
+            <View style={styles.notesSection}>
+              <TouchableOpacity
+                style={styles.notesToggle}
+                onPress={() => setShowNotes(!showNotes)}
+              >
+                <Ionicons name="pencil-outline" size={18} color={GOLD} />
+                <Text style={styles.notesToggleText}>
+                  {showNotes ? 'Nascondi appunti' : 'Appunti'}
+                </Text>
+                <Ionicons name={showNotes ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textLight} />
+              </TouchableOpacity>
+              {showNotes && (
+                <View style={styles.notesContent}>
+                  <TextInput
+                    style={styles.notesInput}
+                    value={noteContent}
+                    onChangeText={setNoteContent}
+                    placeholder="Scrivi i tuoi appunti qui..."
+                    placeholderTextColor={colors.textLight}
+                    multiline
+                    numberOfLines={4}
+                  />
+                  <TouchableOpacity
+                    style={styles.notesSaveBtn}
+                    onPress={handleSaveNote}
+                    disabled={savingNote}
+                  >
+                    {savingNote ? (
+                      <ActivityIndicator size="small" color={GOLD} />
+                    ) : (
+                      <>
+                        <Ionicons name="save-outline" size={16} color={GOLD} />
+                        <Text style={styles.notesSaveText}>Salva</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
 
           {/* Complete button */}
           <View style={styles.footer}>
@@ -610,5 +875,179 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: fontSize.md,
     fontWeight: '700',
+  },
+  // Quiz styles
+  quizContainer: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  bestScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: GOLD + '15',
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  bestScoreText: {
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
+  quizQuestion: {
+    marginBottom: spacing.lg,
+  },
+  quizQuestionText: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+    lineHeight: 22,
+  },
+  quizOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quizOptionSelected: {
+    borderColor: GOLD,
+    backgroundColor: GOLD + '10',
+  },
+  quizOptionCorrect: {
+    borderColor: colors.success,
+    backgroundColor: colors.success + '15',
+  },
+  quizOptionWrong: {
+    borderColor: colors.error,
+    backgroundColor: colors.error + '15',
+  },
+  quizOptionRadio: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quizOptionRadioSelected: {
+    borderColor: GOLD,
+    backgroundColor: GOLD,
+  },
+  quizOptionText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  quizExplanation: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: colors.info + '10',
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xs,
+  },
+  quizExplanationText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.info,
+    lineHeight: 20,
+  },
+  quizResult: {
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  quizResultText: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+  },
+  quizRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD,
+  },
+  quizRetryText: {
+    color: GOLD,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  quizSubmitBtn: {
+    backgroundColor: GOLD,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  quizSubmitBtnDisabled: {
+    opacity: 0.5,
+  },
+  quizSubmitText: {
+    color: '#FFF',
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  // Notes styles
+  notesSection: {
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    paddingHorizontal: spacing.lg,
+  },
+  notesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  notesToggleText: {
+    flex: 1,
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
+  notesContent: {
+    paddingBottom: spacing.sm,
+  },
+  notesInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.text,
+    fontSize: fontSize.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  notesSaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD,
+    marginTop: spacing.xs,
+  },
+  notesSaveText: {
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
 });

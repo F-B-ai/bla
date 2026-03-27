@@ -75,6 +75,8 @@ import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScree
 import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
 import { AcademyScreen } from '../screens/shared/AcademyScreen';
 import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
+import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
+import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -616,6 +618,7 @@ const AcademyOnlyStudentTabs = () => (
   </AcademyTab.Navigator>
 );
 
+
 // Academy-Only for Owner/Manager (shows management view)
 const AcademyOnlyAdminTabs = () => (
   <AcademyTab.Navigator
@@ -640,6 +643,22 @@ const AcademyOnlyAdminTabs = () => (
       options={{
         tabBarLabel: 'Corsi',
         tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyStudenti"
+      component={AcademyStudentsScreen}
+      options={{
+        tabBarLabel: 'Studenti',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyAnalytics"
+      component={AcademyAnalyticsScreen}
+      options={{
+        tabBarLabel: 'Analytics',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
       }}
     />
     <AcademyTab.Screen

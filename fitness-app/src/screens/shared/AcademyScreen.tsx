@@ -8,6 +8,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -27,7 +28,14 @@ import {
   getCourseLessons,
   getStudentProgress,
   markLessonComplete,
+  searchCourses,
+  getCourseAverageRating,
+  saveCourseRating,
+  getStudentCourseRating,
+  generateCertificate,
+  getStudentCertificates,
 } from '../../services/academyService';
+import { AcademyCertificate, AcademyRating } from '../../types';
 
 const CATEGORY_CONFIG: Record<AcademyCourseCategory, { label: string; color: string; icon: string }> = {
   mind: { label: 'Mind', color: '#9C27B0', icon: 'bulb-outline' },
@@ -61,6 +69,20 @@ export const AcademyScreen: React.FC = () => {
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Ratings
+  const [courseAvgRating, setCourseAvgRating] = useState<{ average: number; count: number }>({ average: 0, count: 0 });
+  const [myRating, setMyRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
+  // Certificates
+  const [certificates, setCertificates] = useState<AcademyCertificate[]>([]);
+  const [showCertModal, setShowCertModal] = useState(false);
+  const [selectedCert, setSelectedCert] = useState<AcademyCertificate | null>(null);
+
   const loadCourses = useCallback(async () => {
     if (!user) return;
     setLoadingCourses(true);
@@ -68,8 +90,12 @@ export const AcademyScreen: React.FC = () => {
     try {
       const data = await getCoursesForStudent(user.id);
       setCourses(data);
-      const prog = await getStudentProgress(user.id);
+      const [prog, certs] = await Promise.all([
+        getStudentProgress(user.id),
+        getStudentCertificates(user.id),
+      ]);
       setAllProgress(prog);
+      setCertificates(certs);
     } catch (err) {
       console.error('Academy loadCourses error:', err);
       setLoadError('Impossibile caricare i corsi. Controlla la connessione e riprova.');
@@ -88,14 +114,28 @@ export const AcademyScreen: React.FC = () => {
     setSelectedCourse(course);
     setLoadingLessons(true);
     try {
-      const [modulesData, lessonData, progressData] = await Promise.all([
+      const [modulesData, lessonData, progressData, avgRating] = await Promise.all([
         getCourseModules(course.id),
         getCourseLessons(course.id),
         user ? getStudentProgress(user.id, course.id) : Promise.resolve([]),
+        getCourseAverageRating(course.id),
       ]);
       setModules(modulesData);
       setLessons(lessonData);
       setProgress(progressData);
+      setCourseAvgRating(avgRating);
+      // Load user's rating
+      if (user) {
+        getStudentCourseRating(user.id, course.id).then((r) => {
+          if (r) {
+            setMyRating(r.rating);
+            setRatingComment(r.comment || '');
+          } else {
+            setMyRating(0);
+            setRatingComment('');
+          }
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error('Academy openCourse error:', err);
       setModules([]);
@@ -138,10 +178,60 @@ export const AcademyScreen: React.FC = () => {
     return Math.round((completed / lessonsCount) * 100);
   };
 
-  const filtered =
-    selectedCategory === 'all'
-      ? courses
-      : courses.filter((c) => c.category === selectedCategory);
+  const handleSubmitRating = async () => {
+    if (!user || !selectedCourse || myRating === 0) return;
+    try {
+      await saveCourseRating({
+        studentId: user.id,
+        courseId: selectedCourse.id,
+        rating: myRating,
+        comment: ratingComment,
+        createdAt: new Date(),
+      });
+      const avg = await getCourseAverageRating(selectedCourse.id);
+      setCourseAvgRating(avg);
+      setShowRatingModal(false);
+    } catch (err) {
+      console.error('Rating submit error:', err);
+    }
+  };
+
+  const handleGenerateCertificate = async () => {
+    if (!user || !selectedCourse) return;
+    try {
+      const cert = await generateCertificate(
+        user.id,
+        `${user.name} ${user.surname}`,
+        selectedCourse.id,
+        selectedCourse.title
+      );
+      setSelectedCert(cert);
+      setShowCertModal(true);
+      const certs = await getStudentCertificates(user.id);
+      setCertificates(certs);
+    } catch (err) {
+      console.error('Certificate error:', err);
+    }
+  };
+
+  const isCourseCompleted = (courseId: string, lessonsCount: number) => {
+    if (lessonsCount === 0) return false;
+    const completed = allProgress.filter((p) => p.courseId === courseId).length;
+    return completed >= lessonsCount;
+  };
+
+  const hasCertificate = (courseId: string) =>
+    certificates.some((c) => c.courseId === courseId);
+
+  const searchTerm = searchQuery.toLowerCase().trim();
+  const filtered = courses.filter((c) => {
+    const matchCategory = selectedCategory === 'all' || c.category === selectedCategory;
+    const matchSearch = !searchTerm ||
+      c.title.toLowerCase().includes(searchTerm) ||
+      c.description.toLowerCase().includes(searchTerm) ||
+      c.tags.some((t) => t.toLowerCase().includes(searchTerm));
+    return matchCategory && matchSearch;
+  });
 
   const renderCourse = ({ item }: { item: AcademyCourse }) => {
     const cat = CATEGORY_CONFIG[item.category];
@@ -177,6 +267,19 @@ export const AcademyScreen: React.FC = () => {
                 <View style={[styles.progressFill, { width: `${prog}%` }]} />
               </View>
               <Text style={styles.progressText}>{prog}%</Text>
+            </View>
+          )}
+          {/* Completed + certificate badge */}
+          {isCourseCompleted(item.id, item.lessonsCount) && (
+            <View style={styles.completedCourseBadge}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+              <Text style={styles.completedCourseText}>Completato</Text>
+              {hasCertificate(item.id) && (
+                <>
+                  <Ionicons name="ribbon" size={16} color={GOLD} />
+                  <Text style={styles.certBadgeText}>Certificato</Text>
+                </>
+              )}
             </View>
           )}
           {item.tags.length > 0 && (
@@ -257,6 +360,40 @@ export const AcademyScreen: React.FC = () => {
           Corsi esclusivi per la tua crescita
         </Text>
       </View>
+
+      {/* Search bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search-outline" size={18} color={colors.textLight} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Cerca corsi..."
+          placeholderTextColor={colors.textLight}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textLight} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Certificati */}
+      {certificates.length > 0 && (
+        <TouchableOpacity
+          style={styles.certsBanner}
+          onPress={() => {
+            setSelectedCert(certificates[0]);
+            setShowCertModal(true);
+          }}
+        >
+          <Ionicons name="ribbon-outline" size={20} color={GOLD} />
+          <Text style={styles.certsBannerText}>
+            {certificates.length} certificat{certificates.length === 1 ? 'o' : 'i'} ottenut{certificates.length === 1 ? 'o' : 'i'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={GOLD} />
+        </TouchableOpacity>
+      )}
 
       {/* Filtri categoria */}
       <View style={styles.filterRow}>
@@ -359,6 +496,22 @@ export const AcademyScreen: React.FC = () => {
                     <Text style={styles.modalMeta}>
                       {selectedCourse.lessonsCount} lezioni · {selectedCourse.durationMinutes} min totali
                     </Text>
+                    {/* Rating */}
+                    {courseAvgRating.count > 0 && (
+                      <View style={styles.ratingRow}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= Math.round(courseAvgRating.average) ? 'star' : 'star-outline'}
+                            size={16}
+                            color={GOLD}
+                          />
+                        ))}
+                        <Text style={styles.ratingText}>
+                          {courseAvgRating.average.toFixed(1)} ({courseAvgRating.count})
+                        </Text>
+                      </View>
+                    )}
                     {/* Progress */}
                     {lessons.length > 0 && (
                       <View style={styles.modalProgress}>
@@ -379,6 +532,29 @@ export const AcademyScreen: React.FC = () => {
                         </Text>
                       </View>
                     )}
+                    {/* Actions: Rate + Certificate */}
+                    <View style={styles.courseActionsRow}>
+                      <TouchableOpacity
+                        style={styles.rateBtn}
+                        onPress={() => setShowRatingModal(true)}
+                      >
+                        <Ionicons name={myRating > 0 ? 'star' : 'star-outline'} size={16} color={GOLD} />
+                        <Text style={styles.rateBtnText}>
+                          {myRating > 0 ? `Voto: ${myRating}/5` : 'Valuta'}
+                        </Text>
+                      </TouchableOpacity>
+                      {lessons.length > 0 && progress.length >= lessons.length && (
+                        <TouchableOpacity
+                          style={styles.certBtn}
+                          onPress={handleGenerateCertificate}
+                        >
+                          <Ionicons name="ribbon-outline" size={16} color={GOLD} />
+                          <Text style={styles.certBtnText}>
+                            {hasCertificate(selectedCourse.id) ? 'Vedi certificato' : 'Ottieni certificato'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   <TouchableOpacity
                     onPress={() => setSelectedCourse(null)}
@@ -460,7 +636,100 @@ export const AcademyScreen: React.FC = () => {
         onClose={() => setPlayingLesson(null)}
         onComplete={handlePlayerComplete}
         isCompleted={playingLesson ? isLessonCompleted(playingLesson.id) : false}
+        userId={user?.id}
+        courseId={selectedCourse?.id}
       />
+
+      {/* Rating Modal */}
+      <Modal visible={showRatingModal} animationType="fade" transparent>
+        <View style={styles.ratingOverlay}>
+          <View style={styles.ratingModal}>
+            <Text style={styles.ratingModalTitle}>Valuta questo corso</Text>
+            <View style={styles.ratingStarsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setMyRating(star)}>
+                  <Ionicons
+                    name={star <= myRating ? 'star' : 'star-outline'}
+                    size={36}
+                    color={GOLD}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.ratingInput}
+              value={ratingComment}
+              onChangeText={setRatingComment}
+              placeholder="Commento (opzionale)"
+              placeholderTextColor={colors.textLight}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.ratingActions}>
+              <TouchableOpacity
+                style={styles.ratingCancelBtn}
+                onPress={() => setShowRatingModal(false)}
+              >
+                <Text style={styles.ratingCancelText}>Annulla</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.ratingSendBtn, myRating === 0 && { opacity: 0.5 }]}
+                onPress={handleSubmitRating}
+                disabled={myRating === 0}
+              >
+                <Text style={styles.ratingSendText}>Invia</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Certificate Modal */}
+      <Modal visible={showCertModal} animationType="fade" transparent>
+        <View style={styles.ratingOverlay}>
+          <View style={styles.certModal}>
+            {selectedCert && (
+              <>
+                <Ionicons name="ribbon" size={64} color={GOLD} />
+                <Text style={styles.certTitle}>Certificato di Completamento</Text>
+                <Text style={styles.certStudentName}>{selectedCert.studentName}</Text>
+                <Text style={styles.certCourseTitle}>ha completato il corso</Text>
+                <Text style={styles.certCourseName}>{selectedCert.courseTitle}</Text>
+                <View style={styles.certCodeContainer}>
+                  <Text style={styles.certCodeLabel}>Codice:</Text>
+                  <Text style={styles.certCode}>{selectedCert.certificateCode}</Text>
+                </View>
+              </>
+            )}
+            {!selectedCert && certificates.length > 0 && (
+              <>
+                <Text style={styles.certTitle}>I tuoi certificati</Text>
+                <ScrollView style={{ maxHeight: 300, width: '100%' }}>
+                  {certificates.map((cert) => (
+                    <TouchableOpacity
+                      key={cert.id}
+                      style={styles.certListItem}
+                      onPress={() => setSelectedCert(cert)}
+                    >
+                      <Ionicons name="ribbon" size={24} color={GOLD} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.certListTitle}>{cert.courseTitle}</Text>
+                        <Text style={styles.certListCode}>{cert.certificateCode}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+            <TouchableOpacity
+              style={styles.certCloseBtn}
+              onPress={() => { setShowCertModal(false); setSelectedCert(null); }}
+            >
+              <Text style={styles.certCloseText}>Chiudi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -813,5 +1082,251 @@ const styles = StyleSheet.create({
   },
   completeBtn: {
     padding: 4,
+  },
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    color: colors.text,
+    fontSize: fontSize.md,
+  },
+  // Certificates banner
+  certsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: GOLD + '10',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD + '30',
+  },
+  certsBannerText: {
+    flex: 1,
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
+  // Completed course badge
+  completedCourseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  completedCourseText: {
+    color: colors.success,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+  },
+  certBadgeText: {
+    color: GOLD,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+  },
+  // Rating in course detail
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: spacing.xs,
+  },
+  ratingText: {
+    color: colors.textLight,
+    fontSize: fontSize.xs,
+    marginLeft: spacing.xs,
+  },
+  courseActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  rateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: GOLD + '50',
+  },
+  rateBtnText: {
+    color: GOLD,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+  },
+  certBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.round,
+    backgroundColor: GOLD + '15',
+    borderWidth: 1,
+    borderColor: GOLD + '50',
+  },
+  certBtnText: {
+    color: GOLD,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+  },
+  // Rating modal
+  ratingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  ratingModal: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    gap: spacing.md,
+  },
+  ratingModalTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  ratingStarsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  ratingInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.text,
+    fontSize: fontSize.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  ratingActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  ratingCancelBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+  },
+  ratingCancelText: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  ratingSendBtn: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: GOLD,
+    alignItems: 'center',
+  },
+  ratingSendText: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  // Certificate modal
+  certModal: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  certTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: GOLD,
+  },
+  certStudentName: {
+    fontSize: fontSize.title,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  certCourseTitle: {
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+  },
+  certCourseName: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  certCodeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+  },
+  certCodeLabel: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+  },
+  certCode: {
+    color: GOLD,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  certListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xs,
+  },
+  certListTitle: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  certListCode: {
+    color: colors.textLight,
+    fontSize: fontSize.xs,
+  },
+  certCloseBtn: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: GOLD,
+    marginTop: spacing.sm,
+  },
+  certCloseText: {
+    color: GOLD,
+    fontSize: fontSize.md,
+    fontWeight: '600',
   },
 });
