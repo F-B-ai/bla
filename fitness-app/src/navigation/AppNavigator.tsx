@@ -708,6 +708,12 @@ export const AppNavigator: React.FC = () => {
     });
   }, []);
 
+  // Persist loginMode whenever it changes
+  const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
+    setLoginMode(mode);
+    saveLoginMode(mode);
+  }, []);
+
   // On initial load, if user is NOT authenticated, reset loginMode to null
   // so the selector screen always shows. Persistence only matters while logged in.
   const initialCheckDone = useRef(false);
@@ -719,12 +725,6 @@ export const AppNavigator: React.FC = () => {
       }
     }
   }, [loginModeLoaded, loading, isAuthenticated, loginMode, setLoginModeAndPersist]);
-
-  // Persist loginMode whenever it changes
-  const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
-    setLoginMode(mode);
-    saveLoginMode(mode);
-  }, []);
 
   const handleLogoutAndReset = useCallback(async () => {
     await logout();
