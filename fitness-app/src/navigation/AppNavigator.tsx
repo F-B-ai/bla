@@ -77,6 +77,8 @@ import { AcademyScreen } from '../screens/shared/AcademyScreen';
 import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
 import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
 import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
+import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
+import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -260,6 +262,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -361,6 +371,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -454,6 +472,14 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -528,6 +554,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Scheda',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Workout"
+      component={LiveWorkoutScreen}
+      options={{
+        tabBarLabel: 'Allenamento',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen

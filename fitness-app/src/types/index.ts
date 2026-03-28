@@ -499,6 +499,42 @@ export interface AcademyCertificate {
   certificateCode: string; // codice univoco
 }
 
+// --- Workout Log (registrazione serie in tempo reale) ---
+export type WorkoutLogStatus = 'in_progress' | 'completed' | 'abandoned';
+
+export interface WorkoutLog {
+  id: string;
+  studentId: string;
+  collaboratorId: string;
+  workoutPlanId?: string;
+  dayOfWeek: number;
+  date: Date;
+  startedAt: Date;
+  completedAt?: Date;
+  status: WorkoutLogStatus;
+  exerciseLogs: ExerciseLog[];
+  notes: string;
+  durationMinutes?: number;
+}
+
+export interface ExerciseLog {
+  exerciseId: string;
+  exerciseName: string;
+  targetSets: number;
+  targetReps: string;
+  sets: SetLog[];
+}
+
+export interface SetLog {
+  setNumber: number;
+  reps: number;
+  weight: number; // kg
+  completed: boolean;
+  rpe?: number; // Rate of Perceived Exertion 1-10
+  notes?: string;
+  completedAt: Date;
+}
+
 // --- Navigation types ---
 export type RootStackParamList = {
   Login: undefined;

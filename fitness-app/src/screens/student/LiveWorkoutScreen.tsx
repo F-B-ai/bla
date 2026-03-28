@@ -1,0 +1,816 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { crossAlert } from '../../utils/alert';
+import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { Card } from '../../components/common/Card';
+import { ModalHeader } from '../../components/common/ModalHeader';
+import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, Student } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
+import { getActiveWorkoutPlan } from '../../services/programService';
+import {
+  startWorkoutLog,
+  updateExerciseLogs,
+  completeWorkoutLog,
+  abandonWorkoutLog,
+  getActiveWorkoutLog,
+  getStudentWorkoutLogs,
+  subscribeToWorkoutLog,
+} from '../../services/workoutLogService';
+
+const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
+
+export const LiveWorkoutScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const student = user as Student | null;
+
+  const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
+  const [activeWorkout, setActiveWorkout] = useState<WorkoutLog | null>(null);
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>([]);
+  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  const [timer, setTimer] = useState(0);
+  const [isResting, setIsResting] = useState(false);
+  const [restTimer, setRestTimer] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutLog[]>([]);
+  const [sessionNotes, setSessionNotes] = useState('');
+
+  // Inputs per la serie corrente
+  const [inputWeight, setInputWeight] = useState('');
+  const [inputReps, setInputReps] = useState('');
+  const [inputRpe, setInputRpe] = useState('');
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
+
+  const todayDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+
+  // Carica dati iniziali
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const [plan, existing] = await Promise.all([
+        getActiveWorkoutPlan(user.id),
+        getActiveWorkoutLog(user.id),
+      ]);
+      setActivePlan(plan);
+      if (existing) {
+        setActiveWorkout(existing);
+        setExerciseLogs(existing.exerciseLogs || []);
+        // Sottoscrivi aggiornamenti real-time
+        if (unsubRef.current) unsubRef.current();
+        unsubRef.current = subscribeToWorkoutLog(existing.id, (log) => {
+          if (log) setActiveWorkout(log);
+        });
+      }
+    } catch (err) {
+      console.error('Errore caricamento:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadData();
+    return () => {
+      if (unsubRef.current) unsubRef.current();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+    };
+  }, [loadData]);
+
+  // Timer principale
+  useEffect(() => {
+    if (activeWorkout && activeWorkout.status === 'in_progress') {
+      timerRef.current = setInterval(() => {
+        setTimer((t) => t + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [activeWorkout]);
+
+  const formatTime = (seconds: number): string => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Inizia allenamento
+  const handleStartWorkout = async () => {
+    if (!user || !activePlan) return;
+    const todayExercises = activePlan.weeklySchedule[todayDayIndex]?.exercises || [];
+    if (todayExercises.length === 0) {
+      crossAlert('Info', 'Oggi e\' giorno di riposo. Nessun esercizio programmato.');
+      return;
+    }
+
+    const logs: ExerciseLog[] = todayExercises.map((ex) => ({
+      exerciseId: ex.id,
+      exerciseName: ex.name,
+      targetSets: ex.sets,
+      targetReps: ex.reps,
+      sets: [],
+    }));
+
+    try {
+      const logId = await startWorkoutLog({
+        studentId: user.id,
+        collaboratorId: (student as any)?.assignedCollaboratorId || '',
+        workoutPlanId: activePlan.id,
+        dayOfWeek: todayDayIndex,
+        date: new Date(),
+        startedAt: new Date(),
+        status: 'in_progress',
+        exerciseLogs: logs,
+        notes: '',
+      });
+
+      setExerciseLogs(logs);
+      setCurrentExerciseIndex(0);
+      setTimer(0);
+
+      const newLog: WorkoutLog = {
+        id: logId,
+        studentId: user.id,
+        collaboratorId: (student as any)?.assignedCollaboratorId || '',
+        workoutPlanId: activePlan.id,
+        dayOfWeek: todayDayIndex,
+        date: new Date(),
+        startedAt: new Date(),
+        status: 'in_progress',
+        exerciseLogs: logs,
+        notes: '',
+      };
+      setActiveWorkout(newLog);
+
+      // Sottoscrivi per aggiornamenti real-time
+      if (unsubRef.current) unsubRef.current();
+      unsubRef.current = subscribeToWorkoutLog(logId, (log) => {
+        if (log) setActiveWorkout(log);
+      });
+    } catch (err) {
+      console.error('Errore avvio allenamento:', err);
+      crossAlert('Errore', 'Impossibile avviare l\'allenamento.');
+    }
+  };
+
+  // Registra una serie
+  const handleLogSet = async () => {
+    if (!activeWorkout) return;
+    const reps = parseInt(inputReps, 10);
+    const weight = parseFloat(inputWeight) || 0;
+    const rpe = parseInt(inputRpe, 10) || undefined;
+
+    if (!reps || reps <= 0) {
+      crossAlert('Attenzione', 'Inserisci il numero di ripetizioni.');
+      return;
+    }
+
+    const newLogs = [...exerciseLogs];
+    const currentLog = newLogs[currentExerciseIndex];
+    const newSet: SetLog = {
+      setNumber: currentLog.sets.length + 1,
+      reps,
+      weight,
+      completed: true,
+      rpe,
+      completedAt: new Date(),
+    };
+    currentLog.sets.push(newSet);
+
+    setExerciseLogs(newLogs);
+    setInputReps('');
+    setInputWeight(inputWeight); // mantieni il peso
+    setInputRpe('');
+
+    // Salva su Firebase
+    try {
+      await updateExerciseLogs(activeWorkout.id, newLogs);
+    } catch (err) {
+      console.error('Errore salvataggio serie:', err);
+    }
+
+    // Timer recupero
+    const todayExercises = activePlan?.weeklySchedule[todayDayIndex]?.exercises || [];
+    const restSeconds = todayExercises[currentExerciseIndex]?.restSeconds || 60;
+    startRestTimer(restSeconds);
+
+    // Se ho completato tutte le serie di questo esercizio, passa al prossimo
+    if (currentLog.sets.length >= currentLog.targetSets) {
+      if (currentExerciseIndex < exerciseLogs.length - 1) {
+        setTimeout(() => {
+          setCurrentExerciseIndex(currentExerciseIndex + 1);
+          setInputWeight('');
+        }, 500);
+      }
+    }
+  };
+
+  const startRestTimer = (seconds: number) => {
+    setIsResting(true);
+    setRestTimer(seconds);
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    restTimerRef.current = setInterval(() => {
+      setRestTimer((t) => {
+        if (t <= 1) {
+          clearInterval(restTimerRef.current!);
+          setIsResting(false);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  };
+
+  const skipRest = () => {
+    if (restTimerRef.current) clearInterval(restTimerRef.current);
+    setIsResting(false);
+    setRestTimer(0);
+  };
+
+  // Completa allenamento
+  const handleCompleteWorkout = async () => {
+    if (!activeWorkout) return;
+    try {
+      await completeWorkoutLog(activeWorkout.id, sessionNotes);
+      if (unsubRef.current) unsubRef.current();
+      setActiveWorkout(null);
+      setExerciseLogs([]);
+      setTimer(0);
+      setSessionNotes('');
+      crossAlert('Completato!', 'Allenamento salvato con successo.');
+    } catch (err) {
+      console.error('Errore completamento:', err);
+      crossAlert('Errore', 'Impossibile completare l\'allenamento.');
+    }
+  };
+
+  // Abbandona allenamento
+  const handleAbandonWorkout = () => {
+    crossAlert('Abbandona', 'Vuoi davvero abbandonare l\'allenamento? I dati registrati verranno comunque salvati.', [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Abbandona',
+        style: 'destructive',
+        onPress: async () => {
+          if (!activeWorkout) return;
+          try {
+            await abandonWorkoutLog(activeWorkout.id);
+            if (unsubRef.current) unsubRef.current();
+            setActiveWorkout(null);
+            setExerciseLogs([]);
+            setTimer(0);
+          } catch (err) {
+            console.error('Errore abbandono:', err);
+          }
+        },
+      },
+    ]);
+  };
+
+  // Carica storico
+  const handleShowHistory = async () => {
+    if (!user) return;
+    try {
+      const logs = await getStudentWorkoutLogs(user.id);
+      setWorkoutHistory(logs.filter((l) => l.status !== 'in_progress'));
+      setShowHistory(true);
+    } catch (err) {
+      console.error('Errore storico:', err);
+    }
+  };
+
+  // Calcola progresso totale
+  const totalSetsTarget = exerciseLogs.reduce((sum, e) => sum + e.targetSets, 0);
+  const totalSetsCompleted = exerciseLogs.reduce((sum, e) => sum + e.sets.length, 0);
+  const allDone = totalSetsTarget > 0 && totalSetsCompleted >= totalSetsTarget;
+
+  const currentExercise = exerciseLogs[currentExerciseIndex];
+
+  // Se non c'e' un allenamento attivo, mostra schermata di avvio
+  if (!activeWorkout || activeWorkout.status !== 'in_progress') {
+    return (
+      <ScrollView style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.title}>Allenamento</Text>
+          <Text style={styles.subtitle}>{DAYS[todayDayIndex]}</Text>
+        </View>
+
+        <View style={styles.content}>
+          {!activePlan ? (
+            <Card>
+              <View style={styles.emptyContainer}>
+                <Ionicons name="fitness-outline" size={48} color={colors.textLight} />
+                <Text style={styles.emptyText}>
+                  Nessun programma attivo.{'\n'}
+                  Il tuo coach ti assegnera' presto un programma!
+                </Text>
+              </View>
+            </Card>
+          ) : (activePlan.weeklySchedule[todayDayIndex]?.exercises || []).length === 0 ? (
+            <Card>
+              <View style={styles.emptyContainer}>
+                <Ionicons name="bed-outline" size={48} color={colors.textLight} />
+                <Text style={styles.emptyText}>Oggi e' giorno di riposo</Text>
+              </View>
+            </Card>
+          ) : (
+            <>
+              <Card variant="elevated">
+                <View style={styles.startCard}>
+                  <Ionicons name="barbell-outline" size={56} color={colors.accent} />
+                  <Text style={styles.startTitle}>Pronto per allenarti?</Text>
+                  <Text style={styles.startSubtitle}>
+                    {activePlan.weeklySchedule[todayDayIndex].exercises.length} esercizi programmati
+                  </Text>
+
+                  {/* Preview esercizi */}
+                  <View style={styles.previewList}>
+                    {activePlan.weeklySchedule[todayDayIndex].exercises.map((ex, i) => (
+                      <View key={ex.id || i} style={styles.previewItem}>
+                        <View style={styles.previewDot} />
+                        <Text style={styles.previewText}>
+                          {ex.name} - {ex.sets}x{ex.reps}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity style={styles.startButton} onPress={handleStartWorkout}>
+                    <Ionicons name="play" size={24} color="#FFF" />
+                    <Text style={styles.startButtonText}>INIZIA ALLENAMENTO</Text>
+                  </TouchableOpacity>
+                </View>
+              </Card>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.historyButton} onPress={handleShowHistory}>
+            <Ionicons name="time-outline" size={20} color={colors.accent} />
+            <Text style={styles.historyButtonText}>Storico Allenamenti</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Modal Storico */}
+        <Modal visible={showHistory} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <ScrollView style={styles.modalContent}>
+              <ModalHeader title="Storico Allenamenti" onClose={() => setShowHistory(false)} />
+              {workoutHistory.length === 0 ? (
+                <Text style={styles.emptyText}>Nessun allenamento registrato</Text>
+              ) : (
+                workoutHistory.map((log) => (
+                  <Card key={log.id} variant="outlined">
+                    <View style={styles.historyRow}>
+                      <View style={styles.historyInfo}>
+                        <Text style={styles.historyDate}>
+                          {formatDateShort(log.startedAt)} - {DAYS[log.dayOfWeek]}
+                        </Text>
+                        <Text style={styles.historyStats}>
+                          {log.exerciseLogs?.reduce((s, e) => s + e.sets.length, 0) || 0} serie |{' '}
+                          {log.durationMinutes ? `${log.durationMinutes} min` : '--'}
+                        </Text>
+                      </View>
+                      <View style={[
+                        styles.statusBadge,
+                        { backgroundColor: log.status === 'completed' ? colors.success : colors.warning },
+                      ]}>
+                        <Text style={styles.statusText}>
+                          {log.status === 'completed' ? 'Completato' : 'Abbandonato'}
+                        </Text>
+                      </View>
+                    </View>
+                    {/* Dettaglio esercizi */}
+                    {log.exerciseLogs?.map((el, i) => (
+                      <View key={i} style={styles.historyExercise}>
+                        <Text style={styles.historyExName}>{el.exerciseName}</Text>
+                        <View style={styles.historySets}>
+                          {el.sets.map((s, si) => (
+                            <Text key={si} style={styles.historySetText}>
+                              S{s.setNumber}: {s.weight}kg x {s.reps}
+                            </Text>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                    {log.notes ? (
+                      <Text style={styles.historyNotes}>Note: {log.notes}</Text>
+                    ) : null}
+                  </Card>
+                ))
+              )}
+              <View style={{ height: 100 }} />
+            </ScrollView>
+          </View>
+        </Modal>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    );
+  }
+
+  // --- ALLENAMENTO IN CORSO ---
+  return (
+    <ScrollView style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Allenamento in Corso</Text>
+            <Text style={styles.timerText}>{formatTime(timer)}</Text>
+          </View>
+          <TouchableOpacity style={styles.abandonBtn} onPress={handleAbandonWorkout}>
+            <Ionicons name="close-circle-outline" size={24} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Progress bar */}
+        <View style={styles.progressBar}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${totalSetsTarget > 0 ? (totalSetsCompleted / totalSetsTarget) * 100 : 0}%` },
+            ]}
+          />
+        </View>
+        <Text style={styles.progressText}>
+          {totalSetsCompleted}/{totalSetsTarget} serie completate
+        </Text>
+      </View>
+
+      {/* Navigazione esercizi */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.exerciseNav}
+        contentContainerStyle={styles.exerciseNavContent}
+      >
+        {exerciseLogs.map((ex, i) => {
+          const done = ex.sets.length >= ex.targetSets;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[
+                styles.exerciseNavItem,
+                i === currentExerciseIndex && styles.exerciseNavActive,
+                done && styles.exerciseNavDone,
+              ]}
+              onPress={() => setCurrentExerciseIndex(i)}
+            >
+              <Text style={[
+                styles.exerciseNavText,
+                i === currentExerciseIndex && styles.exerciseNavTextActive,
+              ]}>
+                {done ? '\u2713' : i + 1}
+              </Text>
+              <Text style={[
+                styles.exerciseNavName,
+                i === currentExerciseIndex && styles.exerciseNavTextActive,
+              ]} numberOfLines={1}>
+                {ex.exerciseName}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Esercizio corrente */}
+      {currentExercise && (
+        <View style={styles.content}>
+          <Card variant="elevated">
+            <Text style={styles.exerciseName}>{currentExercise.exerciseName}</Text>
+            <Text style={styles.exerciseTarget}>
+              Obiettivo: {currentExercise.targetSets} x {currentExercise.targetReps}
+            </Text>
+
+            {/* Serie completate */}
+            {currentExercise.sets.length > 0 && (
+              <View style={styles.completedSets}>
+                <Text style={styles.completedTitle}>Serie completate:</Text>
+                {currentExercise.sets.map((s, i) => (
+                  <View key={i} style={styles.setRow}>
+                    <View style={styles.setNumber}>
+                      <Text style={styles.setNumberText}>{s.setNumber}</Text>
+                    </View>
+                    <Text style={styles.setText}>
+                      {s.weight > 0 ? `${s.weight} kg` : 'Corpo libero'} x {s.reps} reps
+                    </Text>
+                    {s.rpe && <Text style={styles.rpeText}>RPE {s.rpe}</Text>}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Timer recupero */}
+            {isResting && (
+              <View style={styles.restContainer}>
+                <Text style={styles.restTitle}>Recupero</Text>
+                <Text style={styles.restTimer}>{restTimer}s</Text>
+                <TouchableOpacity style={styles.skipRestBtn} onPress={skipRest}>
+                  <Text style={styles.skipRestText}>Salta recupero</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Input serie (se non ho completato tutte le serie di questo esercizio) */}
+            {currentExercise.sets.length < currentExercise.targetSets && (
+              <View style={styles.inputSection}>
+                <Text style={styles.inputTitle}>
+                  Serie {currentExercise.sets.length + 1} di {currentExercise.targetSets}
+                </Text>
+
+                <View style={styles.inputRow}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Peso (kg)</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="decimal-pad"
+                      value={inputWeight}
+                      onChangeText={setInputWeight}
+                      placeholder="0"
+                      placeholderTextColor={colors.textLight}
+                    />
+                  </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Reps</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={inputReps}
+                      onChangeText={setInputReps}
+                      placeholder="0"
+                      placeholderTextColor={colors.textLight}
+                    />
+                  </View>
+                  <View style={styles.inputGroupSmall}>
+                    <Text style={styles.inputLabel}>RPE</Text>
+                    <TextInput
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      value={inputRpe}
+                      onChangeText={setInputRpe}
+                      placeholder="-"
+                      placeholderTextColor={colors.textLight}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity style={styles.logSetButton} onPress={handleLogSet}>
+                  <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                  <Text style={styles.logSetButtonText}>REGISTRA SERIE</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Tutte le serie completate per questo esercizio */}
+            {currentExercise.sets.length >= currentExercise.targetSets && (
+              <View style={styles.exerciseDone}>
+                <Ionicons name="checkmark-done-circle" size={40} color={colors.success} />
+                <Text style={styles.exerciseDoneText}>Esercizio completato!</Text>
+                {/* Permetti di aggiungere serie extra */}
+                <TouchableOpacity
+                  style={styles.extraSetBtn}
+                  onPress={() => {
+                    // Resetta input per serie extra
+                    setInputReps('');
+                  }}
+                >
+                  <Text style={styles.extraSetText}>+ Serie extra</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </Card>
+
+          {/* Completa allenamento */}
+          {allDone && (
+            <View style={styles.completeSection}>
+              <TextInput
+                style={styles.notesInput}
+                placeholder="Note sulla sessione (opzionale)..."
+                placeholderTextColor={colors.textLight}
+                multiline
+                value={sessionNotes}
+                onChangeText={setSessionNotes}
+              />
+              <TouchableOpacity style={styles.completeButton} onPress={handleCompleteWorkout}>
+                <Ionicons name="trophy" size={24} color="#FFF" />
+                <Text style={styles.completeButtonText}>COMPLETA ALLENAMENTO</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
+      <View style={{ height: 120 }} />
+    </ScrollView>
+  );
+};
+
+const formatDateShort = (date: any): string => {
+  if (!date) return '';
+  const d = date.toDate ? date.toDate() : new Date(date);
+  return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  header: {
+    backgroundColor: colors.primary,
+    padding: spacing.lg,
+    paddingTop: spacing.xxl,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
+  subtitle: { fontSize: fontSize.md, color: colors.accent, marginTop: 2, fontWeight: '600' },
+  timerText: { fontSize: fontSize.hero, fontWeight: '700', color: colors.accent, marginTop: spacing.xs },
+  abandonBtn: { padding: spacing.sm },
+  progressBar: {
+    height: 6,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 3,
+    marginTop: spacing.md,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  content: { padding: spacing.md },
+  exerciseNav: { marginTop: spacing.sm },
+  exerciseNavContent: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  exerciseNavItem: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    minWidth: 70,
+    ...shadows.small,
+  },
+  exerciseNavActive: { backgroundColor: colors.accent },
+  exerciseNavDone: { backgroundColor: colors.success + '30' },
+  exerciseNavText: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  exerciseNavTextActive: { color: '#FFF' },
+  exerciseNavName: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, maxWidth: 60 },
+  exerciseName: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
+  exerciseTarget: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: 4 },
+  completedSets: { marginTop: spacing.md },
+  completedTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    gap: spacing.sm,
+  },
+  setNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  setNumberText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  setText: { fontSize: fontSize.md, color: colors.text, flex: 1 },
+  rpeText: { fontSize: fontSize.sm, color: colors.warning, fontWeight: '600' },
+  restContainer: {
+    marginTop: spacing.lg,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  restTitle: { fontSize: fontSize.md, color: colors.textSecondary },
+  restTimer: { fontSize: 48, fontWeight: '700', color: colors.accent, marginVertical: spacing.sm },
+  skipRestBtn: { marginTop: spacing.sm },
+  skipRestText: { color: colors.accent, fontSize: fontSize.md, fontWeight: '600' },
+  inputSection: { marginTop: spacing.lg },
+  inputTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  inputRow: { flexDirection: 'row', gap: spacing.sm },
+  inputGroup: { flex: 2 },
+  inputGroupSmall: { flex: 1 },
+  inputLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: 4 },
+  input: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.text,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  logSetButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  logSetButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  exerciseDone: { marginTop: spacing.lg, alignItems: 'center' },
+  exerciseDoneText: { fontSize: fontSize.lg, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
+  extraSetBtn: { marginTop: spacing.sm },
+  extraSetText: { color: colors.accent, fontSize: fontSize.md, fontWeight: '600' },
+  completeSection: { marginTop: spacing.lg },
+  notesInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    color: colors.text,
+    fontSize: fontSize.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  completeButton: {
+    backgroundColor: colors.success,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  completeButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  startCard: { alignItems: 'center', padding: spacing.lg },
+  startTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, marginTop: spacing.md },
+  startSubtitle: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: spacing.xs },
+  previewList: { marginTop: spacing.lg, width: '100%' },
+  previewItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  previewDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
+  previewText: { fontSize: fontSize.md, color: colors.text },
+  startButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+  },
+  startButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  historyButtonText: { color: colors.accent, fontSize: fontSize.md, fontWeight: '600' },
+  emptyContainer: { alignItems: 'center', padding: spacing.xl },
+  emptyText: { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '90%',
+  },
+  historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  historyInfo: { flex: 1 },
+  historyDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
+  historyStats: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  statusBadge: { borderRadius: borderRadius.md, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  statusText: { color: '#FFF', fontSize: fontSize.xs, fontWeight: '700' },
+  historyExercise: { marginTop: spacing.sm, paddingLeft: spacing.md },
+  historyExName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
+  historySets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 2 },
+  historySetText: { fontSize: fontSize.xs, color: colors.textSecondary },
+  historyNotes: { fontSize: fontSize.sm, color: colors.warning, fontStyle: 'italic', marginTop: spacing.sm },
+});
