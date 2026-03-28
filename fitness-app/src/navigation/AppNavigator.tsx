@@ -748,16 +748,19 @@ export const AppNavigator: React.FC = () => {
     saveLoginMode(mode);
   }, []);
 
-  // On initial load, if user is NOT authenticated, reset loginMode to null
-  // so the selector screen always shows. Persistence only matters while logged in.
-  const initialCheckDone = useRef(false);
+  // Reset loginMode to null when user becomes unauthenticated (logout or initial load).
+  // Uses prevAuth ref to detect auth transitions and avoid resetting while on login screen.
+  const prevAuth = useRef<boolean | null>(null);
   useEffect(() => {
-    if (loginModeLoaded && !loading && !initialCheckDone.current) {
-      initialCheckDone.current = true;
-      if (!isAuthenticated && loginMode !== null) {
+    if (!loginModeLoaded || loading) return;
+
+    if (!isAuthenticated && loginMode !== null) {
+      // Reset on initial load (prevAuth is null) or on logout (prevAuth was true)
+      if (prevAuth.current === null || prevAuth.current === true) {
         setLoginModeAndPersist(null);
       }
     }
+    prevAuth.current = isAuthenticated;
   }, [loginModeLoaded, loading, isAuthenticated, loginMode, setLoginModeAndPersist]);
 
   const handleLogoutAndReset = useCallback(async () => {
