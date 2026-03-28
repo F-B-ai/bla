@@ -742,26 +742,29 @@ export const AppNavigator: React.FC = () => {
     });
   }, []);
 
-  // Persist loginMode whenever it changes
+  // Track whether loginMode was set by the user clicking on the selector (not loaded from storage)
+  const loginModeSetByUser = useRef(false);
+
   const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
+    loginModeSetByUser.current = mode !== null;
     setLoginMode(mode);
     saveLoginMode(mode);
   }, []);
 
-  // Reset loginMode to null when user becomes unauthenticated (logout or initial load).
-  // Uses prevAuth ref to detect auth transitions and avoid resetting while on login screen.
-  const prevAuth = useRef<boolean | null>(null);
+  // When user becomes authenticated, reset the flag so next logout will show selector
   useEffect(() => {
-    if (!loginModeLoaded || loading) return;
-
-    if (!isAuthenticated && loginMode !== null) {
-      // Reset on initial load (prevAuth is null) or on logout (prevAuth was true)
-      if (prevAuth.current === null || prevAuth.current === true) {
-        setLoginModeAndPersist(null);
-      }
+    if (isAuthenticated) {
+      loginModeSetByUser.current = false;
     }
-    prevAuth.current = isAuthenticated;
-  }, [loginModeLoaded, loading, isAuthenticated, loginMode, setLoginModeAndPersist]);
+  }, [isAuthenticated]);
+
+  // Clean up stale loginMode from storage when not authenticated
+  useEffect(() => {
+    if (loginModeLoaded && !loading && !isAuthenticated && loginMode !== null && !loginModeSetByUser.current) {
+      saveLoginMode(null);
+      setLoginMode(null);
+    }
+  }, [loginModeLoaded, loading, isAuthenticated, loginMode]);
 
   const handleLogoutAndReset = useCallback(async () => {
     await logout();
@@ -776,6 +779,9 @@ export const AppNavigator: React.FC = () => {
   if (isAuthenticated && !user) {
     return <LoadingScreen />;
   }
+
+  // If not authenticated and loginMode came from storage (not user action), force selector
+  const effectiveLoginMode = (!isAuthenticated && !loginModeSetByUser.current) ? null : loginMode;
 
   // Determine which tabs to show for Academy mode
   const AcademyTabsComponent = (role === 'owner' || role === 'manager')
@@ -793,13 +799,13 @@ export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer
       documentTitle={{
-        formatter: () => loginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
       }}
     >
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
           // Not authenticated: show login selector or specific login
-          loginMode === null ? (
+          effectiveLoginMode === null ? (
             <RootStack.Screen name="LoginSelector">
               {() => (
                 <LoginSelectorScreen
@@ -808,7 +814,7 @@ export const AppNavigator: React.FC = () => {
                 />
               )}
             </RootStack.Screen>
-          ) : loginMode === 'app' ? (
+          ) : effectiveLoginMode === 'app' ? (
             <RootStack.Screen name="Login">
               {() => (
                 <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
@@ -823,7 +829,7 @@ export const AppNavigator: React.FC = () => {
               )}
             </RootStack.Screen>
           )
-        ) : loginMode === 'academy' ? (
+        ) : effectiveLoginMode === 'academy' ? (
           // Authenticated via Academy login: show only Academy tabs with logout
           <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
         ) : role === 'owner' ? (
