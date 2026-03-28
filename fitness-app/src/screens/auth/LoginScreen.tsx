@@ -252,9 +252,10 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 0,
+    top: Platform.OS === 'web' ? spacing.md : 50,
     left: 0,
     padding: spacing.md,
+    zIndex: 10,
   },
   backText: {
     color: colors.accent,
