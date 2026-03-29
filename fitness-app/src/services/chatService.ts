@@ -15,6 +15,14 @@ import {
 import { db } from '../config/firebase';
 import { ChatRoom, ChatMessage } from '../types';
 
+// Helper per convertire Firestore Timestamp a Date
+const toDate = (val: any): Date => {
+  if (!val) return new Date();
+  if (val.toDate) return val.toDate();
+  if (val.seconds) return new Date(val.seconds * 1000);
+  return new Date(val);
+};
+
 const ROOMS_COLLECTION = 'chatRooms';
 const MESSAGES_COLLECTION = 'chatMessages';
 
@@ -68,6 +76,35 @@ export const getAllChatRooms = async (): Promise<ChatRoom[]> => {
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
 };
 
+// --- Listener real-time per le chat rooms ---
+
+export const subscribeToUserChatRooms = (
+  userId: string,
+  callback: (rooms: ChatRoom[]) => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, ROOMS_COLLECTION),
+    where('participants', 'array-contains', userId)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const rooms = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+    callback(rooms);
+  }, (error) => {
+    console.error('Errore listener chat rooms:', error);
+  });
+};
+
+export const subscribeToAllChatRooms = (
+  callback: (rooms: ChatRoom[]) => void
+): Unsubscribe => {
+  return onSnapshot(collection(db, ROOMS_COLLECTION), (snapshot) => {
+    const rooms = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+    callback(rooms);
+  }, (error) => {
+    console.error('Errore listener tutte le chat rooms:', error);
+  });
+};
+
 // --- Messaggi ---
 
 export const sendMessage = async (
@@ -115,6 +152,23 @@ export const subscribeToMessages = (
       (d) => ({ ...d.data(), id: d.id } as ChatMessage)
     );
     callback(messages);
+  }, (error) => {
+    console.error('Errore listener messaggi chat:', error);
+    // Fallback: carica messaggi senza ordinamento se manca l'indice composito
+    const fallbackQuery = query(
+      collection(db, MESSAGES_COLLECTION),
+      where('chatRoomId', '==', chatRoomId)
+    );
+    getDocs(fallbackQuery).then((snap) => {
+      const messages = snap.docs
+        .map((d) => ({ ...d.data(), id: d.id } as ChatMessage))
+        .sort((a, b) => {
+          const ta = toDate(a.timestamp).getTime();
+          const tb = toDate(b.timestamp).getTime();
+          return ta - tb;
+        });
+      callback(messages);
+    }).catch((e) => console.error('Errore fallback messaggi:', e));
   });
 };
 

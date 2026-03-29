@@ -56,21 +56,39 @@ export const createWorkoutPlan = async (
 ): Promise<string> => {
   // Disattiva tutti i piani attivi precedenti per lo stesso studente
   if (plan.isActive && plan.studentId) {
-    const activeQuery = query(
-      collection(db, PLANS_COLLECTION),
-      where('studentId', '==', plan.studentId),
-      where('isActive', '==', true)
-    );
-    const activeSnapshot = await getDocs(activeQuery);
-    for (const activeDoc of activeSnapshot.docs) {
-      await updateDoc(doc(db, PLANS_COLLECTION, activeDoc.id), { isActive: false });
+    try {
+      const activeQuery = query(
+        collection(db, PLANS_COLLECTION),
+        where('studentId', '==', plan.studentId),
+        where('isActive', '==', true)
+      );
+      const activeSnapshot = await getDocs(activeQuery);
+      for (const activeDoc of activeSnapshot.docs) {
+        await updateDoc(doc(db, PLANS_COLLECTION, activeDoc.id), { isActive: false });
+      }
+    } catch {
+      // Fallback: filtra lato client
+      const fallbackQuery = query(
+        collection(db, PLANS_COLLECTION),
+        where('studentId', '==', plan.studentId)
+      );
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      for (const d of fallbackSnapshot.docs) {
+        if (d.data().isActive === true) {
+          await updateDoc(doc(db, PLANS_COLLECTION, d.id), { isActive: false });
+        }
+      }
     }
   }
 
+  // Assicura che startDate e endDate siano Date valide prima di convertire
+  const startDate = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as any);
+  const endDate = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as any);
+
   const docRef = await addDoc(collection(db, PLANS_COLLECTION), {
     ...plan,
-    startDate: Timestamp.fromDate(plan.startDate),
-    endDate: Timestamp.fromDate(plan.endDate),
+    startDate: Timestamp.fromDate(startDate),
+    endDate: Timestamp.fromDate(endDate),
     createdAt: Timestamp.now(),
   });
   return docRef.id;
@@ -79,27 +97,58 @@ export const createWorkoutPlan = async (
 export const getStudentWorkoutPlans = async (
   studentId: string
 ): Promise<WorkoutPlan[]> => {
-  const q = query(
-    collection(db, PLANS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('createdAt', 'desc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WorkoutPlan));
+  try {
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WorkoutPlan));
+  } catch (error) {
+    console.warn('Query con orderBy fallita, uso fallback:', error);
+    // Fallback senza orderBy (ordina lato client)
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map((d) => ({ ...d.data(), id: d.id } as WorkoutPlan))
+      .sort((a, b) => {
+        const ta = (a.createdAt as any)?.seconds || 0;
+        const tb = (b.createdAt as any)?.seconds || 0;
+        return tb - ta;
+      });
+  }
 };
 
 export const getActiveWorkoutPlan = async (
   studentId: string
 ): Promise<WorkoutPlan | null> => {
-  const q = query(
-    collection(db, PLANS_COLLECTION),
-    where('studentId', '==', studentId),
-    where('isActive', '==', true)
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  const d = snapshot.docs[0];
-  return { ...d.data(), id: d.id } as WorkoutPlan;
+  try {
+    // Query composita (richiede indice Firestore su studentId + isActive)
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId),
+      where('isActive', '==', true)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    return { ...d.data(), id: d.id } as WorkoutPlan;
+  } catch (error) {
+    console.warn('Query composita fallita, uso fallback:', error);
+    // Fallback: filtra lato client se l'indice composito non esiste
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    const activePlan = snapshot.docs.find((d) => d.data().isActive === true);
+    if (!activePlan) return null;
+    return { ...activePlan.data(), id: activePlan.id } as WorkoutPlan;
+  }
 };
 
 // --- Libreria esercizi ---

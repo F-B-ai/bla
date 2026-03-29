@@ -91,10 +91,14 @@ export const ChatConversationScreen: React.FC<Props> = ({
           {item.text}
         </Text>
         <Text style={[styles.messageTime, isMe && styles.myMessageTime]}>
-          {new Date(item.timestamp as unknown as string).toLocaleTimeString('it-IT', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {(() => {
+            const ts = item.timestamp as any;
+            const date = ts?.toDate ? ts.toDate() : ts?.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+            return date.toLocaleTimeString('it-IT', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          })()}
         </Text>
       </View>
     );

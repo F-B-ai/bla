@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +35,8 @@ export const MyProgramScreen: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [viewingPlan, setViewingPlan] = useState<WorkoutPlan | null>(null);
   const [historySelectedDay, setHistorySelectedDay] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -51,12 +54,20 @@ export const MyProgramScreen: React.FC = () => {
     } catch (err) {
       console.error('Errore caricamento programma:', err);
       crossAlert('Errore', 'Impossibile caricare il programma. Riprova più tardi.');
+    } finally {
+      setLoading(false);
     }
   }, [user, student]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
   const renderExercise = (exercise: Exercise, index: number) => (
     <Card key={exercise.id || index} variant="outlined">
@@ -105,7 +116,12 @@ export const MyProgramScreen: React.FC = () => {
   const pastPlans = allPlans.filter((p) => !p.isActive);
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Il Mio Programma</Text>
@@ -171,8 +187,9 @@ export const MyProgramScreen: React.FC = () => {
         {!activePlan ? (
           <Card>
             <Text style={styles.emptyText}>
-              Nessun programma attivo al momento.{'\n'}
-              Il tuo allenatore creerà presto il tuo programma!
+              {loading
+                ? 'Caricamento programma...'
+                : 'Nessun programma attivo al momento.\nIl tuo allenatore creerà presto il tuo programma!\n\nScorri verso il basso per aggiornare.'}
             </Text>
           </Card>
         ) : activePlan.weeklySchedule[selectedDay]?.exercises.length === 0 ? (

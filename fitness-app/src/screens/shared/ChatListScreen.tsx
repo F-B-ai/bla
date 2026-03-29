@@ -15,7 +15,13 @@ import { Button } from '../../components/common/Button';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { ChatRoom, User, Student, Collaborator } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { getUserChatRooms, getAllChatRooms, createChatRoom } from '../../services/chatService';
+import {
+  getUserChatRooms,
+  getAllChatRooms,
+  createChatRoom,
+  subscribeToUserChatRooms,
+  subscribeToAllChatRooms,
+} from '../../services/chatService';
 import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
 import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
@@ -31,37 +37,50 @@ export const ChatListScreen: React.FC = () => {
   const [availableContacts, setAvailableContacts] = useState<User[]>([]);
   const [creatingChat, setCreatingChat] = useState(false);
 
+  const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
+    const userIds = new Set<string>();
+    chatRooms.forEach((room) => {
+      room.participants.forEach((id) => userIds.add(id));
+    });
+
+    const profiles: Record<string, User> = {};
+    await Promise.all(
+      Array.from(userIds).map(async (id) => {
+        const profile = await getUserProfile(id);
+        if (profile) profiles[id] = profile;
+      })
+    );
+    setParticipants((prev) => ({ ...prev, ...profiles }));
+  }, []);
+
   const loadRooms = useCallback(async () => {
     if (!user) return;
     try {
-      // Il titolare vede TUTTE le chat
       const chatRooms = isOwner
         ? await getAllChatRooms()
         : await getUserChatRooms(user.id);
       setRooms(chatRooms);
-
-      // Carica i profili dei partecipanti
-      const userIds = new Set<string>();
-      chatRooms.forEach((room) => {
-        room.participants.forEach((id) => userIds.add(id));
-      });
-
-      const profiles: Record<string, User> = {};
-      await Promise.all(
-        Array.from(userIds).map(async (id) => {
-          const profile = await getUserProfile(id);
-          if (profile) profiles[id] = profile;
-        })
-      );
-      setParticipants(profiles);
+      await loadParticipantProfiles(chatRooms);
     } catch {
       // Silently handle
     }
-  }, [user, isOwner]);
+  }, [user, isOwner, loadParticipantProfiles]);
 
+  // Listener real-time per aggiornare la lista chat automaticamente
   useEffect(() => {
-    loadRooms();
-  }, [loadRooms]);
+    if (!user) return;
+
+    const handleRoomsUpdate = (chatRooms: ChatRoom[]) => {
+      setRooms(chatRooms);
+      loadParticipantProfiles(chatRooms);
+    };
+
+    const unsubscribe = isOwner
+      ? subscribeToAllChatRooms(handleRoomsUpdate)
+      : subscribeToUserChatRooms(user.id, handleRoomsUpdate);
+
+    return () => unsubscribe();
+  }, [user, isOwner, loadParticipantProfiles]);
 
   const onRefresh = async () => {
     setRefreshing(true);
