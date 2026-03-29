@@ -50,6 +50,13 @@
     }
     ,
     {
+      "collectionGroup": "academyCourses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "academyModules",
       "queryScope": "COLLECTION",
       "fields": [
