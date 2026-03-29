@@ -122,6 +122,8 @@ export const LessonPlayerModal: React.FC<Props> = ({
         if (q) setQuizAnswers(new Array(q.questions.length).fill(-1));
         setIsLoading(false);
       }).catch(() => setIsLoading(false));
+    } else if (lesson.type === 'article' || lesson.type === 'exercise') {
+      setIsLoading(false);
     }
     if (userId && lesson.id) {
       getNote(userId, lesson.id).then((n) => {
@@ -368,10 +370,16 @@ export const LessonPlayerModal: React.FC<Props> = ({
     // PDF — embed on web or open externally
     if (lesson.type === 'pdf') {
       if (Platform.OS === 'web') {
+        const pdfViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(lesson.contentUrl)}&embedded=true`;
         return (
           <View style={styles.videoContainer}>
+            {isLoading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={GOLD} />
+              </View>
+            )}
             <iframe
-              src={lesson.contentUrl}
+              src={pdfViewerUrl}
               style={{
                 width: '100%',
                 height: VIDEO_HEIGHT + 100,
@@ -379,6 +387,7 @@ export const LessonPlayerModal: React.FC<Props> = ({
                 borderRadius: 8,
               }}
               title={lesson.title}
+              onLoad={() => setIsLoading(false)}
             />
           </View>
         );
