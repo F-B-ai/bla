@@ -109,6 +109,7 @@ export const AcademyManagementScreen: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState('');
   const [selectedFileUri, setSelectedFileUri] = useState('');
+  const [selectedFileBlob, setSelectedFileBlob] = useState<Blob | null>(null);
 
   // Student assignment
   const [allStudents, setAllStudents] = useState<Student[]>([]);
@@ -116,6 +117,7 @@ export const AcademyManagementScreen: React.FC = () => {
   const [studentSearch, setStudentSearch] = useState('');
 
   const [savingCourse, setSavingCourse] = useState(false);
+  const [savingLesson, setSavingLesson] = useState(false);
 
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -363,9 +365,9 @@ export const AcademyManagementScreen: React.FC = () => {
         input.onchange = (e: any) => {
           const file = e.target.files?.[0];
           if (file) {
-            const url = URL.createObjectURL(file);
-            setSelectedFileUri(url);
+            setSelectedFileUri('__web_file__');
             setSelectedFileName(file.name);
+            setSelectedFileBlob(file);
           }
         };
         input.click();
@@ -403,10 +405,12 @@ export const AcademyManagementScreen: React.FC = () => {
         selectedCourse.id,
         selectedFileUri,
         selectedFileName,
-        folder
+        folder,
+        selectedFileBlob || undefined
       );
       return url;
-    } catch {
+    } catch (err) {
+      console.error('Upload error:', err);
       showAlert('Errore', 'Impossibile caricare il file. Riprova.');
       return null;
     } finally {
@@ -436,11 +440,13 @@ export const AcademyManagementScreen: React.FC = () => {
     }
     setSelectedFileUri('');
     setSelectedFileName('');
+    setSelectedFileBlob(null);
     setShowLessonModal(true);
   };
 
   const saveLesson = async () => {
     if (!lessonTitle.trim() || !selectedCourse) return;
+    setSavingLesson(true);
     try {
       // Upload file if selected
       let contentUrl = lessonUrl.trim();
@@ -482,6 +488,8 @@ export const AcademyManagementScreen: React.FC = () => {
     } catch (err) {
       console.error('saveLesson error:', err);
       showAlert('Errore', `Impossibile salvare la lezione.\n\n${getFirebaseErrorMessage(err)}`);
+    } finally {
+      setSavingLesson(false);
     }
   };
 
@@ -1029,7 +1037,7 @@ export const AcademyManagementScreen: React.FC = () => {
                 <TextInput
                   style={styles.input}
                   value={lessonUrl}
-                  onChangeText={(text) => { setLessonUrl(text); if (text) { setSelectedFileUri(''); setSelectedFileName(''); } }}
+                  onChangeText={(text) => { setLessonUrl(text); if (text) { setSelectedFileUri(''); setSelectedFileName(''); setSelectedFileBlob(null); } }}
                   placeholder="https://youtube.com/... oppure link diretto"
                   placeholderTextColor={colors.textLight}
                   autoCapitalize="none"
@@ -1037,7 +1045,7 @@ export const AcademyManagementScreen: React.FC = () => {
                 />
                 {selectedFileUri ? (
                   <TouchableOpacity
-                    onPress={() => { setSelectedFileUri(''); setSelectedFileName(''); }}
+                    onPress={() => { setSelectedFileUri(''); setSelectedFileName(''); setSelectedFileBlob(null); }}
                     style={{ marginTop: spacing.xs }}
                   >
                     <Text style={{ color: colors.error, fontSize: fontSize.sm }}>
@@ -1076,8 +1084,16 @@ export const AcademyManagementScreen: React.FC = () => {
                 >
                   <Text style={styles.cancelBtnText}>Annulla</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={saveLesson}>
-                  <Text style={styles.saveBtnText}>Salva</Text>
+                <TouchableOpacity
+                  style={[styles.saveBtn, (savingLesson || uploading) && { opacity: 0.6 }]}
+                  onPress={saveLesson}
+                  disabled={savingLesson || uploading}
+                >
+                  {savingLesson || uploading ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.saveBtnText}>Salva</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </ScrollView>

@@ -258,7 +258,8 @@ export const uploadAcademyFile = async (
   courseId: string,
   fileUri: string,
   fileName: string,
-  folder: 'video' | 'audio' | 'pdf' | 'extra'
+  folder: 'video' | 'audio' | 'pdf' | 'extra',
+  fileBlob?: Blob
 ): Promise<string> => {
   const timestamp = Date.now();
   const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -267,8 +268,14 @@ export const uploadAcademyFile = async (
     `academy/${courseId}/${folder}/${timestamp}_${sanitizedName}`
   );
 
-  const response = await fetch(fileUri);
-  const blob = await response.blob();
+  let blob: Blob;
+  if (fileBlob) {
+    // Web: use the File/Blob directly (avoids fetch roundtrip on blob URLs)
+    blob = fileBlob;
+  } else {
+    const response = await fetch(fileUri);
+    blob = await response.blob();
+  }
   await uploadBytes(fileRef, blob);
 
   return getDownloadURL(fileRef);
