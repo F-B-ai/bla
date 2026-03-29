@@ -340,6 +340,10 @@ export const getStudentInvites = async (): Promise<StudentInvite[]> => {
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as StudentInvite));
 };
 
+export const deleteStudentInvite = async (inviteId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'studentInvites', inviteId));
+};
+
 export const registerStudentWithInvite = async (
   inviteCode: string,
   email: string,

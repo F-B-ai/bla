@@ -14,7 +14,7 @@ import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { Card } from '../../components/common/Card';
-import { createStudentInvite, getCollaborators, getManagers, getOwner, getStudentInvites, StudentInvite } from '../../services/authService';
+import { createStudentInvite, deleteStudentInvite, getCollaborators, getManagers, getOwner, getStudentInvites, StudentInvite } from '../../services/authService';
 import { Collaborator, Manager, Owner } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -114,6 +114,28 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
     }
   };
 
+  const handleDeleteInvite = (invite: StudentInvite) => {
+    crossAlert(
+      'Elimina Invito',
+      `Sei sicuro di voler eliminare l'invito per ${invite.name} ${invite.surname}?`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteStudentInvite(invite.id);
+              await loadData();
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare l\'invito');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -206,8 +228,16 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
                     <Text style={styles.inviteDetail}>Coach: {inv.assignedCollaboratorName}</Text>
                     <Text style={styles.inviteDetail}>Creato da: {inv.createdByName}</Text>
                   </View>
-                  <View style={styles.inviteCodeBadge}>
-                    <Text style={styles.inviteCodeText}>{inv.inviteCode}</Text>
+                  <View style={styles.inviteActions}>
+                    <View style={styles.inviteCodeBadge}>
+                      <Text style={styles.inviteCodeText}>{inv.inviteCode}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteInvite(inv)}
+                    >
+                      <Text style={styles.deleteButtonText}>✕</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </Card>
@@ -333,6 +363,10 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  inviteActions: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   inviteCodeBadge: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.md,
@@ -344,5 +378,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: fontSize.md,
     letterSpacing: 2,
+  },
+  deleteButton: {
+    backgroundColor: colors.error,
+    borderRadius: borderRadius.round,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: fontSize.sm,
   },
 });
