@@ -95,6 +95,14 @@
         { "fieldPath": "chatRoomId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "chatTyping",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "chatRoomId", "order": "ASCENDING" },
+        { "fieldPath": "isTyping", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

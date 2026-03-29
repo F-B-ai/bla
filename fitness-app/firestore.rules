@@ -116,6 +116,22 @@ service cloud.firestore {
       allow delete: if isOwnerOrManager();
     }
 
+    // Chat typing indicators
+    match /chatTyping/{typingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // User presence (online status)
+    match /userPresence/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+
     // Special content
     match /specialContent/{contentId} {
       allow read: if isAuthenticated();

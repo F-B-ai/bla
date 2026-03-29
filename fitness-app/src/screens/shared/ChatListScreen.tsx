@@ -21,6 +21,7 @@ import {
   createChatRoom,
   subscribeToUserChatRooms,
   subscribeToAllChatRooms,
+  subscribeToPresence,
 } from '../../services/chatService';
 import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
 import { ChatConversationScreen } from './ChatConversationScreen';
@@ -36,6 +37,7 @@ export const ChatListScreen: React.FC = () => {
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const [availableContacts, setAvailableContacts] = useState<User[]>([]);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
 
   const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
     const userIds = new Set<string>();
@@ -81,6 +83,23 @@ export const ChatListScreen: React.FC = () => {
 
     return () => unsubscribe();
   }, [user, isOwner, loadParticipantProfiles]);
+
+  // Sottoscrizione presenza online dei partecipanti
+  useEffect(() => {
+    if (!user || rooms.length === 0) return;
+
+    const otherIds = new Set<string>();
+    rooms.forEach((room) => {
+      room.participants.forEach((id) => {
+        if (id !== user.id) otherIds.add(id);
+      });
+    });
+
+    if (otherIds.size === 0) return;
+
+    const unsubscribe = subscribeToPresence(Array.from(otherIds), setPresence);
+    return () => unsubscribe();
+  }, [user, rooms]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -274,10 +293,17 @@ export const ChatListScreen: React.FC = () => {
             <TouchableOpacity onPress={() => setSelectedRoom(item)}>
               <Card variant="elevated">
                 <View style={styles.roomRow}>
-                  <View style={styles.roomAvatar}>
-                    <Text style={styles.roomAvatarText}>
-                      {getOtherParticipantName(item).charAt(0)}
-                    </Text>
+                  <View style={styles.roomAvatarWrapper}>
+                    <View style={styles.roomAvatar}>
+                      <Text style={styles.roomAvatarText}>
+                        {getOtherParticipantName(item).charAt(0)}
+                      </Text>
+                    </View>
+                    {(() => {
+                      const otherId = item.participants.find((id) => id !== user?.id);
+                      const isOnline = otherId && presence[otherId]?.isOnline;
+                      return isOnline ? <View style={styles.presenceDot} /> : null;
+                    })()}
                   </View>
                   <View style={styles.roomInfo}>
                     <Text style={styles.roomName}>
@@ -425,6 +451,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  roomAvatarWrapper: {
+    position: 'relative',
+    marginRight: spacing.md,
+  },
   roomAvatar: {
     width: 48,
     height: 48,
@@ -432,7 +462,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.collaboratorBadge,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+  },
+  presenceDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   roomAvatarText: {
     color: '#FFFFFF',
