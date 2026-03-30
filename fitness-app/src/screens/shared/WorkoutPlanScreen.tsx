@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../config/firebase';
@@ -17,23 +17,25 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
-import { Exercise, ExerciseCategory, WeeklyDay, Student } from '../../types';
+import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { createWorkoutPlan, getActiveWorkoutPlan } from '../../services/programService';
+import { createWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getStudents } from '../../services/authService';
 import {
   suggestWorkoutProgression,
   suggestExercises,
   AIProgressionSuggestion,
-  getAIApiKey,
+  ensureAIApiKey,
 } from '../../services/aiService';
+import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
+import { getCustomTemplates, CustomWorkoutTemplate } from '../../services/programService';
 
-const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
+const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 const CATEGORIES: { value: ExerciseCategory; label: string }[] = [
   { value: 'forza', label: 'Forza' },
   { value: 'cardio', label: 'Cardio' },
-  { value: 'mobilita', label: 'Mobilita' },
+  { value: 'mobilita', label: 'Mobilità' },
   { value: 'stretching', label: 'Stretching' },
   { value: 'funzionale', label: 'Funzionale' },
   { value: 'posturale', label: 'Posturale' },
@@ -41,7 +43,7 @@ const CATEGORIES: { value: ExerciseCategory; label: string }[] = [
 ];
 
 export const WorkoutPlanScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [planTitle, setPlanTitle] = useState('');
@@ -61,6 +63,19 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
+  // Template State
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'male' | 'female'>('all');
+  const [customTemplates, setCustomTemplates] = useState<CustomWorkoutTemplate[]>([]);
+  const [templateTab, setTemplateTab] = useState<'custom' | 'builtin'>('custom');
+
+  // History State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [studentPlans, setStudentPlans] = useState<WorkoutPlan[]>([]);
+  const [viewingPlan, setViewingPlan] = useState<WorkoutPlan | null>(null);
+  const [historySelectedDay, setHistorySelectedDay] = useState(0);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   // AI State
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AIProgressionSuggestion | null>(null);
@@ -73,23 +88,96 @@ export const WorkoutPlanScreen: React.FC = () => {
       const allStudents = await getStudents();
       if (isOwner) {
         setStudents(allStudents);
+      } else if (isManager) {
+        // Manager vede allievi assegnati direttamente o tramite assignedManagerId
+        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
         setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
       }
     } catch {
       // Silently handle
     }
-  }, [user, isOwner, isCollaborator]);
+  }, [user, isOwner, isManager, isCollaborator]);
+
+  const loadCustomTemplates = useCallback(async () => {
+    try {
+      const templates = await getCustomTemplates();
+      setCustomTemplates(templates);
+    } catch {
+      // silently handle
+    }
+  }, []);
 
   useEffect(() => {
     loadStudents();
-  }, [loadStudents]);
+    loadCustomTemplates();
+  }, [loadStudents, loadCustomTemplates]);
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const handleViewStudentHistory = async () => {
+    if (!selectedStudentId) {
+      crossAlert('Errore', 'Seleziona prima un allievo');
+      return;
+    }
+    setLoadingHistory(true);
+    setShowHistoryModal(true);
+    try {
+      const plans = await getStudentWorkoutPlans(selectedStudentId);
+      setStudentPlans(plans);
+    } catch {
+      crossAlert('Errore', 'Impossibile caricare le programmazioni');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Applica un template alla scheda corrente
+  const applyTemplate = (template: WorkoutTemplate) => {
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of template.weeklySchedule) {
+      newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+        ...ex,
+        id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+      }));
+    }
+    setExercises(newExercises);
+    setPlanTitle(template.name);
+    setShowTemplateModal(false);
+    crossAlert('Template Applicato', `"${template.name}" caricato. Puoi modificare gli esercizi prima di salvare.`);
+  };
+
+  const applyCustomTemplate = (template: CustomWorkoutTemplate) => {
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of template.weeklySchedule) {
+      newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+        ...ex,
+        id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+      }));
+    }
+    setExercises(newExercises);
+    setPlanTitle(template.name);
+    setShowTemplateModal(false);
+    crossAlert('Template Applicato', `"${template.name}" caricato. Puoi modificare gli esercizi prima di salvare.`);
+  };
+
+  const filteredTemplates = allTemplates.filter((t) =>
+    templateFilter === 'all' ? true : t.gender === templateFilter
+  );
+
+  const filteredCustomTemplates = customTemplates.filter((t) =>
+    templateFilter === 'all' ? true : t.gender === templateFilter
+  );
 
   // Upload video esercizio su Firebase Storage
   const pickAndUploadVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ['videos'],
         quality: 0.7,
         videoMaxDuration: 120,
       });
@@ -107,9 +195,9 @@ export const WorkoutPlanScreen: React.FC = () => {
       const downloadUrl = await getDownloadURL(videoRef);
 
       setExVideoUrl(downloadUrl);
-      Alert.alert('Video caricato!');
+      crossAlert('Successo', 'Video caricato!');
     } catch {
-      Alert.alert('Errore', 'Impossibile caricare il video');
+      crossAlert('Errore', 'Impossibile caricare il video');
     } finally {
       setUploadingVideo(false);
     }
@@ -118,11 +206,11 @@ export const WorkoutPlanScreen: React.FC = () => {
   // AI: genera progressione dalla scheda attuale
   const handleAIProgression = async () => {
     if (!selectedStudentId) {
-      Alert.alert('Errore', 'Seleziona prima un allievo');
+      crossAlert('Errore', 'Seleziona prima un allievo');
       return;
     }
-    if (!getAIApiKey()) {
-      Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }
 
@@ -130,7 +218,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     try {
       const activePlan = await getActiveWorkoutPlan(selectedStudentId);
       if (!activePlan) {
-        Alert.alert('Nessuna scheda', 'L\'allievo non ha una scheda attiva da cui generare la progressione.');
+        crossAlert('Nessuna scheda', 'L\'allievo non ha una scheda attiva da cui generare la progressione.');
         return;
       }
 
@@ -154,7 +242,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       setShowAiModal(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Errore AI';
-      Alert.alert('Errore', msg);
+      crossAlert('Errore', msg);
     } finally {
       setAiLoading(false);
     }
@@ -165,8 +253,8 @@ export const WorkoutPlanScreen: React.FC = () => {
     if (!aiSuggestion) return;
 
     const dayMap: Record<string, number> = {
-      Lunedi: 0, Martedi: 1, Mercoledi: 2, Giovedi: 3,
-      Venerdi: 4, Sabato: 5, Domenica: 6,
+      'Lunedì': 0, 'Martedì': 1, 'Mercoledì': 2, 'Giovedì': 3,
+      'Venerdì': 4, Sabato: 5, Domenica: 6,
     };
 
     const newExercises: Record<number, Exercise[]> = {};
@@ -187,13 +275,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExercises(newExercises);
     setPlanTitle(aiSuggestion.title);
     setShowAiModal(false);
-    Alert.alert('Applicata!', 'La progressione AI e\' stata applicata. Puoi modificarla prima di salvare.');
+    crossAlert('Applicata!', 'La progressione AI è stata applicata. Puoi modificarla prima di salvare.');
   };
 
   // AI: suggerisci esercizi per categoria
   const handleAIExerciseSuggestion = async () => {
-    if (!getAIApiKey()) {
-      Alert.alert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
       return;
     }
 
@@ -204,13 +292,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     try {
       const suggestions = await suggestExercises(exCategory, goal);
       if (suggestions.length === 0) {
-        Alert.alert('Nessun suggerimento', 'L\'AI non ha generato suggerimenti');
+        crossAlert('Nessun suggerimento', 'L\'AI non ha generato suggerimenti');
         return;
       }
 
       // Mostra i suggerimenti e lascia scegliere
       const firstSuggestion = suggestions[0];
-      Alert.alert(
+      crossAlert(
         'Suggerimento AI',
         `${firstSuggestion.name}\n${firstSuggestion.sets}x${firstSuggestion.reps} (rec ${firstSuggestion.restSeconds}s)\n\n${firstSuggestion.description}`,
         [
@@ -228,7 +316,7 @@ export const WorkoutPlanScreen: React.FC = () => {
         ]
       );
     } catch {
-      Alert.alert('Errore', 'Impossibile ottenere suggerimenti AI');
+      crossAlert('Errore', 'Impossibile ottenere suggerimenti AI');
     } finally {
       setAiExercisesLoading(false);
     }
@@ -236,7 +324,7 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   const addExercise = () => {
     if (!exName || !exSets || !exReps) {
-      Alert.alert('Errore', 'Compila nome, serie e ripetizioni');
+      crossAlert('Errore', 'Compila nome, serie e ripetizioni');
       return;
     }
 
@@ -276,17 +364,17 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   const savePlan = async () => {
     if (!planTitle || !user) {
-      Alert.alert('Errore', 'Inserisci un titolo per la programmazione');
+      crossAlert('Errore', 'Inserisci un titolo per la programmazione');
       return;
     }
     if (!selectedStudentId) {
-      Alert.alert('Errore', 'Seleziona un allievo');
+      crossAlert('Errore', 'Seleziona un allievo');
       return;
     }
 
     const totalExercises = Object.values(exercises).reduce((sum, exs) => sum + exs.length, 0);
     if (totalExercises === 0) {
-      Alert.alert('Errore', 'Aggiungi almeno un esercizio');
+      crossAlert('Errore', 'Aggiungi almeno un esercizio');
       return;
     }
 
@@ -313,12 +401,12 @@ export const WorkoutPlanScreen: React.FC = () => {
         isActive: true,
       });
 
-      Alert.alert('Successo', 'Programmazione salvata e inviata all\'allievo!');
+      crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
       setPlanTitle('');
       setExercises({});
       setSelectedStudentId('');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la programmazione');
+      crossAlert('Errore', 'Impossibile salvare la programmazione');
     } finally {
       setSaving(false);
     }
@@ -364,11 +452,29 @@ export const WorkoutPlanScreen: React.FC = () => {
           </ScrollView>
         )}
 
+        {/* Vedi storico programmazioni allievo */}
+        {selectedStudentId && (
+          <Button
+            title="Vedi Programmazioni Precedenti"
+            onPress={handleViewStudentHistory}
+            variant="outline"
+            style={{ marginBottom: spacing.md }}
+          />
+        )}
+
         <InputField
           label="Titolo Programmazione"
           value={planTitle}
           onChangeText={setPlanTitle}
           placeholder="Es: Scheda Ipertrofia - Fase 1"
+        />
+
+        {/* Template Button */}
+        <Button
+          title="Carica da Template"
+          onPress={() => setShowTemplateModal(true)}
+          variant="outline"
+          style={{ marginBottom: spacing.sm }}
         />
 
         {/* AI Progression Button */}
@@ -660,6 +766,213 @@ export const WorkoutPlanScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modale Template */}
+      <Modal visible={showTemplateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader title="Scegli Template" onClose={() => setShowTemplateModal(false)} />
+
+            {/* Tab personalizzati / predefiniti */}
+            <View style={styles.templateFilterRow}>
+              <TouchableOpacity
+                style={[styles.templateFilterBtn, templateTab === 'custom' && styles.templateFilterBtnActive]}
+                onPress={() => setTemplateTab('custom')}
+              >
+                <Text style={[styles.templateFilterText, templateTab === 'custom' && styles.templateFilterTextActive]}>
+                  Personalizzati
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.templateFilterBtn, templateTab === 'builtin' && styles.templateFilterBtnActive]}
+                onPress={() => setTemplateTab('builtin')}
+              >
+                <Text style={[styles.templateFilterText, templateTab === 'builtin' && styles.templateFilterTextActive]}>
+                  Predefiniti
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Filtro genere */}
+            <View style={styles.templateFilterRow}>
+              {(['all', 'male', 'female'] as const).map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.templateFilterBtn, templateFilter === f && styles.templateFilterBtnActive]}
+                  onPress={() => setTemplateFilter(f)}
+                >
+                  <Text style={[styles.templateFilterText, templateFilter === f && styles.templateFilterTextActive]}>
+                    {f === 'all' ? 'Tutti' : f === 'male' ? 'Uomo' : 'Donna'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {templateTab === 'custom' ? (
+              filteredCustomTemplates.length === 0 ? (
+                <Card>
+                  <Text style={styles.emptyText}>
+                    Nessun template personalizzato.{'\n'}Creane uno dalla sezione Template!
+                  </Text>
+                </Card>
+              ) : (
+                filteredCustomTemplates.map((tpl) => (
+                  <TouchableOpacity key={tpl.id} onPress={() => applyCustomTemplate(tpl)}>
+                    <Card variant="outlined">
+                      <View style={styles.templateRow}>
+                        <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
+                          <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
+                        </View>
+                        <View style={styles.templateInfo}>
+                          <Text style={styles.templateName}>{tpl.name}</Text>
+                          <Text style={styles.templateCategory}>{tpl.category}</Text>
+                          <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
+                          <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
+                        </View>
+                      </View>
+                    </Card>
+                  </TouchableOpacity>
+                ))
+              )
+            ) : (
+              filteredTemplates.map((tpl) => (
+                <TouchableOpacity key={tpl.id} onPress={() => applyTemplate(tpl)}>
+                  <Card variant="outlined">
+                    <View style={styles.templateRow}>
+                      <View style={[styles.templateGenderBadge, { backgroundColor: tpl.gender === 'male' ? '#4A90D9' : '#D94A8C' }]}>
+                        <Text style={styles.templateGenderText}>{tpl.gender === 'male' ? 'M' : 'F'}</Text>
+                      </View>
+                      <View style={styles.templateInfo}>
+                        <Text style={styles.templateName}>{tpl.name}</Text>
+                        <Text style={styles.templateCategory}>{tpl.category}</Text>
+                        <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
+                        <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
+                      </View>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale Storico Programmazioni */}
+      <Modal visible={showHistoryModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title={`Programmazioni Precedenti`}
+              onClose={() => { setShowHistoryModal(false); setViewingPlan(null); }}
+            />
+
+            {loadingHistory ? (
+              <Card>
+                <Text style={styles.historyEmptyText}>Caricamento...</Text>
+              </Card>
+            ) : !viewingPlan ? (
+              <>
+                {studentPlans.length === 0 ? (
+                  <Card>
+                    <Text style={styles.historyEmptyText}>
+                      Nessuna programmazione trovata per questo allievo.
+                    </Text>
+                  </Card>
+                ) : (
+                  studentPlans.map((plan) => (
+                    <TouchableOpacity
+                      key={plan.id}
+                      onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}
+                    >
+                      <Card variant={plan.isActive ? 'elevated' : 'outlined'}>
+                        <View style={styles.historyRow}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyName}>{plan.title}</Text>
+                            <Text style={styles.historyDate}>
+                              {formatDate(plan.startDate)} - {formatDate(plan.endDate)}
+                            </Text>
+                          </View>
+                          {plan.isActive && (
+                            <View style={styles.activeBadge}>
+                              <Text style={styles.activeBadgeText}>ATTIVO</Text>
+                            </View>
+                          )}
+                        </View>
+                      </Card>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <Card variant="elevated">
+                  <Text style={styles.historyPlanTitle}>{viewingPlan.title}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatDate(viewingPlan.startDate)} - {formatDate(viewingPlan.endDate)}
+                  </Text>
+                  {viewingPlan.isActive && (
+                    <View style={[styles.activeBadge, { marginTop: spacing.xs }]}>
+                      <Text style={styles.activeBadgeText}>ATTIVO</Text>
+                    </View>
+                  )}
+                </Card>
+
+                <TouchableOpacity
+                  style={styles.historyBackBtn}
+                  onPress={() => setViewingPlan(null)}
+                >
+                  <Text style={styles.historyBackText}>Torna alla lista</Text>
+                </TouchableOpacity>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll}>
+                  {DAYS.map((day, index) => (
+                    <TouchableOpacity
+                      key={`hist-${day}`}
+                      style={[styles.dayButton, historySelectedDay === index && styles.dayButtonActive]}
+                      onPress={() => setHistorySelectedDay(index)}
+                    >
+                      <Text style={[styles.dayText, historySelectedDay === index && styles.dayTextActive]}>
+                        {day.substring(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.sectionTitle}>{DAYS[historySelectedDay]}</Text>
+                {viewingPlan.weeklySchedule[historySelectedDay]?.exercises.length === 0 ? (
+                  <Card><Text style={styles.historyEmptyText}>Riposo</Text></Card>
+                ) : (
+                  viewingPlan.weeklySchedule[historySelectedDay]?.exercises.map((ex, i) => (
+                    <Card key={ex.id || i} variant="outlined">
+                      <View style={styles.exerciseRow}>
+                        <View style={styles.exerciseNumber}>
+                          <Text style={styles.exerciseNumberText}>{i + 1}</Text>
+                        </View>
+                        <View style={styles.exerciseInfo}>
+                          <Text style={styles.exerciseName}>{ex.name}</Text>
+                          <Text style={styles.exerciseDetails}>
+                            {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
+                          </Text>
+                          {ex.description ? (
+                            <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                          ) : null}
+                          {ex.notes ? (
+                            <Text style={styles.exerciseNotes}>Note: {ex.notes}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </Card>
+                  ))
+                )}
+              </>
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -934,7 +1247,122 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     lineHeight: 20,
   },
+  templateFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  templateFilterBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  templateFilterBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  templateFilterText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  templateFilterTextActive: {
+    color: colors.textOnAccent,
+  },
+  templateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  templateGenderBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  templateGenderText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  templateInfo: {
+    flex: 1,
+  },
+  templateName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  templateCategory: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  templateDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  templateDays: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginTop: 4,
+  },
   bottomSpacer: {
     height: spacing.xxl * 2,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyDate: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  historyPlanTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyEmptyText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    padding: spacing.lg,
+    lineHeight: 22,
+  },
+  historyBackBtn: {
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  historyBackText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  activeBadge: {
+    backgroundColor: colors.success,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  activeBadgeText: {
+    color: '#FFF',
+    fontSize: fontSize.xs,
+    fontWeight: '800',
   },
 });

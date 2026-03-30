@@ -6,59 +6,186 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
-import { ChatRoom, User } from '../../types';
+import { Button } from '../../components/common/Button';
+import { ModalHeader } from '../../components/common/ModalHeader';
+import { ChatRoom, User, Student, Collaborator } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { getUserChatRooms, getAllChatRooms } from '../../services/chatService';
-import { getUserProfile } from '../../services/authService';
+import {
+  getUserChatRooms,
+  getAllChatRooms,
+  createChatRoom,
+  subscribeToUserChatRooms,
+  subscribeToAllChatRooms,
+  subscribeToPresence,
+} from '../../services/chatService';
+import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
 import { ChatConversationScreen } from './ChatConversationScreen';
+import { crossAlert } from '../../utils/alert';
 
 export const ChatListScreen: React.FC = () => {
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [participants, setParticipants] = useState<Record<string, User>>({});
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showNewChatModal, setShowNewChatModal] = useState(false);
+  const [availableContacts, setAvailableContacts] = useState<User[]>([]);
+  const [creatingChat, setCreatingChat] = useState(false);
+  const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
+
+  const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
+    const userIds = new Set<string>();
+    chatRooms.forEach((room) => {
+      room.participants.forEach((id) => userIds.add(id));
+    });
+
+    const profiles: Record<string, User> = {};
+    await Promise.all(
+      Array.from(userIds).map(async (id) => {
+        const profile = await getUserProfile(id);
+        if (profile) profiles[id] = profile;
+      })
+    );
+    setParticipants((prev) => ({ ...prev, ...profiles }));
+  }, []);
 
   const loadRooms = useCallback(async () => {
     if (!user) return;
     try {
-      // Il titolare vede TUTTE le chat
       const chatRooms = isOwner
         ? await getAllChatRooms()
         : await getUserChatRooms(user.id);
       setRooms(chatRooms);
-
-      // Carica i profili dei partecipanti
-      const userIds = new Set<string>();
-      chatRooms.forEach((room) => {
-        room.participants.forEach((id) => userIds.add(id));
-      });
-
-      const profiles: Record<string, User> = {};
-      await Promise.all(
-        Array.from(userIds).map(async (id) => {
-          const profile = await getUserProfile(id);
-          if (profile) profiles[id] = profile;
-        })
-      );
-      setParticipants(profiles);
+      await loadParticipantProfiles(chatRooms);
     } catch {
       // Silently handle
     }
-  }, [user, isOwner]);
+  }, [user, isOwner, loadParticipantProfiles]);
 
+  // Listener real-time per aggiornare la lista chat automaticamente
   useEffect(() => {
-    loadRooms();
-  }, [loadRooms]);
+    if (!user) return;
+
+    const handleRoomsUpdate = (chatRooms: ChatRoom[]) => {
+      setRooms(chatRooms);
+      loadParticipantProfiles(chatRooms);
+    };
+
+    const unsubscribe = isOwner
+      ? subscribeToAllChatRooms(handleRoomsUpdate)
+      : subscribeToUserChatRooms(user.id, handleRoomsUpdate);
+
+    return () => unsubscribe();
+  }, [user, isOwner, loadParticipantProfiles]);
+
+  // Sottoscrizione presenza online dei partecipanti
+  useEffect(() => {
+    if (!user || rooms.length === 0) return;
+
+    const otherIds = new Set<string>();
+    rooms.forEach((room) => {
+      room.participants.forEach((id) => {
+        if (id !== user.id) otherIds.add(id);
+      });
+    });
+
+    if (otherIds.size === 0) return;
+
+    const unsubscribe = subscribeToPresence(Array.from(otherIds), setPresence);
+    return () => unsubscribe();
+  }, [user, rooms]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadRooms();
     setRefreshing(false);
+  };
+
+  const handleNewChat = async () => {
+    if (!user) return;
+    try {
+      if (isCollaborator || isManager) {
+        // Collaboratore/Manager: mostra i propri allievi
+        const allStudents = await getStudents();
+        const myStudents = allStudents.filter(
+          (s) => (s.assignedCollaboratorId === user.id || (isManager && s.assignedManagerId === user.id)) && s.isActive
+        );
+        setAvailableContacts(myStudents);
+      } else if (isStudent) {
+        // Allievo: mostra il suo collaboratore assegnato
+        const studentProfile = user as unknown as Student;
+        if (studentProfile.assignedCollaboratorId) {
+          const collab = await getUserProfile(studentProfile.assignedCollaboratorId);
+          setAvailableContacts(collab ? [collab] : []);
+        } else {
+          setAvailableContacts([]);
+        }
+      } else if (isOwner) {
+        // Owner: mostra tutti collaboratori e allievi
+        const [allStudents, allCollaborators] = await Promise.all([
+          getStudents(),
+          getCollaborators(),
+        ]);
+        setAvailableContacts([
+          ...allCollaborators.filter((c) => c.isActive),
+          ...allStudents.filter((s) => s.isActive),
+        ]);
+      }
+      setShowNewChatModal(true);
+    } catch {
+      crossAlert('Errore', 'Impossibile caricare i contatti');
+    }
+  };
+
+  const handleStartChat = async (contact: User) => {
+    if (!user) return;
+    setCreatingChat(true);
+    try {
+      let studentId: string;
+      let collaboratorId: string;
+
+      if (isStudent) {
+        studentId = user.id;
+        collaboratorId = contact.id;
+      } else if (isCollaborator) {
+        studentId = contact.id;
+        collaboratorId = user.id;
+      } else {
+        // Owner: determina ruoli in base al contatto
+        if (contact.role === 'student') {
+          const student = contact as unknown as Student;
+          studentId = contact.id;
+          collaboratorId = student.assignedCollaboratorId || user.id;
+        } else {
+          crossAlert('Info', 'Seleziona un allievo per avviare la chat con il suo collaboratore');
+          setCreatingChat(false);
+          return;
+        }
+      }
+
+      const roomId = await createChatRoom(studentId, collaboratorId);
+      setShowNewChatModal(false);
+      await loadRooms();
+
+      // Apri direttamente la conversazione appena creata
+      const updatedRooms = isOwner
+        ? await getAllChatRooms()
+        : await getUserChatRooms(user.id);
+      const newRoom = updatedRooms.find((r) => r.id === roomId);
+      if (newRoom) {
+        setSelectedRoom(newRoom);
+      }
+    } catch {
+      crossAlert('Errore', 'Impossibile avviare la conversazione');
+    } finally {
+      setCreatingChat(false);
+    }
   };
 
   const getOtherParticipantName = (room: ChatRoom): string => {
@@ -88,6 +215,12 @@ export const ChatListScreen: React.FC = () => {
     return '';
   };
 
+  const getRoleBadge = (contact: User): string => {
+    if (contact.role === 'collaborator') return 'Coach';
+    if (contact.role === 'student') return 'Allievo';
+    return contact.role;
+  };
+
   if (selectedRoom) {
     return (
       <ChatConversationScreen
@@ -114,24 +247,36 @@ export const ChatListScreen: React.FC = () => {
         </Text>
       </View>
 
+      {/* Pulsante Nuova Chat */}
+      {!isOwner && (
+        <View style={styles.newChatContainer}>
+          <Button
+            title="+ Nuova Conversazione"
+            onPress={handleNewChat}
+          />
+        </View>
+      )}
+
       {isOwner && (
-        <View style={styles.ownerModeToggle}>
-          <TouchableOpacity
-            style={[styles.modeButton, !isAnonymous && styles.modeButtonActive]}
-            onPress={() => setIsAnonymous(false)}
-          >
-            <Text style={[styles.modeText, !isAnonymous && styles.modeTextActive]}>
-              Partecipa
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeButton, isAnonymous && styles.modeButtonAnon]}
-            onPress={() => setIsAnonymous(true)}
-          >
-            <Text style={[styles.modeText, isAnonymous && styles.modeTextActive]}>
-              Anonimo (sola lettura)
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.ownerActions}>
+          <View style={styles.ownerModeToggle}>
+            <TouchableOpacity
+              style={[styles.modeButton, !isAnonymous && styles.modeButtonActive]}
+              onPress={() => setIsAnonymous(false)}
+            >
+              <Text style={[styles.modeText, !isAnonymous && styles.modeTextActive]}>
+                Partecipa
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, isAnonymous && styles.modeButtonAnon]}
+              onPress={() => setIsAnonymous(true)}
+            >
+              <Text style={[styles.modeText, isAnonymous && styles.modeTextActive]}>
+                Anonimo (sola lettura)
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -148,10 +293,17 @@ export const ChatListScreen: React.FC = () => {
             <TouchableOpacity onPress={() => setSelectedRoom(item)}>
               <Card variant="elevated">
                 <View style={styles.roomRow}>
-                  <View style={styles.roomAvatar}>
-                    <Text style={styles.roomAvatarText}>
-                      {getOtherParticipantName(item).charAt(0)}
-                    </Text>
+                  <View style={styles.roomAvatarWrapper}>
+                    <View style={styles.roomAvatar}>
+                      <Text style={styles.roomAvatarText}>
+                        {getOtherParticipantName(item).charAt(0)}
+                      </Text>
+                    </View>
+                    {(() => {
+                      const otherId = item.participants.find((id) => id !== user?.id);
+                      const isOnline = otherId && presence[otherId]?.isOnline;
+                      return isOnline ? <View style={styles.presenceDot} /> : null;
+                    })()}
                   </View>
                   <View style={styles.roomInfo}>
                     <Text style={styles.roomName}>
@@ -179,11 +331,60 @@ export const ChatListScreen: React.FC = () => {
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              Nessuna conversazione attiva
+              Nessuna conversazione attiva.{'\n'}
+              {!isOwner && 'Premi "+ Nuova Conversazione" per iniziare.'}
             </Text>
           </Card>
         }
       />
+
+      {/* Modale Nuova Chat */}
+      <Modal visible={showNewChatModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ModalHeader
+              title="Nuova Conversazione"
+              onClose={() => setShowNewChatModal(false)}
+            />
+
+            {availableContacts.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {isStudent
+                  ? 'Nessun collaboratore assegnato. Contatta il tuo responsabile.'
+                  : 'Nessun contatto disponibile.'}
+              </Text>
+            ) : (
+              <ScrollView style={styles.contactList}>
+                <Text style={styles.contactHint}>
+                  Seleziona un contatto per avviare la conversazione:
+                </Text>
+                {availableContacts.map((contact) => (
+                  <TouchableOpacity
+                    key={contact.id}
+                    style={styles.contactItem}
+                    onPress={() => handleStartChat(contact)}
+                    disabled={creatingChat}
+                  >
+                    <View style={styles.contactAvatar}>
+                      <Text style={styles.contactAvatarText}>
+                        {contact.name[0]}{contact.surname[0]}
+                      </Text>
+                    </View>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>
+                        {contact.name} {contact.surname}
+                      </Text>
+                      <Text style={styles.contactRole}>
+                        {getRoleBadge(contact)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -208,9 +409,15 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: spacing.xs,
   },
+  newChatContainer: {
+    padding: spacing.md,
+  },
+  ownerActions: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
   ownerModeToggle: {
     flexDirection: 'row',
-    margin: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.xs,
@@ -244,6 +451,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  roomAvatarWrapper: {
+    position: 'relative',
+    marginRight: spacing.md,
+  },
   roomAvatar: {
     width: 48,
     height: 48,
@@ -251,7 +462,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.collaboratorBadge,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+  },
+  presenceDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   roomAvatarText: {
     color: '#FFFFFF',
@@ -291,5 +512,60 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     padding: spacing.lg,
+    lineHeight: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '80%',
+  },
+  contactList: {
+    marginTop: spacing.sm,
+  },
+  contactHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  contactAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  contactAvatarText: {
+    color: '#FFFFFF',
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: fontSize.lg,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  contactRole: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 });

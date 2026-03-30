@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
+import { getFirebaseErrorMessage } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -31,16 +32,16 @@ export const AddCollaboratorScreen: React.FC<Props> = ({ onBack }) => {
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
     const commissionNum = parseInt(commission, 10);
     if (isNaN(commissionNum) || commissionNum < 0 || commissionNum > 100) {
-      Alert.alert('Errore', 'La commissione deve essere un numero tra 0 e 100');
+      crossAlert('Errore', 'La commissione deve essere un numero tra 0 e 100');
       return;
     }
 
@@ -60,12 +61,11 @@ export const AddCollaboratorScreen: React.FC<Props> = ({ onBack }) => {
         commissionNum,
         specs
       );
-      Alert.alert('Successo', `Collaboratore ${name} ${surname} registrato!`, [
+      crossAlert('Successo', `Collaboratore ${name} ${surname} registrato!`, [
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }

@@ -1,13 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
 
+// --- Persist loginMode so Academy mode survives refresh ---
+const LOGIN_MODE_KEY = 'essere_login_mode';
+
+const saveLoginMode = (mode: 'app' | 'academy' | null) => {
+  try {
+    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+      if (mode === null) {
+        localStorage.removeItem(LOGIN_MODE_KEY);
+      } else {
+        localStorage.setItem(LOGIN_MODE_KEY, mode);
+      }
+    } else {
+      // Native: use AsyncStorage
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      if (mode === null) {
+        AsyncStorage.removeItem(LOGIN_MODE_KEY);
+      } else {
+        AsyncStorage.setItem(LOGIN_MODE_KEY, mode);
+      }
+    }
+  } catch {}
+};
+
+const loadLoginMode = async (): Promise<'app' | 'academy' | null> => {
+  try {
+    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+      const val = localStorage.getItem(LOGIN_MODE_KEY);
+      if (val === 'app' || val === 'academy') return val;
+      return null;
+    } else {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const val = await AsyncStorage.getItem(LOGIN_MODE_KEY);
+      if (val === 'app' || val === 'academy') return val;
+      return null;
+    }
+  } catch {
+    return null;
+  }
+};
+
 // Screens
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { LoginSelectorScreen } from '../screens/auth/LoginSelectorScreen';
+import { AcademyLoginScreen } from '../screens/auth/AcademyLoginScreen';
 import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -25,175 +68,370 @@ import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
 
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
+import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
+import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
+import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
+import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
+import { AcademyScreen } from '../screens/shared/AcademyScreen';
+import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
+import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
+import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
+import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
+import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
 const ManagerTab = createBottomTabNavigator();
 const CollaboratorTab = createBottomTabNavigator();
 const StudentTab = createBottomTabNavigator();
+const AcademyTab = createBottomTabNavigator();
 
-// --- Tab icon semplice (testo) ---
-const TabIcon = ({ label, focused }: { label: string; focused: boolean }) => (
-  <Text
-    style={[
-      styles.tabIcon,
-      { color: focused ? colors.accent : colors.textLight },
-    ]}
-  >
-    {label}
-  </Text>
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const TAB_ICON_SIZE = 26;
+const GOLD = '#C5A55A';
+const GOLD_DARK = '#8B7335';
+
+const TabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
+  <Ionicons
+    name={name}
+    size={TAB_ICON_SIZE}
+    color={focused ? colors.accent : colors.textLight}
+  />
+);
+
+const AcademyTabIcon = ({ name, focused }: { name: IoniconsName; focused: boolean }) => (
+  <Ionicons
+    name={name}
+    size={TAB_ICON_SIZE}
+    color={focused ? GOLD : colors.textLight}
+  />
+);
+
+// Custom scrollable tab bar for navigators with many tabs
+const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
+  <View nativeID="tab-bar-bottom" style={styles.scrollableTabBarContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollableTabBarContent}
+    >
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel ?? route.name;
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={styles.scrollableTab}
+            onPress={onPress}
+          >
+            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? colors.accent : colors.textLight, size: TAB_ICON_SIZE })}
+            <Text style={[styles.scrollableTabLabel, { color: isFocused ? colors.accent : colors.textLight }]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  </View>
+);
+
+// Academy-themed scrollable tab bar (gold accent)
+const AcademyScrollableTabBar = ({ state, descriptors, navigation }: any) => (
+  <View nativeID="tab-bar-bottom" style={styles.academyTabBarContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollableTabBarContent}
+    >
+      {state.routes.map((route: any, index: number) => {
+        const { options } = descriptors[route.key];
+        const label = options.tabBarLabel ?? route.name;
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            accessibilityRole="button"
+            activeOpacity={0.7}
+            style={styles.scrollableTab}
+            onPress={onPress}
+          >
+            {options.tabBarIcon?.({ focused: isFocused, color: isFocused ? GOLD : colors.textLight, size: TAB_ICON_SIZE })}
+            <Text style={[styles.scrollableTabLabel, { color: isFocused ? GOLD : colors.textLight }]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  </View>
 );
 
 // --- Owner Tabs ---
-// Il titolare ha accesso a TUTTO
 const OwnerTabs = () => (
   <OwnerTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
-      headerStyle: { backgroundColor: colors.primary },
-      headerTintColor: colors.textOnPrimary,
+      headerShown: false,
     }}
   >
     <OwnerTab.Screen
       name="Dashboard"
       component={DashboardScreen}
       options={{
-        headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} />,
+        tabBarLabel: 'Home',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="MyStudents"
+      component={MyStudentsScreen}
+      options={{
+        tabBarLabel: 'Allievi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Team"
       component={ManageUsersScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Team',
-        tabBarIcon: ({ focused }) => <TabIcon label="Team" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Sessions"
       component={ScheduleSessionScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Sessioni',
-        tabBarIcon: ({ focused }) => <TabIcon label="Cal" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Financial"
       component={FinancialScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Economia',
-        tabBarIcon: ({ focused }) => <TabIcon label="€" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Analytics"
       component={AnalyticsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'KPI',
-        tabBarIcon: ({ focused }) => <TabIcon label="KPI" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Content"
       component={ContentManagementScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Contenuti',
-        tabBarIcon: ({ focused }) => <TabIcon label="Media" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Programmi"
       component={WorkoutPlanScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Programmi',
-        tabBarIcon: ({ focused }) => <TabIcon label="Prog" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Postura"
+      component={PosturalAssessmentScreen}
+      options={{
+        tabBarLabel: 'Postura',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'AI',
-        tabBarIcon: ({ focused }) => <TabIcon label="AI" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
-        headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon label="Chat" focused={focused} />,
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
   </OwnerTab.Navigator>
 );
 
 // --- Manager Tabs ---
-// Il manager gestisce coach e allievi, senza sezione economia
 const ManagerTabs = () => (
   <ManagerTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
-      headerStyle: { backgroundColor: colors.primary },
-      headerTintColor: colors.textOnPrimary,
+      headerShown: false,
     }}
   >
     <ManagerTab.Screen
       name="Dashboard"
-      component={DashboardScreen}
+      component={ManagerDashboardScreen}
       options={{
-        headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon label="Home" focused={focused} />,
+        tabBarLabel: 'Home',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="MyStudents"
+      component={MyStudentsScreen}
+      options={{
+        tabBarLabel: 'Allievi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
       name="Team"
       component={ManageUsersScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Team',
-        tabBarIcon: ({ focused }) => <TabIcon label="Team" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Programmi"
+      component={WorkoutPlanScreen}
+      options={{
+        tabBarLabel: 'Programmi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
       name="Sessions"
       component={ScheduleSessionScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Sessioni',
-        tabBarIcon: ({ focused }) => <TabIcon label="Cal" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Postura"
+      component={PosturalAssessmentScreen}
+      options={{
+        tabBarLabel: 'Postura',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Earnings"
+      component={EarningsScreen}
+      options={{
+        tabBarLabel: 'Guadagni',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
       name="Content"
       component={ContentManagementScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Contenuti',
-        tabBarIcon: ({ focused }) => <TabIcon label="Media" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
-        headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon label="Chat" focused={focused} />,
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
   </ManagerTab.Navigator>
@@ -202,75 +440,99 @@ const ManagerTabs = () => (
 // --- Collaborator Tabs ---
 const CollaboratorTabs = () => (
   <CollaboratorTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
-      headerStyle: { backgroundColor: colors.primary },
-      headerTintColor: colors.textOnPrimary,
+      headerShown: false,
     }}
   >
     <CollaboratorTab.Screen
       name="MyStudents"
       component={MyStudentsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Allievi',
-        tabBarIcon: ({ focused }) => <TabIcon label="Allievi" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="Schedule"
       component={ScheduleSessionScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Sessioni',
-        tabBarIcon: ({ focused }) => <TabIcon label="Cal" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="Programs"
       component={WorkoutPlanScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Programmi',
-        tabBarIcon: ({ focused }) => <TabIcon label="Prog" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="WorkoutMonitor"
+      component={WorkoutMonitorScreen}
+      options={{
+        tabBarLabel: 'Monitor',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Template"
+      component={ManageTemplatesScreen}
+      options={{
+        tabBarLabel: 'Template',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'copy' : 'copy-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="Postura"
       component={PosturalAssessmentScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Postura',
-        tabBarIcon: ({ focused }) => <TabIcon label="Test" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="Earnings"
       component={EarningsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Guadagni',
-        tabBarIcon: ({ focused }) => <TabIcon label="€" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="TeamNutrizionisti"
+      component={NutritionTeamScreen}
+      options={{
+        tabBarLabel: 'Team Nutri',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="AI"
       component={AISettingsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'AI',
-        tabBarIcon: ({ focused }) => <TabIcon label="AI" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
-        headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon label="Chat" focused={focused} />,
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
   </CollaboratorTab.Navigator>
@@ -279,79 +541,182 @@ const CollaboratorTabs = () => (
 // --- Student Tabs ---
 const StudentTabs = () => (
   <StudentTab.Navigator
+    tabBar={(props) => <ScrollableTabBar {...props} />}
     screenOptions={{
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textLight,
-      tabBarStyle: styles.tabBar,
-      tabBarLabelStyle: styles.tabLabel,
-      headerStyle: { backgroundColor: colors.primary },
-      headerTintColor: colors.textOnPrimary,
+      headerShown: false,
     }}
   >
     <StudentTab.Screen
       name="MyProgram"
       component={MyProgramScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Scheda',
-        tabBarIcon: ({ focused }) => <TabIcon label="Scheda" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Workout"
+      component={LiveWorkoutScreen}
+      options={{
+        tabBarLabel: 'Allenamento',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Sessions"
       component={SessionsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Sessioni',
-        tabBarIcon: ({ focused }) => <TabIcon label="Sess." focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Diary"
       component={DiaryScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Diario',
-        tabBarIcon: ({ focused }) => <TabIcon label="Diario" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'journal' : 'journal-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Payments"
       component={PaymentsScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Paga',
-        tabBarIcon: ({ focused }) => <TabIcon label="€" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Postura"
       component={PosturalAssessmentScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Postura',
-        tabBarIcon: ({ focused }) => <TabIcon label="Post." focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Nutrizionista"
+      component={NutritionistScreen}
+      options={{
+        tabBarLabel: 'Nutrizione',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'nutrition' : 'nutrition-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Content"
       component={ContentScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Extra',
-        tabBarIcon: ({ focused }) => <TabIcon label="Extra" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
-        headerShown: false,
         tabBarLabel: 'Chat',
-        tabBarIcon: ({ focused }) => <TabIcon label="Chat" focused={focused} />,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
   </StudentTab.Navigator>
+);
+
+// --- Academy-Only Tabs (for Academy login) ---
+const AcademyOnlyStudentTabs = () => (
+  <AcademyTab.Navigator
+    tabBar={(props) => <AcademyScrollableTabBar {...props} />}
+    screenOptions={{
+      tabBarActiveTintColor: GOLD,
+      tabBarInactiveTintColor: colors.textLight,
+      headerShown: false,
+    }}
+  >
+    <AcademyTab.Screen
+      name="AcademyCorsi"
+      component={AcademyScreen}
+      options={{
+        tabBarLabel: 'Corsi',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyChat"
+      component={ChatListScreen}
+      options={{
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+  </AcademyTab.Navigator>
+);
+
+
+// Academy-Only for Owner/Manager (shows management view)
+const AcademyOnlyAdminTabs = () => (
+  <AcademyTab.Navigator
+    tabBar={(props) => <AcademyScrollableTabBar {...props} />}
+    screenOptions={{
+      tabBarActiveTintColor: GOLD,
+      tabBarInactiveTintColor: colors.textLight,
+      headerShown: false,
+    }}
+  >
+    <AcademyTab.Screen
+      name="AcademyGestione"
+      component={AcademyManagementScreen}
+      options={{
+        tabBarLabel: 'Gestione',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyCorsi"
+      component={AcademyScreen}
+      options={{
+        tabBarLabel: 'Corsi',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'school' : 'school-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyStudenti"
+      component={AcademyStudentsScreen}
+      options={{
+        tabBarLabel: 'Studenti',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyAnalytics"
+      component={AcademyAnalyticsScreen}
+      options={{
+        tabBarLabel: 'Analytics',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
+      }}
+    />
+    <AcademyTab.Screen
+      name="AcademyChat"
+      component={ChatListScreen}
+      options={{
+        tabBarLabel: 'Chat',
+        tabBarIcon: ({ focused }) => <AcademyTabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+  </AcademyTab.Navigator>
+);
+
+// Logout header for Academy mode
+const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => (
+  <View style={styles.academyLogoutHeader}>
+    <View style={styles.academyLogoutBrand}>
+      <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+    </View>
+    <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+      <Ionicons name="log-out-outline" size={20} color={GOLD} />
+      <Text style={styles.logoutBtnText}>Esci</Text>
+    </TouchableOpacity>
+  </View>
 );
 
 // --- Loading screen ---
@@ -364,17 +729,109 @@ const LoadingScreen = () => (
 
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading, role } = useAuth();
+  const { isAuthenticated, loading, role, user, logout } = useAuth();
+  // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
+  const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
+  const [loginModeLoaded, setLoginModeLoaded] = useState(false);
 
-  if (loading) {
+  // Load persisted loginMode on mount
+  useEffect(() => {
+    loadLoginMode().then((mode) => {
+      setLoginMode(mode);
+      setLoginModeLoaded(true);
+    });
+  }, []);
+
+  // Track whether loginMode was set by the user clicking on the selector (not loaded from storage)
+  const loginModeSetByUser = useRef(false);
+
+  const setLoginModeAndPersist = useCallback((mode: 'app' | 'academy' | null) => {
+    loginModeSetByUser.current = mode !== null;
+    setLoginMode(mode);
+    saveLoginMode(mode);
+  }, []);
+
+  // When user becomes authenticated, reset the flag so next logout will show selector
+  useEffect(() => {
+    if (isAuthenticated) {
+      loginModeSetByUser.current = false;
+    }
+  }, [isAuthenticated]);
+
+  // Clean up stale loginMode from storage when not authenticated
+  useEffect(() => {
+    if (loginModeLoaded && !loading && !isAuthenticated && loginMode !== null && !loginModeSetByUser.current) {
+      saveLoginMode(null);
+      setLoginMode(null);
+    }
+  }, [loginModeLoaded, loading, isAuthenticated, loginMode]);
+
+  const handleLogoutAndReset = useCallback(async () => {
+    await logout();
+    setLoginModeAndPersist(null);
+  }, [logout, setLoginModeAndPersist]);
+
+  if (loading || !loginModeLoaded) {
     return <LoadingScreen />;
   }
 
+  // If authenticated but profile not loaded yet, show loading
+  if (isAuthenticated && !user) {
+    return <LoadingScreen />;
+  }
+
+  // If not authenticated and loginMode came from storage (not user action), force selector
+  const effectiveLoginMode = (!isAuthenticated && !loginModeSetByUser.current) ? null : loginMode;
+
+  // Determine which tabs to show for Academy mode
+  const AcademyTabsComponent = (role === 'owner' || role === 'manager')
+    ? AcademyOnlyAdminTabs
+    : AcademyOnlyStudentTabs;
+
+  // Wrap Academy tabs with logout header
+  const AcademyTabsWithLogout = () => (
+    <View style={{ flex: 1 }}>
+      <AcademyLogoutHeader onLogout={handleLogoutAndReset} />
+      <AcademyTabsComponent />
+    </View>
+  );
+
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      documentTitle={{
+        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+      }}
+    >
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!isAuthenticated ? (
-          <RootStack.Screen name="Login" component={LoginScreen} />
+          // Not authenticated: show login selector or specific login
+          effectiveLoginMode === null ? (
+            <RootStack.Screen name="LoginSelector">
+              {() => (
+                <LoginSelectorScreen
+                  onSelectApp={() => setLoginModeAndPersist('app')}
+                  onSelectAcademy={() => setLoginModeAndPersist('academy')}
+                />
+              )}
+            </RootStack.Screen>
+          ) : effectiveLoginMode === 'app' ? (
+            <RootStack.Screen name="Login">
+              {() => (
+                <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
+              )}
+            </RootStack.Screen>
+          ) : (
+            <RootStack.Screen name="AcademyLogin">
+              {() => (
+                <AcademyLoginScreen
+                  onBack={() => setLoginModeAndPersist(null)}
+                />
+              )}
+            </RootStack.Screen>
+          )
+        ) : effectiveLoginMode === 'academy' ? (
+          // Authenticated via Academy login: show only Academy tabs with logout
+          <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
         ) : role === 'owner' ? (
           <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
         ) : role === 'manager' ? (
@@ -397,18 +854,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.divider,
     borderTopWidth: 1,
-    paddingTop: 3,
+    paddingTop: 4,
     paddingBottom: 4,
-    height: 56,
-  },
-  tabIcon: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
+    height: 62,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 3,
+  },
+  scrollableTabBarContainer: {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.divider,
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'web' ? 0 : 20,
+  },
+  academyTabBarContainer: {
+    backgroundColor: '#0D0D0D',
+    borderTopColor: GOLD_DARK + '40',
+    borderTopWidth: 1,
+    paddingBottom: Platform.OS === 'web' ? 0 : 20,
+  },
+  scrollableTabBarContent: {
+    paddingHorizontal: 4,
+  },
+  scrollableTab: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 64,
+    minHeight: 48,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
+  },
+  scrollableTabLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 3,
   },
   loading: {
     flex: 1,
@@ -420,5 +902,41 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
     fontSize: fontSize.md,
     marginTop: 16,
+  },
+  academyLogoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0D0D0D',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 12 : 48,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: GOLD_DARK + '30',
+  },
+  academyLogoutBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  academyLogoutTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: GOLD_DARK,
+    letterSpacing: 1,
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: GOLD_DARK + '50',
+  },
+  logoutBtnText: {
+    color: GOLD,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
 });

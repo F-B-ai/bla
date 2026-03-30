@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext, createContext } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { User, UserRole } from '../types';
@@ -11,7 +11,24 @@ interface AuthState {
   error: string | null;
 }
 
-export const useAuth = () => {
+interface AuthContextValue {
+  user: User | null;
+  firebaseUser: FirebaseUser | null;
+  loading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  role: UserRole | null;
+  isOwner: boolean;
+  isManager: boolean;
+  isCollaborator: boolean;
+  isStudent: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     firebaseUser: null,
     userProfile: null,
@@ -26,13 +43,23 @@ export const useAuth = () => {
     }
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
-        const profile = await getUserProfile(fbUser.uid);
-        setState({
-          firebaseUser: fbUser,
-          userProfile: profile,
-          loading: false,
-          error: null,
-        });
+        try {
+          const profile = await getUserProfile(fbUser.uid);
+          setState({
+            firebaseUser: fbUser,
+            userProfile: profile,
+            loading: false,
+            error: null,
+          });
+        } catch (err) {
+          console.error('AuthProvider: error fetching profile', err);
+          setState({
+            firebaseUser: fbUser,
+            userProfile: null,
+            loading: false,
+            error: 'Errore nel caricamento del profilo',
+          });
+        }
       } else {
         setState({
           firebaseUser: null,
@@ -68,7 +95,7 @@ export const useAuth = () => {
     });
   }, []);
 
-  return {
+  const value: AuthContextValue = {
     user: state.userProfile,
     firebaseUser: state.firebaseUser,
     loading: state.loading,
@@ -82,4 +109,14 @@ export const useAuth = () => {
     login,
     logout,
   };
+
+  return React.createElement(AuthContext.Provider, { value }, children);
+};
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

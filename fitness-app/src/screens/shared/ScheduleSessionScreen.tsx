@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
   FlatList,
   RefreshControl,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -33,7 +33,7 @@ const TIME_SLOTS = [
 ];
 
 export const ScheduleSessionScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator } = useAuth();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -59,6 +59,9 @@ export const ScheduleSessionScreen: React.FC = () => {
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+      } else if (isManager) {
+        // Manager vede allievi assegnati direttamente o tramite assignedManagerId
+        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }
@@ -74,10 +77,11 @@ export const ScheduleSessionScreen: React.FC = () => {
         return dateB - dateA;
       });
       setSessions(allSessions);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento sessioni:', err);
+      crossAlert('Errore', 'Impossibile caricare le sessioni. Riprova più tardi.');
     }
-  }, [user, isOwner, isCollaborator]);
+  }, [user, isOwner, isManager, isCollaborator]);
 
   useEffect(() => {
     loadData();
@@ -108,13 +112,13 @@ export const ScheduleSessionScreen: React.FC = () => {
 
   const handleCreate = async () => {
     if (!selectedStudentId || !selectedDate || !user) {
-      Alert.alert('Errore', 'Seleziona allievo e data');
+      crossAlert('Errore', 'Seleziona allievo e data');
       return;
     }
 
     const collabId = isOwner ? selectedCollaboratorId : user.id;
     if (!collabId) {
-      Alert.alert('Errore', 'Seleziona un collaboratore');
+      crossAlert('Errore', 'Seleziona un collaboratore');
       return;
     }
 
@@ -130,19 +134,19 @@ export const ScheduleSessionScreen: React.FC = () => {
         notes,
         isCountedAsCompleted: false,
       });
-      Alert.alert('Successo', 'Sessione programmata!');
+      crossAlert('Successo', 'Sessione programmata!');
       resetForm();
       setShowModal(false);
       loadData();
     } catch {
-      Alert.alert('Errore', 'Impossibile creare la sessione');
+      crossAlert('Errore', 'Impossibile creare la sessione');
     } finally {
       setSaving(false);
     }
   };
 
   const handleComplete = (sessionId: string) => {
-    Alert.alert(
+    crossAlert(
       'Conferma',
       'Segna questa sessione come completata?',
       [
@@ -154,7 +158,7 @@ export const ScheduleSessionScreen: React.FC = () => {
               await updateSessionStatus(sessionId, 'completed');
               loadData();
             } catch {
-              Alert.alert('Errore', 'Impossibile aggiornare');
+              crossAlert('Errore', 'Impossibile aggiornare');
             }
           },
         },

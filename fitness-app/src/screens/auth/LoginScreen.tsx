@@ -6,10 +6,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -18,7 +18,11 @@ import { resetPassword } from '../../services/authService';
 import { RegisterStudentScreen } from './RegisterStudentScreen';
 import { EnsoLogo } from '../../components/common/EnsōLogo';
 
-export const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  onBack?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showRegister, setShowRegister] = useState(false);
@@ -29,33 +33,33 @@ export const LoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Errore', 'Inserisci email e password');
+      crossAlert('Errore', 'Inserisci email e password');
       return;
     }
     try {
       await login(email.trim(), password);
     } catch {
-      Alert.alert('Errore di accesso', 'Credenziali non valide. Riprova.');
+      crossAlert('Errore di accesso', 'Credenziali non valide. Riprova.');
     }
   };
 
   const handleResetPassword = async () => {
     const target = resetEmail.trim() || email.trim();
     if (!target) {
-      Alert.alert('Errore', 'Inserisci la tua email per recuperare la password');
+      crossAlert('Errore', 'Inserisci la tua email per recuperare la password');
       return;
     }
     setResetLoading(true);
     try {
       await resetPassword(target);
-      Alert.alert(
+      crossAlert(
         'Email inviata',
         `Abbiamo inviato un link per reimpostare la password a ${target}. Controlla la tua casella di posta.`
       );
       setShowForgotPassword(false);
       setResetEmail('');
     } catch {
-      Alert.alert(
+      crossAlert(
         'Errore',
         'Impossibile inviare l\'email di recupero. Verifica che l\'indirizzo sia corretto.'
       );
@@ -77,8 +81,14 @@ export const LoginScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {onBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backText}>{'← Indietro'}</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.header}>
-          <EnsoLogo size={150} />
+          <EnsoLogo size={120} />
           <Text style={styles.title}>Essère</Text>
           <Text style={styles.subtitle}>Il tuo percorso di benessere</Text>
         </View>
@@ -125,11 +135,11 @@ export const LoginScreen: React.FC = () => {
           onPress={() => setShowRegister(true)}
           style={styles.registerLink}
         >
-          <Text style={styles.registerText}>Sei un nuovo allievo? Registrati</Text>
+          <Text style={styles.registerText}>Hai un codice invito? Registrati</Text>
         </TouchableOpacity>
 
         <Text style={styles.footer}>
-          Coach e Manager: contattare l'amministratore per le credenziali
+          Per registrarti come allievo hai bisogno di un codice invito dal tuo coach o manager
         </Text>
       </ScrollView>
 
@@ -191,7 +201,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
   },
   title: {
-    fontSize: 32,
+    fontSize: fontSize.hero,
     fontWeight: '300',
     color: colors.textOnPrimary,
     letterSpacing: 6,
@@ -236,6 +246,18 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
   },
   registerText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? spacing.md : 50,
+    left: 0,
+    padding: spacing.md,
+    zIndex: 10,
+  },
+  backText: {
     color: colors.accent,
     fontSize: fontSize.md,
     fontWeight: '600',

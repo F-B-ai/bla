@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -18,7 +18,7 @@ import {
   TransactionType,
   TransactionCategory,
 } from '../../types';
-import { addTransaction, getTransactions, getFinancialSummary } from '../../services/financialService';
+import { addTransaction, getTransactions, getFinancialSummary, deleteTransaction } from '../../services/financialService';
 
 const CATEGORIES: { value: TransactionCategory; label: string }[] = [
   { value: 'student_payment', label: 'Pagamento allievi' },
@@ -61,13 +61,13 @@ export const FinancialScreen: React.FC = () => {
 
   const handleAddTransaction = async () => {
     if (!newAmount || !newDescription) {
-      Alert.alert('Errore', 'Compila tutti i campi');
+      crossAlert('Errore', 'Compila tutti i campi');
       return;
     }
 
     const amount = parseFloat(newAmount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Errore', 'Importo non valido');
+      crossAlert('Errore', 'Importo non valido');
       return;
     }
 
@@ -84,10 +84,32 @@ export const FinancialScreen: React.FC = () => {
       setNewAmount('');
       setNewDescription('');
       await loadData();
-      Alert.alert('Successo', 'Transazione aggiunta');
+      crossAlert('Successo', 'Transazione aggiunta');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la transazione');
+      crossAlert('Errore', 'Impossibile salvare la transazione');
     }
+  };
+
+  const handleDeleteTransaction = (txId: string, description: string) => {
+    crossAlert(
+      'Elimina Transazione',
+      `Eliminare "${description}"?`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTransaction(txId);
+              await loadData();
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare la transazione');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -155,14 +177,22 @@ export const FinancialScreen: React.FC = () => {
                   {new Date(t.date as unknown as string).toLocaleDateString('it-IT')}
                 </Text>
               </View>
-              <Text
-                style={[
-                  styles.transactionAmount,
-                  { color: t.type === 'income' ? colors.success : colors.error },
-                ]}
-              >
-                {t.type === 'income' ? '+' : '-'}€{t.amount.toLocaleString()}
-              </Text>
+              <View style={styles.transactionRight}>
+                <Text
+                  style={[
+                    styles.transactionAmount,
+                    { color: t.type === 'income' ? colors.success : colors.error },
+                  ]}
+                >
+                  {t.type === 'income' ? '+' : '-'}€{t.amount.toLocaleString()}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleDeleteTransaction(t.id, t.description)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.deleteText}>Elimina</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </Card>
         ))
@@ -342,9 +372,18 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginLeft: spacing.md + spacing.sm,
   },
+  transactionRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
   transactionAmount: {
     fontSize: fontSize.lg,
     fontWeight: '700',
+  },
+  deleteText: {
+    fontSize: fontSize.xs,
+    color: colors.error,
+    fontWeight: '600',
   },
   emptyText: {
     color: colors.textSecondary,

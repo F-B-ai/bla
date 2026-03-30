@@ -3,13 +3,16 @@
 // Analisi posturale con visione + Progressioni allenamento
 // ============================================================
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PosturalFinding, Exercise, WorkoutPlan } from '../types';
 
 // La chiave API va impostata in config. In produzione usare un backend proxy.
 // MAI esporre la chiave in un'app client in produzione.
 const API_URL = 'https://api.anthropic.com/v1/messages';
+const AI_KEY_STORAGE = '@essère_ai_key';
 
 let API_KEY = '';
+let _keyLoaded = false;
 
 export const setAIApiKey = (key: string) => {
   API_KEY = key;
@@ -17,54 +20,159 @@ export const setAIApiKey = (key: string) => {
 
 export const getAIApiKey = () => API_KEY;
 
+export const ensureAIApiKey = async (): Promise<string> => {
+  if (!API_KEY) {
+    await loadAIApiKey();
+  }
+  return API_KEY;
+};
+
+// Carica la chiave API da AsyncStorage all'avvio
+export const loadAIApiKey = async (): Promise<string> => {
+  if (_keyLoaded) return API_KEY;
+  try {
+    const key = await AsyncStorage.getItem(AI_KEY_STORAGE);
+    if (key) {
+      API_KEY = key;
+    }
+  } catch {
+    // ignore
+  }
+  _keyLoaded = true;
+  return API_KEY;
+};
+
+// Caricamento automatico all'import del modulo
+loadAIApiKey();
+
 // --- Helper per chiamata Claude ---
 const callClaude = async (
   messages: Array<{ role: string; content: any }>,
   systemPrompt: string,
   maxTokens: number = 2000
 ): Promise<string> => {
+  // Assicurati che la chiave sia caricata da AsyncStorage
   if (!API_KEY) {
-    throw new Error('API key Anthropic non configurata. Vai nelle impostazioni per inserirla.');
+    await loadAIApiKey();
   }
 
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages,
-    }),
-  });
+  if (!API_KEY) {
+    throw new Error('API key Anthropic non configurata. Vai in Impostazioni AI per inserirla.');
+  }
+
+  if (!API_KEY.startsWith('sk-ant-') && !API_KEY.startsWith('sk-')) {
+    throw new Error('Chiave API non valida. Deve iniziare con "sk-ant-" o "sk-". Controlla le impostazioni.');
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+  } catch (networkError) {
+    throw new Error(
+      'Impossibile connettersi al server AI. Controlla la connessione internet e riprova.'
+    );
+  }
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Errore API Claude: ${response.status} - ${error}`);
+    let errorBody = '';
+    try {
+      errorBody = await response.text();
+    } catch {
+      // ignore
+    }
+
+    if (response.status === 401) {
+      throw new Error('Chiave API non valida o scaduta. Aggiorna la chiave nelle impostazioni AI.');
+    }
+    if (response.status === 429) {
+      throw new Error('Troppe richieste. Attendi qualche secondo e riprova.');
+    }
+    if (response.status === 400) {
+      // Check for common issues
+      if (errorBody.includes('model')) {
+        throw new Error('Modello AI non disponibile. Riprova più tardi.');
+      }
+      if (errorBody.includes('image') || errorBody.includes('base64')) {
+        throw new Error('Errore nell\'invio delle immagini. Prova con foto più piccole o in formato JPEG.');
+      }
+      throw new Error(`Richiesta non valida: ${errorBody.substring(0, 200)}`);
+    }
+    if (response.status >= 500) {
+      throw new Error('Il server AI è temporaneamente non disponibile. Riprova tra qualche minuto.');
+    }
+    throw new Error(`Errore API (${response.status}): ${errorBody.substring(0, 200)}`);
   }
 
-  const data = await response.json();
-  return data.content[0]?.text || '';
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('Risposta non valida dal server AI. Riprova.');
+  }
+
+  const text = data?.content?.[0]?.text;
+  if (!text) {
+    throw new Error('Il server AI ha restituito una risposta vuota. Riprova.');
+  }
+
+  return text;
 };
 
 // --- Converte immagine URI in base64 ---
 const imageUriToBase64 = async (uri: string): Promise<string> => {
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = (reader.result as string).split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+  // Se l'URI è già base64, estrarre i dati
+  if (uri.startsWith('data:')) {
+    const base64Part = uri.split(',')[1];
+    if (base64Part) return base64Part;
+    throw new Error('Formato immagine base64 non valido');
+  }
+
+  try {
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error(`Impossibile caricare l'immagine (${response.status})`);
+    }
+    const blob = await response.blob();
+
+    // Controlla dimensione (max 20MB per l'API)
+    if (blob.size > 20 * 1024 * 1024) {
+      throw new Error('Immagine troppo grande. Usa foto con dimensioni inferiori a 20MB.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        if (!base64) {
+          reject(new Error('Conversione immagine fallita'));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Errore nella lettura dell\'immagine'));
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Immagine')) {
+      throw err;
+    }
+    throw new Error('Impossibile elaborare l\'immagine. Riprova con un\'altra foto.');
+  }
 };
 
 // ============================================================
@@ -233,17 +341,17 @@ export const suggestWorkoutProgression = async (
   weekNumber: number,
   posturalNotes?: string
 ): Promise<AIProgressionSuggestion> => {
-  const days = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
+  const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
   const systemPrompt = `Sei un preparatore atletico e personal trainer esperto italiano. Crea la progressione della scheda di allenamento.
 
 RISPONDI SEMPRE in formato JSON valido con questa struttura:
 {
   "title": "titolo della nuova scheda",
-  "reasoning": "spiegazione delle modifiche apportate e perche'",
+  "reasoning": "spiegazione delle modifiche apportate e perché",
   "weeklySchedule": [
     {
-      "day": "Lunedi",
+      "day": "Lunedì",
       "exercises": [
         {
           "name": "nome esercizio",
@@ -260,7 +368,7 @@ RISPONDI SEMPRE in formato JSON valido con questa struttura:
 }
 
 Principi di progressione:
-- Sovraccarico progressivo (aumento volume o intensita' ogni 2-3 settimane)
+- Sovraccarico progressivo (aumento volume o intensità ogni 2-3 settimane)
 - Periodizzazione (variare stimoli per evitare plateau)
 - Considerare eventuali problemi posturali
 - Inserire esercizi correttivi se necessario

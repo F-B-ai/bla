@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  AppState,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
@@ -17,6 +18,10 @@ import {
   sendMessage,
   subscribeToMessages,
   markMessagesAsRead,
+  setTypingStatus,
+  subscribeToTypingStatus,
+  updatePresence,
+  subscribeToPresence,
 } from '../../services/chatService';
 
 interface Props {
@@ -35,14 +40,17 @@ export const ChatConversationScreen: React.FC<Props> = ({
   const { user, isOwner } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [typingUsers, setTypingUsers] = useState<{ userId: string; userName: string }[]>([]);
+  const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
   const flatListRef = useRef<FlatList>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sottoscrizione messaggi real-time
   useEffect(() => {
     if (!user) return;
 
     const unsubscribe = subscribeToMessages(room.id, (msgs) => {
       setMessages(msgs);
-      // Segna come letti
       if (!isAnonymous) {
         markMessagesAsRead(room.id, user.id);
       }
@@ -51,8 +59,66 @@ export const ChatConversationScreen: React.FC<Props> = ({
     return () => unsubscribe();
   }, [room.id, user, isAnonymous]);
 
+  // Sottoscrizione typing indicators
+  useEffect(() => {
+    if (!user || isAnonymous) return;
+
+    const unsubscribe = subscribeToTypingStatus(room.id, user.id, setTypingUsers);
+    return () => unsubscribe();
+  }, [room.id, user, isAnonymous]);
+
+  // Sottoscrizione presenza online dei partecipanti
+  useEffect(() => {
+    const otherIds = room.participants.filter((id) => id !== user?.id);
+    if (otherIds.length === 0) return;
+
+    const unsubscribe = subscribeToPresence(otherIds, setPresence);
+    return () => unsubscribe();
+  }, [room.participants, user?.id]);
+
+  // Aggiorna la propria presenza quando si entra/esce dalla chat
+  useEffect(() => {
+    if (!user || isAnonymous) return;
+
+    updatePresence(user.id, true);
+
+    const handleAppState = (state: string) => {
+      updatePresence(user.id, state === 'active');
+    };
+    const sub = AppState.addEventListener('change', handleAppState);
+
+    return () => {
+      sub.remove();
+      updatePresence(user.id, false);
+      setTypingStatus(room.id, user.id, '', false);
+    };
+  }, [user, isAnonymous, room.id]);
+
+  // Gestione typing indicator con debounce
+  const handleTextChange = useCallback((text: string) => {
+    setNewMessage(text);
+
+    if (!user || isAnonymous) return;
+
+    if (text.trim()) {
+      setTypingStatus(room.id, user.id, `${user.name}`, true);
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setTypingStatus(room.id, user.id, '', false);
+      }, 3000);
+    } else {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      setTypingStatus(room.id, user.id, '', false);
+    }
+  }, [user, isAnonymous, room.id]);
+
   const handleSend = async () => {
     if (!newMessage.trim() || !user || isAnonymous) return;
+
+    // Ferma typing indicator
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    setTypingStatus(room.id, user.id, '', false);
 
     try {
       await sendMessage(
@@ -66,6 +132,27 @@ export const ChatConversationScreen: React.FC<Props> = ({
     } catch {
       // Silently handle
     }
+  };
+
+  // Stato online dell'altro partecipante
+  const getOnlineStatus = (): { isOnline: boolean; lastSeenText: string } => {
+    const otherId = room.participants.find((id) => id !== user?.id);
+    if (!otherId || !presence[otherId]) return { isOnline: false, lastSeenText: '' };
+
+    const p = presence[otherId];
+    if (p.isOnline) return { isOnline: true, lastSeenText: 'online' };
+
+    if (p.lastSeen) {
+      const diff = Date.now() - p.lastSeen.getTime();
+      const minutes = Math.floor(diff / 60000);
+      if (minutes < 1) return { isOnline: false, lastSeenText: 'visto ora' };
+      if (minutes < 60) return { isOnline: false, lastSeenText: `visto ${minutes} min fa` };
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return { isOnline: false, lastSeenText: `visto ${hours}h fa` };
+      return { isOnline: false, lastSeenText: `visto ${p.lastSeen.toLocaleDateString('it-IT')}` };
+    }
+
+    return { isOnline: false, lastSeenText: '' };
   };
 
   const getSenderName = (msg: ChatMessage): string => {
@@ -91,10 +178,14 @@ export const ChatConversationScreen: React.FC<Props> = ({
           {item.text}
         </Text>
         <Text style={[styles.messageTime, isMe && styles.myMessageTime]}>
-          {new Date(item.timestamp as unknown as string).toLocaleTimeString('it-IT', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {(() => {
+            const ts = item.timestamp as any;
+            const date = ts?.toDate ? ts.toDate() : ts?.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+            return date.toLocaleTimeString('it-IT', {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+          })()}
         </Text>
       </View>
     );
@@ -117,18 +208,41 @@ export const ChatConversationScreen: React.FC<Props> = ({
     return 'Chat';
   };
 
+  const onlineStatus = getOnlineStatus();
+
+  // Sottotitolo header con stato online e typing
+  const getSubtitle = (): string => {
+    if (isAnonymous) return 'Modalità anonima - solo lettura';
+    if (typingUsers.length > 0) {
+      const names = typingUsers.map((u) => u.userName).join(', ');
+      return `${names} sta scrivendo...`;
+    }
+    if (!isOwner && onlineStatus.lastSeenText) {
+      return onlineStatus.lastSeenText;
+    }
+    return '';
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}
     >
-      {/* Header */}
+      {/* Header con stato online */}
       <ScreenHeader
         title={getTitle()}
-        subtitle={isAnonymous ? 'Modalita anonima - solo lettura' : undefined}
+        subtitle={getSubtitle() || undefined}
         onBack={onBack}
       />
+
+      {/* Indicatore online */}
+      {!isOwner && !isAnonymous && onlineStatus.isOnline && (
+        <View style={styles.onlineBanner}>
+          <View style={styles.onlineDot} />
+          <Text style={styles.onlineBannerText}>Online</Text>
+        </View>
+      )}
 
       {/* Messaggi */}
       <FlatList
@@ -149,13 +263,27 @@ export const ChatConversationScreen: React.FC<Props> = ({
         }
       />
 
-      {/* Input messaggio (nascosto in modalita anonima) */}
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
+        <View style={styles.typingContainer}>
+          <View style={styles.typingDots}>
+            <View style={[styles.typingDot, styles.typingDot1]} />
+            <View style={[styles.typingDot, styles.typingDot2]} />
+            <View style={[styles.typingDot, styles.typingDot3]} />
+          </View>
+          <Text style={styles.typingText}>
+            {typingUsers.map((u) => u.userName).join(', ')} sta scrivendo...
+          </Text>
+        </View>
+      )}
+
+      {/* Input messaggio (nascosto in modalità anonima) */}
       {!isAnonymous && (
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
             value={newMessage}
-            onChangeText={setNewMessage}
+            onChangeText={handleTextChange}
             placeholder="Scrivi un messaggio..."
             placeholderTextColor={colors.textLight}
             multiline
@@ -177,7 +305,7 @@ export const ChatConversationScreen: React.FC<Props> = ({
       {isAnonymous && (
         <View style={styles.anonBar}>
           <Text style={styles.anonBarText}>
-            Stai osservando in modalita anonima
+            Stai osservando in modalità anonima
           </Text>
         </View>
       )}
@@ -307,6 +435,57 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+  onlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.success + '15',
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success,
+    marginRight: spacing.xs,
+  },
+  onlineBannerText: {
+    fontSize: fontSize.xs,
+    color: colors.success,
+    fontWeight: '600',
+  },
+  typingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  typingDots: {
+    flexDirection: 'row',
+    marginRight: spacing.sm,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.textSecondary,
+    marginHorizontal: 1,
+  },
+  typingDot1: {
+    opacity: 0.4,
+  },
+  typingDot2: {
+    opacity: 0.7,
+  },
+  typingDot3: {
+    opacity: 1,
+  },
+  typingText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
   },
   emptyContainer: {
     flex: 1,

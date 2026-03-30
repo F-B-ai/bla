@@ -6,22 +6,31 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
+import { Button } from '../../components/common/Button';
 import { BarChart, BarData } from '../../components/charts/BarChart';
-import { Collaborator, TrainingSession, FinancialTransaction } from '../../types';
-import { getCollaborators, getStudents } from '../../services/authService';
+import { Collaborator, Manager, TrainingSession, FinancialTransaction } from '../../types';
+import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
 import { useAuth } from '../../hooks/useAuth';
 
 export const DashboardScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [allSessions, setAllSessions] = useState<TrainingSession[]>([]);
   const [todaySessions, setTodaySessions] = useState<TrainingSession[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
@@ -32,14 +41,16 @@ export const DashboardScreen: React.FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [collabs, studs, sessions, txs, summary] = await Promise.all([
+      const [collabs, mgrs, studs, sessions, txs, summary] = await Promise.all([
         getCollaborators(),
+        getManagers(),
         getStudents(),
         getAllSessions(),
         getTransactions(),
         getFinancialSummary(),
       ]);
       setCollaborators(collabs);
+      setManagers(mgrs);
       setTotalStudents(studs.length);
       setAllSessions(sessions);
       setTransactions(txs);
@@ -55,8 +66,8 @@ export const DashboardScreen: React.FC = () => {
         return d >= today && d < tomorrow;
       });
       setTodaySessions(todayOnly);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento dashboard:', err);
     }
   }, []);
 
@@ -114,6 +125,71 @@ export const DashboardScreen: React.FC = () => {
     }));
   };
 
+  const [resetting, setResetting] = useState(false);
+
+  const deleteCollection = async (collectionName: string) => {
+    const snapshot = await getDocs(collection(db, collectionName));
+    const deletes = snapshot.docs.map((d) => deleteDoc(doc(db, collectionName, d.id)));
+    await Promise.all(deletes);
+    return snapshot.size;
+  };
+
+  const handleResetAllData = () => {
+    crossAlert(
+      'Reset Tutti i Dati',
+      'ATTENZIONE: Questa azione eliminerà TUTTI i dati dell\'app (sessioni, pagamenti, programmi, transazioni, valutazioni, diario, contenuti). Gli account utente NON verranno eliminati.\n\nSei sicuro?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Conferma Reset',
+          style: 'destructive',
+          onPress: () => {
+            crossAlert(
+              'Ultima Conferma',
+              'I dati eliminati NON potranno essere recuperati. Continuare?',
+              [
+                { text: 'No', style: 'cancel' },
+                {
+                  text: 'Sì, Elimina Tutto',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setResetting(true);
+                    try {
+                      const collections = [
+                        'sessions',
+                        'paymentPlans',
+                        'trainingPrograms',
+                        'workoutPlans',
+                        'financialTransactions',
+                        'posturalAssessments',
+                        'diaryEntries',
+                        'specialContent',
+                        'nutritionalConsultations',
+                        'collaboratorEarnings',
+                        'chatRooms',
+                        'chatMessages',
+                      ];
+                      let totalDeleted = 0;
+                      for (const col of collections) {
+                        totalDeleted += await deleteCollection(col);
+                      }
+                      await loadData();
+                      crossAlert('Reset Completato', `${totalDeleted} documenti eliminati.`);
+                    } catch {
+                      crossAlert('Errore', 'Impossibile completare il reset. Alcuni dati potrebbero essere stati eliminati.');
+                    } finally {
+                      setResetting(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   const periods = [
     { key: 'week' as const, label: 'Settimana' },
     { key: 'month' as const, label: 'Mese' },
@@ -131,17 +207,23 @@ export const DashboardScreen: React.FC = () => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.greeting}>Buongiorno{user?.name ? `, ${user.name}` : ''}!</Text>
-            <Text style={styles.date}>
-              {new Date().toLocaleDateString('it-IT', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
-            </Text>
+          <View style={styles.headerLeft}>
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.headerIcon}
+            />
+            <View>
+              <Text style={styles.greeting}>Buongiorno{user?.name ? `, ${user.name}` : ''}!</Text>
+              <Text style={styles.date}>
+                {new Date().toLocaleDateString('it-IT', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Text style={styles.logoutText}>Esci</Text>
@@ -191,14 +273,27 @@ export const DashboardScreen: React.FC = () => {
 
       <View style={styles.statsRow}>
         <StatCard
-          title="Sessioni Oggi"
-          value={todaySessions.length}
-          color={colors.accent}
+          title="Manager"
+          value={managers.length}
+          color={colors.managerBadge}
         />
         <StatCard
           title="Collaboratori"
           value={collaborators.length}
           color={colors.collaboratorBadge}
+        />
+      </View>
+
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Sessioni Oggi"
+          value={todaySessions.length}
+          color={colors.accent}
+        />
+        <StatCard
+          title="Totale Sessioni"
+          value={allSessions.length}
+          color={colors.info}
         />
       </View>
 
@@ -233,39 +328,33 @@ export const DashboardScreen: React.FC = () => {
       </View>
 
       {/* Grafico Ricavi per Coach */}
-      {coachRevenueData.length > 0 && (
-        <View style={styles.chartSection}>
-          <BarChart
-            data={coachRevenueData}
-            title="Ricavi per Coach"
-            height={200}
-          />
-        </View>
-      )}
+      <View style={styles.chartSection}>
+        <BarChart
+          data={coachRevenueData.length > 0 ? coachRevenueData : [{ label: 'Nessun coach', value: 0 }]}
+          title="Ricavi per Coach"
+          height={200}
+        />
+      </View>
 
       {/* Grafico Sessioni */}
-      {allSessions.length > 0 && (
-        <View style={styles.chartSection}>
-          <BarChart
-            data={sessionsData}
-            title="Riepilogo Sessioni"
-            height={180}
-            formatValue={(v) => String(v)}
-          />
-        </View>
-      )}
+      <View style={styles.chartSection}>
+        <BarChart
+          data={sessionsData}
+          title="Riepilogo Sessioni"
+          height={180}
+          formatValue={(v) => String(v)}
+        />
+      </View>
 
       {/* Grafico Allievi per Coach */}
-      {studentsByCoachData.length > 0 && (
-        <View style={styles.chartSection}>
-          <BarChart
-            data={studentsByCoachData}
-            title="Allievi per Coach"
-            height={180}
-            formatValue={(v) => String(v)}
-          />
-        </View>
-      )}
+      <View style={styles.chartSection}>
+        <BarChart
+          data={studentsByCoachData.length > 0 ? studentsByCoachData : [{ label: 'Nessun coach', value: 0 }]}
+          title="Allievi per Coach"
+          height={180}
+          formatValue={(v) => String(v)}
+        />
+      </View>
 
       {/* Sessioni di oggi */}
       <Text style={styles.sectionTitle}>Sessioni di Oggi</Text>
@@ -286,6 +375,35 @@ export const DashboardScreen: React.FC = () => {
                 </Text>
               </View>
               <Badge status={session.status} />
+            </View>
+          </Card>
+        ))
+      )}
+
+      {/* Rendimento Manager */}
+      <Text style={styles.sectionTitle}>Rendimento Manager</Text>
+      {managers.length === 0 ? (
+        <Card>
+          <Text style={styles.emptyText}>Nessun manager registrato</Text>
+        </Card>
+      ) : (
+        managers.map((mgr) => (
+          <Card key={mgr.id} variant="elevated">
+            <View style={styles.collabRow}>
+              <View style={styles.collabInfo}>
+                <Text style={styles.collabName}>
+                  {mgr.name} {mgr.surname}
+                </Text>
+                <Text style={styles.collabStudents}>
+                  {mgr.assignedCollaborators.length} collaboratori · {mgr.assignedStudents.length} allievi diretti
+                </Text>
+              </View>
+              <View style={styles.collabEarnings}>
+                <Text style={[styles.collabAmount, { color: colors.managerBadge }]}>
+                  {mgr.commissionPercentage}%
+                </Text>
+                <Text style={styles.collabLabel}>commissione</Text>
+              </View>
             </View>
           </Card>
         ))
@@ -320,6 +438,20 @@ export const DashboardScreen: React.FC = () => {
         ))
       )}
 
+      {/* Reset dati */}
+      <View style={styles.resetSection}>
+        <Text style={styles.resetTitle}>Zona Pericolosa</Text>
+        <Text style={styles.resetDesc}>
+          Elimina tutti i dati dell'app (sessioni, pagamenti, programmi, transazioni). Gli account utente non verranno eliminati.
+        </Text>
+        <Button
+          title={resetting ? 'Reset in corso...' : 'Reset Tutti i Dati'}
+          onPress={handleResetAllData}
+          variant="danger"
+          loading={resetting}
+        />
+      </View>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -338,7 +470,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: borderRadius.xl,
   },
   greeting: {
-    fontSize: fontSize.title,
+    fontSize: fontSize.xl,
     fontWeight: '700',
     color: colors.textOnPrimary,
   },
@@ -346,6 +478,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
   },
   logoutButton: {
     backgroundColor: colors.surfaceLight,
@@ -414,12 +557,14 @@ const styles = StyleSheet.create({
     ...shadows.small,
   },
   profitLabel: {
-    fontSize: fontSize.md,
+    fontSize: fontSize.sm,
     color: colors.textSecondary,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   profitValue: {
-    fontSize: fontSize.hero,
+    fontSize: fontSize.xxl,
     fontWeight: '700',
     marginTop: spacing.xs,
   },
@@ -502,6 +647,27 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     padding: spacing.md,
+  },
+  resetSection: {
+    margin: spacing.md,
+    marginTop: spacing.xxl,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.error + '40',
+  },
+  resetTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.error,
+    marginBottom: spacing.xs,
+  },
+  resetDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.md,
   },
   bottomSpacer: {
     height: spacing.xxl,

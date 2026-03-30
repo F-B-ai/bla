@@ -7,25 +7,34 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Badge } from '../../components/common/Badge';
-import { Student, TrainingProgram, Exercise } from '../../types';
+import { Student, TrainingProgram, Exercise, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
-import { createProgram } from '../../services/programService';
+import { createProgram, getStudentWorkoutPlans } from '../../services/programService';
 
 export const MyStudentsScreen: React.FC = () => {
-  const { user, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { user, logout, isOwner, isManager } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [studentPlans, setStudentPlans] = useState<WorkoutPlan[]>([]);
+  const [viewingPlan, setViewingPlan] = useState<WorkoutPlan | null>(null);
+  const [historySelectedDay, setHistorySelectedDay] = useState(0);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
   // Form programma
   const [programTitle, setProgramTitle] = useState('');
@@ -37,23 +46,47 @@ export const MyStudentsScreen: React.FC = () => {
     if (!user) return;
     try {
       const allStudents = await getStudents();
-      // Filtra solo gli allievi assegnati a questo collaboratore
+      // Owner: vede allievi assegnati direttamente a sé
+      // Manager: vede allievi assegnati direttamente O tramite assignedManagerId
+      // Collaborator: vede solo i propri allievi
       const myStudents = allStudents.filter(
-        (s) => s.assignedCollaboratorId === user.id
+        (s) =>
+          s.assignedCollaboratorId === user.id ||
+          (isManager && s.assignedManagerId === user.id)
       );
       setStudents(myStudents);
     } catch {
       // Silently handle
     }
-  }, [user]);
+  }, [user, isOwner, isManager]);
 
   useEffect(() => {
     loadStudents();
   }, [loadStudents]);
 
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const handleViewHistory = async (student: Student) => {
+    setSelectedStudent(student);
+    setLoadingHistory(true);
+    setShowHistoryModal(true);
+    try {
+      const plans = await getStudentWorkoutPlans(student.id);
+      setStudentPlans(plans);
+    } catch {
+      crossAlert('Errore', 'Impossibile caricare le programmazioni');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleCreateProgram = async () => {
     if (!selectedStudent || !programTitle || !user) {
-      Alert.alert('Errore', 'Seleziona un allievo e inserisci il titolo');
+      crossAlert('Errore', 'Seleziona un allievo e inserisci il titolo');
       return;
     }
     try {
@@ -67,13 +100,13 @@ export const MyStudentsScreen: React.FC = () => {
         progressNotes: sessionNotes,
         createdAt: new Date(),
       });
-      Alert.alert('Successo', 'Programma creato con successo');
+      crossAlert('Successo', 'Programma creato con successo');
       setShowProgramModal(false);
       setProgramTitle('');
       setProgramDescription('');
       setSessionNotes('');
     } catch {
-      Alert.alert('Errore', 'Impossibile creare il programma');
+      crossAlert('Errore', 'Impossibile creare il programma');
     }
   };
 
@@ -90,11 +123,11 @@ export const MyStudentsScreen: React.FC = () => {
         progressNotes,
         createdAt: new Date(),
       });
-      Alert.alert('Successo', 'Note salvate');
+      crossAlert('Successo', 'Note salvate');
       setShowNotesModal(false);
       setProgressNotes('');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare le note');
+      crossAlert('Errore', 'Impossibile salvare le note');
     }
   };
 
@@ -135,6 +168,12 @@ export const MyStudentsScreen: React.FC = () => {
             variant="secondary"
             style={styles.actionButton}
           />
+          <Button
+            title="Storico"
+            onPress={() => handleViewHistory(item)}
+            variant="outline"
+            style={styles.actionButton}
+          />
         </View>
       )}
     </Card>
@@ -142,7 +181,7 @@ export const MyStudentsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.title}>I Miei Allievi</Text>
@@ -250,6 +289,119 @@ export const MyStudentsScreen: React.FC = () => {
               />
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* Modale Storico Programmazioni */}
+      <Modal visible={showHistoryModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title={`Programmazioni - ${selectedStudent?.name} ${selectedStudent?.surname}`}
+              onClose={() => { setShowHistoryModal(false); setViewingPlan(null); }}
+            />
+
+            {loadingHistory ? (
+              <Card>
+                <Text style={styles.emptyText}>Caricamento...</Text>
+              </Card>
+            ) : !viewingPlan ? (
+              <>
+                {studentPlans.length === 0 ? (
+                  <Card>
+                    <Text style={styles.emptyText}>
+                      Nessuna programmazione trovata per questo allievo.
+                    </Text>
+                  </Card>
+                ) : (
+                  studentPlans.map((plan) => (
+                    <TouchableOpacity
+                      key={plan.id}
+                      onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}
+                    >
+                      <Card variant={plan.isActive ? 'elevated' : 'outlined'}>
+                        <View style={styles.historyRow}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyName}>{plan.title}</Text>
+                            <Text style={styles.historyDate}>
+                              {formatDate(plan.startDate)} - {formatDate(plan.endDate)}
+                            </Text>
+                          </View>
+                          {plan.isActive && (
+                            <Badge status="completed" label="ATTIVO" />
+                          )}
+                        </View>
+                      </Card>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </>
+            ) : (
+              <>
+                <Card variant="elevated">
+                  <Text style={styles.historyPlanTitle}>{viewingPlan.title}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatDate(viewingPlan.startDate)} - {formatDate(viewingPlan.endDate)}
+                  </Text>
+                  {viewingPlan.isActive && (
+                    <Badge status="completed" label="ATTIVO" />
+                  )}
+                </Card>
+
+                <TouchableOpacity
+                  style={styles.backToList}
+                  onPress={() => setViewingPlan(null)}
+                >
+                  <Text style={styles.backToListText}>Torna alla lista</Text>
+                </TouchableOpacity>
+
+                {/* Selettore giorno */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
+                  {DAYS.map((day, index) => (
+                    <TouchableOpacity
+                      key={day}
+                      style={[styles.dayButton, historySelectedDay === index && styles.dayButtonActive]}
+                      onPress={() => setHistorySelectedDay(index)}
+                    >
+                      <Text style={[styles.dayText, historySelectedDay === index && styles.dayTextActive]}>
+                        {day.substring(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={styles.daySectionTitle}>{DAYS[historySelectedDay]}</Text>
+                {viewingPlan.weeklySchedule[historySelectedDay]?.exercises.length === 0 ? (
+                  <Card><Text style={styles.emptyText}>Riposo</Text></Card>
+                ) : (
+                  viewingPlan.weeklySchedule[historySelectedDay]?.exercises.map((ex, i) => (
+                    <Card key={ex.id || i} variant="outlined">
+                      <View style={styles.exerciseRow}>
+                        <View style={styles.exerciseNumber}>
+                          <Text style={styles.exerciseNumberText}>{i + 1}</Text>
+                        </View>
+                        <View style={styles.exerciseInfo}>
+                          <Text style={styles.exerciseName}>{ex.name}</Text>
+                          <Text style={styles.exerciseDetails}>
+                            {ex.sets} serie x {ex.reps} reps
+                            {ex.restSeconds > 0 && ` | Recupero: ${ex.restSeconds}s`}
+                          </Text>
+                          {ex.description ? (
+                            <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                          ) : null}
+                          {ex.notes ? (
+                            <Text style={styles.exerciseNotes}>Note: {ex.notes}</Text>
+                          ) : null}
+                        </View>
+                      </View>
+                    </Card>
+                  ))
+                )}
+              </>
+            )}
+
+            <View style={{ height: 100 }} />
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -384,5 +536,106 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  historyDate: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  historyPlanTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  backToList: {
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  backToListText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  daySelector: {
+    marginVertical: spacing.sm,
+  },
+  dayButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    backgroundColor: colors.surface,
+    marginRight: spacing.sm,
+    ...shadows.small,
+  },
+  dayButtonActive: {
+    backgroundColor: colors.accent,
+  },
+  dayText: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  dayTextActive: {
+    color: colors.textOnAccent,
+  },
+  daySectionTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  exerciseNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exerciseNumberText: {
+    color: colors.textOnAccent,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+  },
+  exerciseInfo: {
+    flex: 1,
+  },
+  exerciseName: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  exerciseDetails: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  exerciseDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  exerciseNotes: {
+    fontSize: fontSize.sm,
+    color: colors.warning,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });

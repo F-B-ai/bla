@@ -3,10 +3,11 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
+import { getFirebaseErrorMessage } from '../../utils/helpers';
 import { colors, spacing, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -23,33 +24,46 @@ export const AddManagerScreen: React.FC<Props> = ({ onBack }) => {
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [phone, setPhone] = useState('');
+  const [commission, setCommission] = useState('10');
+  const [specializations, setSpecializations] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
+      return;
+    }
+    const commissionNum = parseInt(commission, 10);
+    if (isNaN(commissionNum) || commissionNum < 0 || commissionNum > 100) {
+      crossAlert('Errore', 'La commissione deve essere un numero tra 0 e 100');
       return;
     }
 
     setLoading(true);
     try {
+      const specs = specializations
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+
       await registerManager(
         email.trim(),
         password,
         name.trim(),
         surname.trim(),
-        phone.trim()
+        phone.trim(),
+        commissionNum,
+        specs
       );
-      Alert.alert('Successo', `Manager ${name} ${surname} registrato!`, [
+      crossAlert('Successo', `Manager ${name} ${surname} registrato!`, [
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -100,6 +114,19 @@ export const AddManagerScreen: React.FC<Props> = ({ onBack }) => {
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholder="Numero di telefono"
+          />
+          <InputField
+            label="Commissione %"
+            value={commission}
+            onChangeText={setCommission}
+            keyboardType="numeric"
+            placeholder="Es: 10 (il manager riceve il 10% dagli allievi dei coach)"
+          />
+          <InputField
+            label="Specializzazioni"
+            value={specializations}
+            onChangeText={setSpecializations}
+            placeholder="Posturale, Funzionale, Cardio (separati da virgola)"
           />
 
           <Button

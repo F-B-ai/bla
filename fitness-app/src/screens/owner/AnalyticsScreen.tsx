@@ -45,8 +45,8 @@ export const AnalyticsScreen: React.FC = () => {
       setTransactions(txs);
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
-    } catch {
-      // Silently handle
+    } catch (err) {
+      console.error('Errore caricamento analytics:', err);
     }
   }, []);
 
@@ -306,7 +306,7 @@ export const AnalyticsScreen: React.FC = () => {
       }
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Analytics & KPI</Text>
+        <Text style={styles.title}>Analisi & KPI</Text>
         <Text style={styles.subtitle}>Monitoraggio prestazioni</Text>
       </View>
 

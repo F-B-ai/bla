@@ -5,6 +5,7 @@ import {
   updateDoc,
   getDocs,
   getDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -38,7 +39,7 @@ export const getStudentPrograms = async (
     orderBy('createdAt', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TrainingProgram));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingProgram));
 };
 
 export const updateProgram = async (
@@ -53,10 +54,41 @@ export const updateProgram = async (
 export const createWorkoutPlan = async (
   plan: Omit<WorkoutPlan, 'id'>
 ): Promise<string> => {
+  // Disattiva tutti i piani attivi precedenti per lo stesso studente
+  if (plan.isActive && plan.studentId) {
+    try {
+      const activeQuery = query(
+        collection(db, PLANS_COLLECTION),
+        where('studentId', '==', plan.studentId),
+        where('isActive', '==', true)
+      );
+      const activeSnapshot = await getDocs(activeQuery);
+      for (const activeDoc of activeSnapshot.docs) {
+        await updateDoc(doc(db, PLANS_COLLECTION, activeDoc.id), { isActive: false });
+      }
+    } catch {
+      // Fallback: filtra lato client
+      const fallbackQuery = query(
+        collection(db, PLANS_COLLECTION),
+        where('studentId', '==', plan.studentId)
+      );
+      const fallbackSnapshot = await getDocs(fallbackQuery);
+      for (const d of fallbackSnapshot.docs) {
+        if (d.data().isActive === true) {
+          await updateDoc(doc(db, PLANS_COLLECTION, d.id), { isActive: false });
+        }
+      }
+    }
+  }
+
+  // Assicura che startDate e endDate siano Date valide prima di convertire
+  const startDate = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as any);
+  const endDate = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as any);
+
   const docRef = await addDoc(collection(db, PLANS_COLLECTION), {
     ...plan,
-    startDate: Timestamp.fromDate(plan.startDate),
-    endDate: Timestamp.fromDate(plan.endDate),
+    startDate: Timestamp.fromDate(startDate),
+    endDate: Timestamp.fromDate(endDate),
     createdAt: Timestamp.now(),
   });
   return docRef.id;
@@ -65,34 +97,65 @@ export const createWorkoutPlan = async (
 export const getStudentWorkoutPlans = async (
   studentId: string
 ): Promise<WorkoutPlan[]> => {
-  const q = query(
-    collection(db, PLANS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('createdAt', 'desc')
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as WorkoutPlan));
+  try {
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WorkoutPlan));
+  } catch (error) {
+    console.warn('Query con orderBy fallita, uso fallback:', error);
+    // Fallback senza orderBy (ordina lato client)
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map((d) => ({ ...d.data(), id: d.id } as WorkoutPlan))
+      .sort((a, b) => {
+        const ta = (a.createdAt as any)?.seconds || 0;
+        const tb = (b.createdAt as any)?.seconds || 0;
+        return tb - ta;
+      });
+  }
 };
 
 export const getActiveWorkoutPlan = async (
   studentId: string
 ): Promise<WorkoutPlan | null> => {
-  const q = query(
-    collection(db, PLANS_COLLECTION),
-    where('studentId', '==', studentId),
-    where('isActive', '==', true)
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  const d = snapshot.docs[0];
-  return { id: d.id, ...d.data() } as WorkoutPlan;
+  try {
+    // Query composita (richiede indice Firestore su studentId + isActive)
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId),
+      where('isActive', '==', true)
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    const d = snapshot.docs[0];
+    return { ...d.data(), id: d.id } as WorkoutPlan;
+  } catch (error) {
+    console.warn('Query composita fallita, uso fallback:', error);
+    // Fallback: filtra lato client se l'indice composito non esiste
+    const q = query(
+      collection(db, PLANS_COLLECTION),
+      where('studentId', '==', studentId)
+    );
+    const snapshot = await getDocs(q);
+    const activePlan = snapshot.docs.find((d) => d.data().isActive === true);
+    if (!activePlan) return null;
+    return { ...activePlan.data(), id: activePlan.id } as WorkoutPlan;
+  }
 };
 
 // --- Libreria esercizi ---
 
 export const getExerciseLibrary = async (): Promise<Exercise[]> => {
   const snapshot = await getDocs(collection(db, EXERCISES_COLLECTION));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Exercise));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as Exercise));
 };
 
 export const addExerciseToLibrary = async (
@@ -105,5 +168,68 @@ export const addExerciseToLibrary = async (
 export const getExercise = async (exerciseId: string): Promise<Exercise | null> => {
   const docSnap = await getDoc(doc(db, EXERCISES_COLLECTION, exerciseId));
   if (!docSnap.exists()) return null;
-  return { id: docSnap.id, ...docSnap.data() } as Exercise;
+  return { ...docSnap.data(), id: docSnap.id } as Exercise;
+};
+
+export const deleteWorkoutPlan = async (planId: string): Promise<void> => {
+  await deleteDoc(doc(db, PLANS_COLLECTION, planId));
+};
+
+export const deleteProgram = async (programId: string): Promise<void> => {
+  await deleteDoc(doc(db, PROGRAMS_COLLECTION, programId));
+};
+
+// --- Template personalizzati ---
+
+const CUSTOM_TEMPLATES_COLLECTION = 'customWorkoutTemplates';
+
+export interface CustomWorkoutTemplate {
+  id: string;
+  name: string;
+  description: string;
+  gender: 'male' | 'female';
+  category: string;
+  weeklySchedule: {
+    dayOfWeek: number;
+    dayName: string;
+    exercises: Omit<Exercise, 'id'>[];
+    notes: string;
+  }[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const getCustomTemplates = async (): Promise<CustomWorkoutTemplate[]> => {
+  const q = query(
+    collection(db, CUSTOM_TEMPLATES_COLLECTION),
+    orderBy('createdAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as CustomWorkoutTemplate));
+};
+
+export const createCustomTemplate = async (
+  template: Omit<CustomWorkoutTemplate, 'id'>
+): Promise<string> => {
+  const docRef = await addDoc(collection(db, CUSTOM_TEMPLATES_COLLECTION), {
+    ...template,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const updateCustomTemplate = async (
+  templateId: string,
+  data: Partial<Omit<CustomWorkoutTemplate, 'id'>>
+): Promise<void> => {
+  await updateDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId), {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const deleteCustomTemplate = async (templateId: string): Promise<void> => {
+  await deleteDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId));
 };

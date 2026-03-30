@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -22,7 +22,7 @@ import {
   Student,
 } from '../../types';
 import { uploadPosturalImage, analyzePosture, createAssessment, getStudentAssessments } from '../../services/posturalService';
-import { analyzePostureWithAI, AIPosturalAnalysis, getAIApiKey } from '../../services/aiService';
+import { analyzePostureWithAI, AIPosturalAnalysis, ensureAIApiKey } from '../../services/aiService';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 
@@ -45,7 +45,7 @@ const SEVERITY_OPTIONS = [
 ];
 
 export const PosturalAssessmentScreen: React.FC = () => {
-  const { user, isOwner, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [frontImage, setFrontImage] = useState<string | null>(null);
@@ -69,13 +69,15 @@ export const PosturalAssessmentScreen: React.FC = () => {
       const allStudents = await getStudents();
       if (isOwner) {
         setStudents(allStudents);
+      } else if (isManager) {
+        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
         setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
       }
     } catch {
       // Silently handle
     }
-  }, [user, isOwner, isCollaborator]);
+  }, [user, isOwner, isManager, isCollaborator]);
 
   useEffect(() => {
     loadStudents();
@@ -85,7 +87,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permesso negato', 'Serve il permesso per accedere alla galleria');
+        crossAlert('Permesso negato', 'Serve il permesso per accedere alla galleria');
         return;
       }
     }
@@ -104,7 +106,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
+    crossAlert(
       'Seleziona immagine',
       'Scegli da dove caricare l\'immagine',
       [
@@ -113,7 +115,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
           onPress: async () => {
             const camStatus = await ImagePicker.requestCameraPermissionsAsync();
             if (camStatus.status !== 'granted') {
-              Alert.alert('Permesso negato', 'Serve il permesso per usare la fotocamera');
+              crossAlert('Permesso negato', 'Serve il permesso per usare la fotocamera');
               return;
             }
             const result = await ImagePicker.launchCameraAsync({
@@ -164,11 +166,11 @@ export const PosturalAssessmentScreen: React.FC = () => {
   // Analisi AI con visione
   const handleAIAnalysis = async () => {
     if (!frontImage && !sideImage && !backImage) {
-      Alert.alert('Errore', 'Carica almeno una foto per l\'analisi AI');
+      crossAlert('Errore', 'Carica almeno una foto per l\'analisi AI');
       return;
     }
-    if (!getAIApiKey()) {
-      Alert.alert(
+    if (!(await ensureAIApiKey())) {
+      crossAlert(
         'API Key mancante',
         'Inserisci la chiave API Anthropic nelle impostazioni per usare l\'analisi AI.'
       );
@@ -200,10 +202,10 @@ export const PosturalAssessmentScreen: React.FC = () => {
         setFindings(newFindings);
       }
 
-      Alert.alert('Analisi AI completata', result.summary);
+      crossAlert('Analisi AI completata', result.summary);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Errore durante l\'analisi AI';
-      Alert.alert('Errore AI', message);
+      crossAlert('Errore AI', message);
     } finally {
       setAiAnalyzing(false);
     }
@@ -211,7 +213,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
 
   const addFinding = () => {
     if (!selectedArea || !currentObservation.trim()) {
-      Alert.alert('Errore', 'Seleziona un\'area e aggiungi un\'osservazione');
+      crossAlert('Errore', 'Seleziona un\'area e aggiungi un\'osservazione');
       return;
     }
 
@@ -233,12 +235,12 @@ export const PosturalAssessmentScreen: React.FC = () => {
 
   const handleAnalyze = () => {
     if (findings.length === 0) {
-      Alert.alert('Errore', 'Aggiungi almeno un\'osservazione');
+      crossAlert('Errore', 'Aggiungi almeno un\'osservazione');
       return;
     }
 
     const analysis = analyzePosture(findings);
-    Alert.alert(
+    crossAlert(
       'Analisi Posturale',
       `${analysis.summary}\n\nRaccomandazioni:\n- ${analysis.recommendations.join('\n- ')}`,
       [{ text: 'OK' }]
@@ -247,11 +249,11 @@ export const PosturalAssessmentScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!user || findings.length === 0) {
-      Alert.alert('Errore', 'Aggiungi almeno un\'osservazione');
+      crossAlert('Errore', 'Aggiungi almeno un\'osservazione');
       return;
     }
     if (!selectedStudentId) {
-      Alert.alert('Errore', 'Seleziona un allievo');
+      crossAlert('Errore', 'Seleziona un allievo');
       return;
     }
 
@@ -287,7 +289,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
         recommendations: analyzePosture(findings).recommendations.join('\n'),
       });
 
-      Alert.alert('Successo', 'Valutazione posturale salvata!');
+      crossAlert('Successo', 'Valutazione posturale salvata!');
       // Reset form
       setSelectedStudentId('');
       setFrontImage(null);
@@ -296,7 +298,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
       setFindings([]);
       setOverallNotes('');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la valutazione');
+      crossAlert('Errore', 'Impossibile salvare la valutazione');
     } finally {
       setSaving(false);
     }
@@ -398,7 +400,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
           </View>
         </ScrollView>
 
-        <Text style={styles.fieldLabel}>Severita</Text>
+        <Text style={styles.fieldLabel}>Severità</Text>
         <View style={styles.severityRow}>
           {SEVERITY_OPTIONS.map((opt) => (
             <TouchableOpacity
@@ -431,7 +433,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
           label="Osservazione"
           value={currentObservation}
           onChangeText={setCurrentObservation}
-          placeholder="Descrivi cio che osservi..."
+          placeholder="Descrivi ciò che osservi..."
           multiline
           numberOfLines={3}
         />
@@ -508,13 +510,22 @@ export const PosturalAssessmentScreen: React.FC = () => {
           style={styles.actionButton}
         />
         <Button
-          title={aiAnalyzing ? 'AI in corso...' : 'Analisi AI'}
+          title={aiAnalyzing ? 'Analisi AI...' : 'Analisi AI'}
           onPress={handleAIAnalysis}
           variant="primary"
           style={styles.actionButton}
           loading={aiAnalyzing}
+          disabled={(!frontImage && !sideImage && !backImage) || aiAnalyzing}
         />
       </View>
+
+      {aiAnalyzing && (
+        <Card variant="outlined">
+          <Text style={styles.aiLoadingText}>
+            L'AI sta analizzando le immagini... Potrebbe richiedere fino a 30 secondi.
+          </Text>
+        </Card>
+      )}
 
       <Button
         title={saving ? 'Salvataggio...' : 'Salva Valutazione'}
@@ -802,6 +813,13 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+  },
+  aiLoadingText: {
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    padding: spacing.sm,
   },
   aiSummary: {
     fontSize: fontSize.md,

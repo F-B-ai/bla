@@ -6,15 +6,15 @@ import {
   FlatList,
   Modal,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { DiaryEntry } from '../../types';
-import { addDiaryEntry, getStudentDiary } from '../../services/contentService';
+import { addDiaryEntry, getStudentDiary, deleteDiaryEntry } from '../../services/contentService';
 import { useAuth } from '../../hooks/useAuth';
 
 const MOODS = [
@@ -49,7 +49,7 @@ export const DiaryScreen: React.FC = () => {
 
   const handleAddEntry = async () => {
     if (!newContent.trim() || !user) {
-      Alert.alert('Errore', 'Scrivi qualcosa nel diario');
+      crossAlert('Errore', 'Scrivi qualcosa nel diario');
       return;
     }
 
@@ -68,10 +68,32 @@ export const DiaryScreen: React.FC = () => {
       setNewMood('good');
       setNewPainLevel(0);
       await loadEntries();
-      Alert.alert('Fatto', 'Nota aggiunta al diario');
+      crossAlert('Fatto', 'Nota aggiunta al diario');
     } catch {
-      Alert.alert('Errore', 'Impossibile salvare la nota');
+      crossAlert('Errore', 'Impossibile salvare la nota');
     }
+  };
+
+  const handleDeleteEntry = (entryId: string) => {
+    crossAlert(
+      'Elimina Nota',
+      'Vuoi eliminare questa nota dal diario?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDiaryEntry(entryId);
+              await loadEntries();
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare la nota');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getMoodInfo = (mood?: string) =>
@@ -97,6 +119,14 @@ export const DiaryScreen: React.FC = () => {
         </View>
 
         <Text style={styles.entryContent}>{item.content}</Text>
+
+        <TouchableOpacity
+          style={styles.deleteEntryBtn}
+          onPress={() => handleDeleteEntry(item.id)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.deleteEntryText}>Elimina</Text>
+        </TouchableOpacity>
 
         {item.painLevel !== undefined && item.painLevel > 0 && (
           <View style={styles.painRow}>
@@ -145,7 +175,7 @@ export const DiaryScreen: React.FC = () => {
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              Il tuo diario e vuoto.{'\n'}
+              Il tuo diario è vuoto.{'\n'}
               Inizia a scrivere le tue note!
             </Text>
           </Card>
@@ -213,7 +243,7 @@ export const DiaryScreen: React.FC = () => {
               label="Le tue note"
               value={newContent}
               onChangeText={setNewContent}
-              placeholder="Come e andata oggi? Come ti senti?..."
+              placeholder="Com'è andata oggi? Come ti senti?..."
               multiline
               numberOfLines={5}
               style={styles.textArea}
@@ -291,6 +321,15 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.textSecondary,
     lineHeight: 22,
+  },
+  deleteEntryBtn: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.sm,
+  },
+  deleteEntryText: {
+    fontSize: fontSize.xs,
+    color: colors.error,
+    fontWeight: '600',
   },
   painRow: {
     flexDirection: 'row',

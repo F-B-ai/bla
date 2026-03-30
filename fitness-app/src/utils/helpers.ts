@@ -90,3 +90,34 @@ export const getCurrentPeriod = (): string => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 };
+
+const firebaseErrorMessages: Record<string, string> = {
+  'auth/email-already-in-use': 'Questa email è già registrata. Usa un indirizzo email diverso.',
+  'auth/invalid-email': 'L\'indirizzo email non è valido.',
+  'auth/weak-password': 'La password è troppo debole. Usa almeno 6 caratteri.',
+  'auth/user-not-found': 'Nessun account trovato con questa email.',
+  'auth/wrong-password': 'Password non corretta.',
+  'auth/too-many-requests': 'Troppi tentativi. Riprova tra qualche minuto.',
+  'auth/network-request-failed': 'Errore di connessione. Controlla la tua rete.',
+  'auth/operation-not-allowed': 'Operazione non consentita. Contatta l\'amministratore.',
+  'auth/invalid-credential': 'Credenziali non valide. Riprova.',
+};
+
+/**
+ * Traduce un errore Firebase in un messaggio user-friendly in italiano
+ */
+export const getFirebaseErrorMessage = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = (error as { code: string }).code;
+    if (firebaseErrorMessages[code]) {
+      return firebaseErrorMessages[code];
+    }
+  }
+  if (error instanceof Error) {
+    const match = error.message.match(/\(([^)]+)\)/);
+    if (match && firebaseErrorMessages[match[1]]) {
+      return firebaseErrorMessages[match[1]];
+    }
+  }
+  return 'Errore durante la registrazione. Riprova.';
+};

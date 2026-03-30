@@ -4,6 +4,7 @@ import {
   addDoc,
   updateDoc,
   getDocs,
+  deleteDoc,
   query,
   where,
   Timestamp,
@@ -34,7 +35,7 @@ export const getStudentPaymentPlans = async (
     where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PaymentPlan));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as PaymentPlan));
 };
 
 export const markInstallmentPaid = async (
@@ -52,7 +53,7 @@ export const markInstallmentPaid = async (
   });
 };
 
-// --- Calcolo commissioni collaboratore ---
+// --- Calcolo commissioni collaboratore e manager ---
 
 export const calculateCollaboratorEarnings = (
   totalPaid: number,
@@ -61,6 +62,17 @@ export const calculateCollaboratorEarnings = (
   const collaboratorShare = (totalPaid * commissionPercentage) / 100;
   const ownerShare = totalPaid - collaboratorShare;
   return { collaboratorShare, ownerShare };
+};
+
+export const calculateFullEarnings = (
+  totalPaid: number,
+  coachCommissionPercentage: number,
+  managerCommissionPercentage: number
+): { coachShare: number; managerShare: number; ownerShare: number } => {
+  const coachShare = (totalPaid * coachCommissionPercentage) / 100;
+  const managerShare = (totalPaid * managerCommissionPercentage) / 100;
+  const ownerShare = totalPaid - coachShare - managerShare;
+  return { coachShare, managerShare, ownerShare };
 };
 
 export const getCollaboratorEarnings = async (
@@ -96,7 +108,7 @@ export const getUpcomingInstallments = async (
     where(field, '==', userId)
   );
   const snapshot = await getDocs(q);
-  const plans = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PaymentPlan));
+  const plans = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as PaymentPlan));
 
   const upcoming: { plan: PaymentPlan; installment: Installment }[] = [];
   const now = new Date();
@@ -115,4 +127,8 @@ export const getUpcomingInstallments = async (
   return upcoming.sort(
     (a, b) => new Date(a.installment.dueDate).getTime() - new Date(b.installment.dueDate).getTime()
   );
+};
+
+export const deletePaymentPlan = async (planId: string): Promise<void> => {
+  await deleteDoc(doc(db, PAYMENTS_COLLECTION, planId));
 };

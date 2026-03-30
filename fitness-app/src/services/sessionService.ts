@@ -4,6 +4,7 @@ import {
   addDoc,
   updateDoc,
   getDocs,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -55,7 +56,7 @@ export const getStudentSessions = async (
     orderBy('date', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TrainingSession));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
 };
 
 export const getCollaboratorSessions = async (
@@ -67,7 +68,7 @@ export const getCollaboratorSessions = async (
     orderBy('date', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TrainingSession));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
 };
 
 export const getAllSessions = async (): Promise<TrainingSession[]> => {
@@ -76,7 +77,7 @@ export const getAllSessions = async (): Promise<TrainingSession[]> => {
     orderBy('date', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as TrainingSession));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
 };
 
 export const updateSessionStatus = async (
@@ -95,4 +96,8 @@ export const getCompletedSessionsCount = async (
 ): Promise<number> => {
   const sessions = await getStudentSessions(studentId);
   return sessions.filter((s) => s.isCountedAsCompleted).length;
+};
+
+export const deleteSession = async (sessionId: string): Promise<void> => {
+  await deleteDoc(doc(db, SESSIONS_COLLECTION, sessionId));
 };

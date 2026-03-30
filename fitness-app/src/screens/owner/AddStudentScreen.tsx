@@ -4,23 +4,26 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { crossAlert } from '../../utils/alert';
+import { getFirebaseErrorMessage } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
-import { registerStudent, getCollaborators } from '../../services/authService';
-import { Collaborator } from '../../types';
+import { registerStudent, getCollaborators, getManagers, getOwner } from '../../services/authService';
+import { Collaborator, Manager, Owner } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 
 interface Props {
   onBack: () => void;
 }
 
 export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
+  const { user: currentUser, isOwner } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -29,36 +32,52 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
   const [goals, setGoals] = useState('');
   const [medicalNotes, setMedicalNotes] = useState('');
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [owner, setOwner] = useState<Owner | null>(null);
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState('');
+  const [selectedManagerId, setSelectedManagerId] = useState('');
+  const [managerCommission, setManagerCommission] = useState('');
+  const [coachCommission, setCoachCommission] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadCollaborators();
+    loadData();
   }, []);
 
-  const loadCollaborators = async () => {
+  const loadData = async () => {
     try {
-      const collabs = await getCollaborators();
+      const [collabs, mgrs, ownerData] = await Promise.all([getCollaborators(), getManagers(), getOwner()]);
       setCollaborators(collabs);
+      setManagers(mgrs);
+      setOwner(ownerData);
+      // Include anche i manager come possibili assegnatari diretti
       if (collabs.length > 0) {
         setSelectedCollaboratorId(collabs[0].id);
+        setCoachCommission(String(collabs[0].commissionPercentage));
       }
     } catch {
-      Alert.alert('Errore', 'Impossibile caricare i collaboratori');
+      crossAlert('Errore', 'Impossibile caricare i dati');
     }
   };
 
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi obbligatori');
+      crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+      crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
     if (!selectedCollaboratorId) {
-      Alert.alert('Errore', 'Seleziona un collaboratore da assegnare');
+      crossAlert('Errore', 'Seleziona un coach o manager da assegnare');
+      return;
+    }
+
+    const mgrComm = parseInt(managerCommission, 10) || 0;
+    const coachComm = parseInt(coachCommission, 10) || 0;
+    if (mgrComm < 0 || mgrComm > 100 || coachComm < 0 || coachComm > 100) {
+      crossAlert('Errore', 'Le commissioni devono essere tra 0 e 100');
       return;
     }
 
@@ -72,14 +91,16 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
         phone.trim(),
         selectedCollaboratorId,
         goals.trim(),
-        medicalNotes.trim() || undefined
+        medicalNotes.trim() || undefined,
+        selectedManagerId || undefined,
+        mgrComm,
+        coachComm
       );
-      Alert.alert('Successo', `Allievo ${name} ${surname} registrato!`, [
+      crossAlert('Successo', `Allievo ${name} ${surname} registrato!`, [
         { text: 'OK', onPress: onBack },
       ]);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Errore durante la registrazione';
-      Alert.alert('Errore', message);
+      crossAlert('Errore', getFirebaseErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -133,14 +154,101 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="Numero di telefono"
           />
 
-          {/* Selezione collaboratore */}
-          <Text style={styles.fieldLabel}>Collaboratore assegnato *</Text>
-          {collaborators.length === 0 ? (
+          {/* Selezione manager (opzionale) */}
+          {managers.length > 0 && (
+            <>
+              <Text style={styles.fieldLabel}>Manager responsabile</Text>
+              <View style={styles.collabList}>
+                <TouchableOpacity
+                  style={[
+                    styles.collabOption,
+                    selectedManagerId === '' && styles.collabOptionSelected,
+                  ]}
+                  onPress={() => { setSelectedManagerId(''); setManagerCommission('0'); }}
+                >
+                  <Text style={[styles.collabOptionText, selectedManagerId === '' && styles.collabOptionTextSelected]}>
+                    Nessun manager
+                  </Text>
+                </TouchableOpacity>
+                {managers.map((mgr) => (
+                  <TouchableOpacity
+                    key={mgr.id}
+                    style={[
+                      styles.collabOption,
+                      selectedManagerId === mgr.id && styles.collabOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedManagerId(mgr.id);
+                      setManagerCommission(String(mgr.commissionPercentage ?? 10));
+                    }}
+                  >
+                    <Text style={[styles.collabOptionText, selectedManagerId === mgr.id && styles.collabOptionTextSelected]}>
+                      {mgr.name} {mgr.surname} (Manager)
+                    </Text>
+                    <Text style={styles.collabSpecText}>
+                      Commissione default: {mgr.commissionPercentage ?? 10}%
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Selezione coach o manager diretto */}
+          <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
+          {collaborators.length === 0 && managers.length === 0 && !owner ? (
             <Text style={styles.noCollabText}>
-              Nessun collaboratore disponibile. Registra prima un collaboratore.
+              Nessun coach o manager disponibile. Registrane uno prima.
             </Text>
           ) : (
             <View style={styles.collabList}>
+              {/* Owner come coach diretto */}
+              {owner && (
+                <TouchableOpacity
+                  key={`owner-${owner.id}`}
+                  style={[
+                    styles.collabOption,
+                    selectedCollaboratorId === owner.id && styles.collabOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedCollaboratorId(owner.id);
+                    setCoachCommission('100');
+                    setSelectedManagerId('');
+                    setManagerCommission('0');
+                  }}
+                >
+                  <Text style={[styles.collabOptionText, selectedCollaboratorId === owner.id && styles.collabOptionTextSelected]}>
+                    {owner.name} {owner.surname} (Titolare - diretto)
+                  </Text>
+                  <Text style={styles.collabSpecText}>
+                    {(owner.specializations || []).join(', ')} 100%
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {/* Manager come coach diretto */}
+              {managers.map((mgr) => (
+                <TouchableOpacity
+                  key={`mgr-${mgr.id}`}
+                  style={[
+                    styles.collabOption,
+                    selectedCollaboratorId === mgr.id && styles.collabOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedCollaboratorId(mgr.id);
+                    setCoachCommission(String(mgr.commissionPercentage ?? 10));
+                    setSelectedManagerId('');
+                    setManagerCommission('0');
+                  }}
+                >
+                  <Text style={[styles.collabOptionText, selectedCollaboratorId === mgr.id && styles.collabOptionTextSelected]}>
+                    {mgr.name} {mgr.surname} (Manager - diretto)
+                  </Text>
+                  <Text style={styles.collabSpecText}>
+                    {(mgr.specializations || []).join(', ')} {mgr.commissionPercentage ?? 10}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {/* Coach */}
               {collaborators.map((collab) => (
                 <TouchableOpacity
                   key={collab.id}
@@ -148,7 +256,10 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
                     styles.collabOption,
                     selectedCollaboratorId === collab.id && styles.collabOptionSelected,
                   ]}
-                  onPress={() => setSelectedCollaboratorId(collab.id)}
+                  onPress={() => {
+                    setSelectedCollaboratorId(collab.id);
+                    setCoachCommission(String(collab.commissionPercentage));
+                  }}
                 >
                   <Text
                     style={[
@@ -156,15 +267,33 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
                       selectedCollaboratorId === collab.id && styles.collabOptionTextSelected,
                     ]}
                   >
-                    {collab.name} {collab.surname}
+                    {collab.name} {collab.surname} (Coach)
                   </Text>
                   <Text style={styles.collabSpecText}>
-                    {collab.specializations.join(', ')}
+                    {collab.specializations.join(', ')} {collab.commissionPercentage}%
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
+
+          {/* Commissioni configurabili */}
+          {selectedManagerId !== '' && (
+            <InputField
+              label="Commissione Manager %"
+              value={managerCommission}
+              onChangeText={setManagerCommission}
+              keyboardType="numeric"
+              placeholder="Es: 10"
+            />
+          )}
+          <InputField
+            label="Commissione Coach %"
+            value={coachCommission}
+            onChangeText={setCoachCommission}
+            keyboardType="numeric"
+            placeholder="Es: 60"
+          />
 
           <InputField
             label="Obiettivi"

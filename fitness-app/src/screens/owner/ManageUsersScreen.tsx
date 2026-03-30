@@ -8,34 +8,57 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getCollaborators, getStudents, getManagers } from '../../services/authService';
-import { Collaborator, Student, Manager } from '../../types';
+import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
+import { Collaborator, Student, Manager, Owner } from '../../types';
+import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
+import { AddNutritionistScreen } from './AddNutritionistScreen';
+import { InviteStudentScreen } from './InviteStudentScreen';
 
-type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addStudent';
+type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent';
 
 export const ManageUsersScreen: React.FC = () => {
+  const { isOwner, isManager, isCollaborator, user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [managers, setManagers] = useState<Manager[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [owner, setOwner] = useState<Owner | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>('collaborators');
+  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>(
+    isCollaborator ? 'students' : 'collaborators'
+  );
+
+  // Gerarchia permessi:
+  // Owner: crea manager, coach, allievi
+  // Manager: crea coach, allievi
+  // Coach: crea allievi (solo i propri)
+  const canCreateManager = isOwner;
+  const canCreateCoach = isOwner || isManager;
+  const canCreateStudent = isOwner || isManager || isCollaborator;
+  const canDeleteUsers = isOwner || isManager;
 
   const loadData = useCallback(async () => {
     try {
-      const [mgrs, collabs, studs] = await Promise.all([getManagers(), getCollaborators(), getStudents()]);
+      const [mgrs, collabs, studs, ownerData] = await Promise.all([getManagers(), getCollaborators(), getStudents(), getOwner()]);
       setManagers(mgrs);
       setCollaborators(collabs);
-      setStudents(studs);
+      setOwner(ownerData);
+      // Coach vede solo i propri allievi
+      if (isCollaborator && user) {
+        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+      } else {
+        setStudents(studs);
+      }
     } catch {
       // Silently handle - data will show empty
     }
-  }, []);
+  }, [isCollaborator, user]);
 
   useEffect(() => {
     loadData();
@@ -52,6 +75,58 @@ export const ManageUsersScreen: React.FC = () => {
     loadData(); // Ricarica dati dopo aggiunta
   };
 
+  const handleToggleActive = async (userId: string, currentActive: boolean, name: string) => {
+    const action = currentActive ? 'disattivare' : 'riattivare';
+    crossAlert(
+      'Conferma',
+      `Vuoi ${action} ${name}?`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: currentActive ? 'Disattiva' : 'Riattiva',
+          style: currentActive ? 'destructive' : 'default',
+          onPress: async () => {
+            try {
+              await toggleUserActive(userId, !currentActive);
+              await loadData();
+            } catch {
+              crossAlert('Errore', 'Impossibile aggiornare lo stato');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteUser = async (userId: string, name: string) => {
+    crossAlert(
+      'Elimina Utente',
+      `Sei sicuro di voler eliminare ${name}? Questa azione non può essere annullata.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Se è uno studente, rimuovilo dalla lista del collaboratore
+              const student = students.find((s) => s.id === userId);
+              if (student && student.assignedCollaboratorId) {
+                await removeStudentFromCollaborator(student.assignedCollaboratorId, userId);
+              }
+              await deleteUser(userId);
+              await loadData();
+              crossAlert('Fatto', `${name} eliminato`);
+            } catch (err: any) {
+              console.error('Errore eliminazione utente:', err);
+              crossAlert('Errore', `Impossibile eliminare l'utente: ${err?.message || err?.code || JSON.stringify(err)}`);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (viewMode === 'addManager') {
     return <AddManagerScreen onBack={handleBack} />;
   }
@@ -60,8 +135,16 @@ export const ManageUsersScreen: React.FC = () => {
     return <AddCollaboratorScreen onBack={handleBack} />;
   }
 
+  if (viewMode === 'addNutritionist') {
+    return <AddNutritionistScreen onBack={handleBack} />;
+  }
+
   if (viewMode === 'addStudent') {
     return <AddStudentScreen onBack={handleBack} />;
+  }
+
+  if (viewMode === 'inviteStudent') {
+    return <InviteStudentScreen onBack={handleBack} />;
   }
 
   return (
@@ -76,43 +159,68 @@ export const ManageUsersScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* Pulsanti azione */}
+      {/* Pulsanti azione in base al ruolo */}
       <View style={styles.actions}>
-        <Button
-          title="+ Manager"
-          onPress={() => setViewMode('addManager')}
-          style={styles.actionButton}
-        />
-        <Button
-          title="+ Coach"
-          onPress={() => setViewMode('addCollaborator')}
-          style={styles.actionButton}
-        />
-        <Button
-          title="+ Allievo"
-          onPress={() => setViewMode('addStudent')}
-          style={styles.actionButton}
-        />
+        {canCreateManager && (
+          <Button
+            title="+ Manager"
+            onPress={() => setViewMode('addManager')}
+            style={styles.actionButton}
+          />
+        )}
+        {canCreateCoach && (
+          <Button
+            title="+ Coach"
+            onPress={() => setViewMode('addCollaborator')}
+            style={styles.actionButton}
+          />
+        )}
+        {canCreateCoach && (
+          <Button
+            title="+ Nutrizionista"
+            onPress={() => setViewMode('addNutritionist')}
+            style={styles.actionButton}
+          />
+        )}
       </View>
+      {canCreateStudent && (
+        <View style={styles.actions}>
+          <Button
+            title="+ Allievo"
+            onPress={() => setViewMode('addStudent')}
+            style={styles.actionButton}
+          />
+          <Button
+            title="Invita Allievo"
+            onPress={() => setViewMode('inviteStudent')}
+            variant="outline"
+            style={styles.actionButton}
+          />
+        </View>
+      )}
 
       {/* Tab switch */}
       <View style={styles.tabSwitch}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'managers' && styles.tabActive]}
-          onPress={() => setActiveTab('managers')}
-        >
-          <Text style={[styles.tabText, activeTab === 'managers' && styles.tabTextActive]}>
-            Manager ({managers.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'collaborators' && styles.tabActive]}
-          onPress={() => setActiveTab('collaborators')}
-        >
-          <Text style={[styles.tabText, activeTab === 'collaborators' && styles.tabTextActive]}>
-            Coach ({collaborators.length})
-          </Text>
-        </TouchableOpacity>
+        {(isOwner || isManager) && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'managers' && styles.tabActive]}
+            onPress={() => setActiveTab('managers')}
+          >
+            <Text style={[styles.tabText, activeTab === 'managers' && styles.tabTextActive]}>
+              Manager ({managers.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+        {(isOwner || isManager) && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'collaborators' && styles.tabActive]}
+            onPress={() => setActiveTab('collaborators')}
+          >
+            <Text style={[styles.tabText, activeTab === 'collaborators' && styles.tabTextActive]}>
+              Coach ({collaborators.length})
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={[styles.tab, activeTab === 'students' && styles.tabActive]}
           onPress={() => setActiveTab('students')}
@@ -147,11 +255,29 @@ export const ManageUsersScreen: React.FC = () => {
                     </Text>
                     <Text style={styles.userEmail}>{mgr.email}</Text>
                     <Text style={styles.userDetail}>
-                      {mgr.assignedCollaborators.length} coach · {mgr.assignedStudents.length} allievi
+                      {mgr.assignedCollaborators.length} coach · {mgr.assignedStudents.length} allievi · {mgr.commissionPercentage ?? 0}% comm.
                     </Text>
                   </View>
                   <View style={[styles.statusDot, mgr.isActive ? styles.statusActive : styles.statusInactive]} />
                 </View>
+                {canDeleteUsers && (
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
+                    >
+                      <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
+                        {mgr.isActive ? 'Disattiva' : 'Riattiva'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleDeleteUser(mgr.id, `${mgr.name} ${mgr.surname}`)}
+                    >
+                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </Card>
             ))
           )}
@@ -182,7 +308,7 @@ export const ManageUsersScreen: React.FC = () => {
                     </Text>
                     <Text style={styles.userEmail}>{collab.email}</Text>
                     <Text style={styles.userDetail}>
-                      {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
+                      {collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'} · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
                     </Text>
                     <Text style={styles.userStudents}>
                       {collab.assignedStudents.length} allievi assegnati
@@ -190,6 +316,24 @@ export const ManageUsersScreen: React.FC = () => {
                   </View>
                   <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
                 </View>
+                {canDeleteUsers && (
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
+                    >
+                      <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
+                        {collab.isActive ? 'Disattiva' : 'Riattiva'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
+                    >
+                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </Card>
             ))
           )}
@@ -208,6 +352,15 @@ export const ManageUsersScreen: React.FC = () => {
           ) : (
             students.map((student) => {
               const collab = collaborators.find((c) => c.id === student.assignedCollaboratorId);
+              const mgr = managers.find((m) => m.id === student.assignedCollaboratorId);
+              const isOwnerCoach = owner && owner.id === student.assignedCollaboratorId;
+              const coachName = collab
+                ? `${collab.name} ${collab.surname} (Coach)`
+                : mgr
+                ? `${mgr.name} ${mgr.surname} (Manager)`
+                : isOwnerCoach
+                ? `${owner.name} ${owner.surname} (Titolare)`
+                : null;
               return (
                 <Card key={student.id} variant="elevated">
                   <View style={styles.userRow}>
@@ -224,13 +377,35 @@ export const ManageUsersScreen: React.FC = () => {
                       {student.goals && (
                         <Text style={styles.userDetail}>Obiettivi: {student.goals}</Text>
                       )}
-                      {collab && (
+                      {coachName && (
                         <Text style={styles.userCollab}>
-                          Seguito da: {collab.name} {collab.surname}
+                          Seguito da: {coachName}
                         </Text>
                       )}
+                      {(student.coachCommissionPercentage || student.managerCommissionPercentage) ? (
+                        <Text style={styles.userDetail}>
+                          Coach: {student.coachCommissionPercentage ?? 0}%
+                          {student.managerCommissionPercentage ? ` · Manager: ${student.managerCommissionPercentage}%` : ''}
+                        </Text>
+                      ) : null}
                     </View>
                     <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
+                  </View>
+                  <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleToggleActive(student.id, student.isActive, student.name)}
+                    >
+                      <Text style={[styles.userActionText, { color: student.isActive ? colors.warning : colors.success }]}>
+                        {student.isActive ? 'Disattiva' : 'Riattiva'}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleDeleteUser(student.id, `${student.name} ${student.surname}`)}
+                    >
+                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                    </TouchableOpacity>
                   </View>
                 </Card>
               );
@@ -364,6 +539,22 @@ const styles = StyleSheet.create({
   },
   statusInactive: {
     backgroundColor: colors.error,
+  },
+  userActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  userActionBtn: {
+    padding: spacing.xs,
+  },
+  userActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   emptyText: {
     color: colors.textSecondary,
