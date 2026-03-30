@@ -15,8 +15,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.essere.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Necessario per i test posturali",
-        "NSPhotoLibraryUsageDescription": "Per caricare foto per i test posturali"
+        "NSCameraUsageDescription": "Necessario per i test posturali e per registrare foto e video degli esercizi.",
+        "NSPhotoLibraryUsageDescription": "Per caricare foto per i test posturali.",
+        "NSMicrophoneUsageDescription": "Per registrare l'audio nei video degli esercizi."
       }
     },
     "android": {
