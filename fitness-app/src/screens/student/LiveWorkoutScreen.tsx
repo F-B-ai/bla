@@ -126,7 +126,10 @@ export const LiveWorkoutScreen: React.FC = () => {
     try {
       const logId = await startWorkoutLog({
         studentId: user.id,
-        collaboratorId: (student as any)?.assignedCollaboratorId || '',
+        collaboratorId:
+          (student as any)?.assignedCollaboratorId ||
+          (student as any)?.assignedManagerId ||
+          '',
         workoutPlanId: activePlan.id,
         dayOfWeek: todayDayIndex,
         date: new Date(),
@@ -143,7 +146,10 @@ export const LiveWorkoutScreen: React.FC = () => {
       const newLog: WorkoutLog = {
         id: logId,
         studentId: user.id,
-        collaboratorId: (student as any)?.assignedCollaboratorId || '',
+        collaboratorId:
+          (student as any)?.assignedCollaboratorId ||
+          (student as any)?.assignedManagerId ||
+          '',
         workoutPlanId: activePlan.id,
         dayOfWeek: todayDayIndex,
         date: new Date(),

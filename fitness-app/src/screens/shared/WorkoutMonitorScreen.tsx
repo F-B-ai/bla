@@ -20,14 +20,17 @@ import {
   getCollaboratorWorkoutLogs,
   getAllWorkoutLogs,
   subscribeToWorkoutLog,
+  deleteWorkoutLog,
 } from '../../services/workoutLogService';
 import { getUserProfile } from '../../services/authService';
+import { crossAlert } from '../../utils/alert';
 
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
 export const WorkoutMonitorScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, isManager } = useAuth();
+  const canSeeAll = isOwner || isManager;
   const [activeWorkouts, setActiveWorkouts] = useState<WorkoutLog[]>([]);
   const [studentNames, setStudentNames] = useState<Record<string, string>>({});
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutLog | null>(null);
@@ -44,7 +47,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
   // Sottoscrivi allenamenti in corso
   useEffect(() => {
     if (!user) return;
-    const collaboratorId = isOwner ? null : user.id;
+    const collaboratorId = canSeeAll ? null : user.id;
     unsubActiveRef.current = subscribeToActiveWorkouts(collaboratorId, async (logs) => {
       setActiveWorkouts(logs);
       // Carica nomi studenti
@@ -63,7 +66,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
     return () => {
       if (unsubActiveRef.current) unsubActiveRef.current();
     };
-  }, [user, isOwner]);
+  }, [user, canSeeAll]);
 
   // Dettaglio real-time di un workout selezionato
   useEffect(() => {
@@ -79,11 +82,11 @@ export const WorkoutMonitorScreen: React.FC = () => {
     };
   }, [selectedWorkout?.id]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!user) return;
     setRefreshing(true);
     try {
-      const logs = isOwner
+      const logs = canSeeAll
         ? await getAllWorkoutLogs()
         : await getCollaboratorWorkoutLogs(user.id);
       setHistoryLogs(logs);
@@ -103,13 +106,46 @@ export const WorkoutMonitorScreen: React.FC = () => {
       console.error('Errore caricamento storico:', err);
     }
     setRefreshing(false);
-  };
+    // studentNames intentionally not in deps to avoid re-running on every name resolution
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, canSeeAll]);
+
+  // Precarica lo storico all'apertura della schermata cosi' i risultati
+  // sono visibili senza dover premere "Storico Risultati"
+  useEffect(() => {
+    if (user) loadHistory();
+  }, [user, canSeeAll, loadHistory]);
 
   const handleShowStudentHistory = async (studentId: string) => {
     setSelectedStudent(studentId);
     const logs = historyLogs.filter((l) => l.studentId === studentId);
     setStudentHistoryLogs(logs);
     setShowStudentHistory(true);
+  };
+
+  const handleDeleteLog = (log: WorkoutLog) => {
+    crossAlert(
+      'Elimina sessione',
+      `Eliminare la sessione del ${formatDateShort(log.startedAt)}? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWorkoutLog(log.id);
+              setHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
+              setStudentHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
+              if (selectedWorkout?.id === log.id) setSelectedWorkout(null);
+            } catch (err) {
+              console.error('Errore eliminazione sessione:', err);
+              crossAlert('Errore', 'Impossibile eliminare la sessione. Riprova.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDateFull = (date: any): string => {
@@ -335,41 +371,50 @@ export const WorkoutMonitorScreen: React.FC = () => {
                 </Text>
 
                 {studentHistoryLogs.map((log) => (
-                  <TouchableOpacity
-                    key={log.id}
-                    onPress={() => { setSelectedWorkout(log); setShowHistory(false); }}
-                  >
-                    <Card variant="outlined">
-                      <View style={styles.historyRow}>
-                        <View style={styles.historyInfo}>
-                          <Text style={styles.historyDate}>
-                            {formatDateShort(log.startedAt)} - {DAYS[log.dayOfWeek]}
-                          </Text>
-                          <Text style={styles.historyStats}>
-                            {log.exerciseLogs?.reduce((s, e) => s + e.sets.length, 0) || 0} serie |{' '}
-                            {log.durationMinutes ? `${log.durationMinutes} min` : '--'}
-                          </Text>
+                  <Card key={log.id} variant="outlined">
+                    <View style={styles.historyCardRow}>
+                      <TouchableOpacity
+                        style={styles.historyMain}
+                        onPress={() => { setSelectedWorkout(log); setShowHistory(false); }}
+                      >
+                        <View style={styles.historyRow}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyDate}>
+                              {formatDateShort(log.startedAt)} - {DAYS[log.dayOfWeek]}
+                            </Text>
+                            <Text style={styles.historyStats}>
+                              {log.exerciseLogs?.reduce((s, e) => s + e.sets.length, 0) || 0} serie |{' '}
+                              {log.durationMinutes ? `${log.durationMinutes} min` : '--'}
+                            </Text>
+                          </View>
+                          <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: log.status === 'completed' ? colors.success : colors.warning },
+                          ]}>
+                            <Text style={styles.statusText}>
+                              {log.status === 'completed' ? 'OK' : 'ABB'}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={[
-                          styles.statusBadge,
-                          { backgroundColor: log.status === 'completed' ? colors.success : colors.warning },
-                        ]}>
-                          <Text style={styles.statusText}>
-                            {log.status === 'completed' ? 'OK' : 'ABB'}
-                          </Text>
-                        </View>
-                      </View>
-                      {/* Mini riepilogo esercizi */}
-                      {log.exerciseLogs?.map((el, i) => (
-                        <View key={i} style={styles.miniExRow}>
-                          <Text style={styles.miniExName} numberOfLines={1}>{el.exerciseName}</Text>
-                          <Text style={styles.miniExSets}>
-                            {el.sets.map((s) => `${s.weight}x${s.reps}`).join(' | ')}
-                          </Text>
-                        </View>
-                      ))}
-                    </Card>
-                  </TouchableOpacity>
+                        {/* Mini riepilogo esercizi */}
+                        {log.exerciseLogs?.map((el, i) => (
+                          <View key={i} style={styles.miniExRow}>
+                            <Text style={styles.miniExName} numberOfLines={1}>{el.exerciseName}</Text>
+                            <Text style={styles.miniExSets}>
+                              {el.sets.map((s) => `${s.weight}x${s.reps}`).join(' | ')}
+                            </Text>
+                          </View>
+                        ))}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteLog(log)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  </Card>
                 ))}
               </>
             )}
@@ -477,6 +522,13 @@ const styles = StyleSheet.create({
   studentHistoryTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
   historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   historyInfo: { flex: 1 },
+  historyCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  historyMain: { flex: 1 },
+  deleteBtn: {
+    padding: spacing.xs,
+    borderRadius: borderRadius.round,
+    alignSelf: 'flex-start',
+  },
   historyDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   historyStats: { fontSize: fontSize.sm, color: colors.textSecondary },
   statusBadge: { borderRadius: borderRadius.md, paddingHorizontal: spacing.sm, paddingVertical: 2 },

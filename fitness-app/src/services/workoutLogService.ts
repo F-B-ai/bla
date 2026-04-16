@@ -3,6 +3,7 @@ import {
   doc,
   addDoc,
   updateDoc,
+  deleteDoc,
   getDocs,
   getDoc,
   query,
@@ -200,4 +201,9 @@ export const subscribeToActiveWorkouts = (
     const logs = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WorkoutLog));
     callback(logs);
   });
+};
+
+// --- Elimina una sessione di allenamento dallo storico ---
+export const deleteWorkoutLog = async (workoutLogId: string): Promise<void> => {
+  await deleteDoc(doc(db, WORKOUT_LOGS_COLLECTION, workoutLogId));
 };

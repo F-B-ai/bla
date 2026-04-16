@@ -76,6 +76,20 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    // Workout logs (sessioni di allenamento registrate dagli allievi)
+    match /workoutLogs/{logId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isStaff() || request.resource.data.studentId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isStaff();
+    }
+
     // Payment plans
     match /paymentPlans/{planId} {
       allow read: if isAuthenticated();
