@@ -79,6 +79,7 @@ import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
 import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
 import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
 import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
+import { ProfileScreen } from '../screens/shared/ProfileScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -317,6 +318,14 @@ const OwnerTabs = () => (
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
+    <OwnerTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
+      }}
+    />
   </OwnerTab.Navigator>
 );
 
@@ -434,6 +443,14 @@ const ManagerTabs = () => (
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
+    <ManagerTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
+      }}
+    />
   </ManagerTab.Navigator>
 );
 
@@ -535,6 +552,14 @@ const CollaboratorTabs = () => (
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
       }}
     />
+    <CollaboratorTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
+      }}
+    />
   </CollaboratorTab.Navigator>
 );
 
@@ -618,6 +643,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
       }}
     />
   </StudentTab.Navigator>

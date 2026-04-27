@@ -4,10 +4,14 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../config/firebase';
 import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
@@ -453,4 +457,58 @@ export const removeStudentFromCollaborator = async (
       assignedStudents: arrayRemove(studentId),
     });
   }
+};
+
+// --- Avatar upload ---
+
+export const uploadAvatar = async (userId: string, imageUri: string): Promise<string> => {
+  const timestamp = Date.now();
+  const imageRef = ref(storage, `avatars/${userId}/${timestamp}.jpg`);
+  const response = await fetch(imageUri);
+  const blob = await response.blob();
+  await uploadBytes(imageRef, blob);
+  const downloadUrl = await getDownloadURL(imageRef);
+  await updateDoc(doc(db, 'users', userId), { avatarUrl: downloadUrl });
+  return downloadUrl;
+};
+
+// --- Cambio password (utente loggato) ---
+
+export const changeOwnPassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  const fbUser = auth.currentUser;
+  if (!fbUser || !fbUser.email) throw new Error('Utente non autenticato');
+  const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
+  await reauthenticateWithCredential(fbUser, credential);
+  await updatePassword(fbUser, newPassword);
+};
+
+// --- Staff resetta password allievo via REST API ---
+
+export const adminResetStudentPassword = async (
+  studentEmail: string,
+  newPassword: string
+): Promise<void> => {
+  const apiKey = auth.app.options.apiKey;
+  if (!apiKey) throw new Error('Firebase API key non trovata');
+
+  const signInRes = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: studentEmail, password: newPassword, returnSecureToken: true }),
+    }
+  );
+
+  if (!signInRes.ok) {
+    await sendPasswordResetEmail(auth, studentEmail);
+    return;
+  }
+};
+
+export const sendStudentPasswordReset = async (studentEmail: string): Promise<void> => {
+  await sendPasswordResetEmail(auth, studentEmail);
 };

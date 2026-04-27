@@ -19,8 +19,10 @@ import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
 import { AddNutritionistScreen } from './AddNutritionistScreen';
 import { InviteStudentScreen } from './InviteStudentScreen';
+import { ProfileScreen } from '../shared/ProfileScreen';
+import { Ionicons } from '@expo/vector-icons';
 
-type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent';
+type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent' | 'editProfile';
 
 export const ManageUsersScreen: React.FC = () => {
   const { isOwner, isManager, isCollaborator, user } = useAuth();
@@ -33,6 +35,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>(
     isCollaborator ? 'students' : 'collaborators'
   );
+  const [editingUser, setEditingUser] = useState<Student | null>(null);
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -145,6 +148,20 @@ export const ManageUsersScreen: React.FC = () => {
 
   if (viewMode === 'inviteStudent') {
     return <InviteStudentScreen onBack={handleBack} />;
+  }
+
+  if (viewMode === 'editProfile' && editingUser) {
+    return (
+      <ProfileScreen
+        targetUserId={editingUser.id}
+        targetUser={editingUser}
+        onBack={() => {
+          setViewMode('list');
+          setEditingUser(null);
+          loadData();
+        }}
+      />
+    );
   }
 
   return (
@@ -394,6 +411,18 @@ export const ManageUsersScreen: React.FC = () => {
                   <View style={styles.userActions}>
                     <TouchableOpacity
                       style={styles.userActionBtn}
+                      onPress={() => {
+                        setEditingUser(student);
+                        setViewMode('editProfile');
+                      }}
+                    >
+                      <View style={styles.userActionRow}>
+                        <Ionicons name="create-outline" size={14} color={colors.info} />
+                        <Text style={[styles.userActionText, { color: colors.info }]}>Modifica</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
                       onPress={() => handleToggleActive(student.id, student.isActive, student.name)}
                     >
                       <Text style={[styles.userActionText, { color: student.isActive ? colors.warning : colors.success }]}>
@@ -555,6 +584,11 @@ const styles = StyleSheet.create({
   userActionText: {
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+  userActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   emptyText: {
     color: colors.textSecondary,
