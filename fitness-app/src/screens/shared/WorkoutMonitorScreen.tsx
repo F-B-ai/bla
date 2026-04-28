@@ -213,7 +213,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
                         <View style={[styles.miniProgressFill, { width: `${progress}%` }]} />
                       </View>
                       <Text style={styles.workoutStats}>
-                        {doneSets}/{totalSets} serie | {workout.exerciseLogs?.length || 0} esercizi
+                        {doneSets}/{totalSets} serie | {workout.exerciseLogs?.filter((e) => e.sets.length > 0).length || 0}/{workout.exerciseLogs?.length || 0} esercizi
                       </Text>
                     </View>
                     <Ionicons name="eye-outline" size={24} color={colors.accent} />
@@ -260,8 +260,8 @@ export const WorkoutMonitorScreen: React.FC = () => {
                   )}
                 </View>
 
-                {/* Dettaglio esercizi */}
-                {selectedWorkout.exerciseLogs?.map((ex, i) => {
+                {/* Dettaglio esercizi (solo quelli con almeno una serie registrata) */}
+                {selectedWorkout.exerciseLogs?.filter((ex) => ex.sets.length > 0).map((ex, i) => {
                   const done = ex.sets.length >= ex.targetSets;
                   return (
                     <Card key={i} variant={done ? 'outlined' : 'elevated'}>
@@ -278,26 +278,24 @@ export const WorkoutMonitorScreen: React.FC = () => {
                         {done && <Ionicons name="checkmark-circle" size={24} color={colors.success} />}
                       </View>
 
-                      {ex.sets.length > 0 && (
-                        <View style={styles.setsTable}>
-                          <View style={styles.setsTableHeader}>
-                            <Text style={[styles.tableCell, styles.tableHeader]}>#</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Peso</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Reps</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader]}>RPE</Text>
-                          </View>
-                          {ex.sets.map((s, si) => (
-                            <View key={si} style={styles.setsTableRow}>
-                              <Text style={styles.tableCell}>{s.setNumber}</Text>
-                              <Text style={[styles.tableCell, { flex: 2 }]}>
-                                {s.weight > 0 ? `${s.weight} kg` : '-'}
-                              </Text>
-                              <Text style={[styles.tableCell, { flex: 2 }]}>{s.reps}</Text>
-                              <Text style={styles.tableCell}>{s.rpe || '-'}</Text>
-                            </View>
-                          ))}
+                      <View style={styles.setsTable}>
+                        <View style={styles.setsTableHeader}>
+                          <Text style={[styles.tableCell, styles.tableHeader]}>#</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Peso</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Reps</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader]}>RPE</Text>
                         </View>
-                      )}
+                        {ex.sets.map((s, si) => (
+                          <View key={si} style={styles.setsTableRow}>
+                            <Text style={styles.tableCell}>{s.setNumber}</Text>
+                            <Text style={[styles.tableCell, { flex: 2 }]}>
+                              {s.weight > 0 ? `${s.weight} kg` : '-'}
+                            </Text>
+                            <Text style={[styles.tableCell, { flex: 2 }]}>{s.reps}</Text>
+                            <Text style={styles.tableCell}>{s.rpe || '-'}</Text>
+                          </View>
+                        ))}
+                      </View>
                     </Card>
                   );
                 })}
@@ -397,7 +395,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
                           </View>
                         </View>
                         {/* Mini riepilogo esercizi */}
-                        {log.exerciseLogs?.map((el, i) => (
+                        {log.exerciseLogs?.filter((el) => el.sets.length > 0).map((el, i) => (
                           <View key={i} style={styles.miniExRow}>
                             <Text style={styles.miniExName} numberOfLines={1}>{el.exerciseName}</Text>
                             <Text style={styles.miniExSets}>
