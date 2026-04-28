@@ -175,6 +175,22 @@ export const deleteWorkoutPlan = async (planId: string): Promise<void> => {
   await deleteDoc(doc(db, PLANS_COLLECTION, planId));
 };
 
+export const updateWorkoutPlan = async (
+  planId: string,
+  data: Partial<Omit<WorkoutPlan, 'id'>>
+): Promise<void> => {
+  const update: Record<string, unknown> = { ...data };
+  if (data.startDate) {
+    const sd = data.startDate instanceof Date ? data.startDate : new Date(data.startDate as any);
+    update.startDate = Timestamp.fromDate(sd);
+  }
+  if (data.endDate) {
+    const ed = data.endDate instanceof Date ? data.endDate : new Date(data.endDate as any);
+    update.endDate = Timestamp.fromDate(ed);
+  }
+  await updateDoc(doc(db, PLANS_COLLECTION, planId), update);
+};
+
 export const deleteProgram = async (programId: string): Promise<void> => {
   await deleteDoc(doc(db, PROGRAMS_COLLECTION, programId));
 };

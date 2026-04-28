@@ -124,7 +124,10 @@ export const MyProgramScreen: React.FC = () => {
     >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Il Mio Programma</Text>
+          <View>
+            <Text style={styles.greeting}>Ciao{user?.name ? `, ${user.name}` : ''}!</Text>
+            <Text style={styles.title}>Il Mio Programma</Text>
+          </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Text style={styles.logoutText}>Esci</Text>
           </TouchableOpacity>
@@ -330,6 +333,12 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+  greeting: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   title: {
     fontSize: fontSize.xxl,

@@ -55,6 +55,7 @@ export const LiveWorkoutScreen: React.FC = () => {
   const unsubRef = useRef<(() => void) | null>(null);
 
   const todayDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  const [selectedDayIndex, setSelectedDayIndex] = useState(todayDayIndex);
 
   // Carica dati iniziali
   const loadData = useCallback(async () => {
@@ -109,13 +110,13 @@ export const LiveWorkoutScreen: React.FC = () => {
   // Inizia allenamento
   const handleStartWorkout = async () => {
     if (!user || !activePlan) return;
-    const todayExercises = activePlan.weeklySchedule[todayDayIndex]?.exercises || [];
-    if (todayExercises.length === 0) {
-      crossAlert('Info', 'Oggi e\' giorno di riposo. Nessun esercizio programmato.');
+    const dayExercises = activePlan.weeklySchedule[selectedDayIndex]?.exercises || [];
+    if (dayExercises.length === 0) {
+      crossAlert('Info', `${DAYS[selectedDayIndex]} e' giorno di riposo. Nessun esercizio programmato.`);
       return;
     }
 
-    const logs: ExerciseLog[] = todayExercises.map((ex) => ({
+    const logs: ExerciseLog[] = dayExercises.map((ex) => ({
       exerciseId: ex.id,
       exerciseName: ex.name,
       targetSets: ex.sets,
@@ -131,7 +132,7 @@ export const LiveWorkoutScreen: React.FC = () => {
           (student as any)?.assignedManagerId ||
           '',
         workoutPlanId: activePlan.id,
-        dayOfWeek: todayDayIndex,
+        dayOfWeek: selectedDayIndex,
         date: new Date(),
         startedAt: new Date(),
         status: 'in_progress',
@@ -151,7 +152,7 @@ export const LiveWorkoutScreen: React.FC = () => {
           (student as any)?.assignedManagerId ||
           '',
         workoutPlanId: activePlan.id,
-        dayOfWeek: todayDayIndex,
+        dayOfWeek: selectedDayIndex,
         date: new Date(),
         startedAt: new Date(),
         status: 'in_progress',
@@ -208,8 +209,9 @@ export const LiveWorkoutScreen: React.FC = () => {
     }
 
     // Timer recupero
-    const todayExercises = activePlan?.weeklySchedule[todayDayIndex]?.exercises || [];
-    const restSeconds = todayExercises[currentExerciseIndex]?.restSeconds || 60;
+    const workoutDay = activeWorkout?.dayOfWeek ?? selectedDayIndex;
+    const dayExs = activePlan?.weeklySchedule[workoutDay]?.exercises || [];
+    const restSeconds = dayExs[currentExerciseIndex]?.restSeconds || 60;
     startRestTimer(restSeconds);
 
     // Se ho completato tutte le serie di questo esercizio, passa al prossimo
@@ -309,8 +311,8 @@ export const LiveWorkoutScreen: React.FC = () => {
     return (
       <ScrollView style={styles.container}>
         <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
+          <Text style={styles.greeting}>Ciao{user?.name ? `, ${user.name}` : ''}!</Text>
           <Text style={styles.title}>Allenamento</Text>
-          <Text style={styles.subtitle}>{DAYS[todayDayIndex]}</Text>
         </View>
 
         <View style={styles.content}>
@@ -324,41 +326,73 @@ export const LiveWorkoutScreen: React.FC = () => {
                 </Text>
               </View>
             </Card>
-          ) : (activePlan.weeklySchedule[todayDayIndex]?.exercises || []).length === 0 ? (
-            <Card>
-              <View style={styles.emptyContainer}>
-                <Ionicons name="bed-outline" size={48} color={colors.textLight} />
-                <Text style={styles.emptyText}>Oggi e' giorno di riposo</Text>
-              </View>
-            </Card>
           ) : (
             <>
-              <Card variant="elevated">
-                <View style={styles.startCard}>
-                  <Ionicons name="barbell-outline" size={56} color={colors.accent} />
-                  <Text style={styles.startTitle}>Pronto per allenarti?</Text>
-                  <Text style={styles.startSubtitle}>
-                    {activePlan.weeklySchedule[todayDayIndex].exercises.length} esercizi programmati
-                  </Text>
+              {/* Selettore giorno */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
+                {DAYS.map((day, index) => {
+                  const hasExercises = (activePlan.weeklySchedule[index]?.exercises || []).length > 0;
+                  const isToday = index === todayDayIndex;
+                  return (
+                    <TouchableOpacity
+                      key={day}
+                      style={[
+                        styles.dayChip,
+                        selectedDayIndex === index && styles.dayChipActive,
+                      ]}
+                      onPress={() => setSelectedDayIndex(index)}
+                    >
+                      <Text style={[styles.dayChipText, selectedDayIndex === index && styles.dayChipTextActive]}>
+                        {day.substring(0, 3)}
+                      </Text>
+                      {isToday && <View style={styles.todayDot} />}
+                      {hasExercises && <View style={styles.exerciseDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
-                  {/* Preview esercizi */}
-                  <View style={styles.previewList}>
-                    {activePlan.weeklySchedule[todayDayIndex].exercises.map((ex, i) => (
-                      <View key={ex.id || i} style={styles.previewItem}>
-                        <View style={styles.previewDot} />
-                        <Text style={styles.previewText}>
-                          {ex.name} - {ex.sets}x{ex.reps}
-                        </Text>
-                      </View>
-                    ))}
+              {selectedDayIndex !== todayDayIndex && (
+                <Text style={styles.differentDayHint}>
+                  Stai visualizzando {DAYS[selectedDayIndex]} (oggi e' {DAYS[todayDayIndex]})
+                </Text>
+              )}
+
+              {(activePlan.weeklySchedule[selectedDayIndex]?.exercises || []).length === 0 ? (
+                <Card>
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="bed-outline" size={48} color={colors.textLight} />
+                    <Text style={styles.emptyText}>{DAYS[selectedDayIndex]}: giorno di riposo</Text>
                   </View>
+                </Card>
+              ) : (
+                <Card variant="elevated">
+                  <View style={styles.startCard}>
+                    <Ionicons name="barbell-outline" size={56} color={colors.accent} />
+                    <Text style={styles.startTitle}>Pronto per allenarti?</Text>
+                    <Text style={styles.startSubtitle}>
+                      {activePlan.weeklySchedule[selectedDayIndex].exercises.length} esercizi programmati - {DAYS[selectedDayIndex]}
+                    </Text>
 
-                  <TouchableOpacity style={styles.startButton} onPress={handleStartWorkout}>
-                    <Ionicons name="play" size={24} color="#FFF" />
-                    <Text style={styles.startButtonText}>INIZIA ALLENAMENTO</Text>
-                  </TouchableOpacity>
-                </View>
-              </Card>
+                    {/* Preview esercizi */}
+                    <View style={styles.previewList}>
+                      {activePlan.weeklySchedule[selectedDayIndex].exercises.map((ex, i) => (
+                        <View key={ex.id || i} style={styles.previewItem}>
+                          <View style={styles.previewDot} />
+                          <Text style={styles.previewText}>
+                            {ex.name} - {ex.sets}x{ex.reps}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity style={styles.startButton} onPress={handleStartWorkout}>
+                      <Ionicons name="play" size={24} color="#FFF" />
+                      <Text style={styles.startButtonText}>INIZIA ALLENAMENTO</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              )}
             </>
           )}
 
@@ -640,6 +674,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  greeting: { fontSize: fontSize.md, color: colors.accent, fontWeight: '600', marginBottom: 2 },
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.accent, marginTop: 2, fontWeight: '600' },
   timerText: { fontSize: fontSize.hero, fontWeight: '700', color: colors.accent, marginTop: spacing.xs },
@@ -662,6 +697,34 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   content: { padding: spacing.md },
+  daySelector: { marginBottom: spacing.md },
+  dayChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    backgroundColor: colors.surface,
+    marginRight: spacing.sm,
+    alignItems: 'center',
+    ...shadows.small,
+  },
+  dayChipActive: { backgroundColor: colors.accent },
+  dayChipText: { fontSize: fontSize.md, fontWeight: '600', color: colors.textSecondary },
+  dayChipTextActive: { color: colors.textOnAccent },
+  todayDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: colors.accent, marginTop: 3,
+  },
+  exerciseDot: {
+    width: 5, height: 5, borderRadius: 3,
+    backgroundColor: colors.success, marginTop: 2,
+  },
+  differentDayHint: {
+    fontSize: fontSize.sm,
+    color: colors.warning,
+    fontWeight: '600',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
   exerciseNav: { marginTop: spacing.sm },
   exerciseNavContent: { paddingHorizontal: spacing.md, gap: spacing.sm },
   exerciseNavItem: {

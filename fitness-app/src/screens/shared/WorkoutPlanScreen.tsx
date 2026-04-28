@@ -19,7 +19,7 @@ import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { createWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
+import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getStudents } from '../../services/authService';
 import {
   suggestWorkoutProgression,
@@ -51,6 +51,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exercises, setExercises] = useState<Record<number, Exercise[]>>({});
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Editing state
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
 
   // Form esercizio
   const [exName, setExName] = useState('');
@@ -362,6 +365,33 @@ export const WorkoutPlanScreen: React.FC = () => {
     }));
   };
 
+  const loadPlanForEditing = (plan: WorkoutPlan) => {
+    setEditingPlan(plan);
+    setSelectedStudentId(plan.studentId);
+    setPlanTitle(plan.title);
+    const loaded: Record<number, Exercise[]> = {};
+    for (const day of plan.weeklySchedule) {
+      if (day.exercises.length > 0) {
+        loaded[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+          ...ex,
+          id: ex.id || `${Date.now()}_${day.dayOfWeek}_${i}`,
+        }));
+      }
+    }
+    setExercises(loaded);
+    setSelectedDay(0);
+    setShowHistoryModal(false);
+    setViewingPlan(null);
+  };
+
+  const resetForm = () => {
+    setEditingPlan(null);
+    setPlanTitle('');
+    setExercises({});
+    setSelectedStudentId('');
+    setSelectedDay(0);
+  };
+
   const savePlan = async () => {
     if (!planTitle || !user) {
       crossAlert('Errore', 'Inserisci un titolo per la programmazione');
@@ -386,25 +416,31 @@ export const WorkoutPlanScreen: React.FC = () => {
         notes: '',
       }));
 
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 28);
+      if (editingPlan) {
+        await updateWorkoutPlan(editingPlan.id, {
+          title: planTitle,
+          weeklySchedule,
+        });
+        crossAlert('Successo', 'Programmazione aggiornata!');
+      } else {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 28);
 
-      await createWorkoutPlan({
-        studentId: selectedStudentId,
-        collaboratorId: user.id,
-        title: planTitle,
-        startDate,
-        endDate,
-        weeklySchedule,
-        createdAt: new Date(),
-        isActive: true,
-      });
+        await createWorkoutPlan({
+          studentId: selectedStudentId,
+          collaboratorId: user.id,
+          title: planTitle,
+          startDate,
+          endDate,
+          weeklySchedule,
+          createdAt: new Date(),
+          isActive: true,
+        });
+        crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
+      }
 
-      crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
-      setPlanTitle('');
-      setExercises({});
-      setSelectedStudentId('');
+      resetForm();
     } catch {
       crossAlert('Errore', 'Impossibile salvare la programmazione');
     } finally {
@@ -415,10 +451,15 @@ export const WorkoutPlanScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Crea Programmazione</Text>
+        <Text style={styles.title}>{editingPlan ? 'Modifica Programmazione' : 'Crea Programmazione'}</Text>
         <Text style={styles.subtitle}>
-          Crea il piano settimanale con video e descrizioni
+          {editingPlan ? `Stai modificando: ${editingPlan.title}` : 'Crea il piano settimanale con video e descrizioni'}
         </Text>
+        {editingPlan && (
+          <TouchableOpacity style={styles.newPlanBtn} onPress={resetForm}>
+            <Text style={styles.newPlanBtnText}>+ Nuova Programmazione</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.content}>
@@ -580,7 +621,7 @@ export const WorkoutPlanScreen: React.FC = () => {
         </View>
 
         <Button
-          title={saving ? 'Salvataggio...' : 'Salva e Invia Programmazione'}
+          title={saving ? 'Salvataggio...' : editingPlan ? 'Aggiorna Programmazione' : 'Salva e Invia Programmazione'}
           onPress={savePlan}
           style={styles.saveButton}
           loading={saving}
@@ -881,11 +922,8 @@ export const WorkoutPlanScreen: React.FC = () => {
                   </Card>
                 ) : (
                   studentPlans.map((plan) => (
-                    <TouchableOpacity
-                      key={plan.id}
-                      onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}
-                    >
-                      <Card variant={plan.isActive ? 'elevated' : 'outlined'}>
+                    <Card key={plan.id} variant={plan.isActive ? 'elevated' : 'outlined'}>
+                      <TouchableOpacity onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}>
                         <View style={styles.historyRow}>
                           <View style={styles.historyInfo}>
                             <Text style={styles.historyName}>{plan.title}</Text>
@@ -899,8 +937,16 @@ export const WorkoutPlanScreen: React.FC = () => {
                             </View>
                           )}
                         </View>
-                      </Card>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      <View style={styles.historyActions}>
+                        <TouchableOpacity
+                          style={styles.historyEditBtn}
+                          onPress={() => loadPlanForEditing(plan)}
+                        >
+                          <Text style={styles.historyEditText}>Modifica</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </Card>
                   ))
                 )}
               </>
@@ -1364,5 +1410,37 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: fontSize.xs,
     fontWeight: '800',
+  },
+  newPlanBtn: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  newPlanBtnText: {
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  historyActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  historyEditBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  historyEditText: {
+    color: colors.info,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
   },
 });

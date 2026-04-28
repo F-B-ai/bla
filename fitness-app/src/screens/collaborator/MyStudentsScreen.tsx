@@ -184,6 +184,7 @@ export const MyStudentsScreen: React.FC = () => {
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View>
+            <Text style={styles.greeting}>Ciao{user?.name ? `, ${user.name}` : ''}!</Text>
             <Text style={styles.title}>I Miei Allievi</Text>
             <Text style={styles.subtitle}>{students.length} allievi assegnati</Text>
           </View>
@@ -417,6 +418,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     padding: spacing.lg,
     paddingTop: spacing.xxl,
+  },
+  greeting: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   title: {
     fontSize: fontSize.xxl,
