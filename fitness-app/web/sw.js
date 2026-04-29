@@ -68,7 +68,21 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match(request) || caches.match('/'))
+        .catch(() => caches.match(request).then((r) => r || caches.match('/')))
+    );
+    return;
+  }
+
+  // JS bundles: always network-first (hash in filename ensures correct version)
+  if (request.url.includes('/_expo/static/js/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
