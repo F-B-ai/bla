@@ -258,45 +258,65 @@ export const ManageUsersScreen: React.FC = () => {
               </Text>
             </Card>
           ) : (
-            managers.map((mgr) => (
-              <Card key={mgr.id} variant="elevated">
-                <View style={styles.userRow}>
-                  <View style={[styles.avatar, styles.avatarManager]}>
-                    <Text style={styles.avatarText}>
-                      {mgr.name[0]}{mgr.surname[0]}
-                    </Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>
-                      {mgr.name} {mgr.surname}
-                    </Text>
-                    <Text style={styles.userEmail}>{mgr.email}</Text>
-                    <Text style={styles.userDetail}>
-                      {mgr.assignedCollaborators.length} coach · {mgr.assignedStudents.length} allievi · {mgr.commissionPercentage ?? 0}% comm.
-                    </Text>
-                  </View>
-                  <View style={[styles.statusDot, mgr.isActive ? styles.statusActive : styles.statusInactive]} />
-                </View>
-                {canDeleteUsers && (
-                  <View style={styles.userActions}>
-                    <TouchableOpacity
-                      style={styles.userActionBtn}
-                      onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
-                    >
-                      <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
-                        {mgr.isActive ? 'Disattiva' : 'Riattiva'}
+            managers.map((mgr) => {
+              const mgrStudents = students.filter(
+                (s) => s.assignedManagerId === mgr.id || s.assignedCollaboratorId === mgr.id
+              );
+              return (
+                <Card key={mgr.id} variant="elevated">
+                  <View style={styles.userRow}>
+                    <View style={[styles.avatar, styles.avatarManager]}>
+                      <Text style={styles.avatarText}>
+                        {mgr.name[0]}{mgr.surname[0]}
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.userActionBtn}
-                      onPress={() => handleDeleteUser(mgr.id, `${mgr.name} ${mgr.surname}`)}
-                    >
-                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
-                    </TouchableOpacity>
+                    </View>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>
+                        {mgr.name} {mgr.surname}
+                      </Text>
+                      <Text style={styles.userEmail}>{mgr.email}</Text>
+                      <Text style={styles.userDetail}>
+                        {mgr.assignedCollaborators.length} coach · {mgrStudents.length} allievi · {mgr.commissionPercentage ?? 0}% comm.
+                      </Text>
+                    </View>
+                    <View style={[styles.statusDot, mgr.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
-                )}
-              </Card>
-            ))
+
+                  {mgrStudents.length > 0 && (
+                    <View style={styles.assignedList}>
+                      {mgrStudents.map((s) => (
+                        <View key={s.id} style={styles.assignedItem}>
+                          <View style={styles.assignedDot} />
+                          <Text style={styles.assignedName}>{s.name} {s.surname}</Text>
+                          {!s.isActive && (
+                            <Text style={styles.assignedInactive}>(disattivato)</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {canDeleteUsers && (
+                    <View style={styles.userActions}>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
+                      >
+                        <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
+                          {mgr.isActive ? 'Disattiva' : 'Riattiva'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleDeleteUser(mgr.id, `${mgr.name} ${mgr.surname}`)}
+                      >
+                        <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </Card>
+              );
+            })
           )}
         </>
       )}
@@ -311,48 +331,69 @@ export const ManageUsersScreen: React.FC = () => {
               </Text>
             </Card>
           ) : (
-            collaborators.map((collab) => (
-              <Card key={collab.id} variant="elevated">
-                <View style={styles.userRow}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                      {collab.name[0]}{collab.surname[0]}
-                    </Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>
-                      {collab.name} {collab.surname}
-                    </Text>
-                    <Text style={styles.userEmail}>{collab.email}</Text>
-                    <Text style={styles.userDetail}>
-                      {collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'} · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
-                    </Text>
-                    <Text style={styles.userStudents}>
-                      {collab.assignedStudents.length} allievi assegnati
-                    </Text>
-                  </View>
-                  <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
-                </View>
-                {canDeleteUsers && (
-                  <View style={styles.userActions}>
-                    <TouchableOpacity
-                      style={styles.userActionBtn}
-                      onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
-                    >
-                      <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
-                        {collab.isActive ? 'Disattiva' : 'Riattiva'}
+            collaborators.map((collab) => {
+              const assignedStudents = students.filter(
+                (s) => s.assignedCollaboratorId === collab.id
+              );
+              return (
+                <Card key={collab.id} variant="elevated">
+                  <View style={styles.userRow}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {collab.name[0]}{collab.surname[0]}
                       </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.userActionBtn}
-                      onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
-                    >
-                      <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
-                    </TouchableOpacity>
+                    </View>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>
+                        {collab.name} {collab.surname}
+                      </Text>
+                      <Text style={styles.userEmail}>{collab.email}</Text>
+                      <Text style={styles.userDetail}>
+                        {collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'} · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
+                      </Text>
+                      <Text style={styles.userStudents}>
+                        {assignedStudents.length} allievi assegnati
+                      </Text>
+                    </View>
+                    <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
-                )}
-              </Card>
-            ))
+
+                  {/* Lista allievi assegnati */}
+                  {assignedStudents.length > 0 && (
+                    <View style={styles.assignedList}>
+                      {assignedStudents.map((s) => (
+                        <View key={s.id} style={styles.assignedItem}>
+                          <View style={styles.assignedDot} />
+                          <Text style={styles.assignedName}>{s.name} {s.surname}</Text>
+                          {!s.isActive && (
+                            <Text style={styles.assignedInactive}>(disattivato)</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {canDeleteUsers && (
+                    <View style={styles.userActions}>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
+                      >
+                        <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
+                          {collab.isActive ? 'Disattiva' : 'Riattiva'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
+                      >
+                        <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </Card>
+              );
+            })
           )}
         </>
       )}
@@ -568,6 +609,35 @@ const styles = StyleSheet.create({
   },
   statusInactive: {
     backgroundColor: colors.error,
+  },
+  assignedList: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  assignedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 3,
+    paddingLeft: spacing.sm,
+  },
+  assignedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.studentBadge,
+  },
+  assignedName: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  assignedInactive: {
+    fontSize: fontSize.xs,
+    color: colors.error,
+    fontStyle: 'italic',
   },
   userActions: {
     flexDirection: 'row',
