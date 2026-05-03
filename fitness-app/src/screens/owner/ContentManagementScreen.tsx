@@ -15,6 +15,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { SpecialContent, ContentType, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { addContent, getAllContent, deleteContent } from '../../services/contentService';
@@ -268,32 +269,13 @@ export const ContentManagementScreen: React.FC = () => {
             />
 
             {/* Assegnazione allievi */}
-            <Text style={styles.fieldLabel}>
-              Assegna a (vuoto = tutti gli allievi)
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.studentRow}>
-                {students.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[
-                      styles.studentChip,
-                      selectedStudentIds.includes(s.id) && styles.studentChipActive,
-                    ]}
-                    onPress={() => toggleStudent(s.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.studentChipText,
-                        selectedStudentIds.includes(s.id) && styles.studentChipTextActive,
-                      ]}
-                    >
-                      {s.name} {s.surname}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <StudentSearchPicker
+              students={students}
+              selectedIds={selectedStudentIds}
+              onSelect={(id) => toggleStudent(id)}
+              multiSelect
+              label="Assegna a (vuoto = tutti gli allievi)"
+            />
 
             <View style={styles.modalButtons}>
               <Button
@@ -432,29 +414,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     fontWeight: '600',
-  },
-  studentRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  studentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  studentChipActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  studentChipText: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-  },
-  studentChipTextActive: {
-    color: colors.textOnAccent,
   },
   modalButtons: {
     flexDirection: 'row',

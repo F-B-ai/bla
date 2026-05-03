@@ -16,6 +16,7 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Badge } from '../../components/common/Badge';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { TrainingSession, Student, Collaborator } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -271,30 +272,12 @@ export const ScheduleSessionScreen: React.FC = () => {
             <ModalHeader title="Nuova Sessione" onClose={() => { setShowModal(false); resetForm(); }} />
 
             {/* Allievo */}
-            <Text style={styles.fieldLabel}>Allievo</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {students.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[
-                      styles.chip,
-                      selectedStudentId === s.id && styles.chipActive,
-                    ]}
-                    onPress={() => setSelectedStudentId(s.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        selectedStudentId === s.id && styles.chipTextActive,
-                      ]}
-                    >
-                      {s.name} {s.surname}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <StudentSearchPicker
+              students={students}
+              selectedId={selectedStudentId}
+              onSelect={(id) => setSelectedStudentId(id)}
+              label="Allievo"
+            />
 
             {/* Collaboratore (solo owner) */}
             {isOwner && (

@@ -18,6 +18,7 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { useAuth } from '../../hooks/useAuth';
 import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getStudents } from '../../services/authService';
@@ -464,34 +465,11 @@ export const WorkoutPlanScreen: React.FC = () => {
 
       <View style={styles.content}>
         {/* Selezione allievo */}
-        <Text style={styles.sectionTitle}>Seleziona Allievo</Text>
-        {students.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>Nessun allievo disponibile</Text>
-          </Card>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
-            {students.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.studentChip,
-                  selectedStudentId === s.id && styles.studentChipActive,
-                ]}
-                onPress={() => setSelectedStudentId(s.id)}
-              >
-                <Text
-                  style={[
-                    styles.studentChipText,
-                    selectedStudentId === s.id && styles.studentChipTextActive,
-                  ]}
-                >
-                  {s.name} {s.surname}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+        <StudentSearchPicker
+          students={students}
+          selectedId={selectedStudentId}
+          onSelect={(id) => setSelectedStudentId(id)}
+        />
 
         {/* Vedi storico programmazioni allievo */}
         {selectedStudentId && (
@@ -1052,31 +1030,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.sm,
-  },
-  studentScroll: {
-    marginBottom: spacing.md,
-  },
-  studentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    backgroundColor: colors.surface,
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-  },
-  studentChipActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  studentChipText: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  studentChipTextActive: {
-    color: colors.textOnAccent,
   },
   dayScroll: {
     marginBottom: spacing.md,

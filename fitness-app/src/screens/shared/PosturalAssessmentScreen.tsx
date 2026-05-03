@@ -15,6 +15,7 @@ import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/t
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import {
   PosturalAssessment,
   PosturalFinding,
@@ -314,36 +315,11 @@ export const PosturalAssessmentScreen: React.FC = () => {
       </View>
 
       {/* Selezione allievo */}
-      <Text style={styles.sectionTitle}>Allievo</Text>
-      {students.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>Nessun allievo disponibile</Text>
-        </Card>
-      ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.studentRow}>
-            {students.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.studentChip,
-                  selectedStudentId === s.id && styles.studentChipActive,
-                ]}
-                onPress={() => setSelectedStudentId(s.id)}
-              >
-                <Text
-                  style={[
-                    styles.studentChipText,
-                    selectedStudentId === s.id && styles.studentChipTextActive,
-                  ]}
-                >
-                  {s.name} {s.surname}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      )}
+      <StudentSearchPicker
+        students={students}
+        selectedId={selectedStudentId}
+        onSelect={(id) => setSelectedStudentId(id)}
+      />
 
       {/* Sezione foto */}
       <Text style={styles.sectionTitle}>Fotografie</Text>
@@ -642,31 +618,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
-  },
-  studentRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  studentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  studentChipActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  studentChipText: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  studentChipTextActive: {
-    color: colors.textOnAccent,
   },
   imageRow: {
     flexDirection: 'row',
