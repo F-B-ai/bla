@@ -236,6 +236,27 @@ export const CalendarScreen: React.FC = () => {
 
   const selectedDayItems = appointmentsByDate[selectedDate] || [];
 
+  const getStudentName = (id: string) => {
+    const s = students.find((st) => st.id === id);
+    return s ? `${s.name} ${s.surname}` : 'Allievo';
+  };
+  const getStaffName = (id: string) => {
+    if (id === user?.id) return `${user.name} ${user.surname}`;
+    const c = collaborators.find((co) => co.id === id);
+    return c ? `${c.name} ${c.surname}` : '';
+  };
+
+  const calcEarnings = (cost: number, studentId: string, staffId: string) => {
+    const student = students.find((s) => s.id === studentId);
+    const collab = collaborators.find((c) => c.id === staffId);
+    const coachPct = student?.coachCommissionPercentage ?? collab?.commissionPercentage ?? 60;
+    const managerPct = student?.managerCommissionPercentage ?? 0;
+    const coachEarning = Math.round(cost * coachPct / 100);
+    const managerEarning = Math.round(cost * managerPct / 100);
+    const ownerEarning = cost - coachEarning - managerEarning;
+    return { coachEarning, managerEarning, ownerEarning, coachPct, managerPct };
+  };
+
   const staffStats = useMemo(() => {
     if (!isOwner) return [];
     const map: Record<string, { name: string; training: number; nutrition: number }> = {};
@@ -268,28 +289,6 @@ export const CalendarScreen: React.FC = () => {
   const nextMonth = () => {
     if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear((y) => y + 1); }
     else setCurrentMonth((m) => m + 1);
-  };
-
-  // Helpers
-  const getStudentName = (id: string) => {
-    const s = students.find((st) => st.id === id);
-    return s ? `${s.name} ${s.surname}` : 'Allievo';
-  };
-  const getStaffName = (id: string) => {
-    if (id === user?.id) return `${user.name} ${user.surname}`;
-    const c = collaborators.find((co) => co.id === id);
-    return c ? `${c.name} ${c.surname}` : '';
-  };
-
-  const calcEarnings = (cost: number, studentId: string, staffId: string) => {
-    const student = students.find((s) => s.id === studentId);
-    const collab = collaborators.find((c) => c.id === staffId);
-    const coachPct = student?.coachCommissionPercentage ?? collab?.commissionPercentage ?? 60;
-    const managerPct = student?.managerCommissionPercentage ?? 0;
-    const coachEarning = Math.round(cost * coachPct / 100);
-    const managerEarning = Math.round(cost * managerPct / 100);
-    const ownerEarning = cost - coachEarning - managerEarning;
-    return { coachEarning, managerEarning, ownerEarning, coachPct, managerPct };
   };
 
   // Form
