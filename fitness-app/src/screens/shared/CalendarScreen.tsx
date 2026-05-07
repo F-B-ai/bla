@@ -115,7 +115,7 @@ const buildCalendarGrid = (year: number, month: number): (number | null)[][] => 
 
 export const CalendarScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
-  const canSeeAll = isOwner || isManager;
+  const canSeeAll = isOwner;
   const isStaff = isOwner || isManager || isCollaborator;
 
   const now = new Date();
@@ -169,6 +169,8 @@ export const CalendarScreen: React.FC = () => {
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+      } else if (isManager) {
+        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }
@@ -187,7 +189,7 @@ export const CalendarScreen: React.FC = () => {
       console.error('Errore caricamento calendario:', err);
       crossAlert('Errore', 'Impossibile caricare i dati.');
     }
-  }, [user, canSeeAll, isCollaborator, isStudent]);
+  }, [user, canSeeAll, isCollaborator, isManager, isStudent]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -233,6 +235,25 @@ export const CalendarScreen: React.FC = () => {
   }, [allAppointments]);
 
   const selectedDayItems = appointmentsByDate[selectedDate] || [];
+
+  const staffStats = useMemo(() => {
+    if (!isOwner) return [];
+    const map: Record<string, { name: string; training: number; nutrition: number }> = {};
+    allAppointments.forEach((a) => {
+      if (!a.isCountedAsCompleted && a.status !== 'completed') return;
+      const id = a.staffId || 'unknown';
+      if (!map[id]) map[id] = { name: getStaffName(id) || 'Sconosciuto', training: 0, nutrition: 0 };
+      if (a.kind === 'training') map[id].training++;
+      else map[id].nutrition++;
+    });
+    if (user) {
+      const myId = user.id;
+      if (!map[myId]) map[myId] = { name: `${user.name} ${user.surname}`, training: 0, nutrition: 0 };
+    }
+    return Object.entries(map)
+      .map(([id, data]) => ({ id, ...data, total: data.training + data.nutrition }))
+      .sort((a, b) => b.total - a.total);
+  }, [isOwner, allAppointments, collaborators, user]);
 
   // Calendar grid
   const calendarGrid = useMemo(
@@ -392,29 +413,31 @@ export const CalendarScreen: React.FC = () => {
   };
 
   const handleCancel = (item: AppointmentItem) => {
-    const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
-    const isLate = hoursLeft < 10;
+    if (isStudent) {
+      const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
+      const isLate = hoursLeft < 10;
 
-    if (isStudent && isLate) {
-      crossAlert(
-        'Attenzione',
-        'Meno di 10 ore prima: la sessione sarà considerata come eseguita e verrà addebitata.',
-        [
-          { text: 'Ho capito', style: 'cancel' },
-          {
-            text: 'Annulla comunque',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                if (item.kind === 'training') await cancelSession(item.id, item.date);
-                else await cancelAppointment(item.id, item.date);
-                loadData();
-              } catch { crossAlert('Errore', 'Impossibile annullare'); }
+      if (isLate) {
+        crossAlert(
+          'Attenzione',
+          'Meno di 10 ore prima: la sessione sarà considerata come eseguita e verrà addebitata.',
+          [
+            { text: 'Ho capito', style: 'cancel' },
+            {
+              text: 'Annulla comunque',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  if (item.kind === 'training') await cancelSession(item.id, item.date);
+                  else await cancelAppointment(item.id, item.date);
+                  loadData();
+                } catch { crossAlert('Errore', 'Impossibile annullare'); }
+              },
             },
-          },
-        ]
-      );
-      return;
+          ]
+        );
+        return;
+      }
     }
 
     crossAlert('Conferma', 'Annullare questo appuntamento?', [
@@ -424,8 +447,13 @@ export const CalendarScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (item.kind === 'training') await cancelSession(item.id, item.date);
-            else await cancelAppointment(item.id, item.date);
+            if (isStaff) {
+              if (item.kind === 'training') await updateSessionStatus(item.id, 'cancelled_by_student');
+              else await updateAppointmentStatus(item.id, 'cancelled');
+            } else {
+              if (item.kind === 'training') await cancelSession(item.id, item.date);
+              else await cancelAppointment(item.id, item.date);
+            }
             loadData();
           } catch { crossAlert('Errore', 'Impossibile annullare'); }
         },
@@ -656,6 +684,29 @@ export const CalendarScreen: React.FC = () => {
                 <Text style={styles.legendText}>Nutrizione</Text>
               </View>
             </View>
+
+            {/* Staff stats (owner only) */}
+            {isOwner && staffStats.length > 0 && (
+              <View style={styles.staffStatsSection}>
+                <Text style={styles.staffStatsTitle}>Lezioni Completate per Staff</Text>
+                {staffStats.map((s) => (
+                  <View key={s.id} style={styles.staffStatRow}>
+                    <Text style={styles.staffStatName} numberOfLines={1}>{s.name}</Text>
+                    <View style={styles.staffStatCounts}>
+                      <View style={styles.staffStatBadge}>
+                        <Ionicons name="barbell" size={12} color={colors.accent} />
+                        <Text style={styles.staffStatNum}>{s.training}</Text>
+                      </View>
+                      <View style={styles.staffStatBadge}>
+                        <Ionicons name="nutrition" size={12} color={colors.success} />
+                        <Text style={styles.staffStatNum}>{s.nutrition}</Text>
+                      </View>
+                      <Text style={styles.staffStatTotal}>{s.total}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Selected day header */}
             <View style={styles.dayHeader}>
@@ -1170,4 +1221,59 @@ const styles = StyleSheet.create({
   miniCardDate: { fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
   miniCardTime: { fontSize: fontSize.sm, color: colors.textSecondary },
   miniCardCost: { fontSize: fontSize.sm, color: colors.success, fontWeight: '600' },
+
+  staffStatsSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  staffStatsTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  staffStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  staffStatName: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '600',
+    marginRight: spacing.sm,
+  },
+  staffStatCounts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  staffStatBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  staffStatNum: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  staffStatTotal: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.accent,
+    minWidth: 30,
+    textAlign: 'right',
+  },
 });
