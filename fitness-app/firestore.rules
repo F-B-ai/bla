@@ -76,6 +76,30 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    // Nutritionist appointments
+    match /nutritionistAppointments/{appointmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
+
+    // Body measurements
+    match /bodyMeasurements/{measurementId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // BIA documents
+    match /biaDocuments/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
     // Workout logs (sessioni di allenamento registrate dagli allievi)
     match /workoutLogs/{logId} {
       allow read: if isAuthenticated() && (

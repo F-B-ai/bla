@@ -58,25 +58,35 @@ export const cancelAppointment = async (
   return { success: true, isLate };
 };
 
+const sortByDateDesc = (items: NutritionistAppointment[]) => {
+  items.sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return db2 - da;
+  });
+  return items;
+};
+
 export const getStudentAppointments = async (
   studentId: string
 ): Promise<NutritionistAppointment[]> => {
   const q = query(
     collection(db, APPOINTMENTS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('date', 'desc')
+    where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
+  );
 };
 
 export const getAllAppointments = async (): Promise<NutritionistAppointment[]> => {
-  const q = query(
-    collection(db, APPOINTMENTS_COLLECTION),
-    orderBy('date', 'desc')
+  const snapshot = await getDocs(collection(db, APPOINTMENTS_COLLECTION));
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
   );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
 };
 
 export const updateAppointmentStatus = async (
@@ -106,11 +116,12 @@ export const getNutritionistAppointmentsByStaff = async (
 ): Promise<NutritionistAppointment[]> => {
   const q = query(
     collection(db, APPOINTMENTS_COLLECTION),
-    where('nutritionistId', '==', staffId),
-    orderBy('date', 'desc')
+    where('nutritionistId', '==', staffId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
+  );
 };
 
 export const deleteAppointment = async (appointmentId: string): Promise<void> => {

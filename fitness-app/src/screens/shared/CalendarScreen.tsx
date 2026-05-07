@@ -29,6 +29,7 @@ import {
   createSession,
   getAllSessions,
   getCollaboratorSessions,
+  getStudentSessions,
   updateSessionStatus,
   updateSession,
   cancelSession,
@@ -38,6 +39,7 @@ import {
   createAppointment,
   getAllAppointments,
   getNutritionistAppointmentsByStaff,
+  getStudentAppointments,
   updateAppointmentStatus,
   updateAppointment,
   cancelAppointment,
@@ -73,6 +75,15 @@ type AppointmentItem = {
   isCountedAsCompleted: boolean;
 };
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 const toDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -103,8 +114,9 @@ const buildCalendarGrid = (year: number, month: number): (number | null)[][] => 
 };
 
 export const CalendarScreen: React.FC = () => {
-  const { user, isOwner, isManager, isCollaborator } = useAuth();
+  const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const canSeeAll = isOwner || isManager;
+  const isStaff = isOwner || isManager || isCollaborator;
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
@@ -138,6 +150,18 @@ export const CalendarScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
+      if (isStudent) {
+        const [trainingSessions, nutrAppts] = await Promise.all([
+          getStudentSessions(user.id).catch(() => []),
+          getStudentAppointments(user.id).catch(() => []),
+        ]);
+        setSessions(trainingSessions);
+        setNutritionAppts(nutrAppts);
+        setStudents([]);
+        setCollaborators([]);
+        return;
+      }
+
       const [studs, collabs] = await Promise.all([
         getStudents(),
         canSeeAll ? getCollaborators() : Promise.resolve([]),
@@ -145,8 +169,6 @@ export const CalendarScreen: React.FC = () => {
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
-      } else if (isManager) {
-        setStudents(studs);
       } else {
         setStudents(studs);
       }
@@ -154,9 +176,10 @@ export const CalendarScreen: React.FC = () => {
 
       const [trainingSessions, nutrAppts] = await Promise.all([
         canSeeAll ? getAllSessions() : getCollaboratorSessions(user.id),
-        canSeeAll
+        (canSeeAll
           ? getAllAppointments()
-          : getNutritionistAppointmentsByStaff(user.id),
+          : getNutritionistAppointmentsByStaff(user.id)
+        ).catch(() => []),
       ]);
       setSessions(trainingSessions);
       setNutritionAppts(nutrAppts);
@@ -164,7 +187,7 @@ export const CalendarScreen: React.FC = () => {
       console.error('Errore caricamento calendario:', err);
       crossAlert('Errore', 'Impossibile caricare i dati.');
     }
-  }, [user, canSeeAll, isCollaborator, isManager]);
+  }, [user, canSeeAll, isCollaborator, isStudent]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -178,7 +201,7 @@ export const CalendarScreen: React.FC = () => {
   const allAppointments = useMemo(() => {
     const items: AppointmentItem[] = [];
     sessions.forEach((s) => {
-      const d = new Date(s.date as unknown as string);
+      const d = toSafeDate(s.date);
       items.push({
         id: s.id, kind: 'training', studentId: s.studentId, staffId: s.collaboratorId,
         date: d, dateStr: toDateStr(d), startTime: s.startTime, endTime: s.endTime,
@@ -187,7 +210,7 @@ export const CalendarScreen: React.FC = () => {
       });
     });
     nutritionAppts.forEach((a) => {
-      const d = new Date(a.date as unknown as string);
+      const d = toSafeDate(a.date);
       items.push({
         id: a.id, kind: 'nutrition', studentId: a.studentId,
         staffId: a.nutritionistId || a.nutritionManagerId || '',
@@ -369,6 +392,31 @@ export const CalendarScreen: React.FC = () => {
   };
 
   const handleCancel = (item: AppointmentItem) => {
+    const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
+    const isLate = hoursLeft < 10;
+
+    if (isStudent && isLate) {
+      crossAlert(
+        'Attenzione',
+        'Meno di 10 ore prima: la sessione sarà considerata come eseguita e verrà addebitata.',
+        [
+          { text: 'Ho capito', style: 'cancel' },
+          {
+            text: 'Annulla comunque',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                if (item.kind === 'training') await cancelSession(item.id, item.date);
+                else await cancelAppointment(item.id, item.date);
+                loadData();
+              } catch { crossAlert('Errore', 'Impossibile annullare'); }
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     crossAlert('Conferma', 'Annullare questo appuntamento?', [
       { text: 'No', style: 'cancel' },
       {
@@ -376,11 +424,8 @@ export const CalendarScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (item.kind === 'training') {
-              await cancelSession(item.id, item.date);
-            } else {
-              await cancelAppointment(item.id, item.date);
-            }
+            if (item.kind === 'training') await cancelSession(item.id, item.date);
+            else await cancelAppointment(item.id, item.date);
             loadData();
           } catch { crossAlert('Errore', 'Impossibile annullare'); }
         },
@@ -492,9 +537,11 @@ export const CalendarScreen: React.FC = () => {
 
         <View style={styles.cardBody}>
           <Text style={styles.cardTime}>{item.startTime} - {item.endTime}</Text>
-          <TouchableOpacity onPress={() => setStudentDetailId(item.studentId)}>
-            <Text style={styles.cardStudent}>{getStudentName(item.studentId)}</Text>
-          </TouchableOpacity>
+          {isStaff ? (
+            <TouchableOpacity onPress={() => setStudentDetailId(item.studentId)}>
+              <Text style={styles.cardStudent}>{getStudentName(item.studentId)}</Text>
+            </TouchableOpacity>
+          ) : null}
           {staffName ? <Text style={styles.cardStaff}>{staffName}</Text> : null}
           {item.notes ? <Text style={styles.cardNotes}>{item.notes}</Text> : null}
         </View>
@@ -515,7 +562,7 @@ export const CalendarScreen: React.FC = () => {
         )}
 
         {/* Actions */}
-        {canAct && (
+        {canAct && isStaff && (
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
               <Ionicons name="create-outline" size={18} color={colors.info} />
@@ -531,6 +578,14 @@ export const CalendarScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
               <Ionicons name="trash-outline" size={18} color={colors.error} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {canAct && isStudent && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
+              <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+              <Text style={[styles.actionText, { color: colors.error }]}>Annulla Sessione</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -553,10 +608,16 @@ export const CalendarScreen: React.FC = () => {
           <View>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>Calendario</Text>
+              <Text style={styles.title}>{isStudent ? 'I Miei Appuntamenti' : 'Calendario'}</Text>
               <Text style={styles.subtitle}>
-                {allAppointments.length} appuntamenti totali
+                {allAppointments.length} appuntament{allAppointments.length === 1 ? 'o' : 'i'} totali
+                {' · '}{allAppointments.filter(a => a.status === 'scheduled').length} in programma
               </Text>
+              {isStudent && (
+                <Text style={styles.cancelHint}>
+                  Disdetta gratuita entro 10 ore prima
+                </Text>
+              )}
             </View>
 
             {/* Month nav */}
@@ -613,7 +674,7 @@ export const CalendarScreen: React.FC = () => {
         }
         ListFooterComponent={
           <View style={styles.footerSpacer}>
-            <Button title="+ Nuovo Appuntamento" onPress={openCreate} />
+            {isStaff && <Button title="+ Nuovo Appuntamento" onPress={openCreate} />}
           </View>
         }
         contentContainerStyle={styles.listContent}
@@ -872,6 +933,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
+  cancelHint: { fontSize: fontSize.xs, color: colors.warning, marginTop: spacing.xs },
 
   // Month navigation
   monthNav: {

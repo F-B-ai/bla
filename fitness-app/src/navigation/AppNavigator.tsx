@@ -592,9 +592,9 @@ const StudentTabs = () => (
     />
     <StudentTab.Screen
       name="Sessions"
-      component={SessionsScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -612,14 +612,6 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Paga',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
-      }}
-    />
-    <StudentTab.Screen
-      name="Postura"
-      component={PosturalAssessmentScreen}
-      options={{
-        tabBarLabel: 'Postura',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen

@@ -7,7 +7,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -47,16 +46,28 @@ export const cancelSession = async (
   return { success: true, isLate };
 };
 
+const sortSessionsByDate = (items: TrainingSession[]) => {
+  items.sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return db2 - da;
+  });
+  return items;
+};
+
 export const getStudentSessions = async (
   studentId: string
 ): Promise<TrainingSession[]> => {
   const q = query(
     collection(db, SESSIONS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('date', 'desc')
+    where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
+  );
 };
 
 export const getCollaboratorSessions = async (
@@ -64,20 +75,19 @@ export const getCollaboratorSessions = async (
 ): Promise<TrainingSession[]> => {
   const q = query(
     collection(db, SESSIONS_COLLECTION),
-    where('collaboratorId', '==', collaboratorId),
-    orderBy('date', 'desc')
+    where('collaboratorId', '==', collaboratorId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
+  );
 };
 
 export const getAllSessions = async (): Promise<TrainingSession[]> => {
-  const q = query(
-    collection(db, SESSIONS_COLLECTION),
-    orderBy('date', 'desc')
+  const snapshot = await getDocs(collection(db, SESSIONS_COLLECTION));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
   );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
 };
 
 export const updateSessionStatus = async (

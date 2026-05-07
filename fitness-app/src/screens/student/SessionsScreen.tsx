@@ -22,6 +22,15 @@ import { useAuth } from '../../hooks/useAuth';
 
 const CANCELLATION_HOURS = 10;
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 type UnifiedItem = {
   id: string;
   kind: 'training' | 'nutrition';
@@ -41,7 +50,7 @@ const toUnified = (
   sessions.forEach((s) => {
     items.push({
       id: s.id, kind: 'training',
-      date: new Date(s.date as unknown as string),
+      date: toSafeDate(s.date),
       startTime: s.startTime, endTime: s.endTime,
       status: s.status, notes: s.notes,
       isCountedAsCompleted: s.isCountedAsCompleted,
@@ -50,7 +59,7 @@ const toUnified = (
   appointments.forEach((a) => {
     items.push({
       id: a.id, kind: 'nutrition',
-      date: new Date(a.date as unknown as string),
+      date: toSafeDate(a.date),
       startTime: a.startTime, endTime: a.endTime,
       status: a.status, notes: a.notes,
       isCountedAsCompleted: a.isCountedAsCompleted,

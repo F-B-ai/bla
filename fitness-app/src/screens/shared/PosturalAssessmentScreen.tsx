@@ -298,8 +298,10 @@ export const PosturalAssessmentScreen: React.FC = () => {
       setBackImage(null);
       setFindings([]);
       setOverallNotes('');
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare la valutazione');
+    } catch (err) {
+      console.error('Errore salvataggio posturale:', err);
+      const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
+      crossAlert('Errore', `Impossibile salvare la valutazione: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -557,9 +559,13 @@ export const PosturalAssessmentScreen: React.FC = () => {
           {showComparison && previousAssessments.map((assessment, idx) => (
             <Card key={assessment.id || idx} variant="outlined">
               <Text style={styles.comparisonDate}>
-                {new Date(assessment.date as unknown as string).toLocaleDateString('it-IT', {
-                  day: 'numeric', month: 'long', year: 'numeric',
-                })}
+                {(() => {
+                  const d = assessment.date;
+                  const parsed = d && typeof d === 'object' && 'toDate' in d ? (d as any).toDate()
+                    : d && typeof d === 'object' && 'seconds' in d ? new Date((d as any).seconds * 1000)
+                    : new Date(d as any);
+                  return parsed.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+                })()}
               </Text>
               <View style={styles.comparisonImages}>
                 {assessment.frontImageUrl ? (
