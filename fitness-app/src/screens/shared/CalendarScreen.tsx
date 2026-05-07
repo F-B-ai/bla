@@ -23,6 +23,7 @@ import {
   NutritionistAppointment,
   Student,
   Collaborator,
+  Manager,
 } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -45,7 +46,7 @@ import {
   cancelAppointment,
   deleteAppointment,
 } from '../../services/nutritionistService';
-import { getStudents, getCollaborators } from '../../services/authService';
+import { getStudents, getCollaborators, getManagers } from '../../services/authService';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -127,7 +128,11 @@ export const CalendarScreen: React.FC = () => {
   const [nutritionAppts, setNutritionAppts] = useState<NutritionistAppointment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [managers, setManagers] = useState<Manager[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Staff filter (owner only)
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
 
   // Create/Edit modal
   const [showModal, setShowModal] = useState(false);
@@ -162,9 +167,10 @@ export const CalendarScreen: React.FC = () => {
         return;
       }
 
-      const [studs, collabs] = await Promise.all([
+      const [studs, collabs, mgrs] = await Promise.all([
         getStudents(),
         canSeeAll ? getCollaborators() : Promise.resolve([]),
+        canSeeAll ? getManagers() : Promise.resolve([]),
       ]);
 
       if (isCollaborator) {
@@ -175,6 +181,7 @@ export const CalendarScreen: React.FC = () => {
         setStudents(studs);
       }
       setCollaborators(collabs);
+      setManagers(mgrs);
 
       const [trainingSessions, nutrAppts] = await Promise.all([
         canSeeAll ? getAllSessions() : getCollaboratorSessions(user.id),
@@ -225,16 +232,35 @@ export const CalendarScreen: React.FC = () => {
     return items;
   }, [sessions, nutritionAppts]);
 
+  const filteredAppointments = useMemo(() => {
+    if (!canSeeAll || !selectedStaffId) return allAppointments;
+    return allAppointments.filter((a) => a.staffId === selectedStaffId);
+  }, [allAppointments, selectedStaffId, canSeeAll]);
+
   const appointmentsByDate = useMemo(() => {
     const map: Record<string, AppointmentItem[]> = {};
-    allAppointments.forEach((item) => {
+    filteredAppointments.forEach((item) => {
       if (!map[item.dateStr]) map[item.dateStr] = [];
       map[item.dateStr].push(item);
     });
     return map;
-  }, [allAppointments]);
+  }, [filteredAppointments]);
 
   const selectedDayItems = appointmentsByDate[selectedDate] || [];
+
+  const staffList = useMemo(() => {
+    if (!canSeeAll) return [];
+    const list: { id: string; name: string; role: string }[] = [];
+    if (user) list.push({ id: user.id, name: `${user.name} ${user.surname}`, role: 'Owner' });
+    managers.forEach((m) => {
+      list.push({ id: m.id, name: `${m.name} ${m.surname}`, role: 'Manager' });
+    });
+    collaborators.forEach((c) => {
+      const type = c.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+      list.push({ id: c.id, name: `${c.name} ${c.surname}`, role: type });
+    });
+    return list;
+  }, [canSeeAll, user, collaborators, managers]);
 
   const getStudentName = (id: string) => {
     const s = students.find((st) => st.id === id);
@@ -243,7 +269,9 @@ export const CalendarScreen: React.FC = () => {
   const getStaffName = (id: string) => {
     if (id === user?.id) return `${user.name} ${user.surname}`;
     const c = collaborators.find((co) => co.id === id);
-    return c ? `${c.name} ${c.surname}` : '';
+    if (c) return `${c.name} ${c.surname}`;
+    const m = managers.find((mg) => mg.id === id);
+    return m ? `${m.name} ${m.surname}` : '';
   };
 
   const calcEarnings = (cost: number, studentId: string, staffId: string) => {
@@ -543,7 +571,9 @@ export const CalendarScreen: React.FC = () => {
   const renderAppointmentCard = (item: AppointmentItem) => {
     const isScheduled = item.status === 'scheduled';
     const isFuture = item.date >= new Date();
-    const canAct = isScheduled && isFuture;
+    const canStudentCancel = isScheduled && isFuture;
+    const canStaffAct = isScheduled;
+    const isCancelledOrDone = item.status !== 'scheduled';
     const staffName = getStaffName(item.staffId);
 
     return (
@@ -588,27 +618,31 @@ export const CalendarScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Actions */}
-        {canAct && isStaff && (
+        {/* Staff actions */}
+        {isStaff && (
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
-              <Ionicons name="create-outline" size={18} color={colors.info} />
-              <Text style={[styles.actionText, { color: colors.info }]}>Modifica</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleComplete(item)}>
-              <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
-              <Text style={[styles.actionText, { color: colors.success }]}>Completato</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
-              <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
-              <Text style={[styles.actionText, { color: colors.warning }]}>Annulla</Text>
-            </TouchableOpacity>
+            {canStaffAct && (
+              <>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
+                  <Ionicons name="create-outline" size={18} color={colors.info} />
+                  <Text style={[styles.actionText, { color: colors.info }]}>Modifica</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleComplete(item)}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
+                  <Text style={[styles.actionText, { color: colors.success }]}>Completato</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
+                  <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
+                  <Text style={[styles.actionText, { color: colors.warning }]}>Annulla</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
               <Ionicons name="trash-outline" size={18} color={colors.error} />
             </TouchableOpacity>
           </View>
         )}
-        {canAct && isStudent && (
+        {canStudentCancel && isStudent && (
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
               <Ionicons name="close-circle-outline" size={18} color={colors.error} />
@@ -637,8 +671,8 @@ export const CalendarScreen: React.FC = () => {
             <View style={styles.header}>
               <Text style={styles.title}>{isStudent ? 'I Miei Appuntamenti' : 'Calendario'}</Text>
               <Text style={styles.subtitle}>
-                {allAppointments.length} appuntament{allAppointments.length === 1 ? 'o' : 'i'} totali
-                {' · '}{allAppointments.filter(a => a.status === 'scheduled').length} in programma
+                {filteredAppointments.length} appuntament{filteredAppointments.length === 1 ? 'o' : 'i'} totali
+                {' · '}{filteredAppointments.filter(a => a.status === 'scheduled').length} in programma
               </Text>
               {isStudent && (
                 <Text style={styles.cancelHint}>
@@ -646,6 +680,37 @@ export const CalendarScreen: React.FC = () => {
                 </Text>
               )}
             </View>
+
+            {/* Staff filter (owner only) */}
+            {canSeeAll && staffList.length > 0 && (
+              <View style={styles.staffFilterSection}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.staffFilterRow}>
+                    <TouchableOpacity
+                      style={[styles.staffFilterChip, !selectedStaffId && styles.staffFilterChipActive]}
+                      onPress={() => setSelectedStaffId(null)}
+                    >
+                      <Ionicons name="people" size={14} color={!selectedStaffId ? colors.textOnAccent : colors.textSecondary} />
+                      <Text style={[styles.staffFilterChipText, !selectedStaffId && styles.staffFilterChipTextActive]}>Tutti</Text>
+                    </TouchableOpacity>
+                    {staffList.map((s) => (
+                      <TouchableOpacity
+                        key={s.id}
+                        style={[styles.staffFilterChip, selectedStaffId === s.id && styles.staffFilterChipActive]}
+                        onPress={() => setSelectedStaffId(selectedStaffId === s.id ? null : s.id)}
+                      >
+                        <Text style={[styles.staffFilterChipText, selectedStaffId === s.id && styles.staffFilterChipTextActive]}>
+                          {s.name}
+                        </Text>
+                        <Text style={[styles.staffFilterChipRole, selectedStaffId === s.id && { color: colors.textOnAccent }]}>
+                          {s.role}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
 
             {/* Month nav */}
             <View style={styles.monthNav}>
@@ -984,6 +1049,46 @@ const styles = StyleSheet.create({
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
   cancelHint: { fontSize: fontSize.xs, color: colors.warning, marginTop: spacing.xs },
+
+  staffFilterSection: {
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  staffFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  staffFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  staffFilterChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  staffFilterChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  staffFilterChipTextActive: {
+    color: colors.textOnAccent,
+  },
+  staffFilterChipRole: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginLeft: 2,
+  },
 
   // Month navigation
   monthNav: {
