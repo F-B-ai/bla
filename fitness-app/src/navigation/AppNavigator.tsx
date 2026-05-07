@@ -73,6 +73,7 @@ import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
+import { CalendarScreen } from '../screens/shared/CalendarScreen';
 import { AcademyScreen } from '../screens/shared/AcademyScreen';
 import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
 import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
@@ -224,9 +225,9 @@ const OwnerTabs = () => (
     />
     <OwnerTab.Screen
       name="Sessions"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -373,9 +374,9 @@ const ManagerTabs = () => (
     />
     <ManagerTab.Screen
       name="Sessions"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -474,9 +475,9 @@ const CollaboratorTabs = () => (
     />
     <CollaboratorTab.Screen
       name="Schedule"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />

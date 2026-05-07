@@ -98,6 +98,17 @@ export const getCompletedSessionsCount = async (
   return sessions.filter((s) => s.isCountedAsCompleted).length;
 };
 
+export const updateSession = async (
+  sessionId: string,
+  updates: Partial<Omit<TrainingSession, 'id'>>
+): Promise<void> => {
+  const data: Record<string, unknown> = { ...updates };
+  if (updates.date) {
+    data.date = Timestamp.fromDate(updates.date);
+  }
+  await updateDoc(doc(db, SESSIONS_COLLECTION, sessionId), data);
+};
+
 export const deleteSession = async (sessionId: string): Promise<void> => {
   await deleteDoc(doc(db, SESSIONS_COLLECTION, sessionId));
 };

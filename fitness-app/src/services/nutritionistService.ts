@@ -90,6 +90,29 @@ export const updateAppointmentStatus = async (
   await updateDoc(doc(db, APPOINTMENTS_COLLECTION, appointmentId), updateData);
 };
 
+export const updateAppointment = async (
+  appointmentId: string,
+  updates: Partial<Omit<NutritionistAppointment, 'id'>>
+): Promise<void> => {
+  const data: Record<string, unknown> = { ...updates };
+  if (updates.date) {
+    data.date = Timestamp.fromDate(updates.date);
+  }
+  await updateDoc(doc(db, APPOINTMENTS_COLLECTION, appointmentId), data);
+};
+
+export const getNutritionistAppointmentsByStaff = async (
+  staffId: string
+): Promise<NutritionistAppointment[]> => {
+  const q = query(
+    collection(db, APPOINTMENTS_COLLECTION),
+    where('nutritionistId', '==', staffId),
+    orderBy('date', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
+};
+
 export const deleteAppointment = async (appointmentId: string): Promise<void> => {
   await deleteDoc(doc(db, APPOINTMENTS_COLLECTION, appointmentId));
 };

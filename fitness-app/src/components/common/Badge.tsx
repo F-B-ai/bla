@@ -11,6 +11,7 @@ const statusColors: Record<string, string> = {
   // Session
   scheduled: colors.info,
   completed: colors.success,
+  cancelled: colors.textSecondary,
   cancelled_by_student: colors.textSecondary,
   cancelled_late: colors.error,
   no_show: colors.error,
@@ -22,6 +23,7 @@ const statusLabels: Record<string, string> = {
   overdue: 'Scaduto',
   scheduled: 'Programmata',
   completed: 'Completata',
+  cancelled: 'Annullata',
   cancelled_by_student: 'Annullata',
   cancelled_late: 'Annullata tardi',
   no_show: 'Assente',

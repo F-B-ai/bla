@@ -81,6 +81,7 @@ export interface TrainingSession {
   program?: TrainingProgram;
   notes: string;
   cancelledAt?: Date;
+  sessionCost?: number;
   // Se cancellato < 10 ore prima => considerato eseguito
   isCountedAsCompleted: boolean;
 }
@@ -310,6 +311,7 @@ export interface NutritionistAppointment {
   endTime: string;   // "10:00"
   status: NutritionistAppointmentStatus;
   notes: string;
+  sessionCost?: number;
   cancelledAt?: Date;
   isCountedAsCompleted: boolean; // Se cancellato < 10 ore prima
   createdAt: Date;
