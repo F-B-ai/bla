@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -22,6 +23,8 @@ import {
   updateCustomTemplate,
   deleteCustomTemplate,
   CustomWorkoutTemplate,
+  getFullExerciseLibrary,
+  LibraryExercise,
 } from '../../services/programService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 
@@ -78,6 +81,12 @@ export const ManageTemplatesScreen: React.FC = () => {
   const [exCategory, setExCategory] = useState<ExerciseCategory>('forza');
   const [exNotes, setExNotes] = useState('');
 
+  // Exercise Library
+  const [exerciseLibrary, setExerciseLibrary] = useState<LibraryExercise[]>([]);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+
   const loadTemplates = useCallback(async () => {
     setLoading(true);
     try {
@@ -90,9 +99,19 @@ export const ManageTemplatesScreen: React.FC = () => {
     }
   }, []);
 
+  const loadExerciseLibrary = useCallback(async () => {
+    try {
+      const library = await getFullExerciseLibrary();
+      setExerciseLibrary(library);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   useEffect(() => {
     loadTemplates();
-  }, [loadTemplates]);
+    loadExerciseLibrary();
+  }, [loadTemplates, loadExerciseLibrary]);
 
   const resetExForm = () => {
     setExName('');
@@ -122,6 +141,21 @@ export const ManageTemplatesScreen: React.FC = () => {
 
   const openEditModal = (template: CustomWorkoutTemplate) => {
     setEditingTemplate(template);
+    setTplName(template.name);
+    setTplDescription(template.description);
+    setTplGender(template.gender);
+    setTplCategory(template.category);
+    const exMap: Record<number, Omit<Exercise, 'id'>[]> = {};
+    for (const day of template.weeklySchedule) {
+      exMap[day.dayOfWeek] = [...day.exercises];
+    }
+    setTplExercises(exMap);
+    setTplSelectedDay(0);
+    setShowEditModal(true);
+  };
+
+  const editBuiltinTemplate = (template: WorkoutTemplate) => {
+    resetEditForm();
     setTplName(template.name);
     setTplDescription(template.description);
     setTplGender(template.gender);
@@ -313,6 +347,29 @@ export const ManageTemplatesScreen: React.FC = () => {
     return day?.exercises || [];
   };
 
+  const selectFromLibrary = (libEx: LibraryExercise) => {
+    setExName(libEx.name);
+    setExDescription(libEx.description);
+    setExSets(String(libEx.sets));
+    setExReps(libEx.reps);
+    setExRest(String(libEx.restSeconds));
+    setExCategory(libEx.category);
+    setExNotes(libEx.notes);
+    setShowLibraryPicker(false);
+    setLibrarySearch('');
+  };
+
+  const filteredLibrary = exerciseLibrary.filter((ex) => {
+    if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
+      return false;
+    }
+    if (librarySearch) {
+      const search = librarySearch.toLowerCase();
+      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+    }
+    return true;
+  });
+
   const isCustomTemplate = (t: any): t is CustomWorkoutTemplate => 'createdBy' in t;
 
   // --- Render ---
@@ -406,11 +463,19 @@ export const ManageTemplatesScreen: React.FC = () => {
                 />
               </>
             ) : (
-              <Button
-                title="Duplica e Modifica"
-                onPress={() => { setViewMode('list'); duplicateBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
-                style={styles.detailBtn}
-              />
+              <>
+                <Button
+                  title="Modifica"
+                  onPress={() => { setViewMode('list'); editBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
+                  style={styles.detailBtn}
+                />
+                <Button
+                  title="Duplica"
+                  onPress={() => { setViewMode('list'); duplicateBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
+                  variant="outline"
+                  style={styles.detailBtn}
+                />
+              </>
             )}
           </View>
         </View>
@@ -492,7 +557,7 @@ export const ManageTemplatesScreen: React.FC = () => {
         ) : (
           <>
             <Text style={styles.builtinHint}>
-              I template predefiniti non sono modificabili, ma puoi duplicarli per creare versioni personalizzate.
+              Modifica i template predefiniti — le modifiche vengono salvate come template personalizzati.
             </Text>
             {allTemplates.map((tpl) => (
               <TouchableOpacity key={tpl.id} onPress={() => viewTemplateDetail(tpl)}>
@@ -507,9 +572,14 @@ export const ManageTemplatesScreen: React.FC = () => {
                       <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
                       <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
                     </View>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => duplicateBuiltinTemplate(tpl)}>
-                      <Text style={styles.iconBtnText}>⧉</Text>
-                    </TouchableOpacity>
+                    <View style={styles.templateActions}>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => editBuiltinTemplate(tpl)}>
+                        <Text style={styles.iconBtnText}>✎</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => duplicateBuiltinTemplate(tpl)}>
+                        <Text style={styles.iconBtnText}>⧉</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -671,6 +741,68 @@ export const ManageTemplatesScreen: React.FC = () => {
               title={editingExIndex !== null ? 'Modifica Esercizio' : 'Nuovo Esercizio'}
               onClose={() => { setShowExForm(false); resetExForm(); }}
             />
+
+            {/* Library Picker */}
+            <TouchableOpacity
+              style={styles.libraryPickerToggle}
+              onPress={() => setShowLibraryPicker(!showLibraryPicker)}
+            >
+              <Ionicons name="library-outline" size={20} color={colors.accent} />
+              <Text style={styles.libraryPickerToggleText}>
+                {showLibraryPicker ? 'Chiudi Libreria' : 'Scegli dalla Libreria Esercizi'}
+              </Text>
+              <Ionicons name={showLibraryPicker ? 'chevron-up' : 'chevron-down'} size={18} color={colors.accent} />
+            </TouchableOpacity>
+
+            {showLibraryPicker && (
+              <View style={styles.libraryPickerContainer}>
+                <InputField
+                  label=""
+                  value={librarySearch}
+                  onChangeText={setLibrarySearch}
+                  placeholder="Cerca esercizio..."
+                />
+                <View style={styles.libraryFilterRow}>
+                  {(['all', 'male', 'female'] as const).map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
+                      onPress={() => setLibraryGenderFilter(f)}
+                    >
+                      <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
+                        {f === 'all' ? 'Tutti' : f === 'male' ? 'Uomo' : 'Donna'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.libraryList}>
+                  {filteredLibrary.length === 0 ? (
+                    <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
+                  ) : (
+                    filteredLibrary.map((libEx) => (
+                      <TouchableOpacity
+                        key={libEx.id}
+                        style={styles.libraryItem}
+                        onPress={() => selectFromLibrary(libEx)}
+                      >
+                        <View style={styles.libraryItemLeft}>
+                          <Text style={styles.libraryItemName}>{libEx.name}</Text>
+                          <Text style={styles.libraryItemDetails}>
+                            {libEx.sets}x{libEx.reps} | {libEx.category}
+                            {libEx.videoUrl ? ' | Video' : ''}
+                          </Text>
+                        </View>
+                        {libEx.videoUrl ? (
+                          <Ionicons name="videocam" size={18} color={colors.success} />
+                        ) : (
+                          <Ionicons name="add-circle-outline" size={18} color={colors.textLight} />
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              </View>
+            )}
 
             <InputField
               label="Nome esercizio"
@@ -870,4 +1002,34 @@ const styles = StyleSheet.create({
   modalButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   modalButton: { flex: 1 },
   bottomSpacer: { height: spacing.xxl * 2 },
+
+  // Library picker
+  libraryPickerToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent + '10', borderRadius: borderRadius.md,
+    borderWidth: 1, borderColor: colors.accent + '30', marginBottom: spacing.md,
+  },
+  libraryPickerToggleText: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
+  libraryPickerContainer: {
+    marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border,
+    borderRadius: borderRadius.md, padding: spacing.sm, backgroundColor: colors.background,
+  },
+  libraryFilterRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  libraryFilterChip: {
+    flex: 1, paddingVertical: spacing.xs, borderRadius: borderRadius.round,
+    borderWidth: 1, borderColor: colors.border, alignItems: 'center',
+  },
+  libraryFilterChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  libraryFilterText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
+  libraryFilterTextActive: { color: colors.textOnAccent },
+  libraryList: { maxHeight: 250 },
+  libraryEmptyText: { color: colors.textSecondary, textAlign: 'center', padding: spacing.md, fontSize: fontSize.sm },
+  libraryItem: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider,
+  },
+  libraryItemLeft: { flex: 1 },
+  libraryItemName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  libraryItemDetails: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
 });
