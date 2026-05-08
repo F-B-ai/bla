@@ -309,3 +309,72 @@ export const markMessagesAsRead = async (
   });
   await Promise.all(batch);
 };
+
+// --- Team Chat (staff-only) ---
+
+export const createTeamChatRoom = async (
+  creatorId: string,
+  participantIds: string[],
+  name: string
+): Promise<string> => {
+  const allParticipants = Array.from(new Set([creatorId, ...participantIds]));
+  const docRef = await addDoc(collection(db, ROOMS_COLLECTION), {
+    participants: allParticipants,
+    type: 'group',
+    chatType: 'team',
+    name,
+    studentId: '',
+    collaboratorId: '',
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const getTeamChatRooms = async (userId: string): Promise<ChatRoom[]> => {
+  const q = query(
+    collection(db, ROOMS_COLLECTION),
+    where('chatType', '==', 'team'),
+    where('participants', 'array-contains', userId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+};
+
+export const getAllTeamChatRooms = async (): Promise<ChatRoom[]> => {
+  const q = query(
+    collection(db, ROOMS_COLLECTION),
+    where('chatType', '==', 'team')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+};
+
+export const subscribeToTeamChatRooms = (
+  userId: string,
+  isOwner: boolean,
+  callback: (rooms: ChatRoom[]) => void
+): Unsubscribe => {
+  const q = isOwner
+    ? query(collection(db, ROOMS_COLLECTION), where('chatType', '==', 'team'))
+    : query(
+        collection(db, ROOMS_COLLECTION),
+        where('chatType', '==', 'team'),
+        where('participants', 'array-contains', userId)
+      );
+  return onSnapshot(q, (snapshot) => {
+    const rooms = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+    callback(rooms);
+  }, (error) => {
+    console.error('Errore listener team chat rooms:', error);
+  });
+};
+
+export const addParticipantToRoom = async (
+  roomId: string,
+  userId: string
+): Promise<void> => {
+  await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+    participants: arrayUnion(userId),
+  });
+};
+

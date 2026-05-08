@@ -81,6 +81,7 @@ import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen'
 import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
 import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
+import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -312,6 +313,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
@@ -437,6 +446,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
@@ -543,6 +560,14 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'AI',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen

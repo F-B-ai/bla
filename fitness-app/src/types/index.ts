@@ -201,9 +201,10 @@ export interface FinancialTransaction {
 // --- Chat ---
 export interface ChatRoom {
   id: string;
-  participants: string[]; // user IDs
+  participants: string[];
   type: 'direct' | 'group';
-  chatType?: 'training' | 'nutrition'; // tipo di chat: allenamento o nutrizione
+  chatType?: 'training' | 'nutrition' | 'team';
+  name?: string;
   createdAt: Date;
   lastMessage?: ChatMessage;
   studentId: string;
