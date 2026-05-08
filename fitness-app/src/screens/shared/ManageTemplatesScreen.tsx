@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
@@ -742,67 +743,15 @@ export const ManageTemplatesScreen: React.FC = () => {
               onClose={() => { setShowExForm(false); resetExForm(); }}
             />
 
-            {/* Library Picker */}
+            {/* Library Picker Button */}
             <TouchableOpacity
               style={styles.libraryPickerToggle}
-              onPress={() => setShowLibraryPicker(!showLibraryPicker)}
+              onPress={() => { setShowLibraryPicker(true); setLibrarySearch(''); }}
             >
               <Ionicons name="library-outline" size={20} color={colors.accent} />
-              <Text style={styles.libraryPickerToggleText}>
-                {showLibraryPicker ? 'Chiudi Libreria' : 'Scegli dalla Libreria Esercizi'}
-              </Text>
-              <Ionicons name={showLibraryPicker ? 'chevron-up' : 'chevron-down'} size={18} color={colors.accent} />
+              <Text style={styles.libraryPickerToggleText}>Scegli dalla Libreria Esercizi</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.accent} />
             </TouchableOpacity>
-
-            {showLibraryPicker && (
-              <View style={styles.libraryPickerContainer}>
-                <InputField
-                  label=""
-                  value={librarySearch}
-                  onChangeText={setLibrarySearch}
-                  placeholder="Cerca esercizio..."
-                />
-                <View style={styles.libraryFilterRow}>
-                  {(['all', 'male', 'female'] as const).map((f) => (
-                    <TouchableOpacity
-                      key={f}
-                      style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
-                      onPress={() => setLibraryGenderFilter(f)}
-                    >
-                      <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
-                        {f === 'all' ? 'Tutti' : f === 'male' ? 'Uomo' : 'Donna'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.libraryList}>
-                  {filteredLibrary.length === 0 ? (
-                    <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
-                  ) : (
-                    filteredLibrary.map((libEx) => (
-                      <TouchableOpacity
-                        key={libEx.id}
-                        style={styles.libraryItem}
-                        onPress={() => selectFromLibrary(libEx)}
-                      >
-                        <View style={styles.libraryItemLeft}>
-                          <Text style={styles.libraryItemName}>{libEx.name}</Text>
-                          <Text style={styles.libraryItemDetails}>
-                            {libEx.sets}x{libEx.reps} | {libEx.category}
-                            {libEx.videoUrl ? ' | Video' : ''}
-                          </Text>
-                        </View>
-                        {libEx.videoUrl ? (
-                          <Ionicons name="videocam" size={18} color={colors.success} />
-                        ) : (
-                          <Ionicons name="add-circle-outline" size={18} color={colors.textLight} />
-                        )}
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </View>
-              </View>
-            )}
 
             <InputField
               label="Nome esercizio"
@@ -876,6 +825,79 @@ export const ManageTemplatesScreen: React.FC = () => {
 
             <View style={styles.bottomSpacer} />
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale Libreria Esercizi */}
+      <Modal visible={showLibraryPicker} animationType="slide" transparent={false}>
+        <View style={styles.libraryModalContainer}>
+          <View style={styles.libraryModalHeader}>
+            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
+            <View style={{ width: 40 }} />
+          </View>
+
+          <View style={styles.libraryModalSearch}>
+            <Ionicons name="search" size={18} color={colors.textLight} style={{ marginRight: spacing.sm }} />
+            <InputField
+              label=""
+              value={librarySearch}
+              onChangeText={setLibrarySearch}
+              placeholder="Cerca esercizio..."
+            />
+          </View>
+
+          <View style={styles.libraryFilterRow}>
+            {(['all', 'male', 'female'] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
+                onPress={() => setLibraryGenderFilter(f)}
+              >
+                <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
+                  {f === 'all' ? `Tutti (${exerciseLibrary.length})` : f === 'male' ? 'Uomo' : 'Donna'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <FlatList
+            data={filteredLibrary}
+            keyExtractor={(item) => item.id}
+            style={styles.libraryFlatList}
+            renderItem={({ item: libEx }) => (
+              <TouchableOpacity
+                style={styles.libraryItem}
+                onPress={() => selectFromLibrary(libEx)}
+              >
+                <View style={styles.libraryItemLeft}>
+                  <Text style={styles.libraryItemName}>{libEx.name}</Text>
+                  <Text style={styles.libraryItemDesc} numberOfLines={2}>{libEx.description}</Text>
+                  <View style={styles.libraryItemMeta}>
+                    <Text style={styles.libraryItemBadge}>{libEx.sets}x{libEx.reps}</Text>
+                    <Text style={styles.libraryItemBadge}>Rec: {libEx.restSeconds}s</Text>
+                    <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
+                    {libEx.videoUrl && (
+                      <View style={styles.libraryVideoBadge}>
+                        <Ionicons name="videocam" size={12} color="#FFF" />
+                        <Text style={styles.libraryVideoBadgeText}>Video</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="add-circle" size={26} color={colors.accent} />
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.libraryEmptyContainer}>
+                <Ionicons name="barbell-outline" size={48} color={colors.textLight} />
+                <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
+              </View>
+            }
+            ItemSeparatorComponent={() => <View style={styles.libraryItemSeparator} />}
+          />
         </View>
       </Modal>
 
@@ -1011,25 +1033,45 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.accent + '30', marginBottom: spacing.md,
   },
   libraryPickerToggleText: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
-  libraryPickerContainer: {
-    marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border,
-    borderRadius: borderRadius.md, padding: spacing.sm, backgroundColor: colors.background,
+  libraryModalContainer: { flex: 1, backgroundColor: colors.background },
+  libraryModalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: colors.primary, paddingTop: spacing.xxl, paddingBottom: spacing.md, paddingHorizontal: spacing.md,
   },
-  libraryFilterRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  libraryModalClose: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLight,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  libraryModalTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.textOnPrimary },
+  libraryModalSearch: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md,
+  },
+  libraryFilterRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   libraryFilterChip: {
-    flex: 1, paddingVertical: spacing.xs, borderRadius: borderRadius.round,
+    flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.round,
     borderWidth: 1, borderColor: colors.border, alignItems: 'center',
   },
   libraryFilterChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   libraryFilterText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
   libraryFilterTextActive: { color: colors.textOnAccent },
-  libraryList: { maxHeight: 250 },
-  libraryEmptyText: { color: colors.textSecondary, textAlign: 'center', padding: spacing.md, fontSize: fontSize.sm },
+  libraryFlatList: { flex: 1 },
   libraryItem: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.divider,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md,
   },
-  libraryItemLeft: { flex: 1 },
-  libraryItemName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
-  libraryItemDetails: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  libraryItemLeft: { flex: 1, marginRight: spacing.md },
+  libraryItemName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  libraryItemDesc: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4, lineHeight: 18 },
+  libraryItemMeta: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' },
+  libraryItemBadge: {
+    fontSize: fontSize.xs, color: colors.textLight, backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm, overflow: 'hidden',
+  },
+  libraryVideoBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success,
+    paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm,
+  },
+  libraryVideoBadgeText: { fontSize: fontSize.xs, color: '#FFF', fontWeight: '700' },
+  libraryItemSeparator: { height: 1, backgroundColor: colors.divider, marginHorizontal: spacing.md },
+  libraryEmptyContainer: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
+  libraryEmptyText: { color: colors.textSecondary, textAlign: 'center', fontSize: fontSize.md },
 });
