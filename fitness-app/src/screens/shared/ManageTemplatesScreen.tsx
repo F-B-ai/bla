@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -830,17 +831,16 @@ export const ManageTemplatesScreen: React.FC = () => {
 
       {/* Modale Libreria Esercizi */}
       <Modal visible={showLibraryPicker} animationType="slide" transparent={false}>
-        <View style={styles.libraryModalContainer}>
+        <SafeAreaView style={styles.libraryModalContainer}>
           <View style={styles.libraryModalHeader}>
-            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
+            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalBack}>
+              <Ionicons name="arrow-back" size={22} color={colors.accent} />
+              <Text style={styles.libraryModalBackText}>Indietro</Text>
             </TouchableOpacity>
-            <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
-            <View style={{ width: 40 }} />
           </View>
+          <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
 
           <View style={styles.libraryModalSearch}>
-            <Ionicons name="search" size={18} color={colors.textLight} style={{ marginRight: spacing.sm }} />
             <InputField
               label=""
               value={librarySearch}
@@ -898,7 +898,7 @@ export const ManageTemplatesScreen: React.FC = () => {
             }
             ItemSeparatorComponent={() => <View style={styles.libraryItemSeparator} />}
           />
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <View style={styles.bottomSpacer} />
@@ -1035,17 +1035,16 @@ const styles = StyleSheet.create({
   libraryPickerToggleText: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
   libraryModalContainer: { flex: 1, backgroundColor: colors.background },
   libraryModalHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.primary, paddingTop: spacing.xxl, paddingBottom: spacing.md, paddingHorizontal: spacing.md,
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm,
   },
-  libraryModalClose: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceLight,
-    justifyContent: 'center', alignItems: 'center',
+  libraryModalBack: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingRight: spacing.md, gap: spacing.xs,
   },
-  libraryModalTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.textOnPrimary },
-  libraryModalSearch: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md,
+  libraryModalBackText: { fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
+  libraryModalTitle: {
+    fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, paddingHorizontal: spacing.md, paddingBottom: spacing.sm,
   },
+  libraryModalSearch: { paddingHorizontal: spacing.md },
   libraryFilterRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   libraryFilterChip: {
     flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.round,

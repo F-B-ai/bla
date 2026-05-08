@@ -8,7 +8,9 @@ import {
   Modal,
   ActivityIndicator,
   FlatList,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -1089,17 +1091,16 @@ export const WorkoutPlanScreen: React.FC = () => {
 
       {/* Modale Libreria Esercizi */}
       <Modal visible={showLibraryPicker} animationType="slide" transparent={false}>
-        <View style={styles.libraryModalContainer}>
+        <SafeAreaView style={styles.libraryModalContainer}>
           <View style={styles.libraryModalHeader}>
-            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalClose}>
-              <Ionicons name="close" size={24} color={colors.text} />
+            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalBack}>
+              <Ionicons name="arrow-back" size={22} color={colors.accent} />
+              <Text style={styles.libraryModalBackText}>Indietro</Text>
             </TouchableOpacity>
-            <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
-            <View style={{ width: 40 }} />
           </View>
+          <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
 
           <View style={styles.libraryModalSearch}>
-            <Ionicons name="search" size={18} color={colors.textLight} style={{ marginRight: spacing.sm }} />
             <InputField
               label=""
               value={librarySearch}
@@ -1157,7 +1158,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             }
             ItemSeparatorComponent={() => <View style={styles.libraryItemSeparator} />}
           />
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <View style={styles.bottomSpacer} />
@@ -1584,30 +1585,30 @@ const styles = StyleSheet.create({
   libraryModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primary,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.md,
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
   },
-  libraryModalClose: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  libraryModalTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '700',
-    color: colors.textOnPrimary,
-  },
-  libraryModalSearch: {
+  libraryModalBack: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.md,
+    gap: spacing.xs,
+  },
+  libraryModalBackText: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  libraryModalTitle: {
+    fontSize: fontSize.xxl,
+    fontWeight: '700',
+    color: colors.text,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  libraryModalSearch: {
+    paddingHorizontal: spacing.md,
   },
   libraryFilterRow: {
     flexDirection: 'row',
