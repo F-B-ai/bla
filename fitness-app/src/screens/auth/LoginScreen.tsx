@@ -252,15 +252,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? spacing.md : 50,
-    left: 0,
-    padding: spacing.md,
+    top: Platform.OS === 'web' ? spacing.md : 60,
+    left: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
     zIndex: 10,
   },
   backText: {
     color: colors.accent,
-    fontSize: fontSize.md,
-    fontWeight: '600',
+    fontSize: fontSize.lg,
+    fontWeight: '700',
   },
   footer: {
     color: colors.textLight,
