@@ -39,7 +39,7 @@ export const ManagerDashboardScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     if (!manager) return;
     try {
-      const [allCollabs, allStudents, allSessions, allTxs, allAppts] = await Promise.all([
+      const results = await Promise.allSettled([
         getCollaborators(),
         getStudents(),
         getAllSessions(),
@@ -47,22 +47,33 @@ export const ManagerDashboardScreen: React.FC = () => {
         getAllAppointments(),
       ]);
 
+      const allCollabs = results[0].status === 'fulfilled' ? results[0].value : [];
+      const allStudents = results[1].status === 'fulfilled' ? results[1].value : [];
+      const allSessions = results[2].status === 'fulfilled' ? results[2].value : [];
+      const allTxs = results[3].status === 'fulfilled' ? results[3].value : [];
+      const allAppts = results[4].status === 'fulfilled' ? results[4].value : [];
+
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0) {
+        console.warn('Alcune query dashboard fallite:', failed.map((f) => (f as PromiseRejectedResult).reason));
+      }
+
       // Filtra solo i collaboratori assegnati a questo manager
-      const myCollabs = allCollabs.filter((c) =>
+      const myCollabs = allCollabs.filter((c: Collaborator) =>
         manager.assignedCollaborators?.includes(c.id)
       );
       setTeamCollaborators(myCollabs);
 
       // Allievi diretti del manager
-      const myDirectStudents = allStudents.filter((s) =>
+      const myDirectStudents = allStudents.filter((s: Student) =>
         manager.assignedStudents?.includes(s.id)
       );
       setDirectStudents(myDirectStudents);
 
       // Allievi del team (coach sotto il manager) + allievi diretti
-      const teamCollabIds = myCollabs.map((c) => c.id);
+      const teamCollabIds = myCollabs.map((c: Collaborator) => c.id);
       const myTeamStudents = allStudents.filter(
-        (s) =>
+        (s: Student) =>
           teamCollabIds.includes(s.assignedCollaboratorId) ||
           manager.assignedStudents?.includes(s.id)
       );
@@ -70,14 +81,14 @@ export const ManagerDashboardScreen: React.FC = () => {
 
       // Sessioni del team (coach + manager stesso come coach)
       const allTeamIds = [...teamCollabIds, manager.id];
-      const myTeamSessions = allSessions.filter((s) =>
+      const myTeamSessions = allSessions.filter((s: TrainingSession) =>
         allTeamIds.includes(s.collaboratorId)
       );
       setTeamSessions(myTeamSessions);
 
       // Transazioni legate al team
       const myTxs = allTxs.filter(
-        (t) => allTeamIds.includes(t.collaboratorId || '')
+        (t: FinancialTransaction) => allTeamIds.includes(t.collaboratorId || '')
       );
       setTransactions(myTxs);
       setAppointments(allAppts);

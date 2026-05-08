@@ -273,5 +273,13 @@ service cloud.firestore {
       allow update: if isStaff();
       allow delete: if isStaff();
     }
+
+    // KPI targets (obiettivi personalizzabili)
+    match /kpiTargets/{targetId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwnerOrManager();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwner();
+    }
   }
 }
