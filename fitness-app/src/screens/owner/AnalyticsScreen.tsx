@@ -13,7 +13,8 @@ import { KPICard, KPIData } from '../../components/charts/KPICard';
 import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { getTransactions, getFinancialSummary } from '../../services/financialService';
 import { getAllSessions } from '../../services/sessionService';
-import { Collaborator, Manager, Student, TrainingSession, FinancialTransaction } from '../../types';
+import { getAllAppointments } from '../../services/nutritionistService';
+import { Collaborator, Manager, Student, TrainingSession, FinancialTransaction, NutritionistAppointment } from '../../types';
 
 type Period = 'month' | 'quarter' | 'year';
 
@@ -25,24 +26,27 @@ export const AnalyticsScreen: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [appointments, setAppointments] = useState<NutritionistAppointment[]>([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
-      const [collabs, mgrs, studs, allSessions, txs, summary] = await Promise.all([
+      const [collabs, mgrs, studs, allSessions, txs, summary, appts] = await Promise.all([
         getCollaborators(),
         getManagers(),
         getStudents(),
         getAllSessions(),
         getTransactions(),
         getFinancialSummary(),
+        getAllAppointments(),
       ]);
       setCollaborators(collabs);
       setManagers(mgrs);
       setStudents(studs);
       setSessions(allSessions);
       setTransactions(txs);
+      setAppointments(appts);
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
     } catch (err) {
@@ -60,9 +64,12 @@ export const AnalyticsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const coaches = collaborators.filter((c) => c.collaboratorType !== 'nutritionist');
+  const nutritionists = collaborators.filter((c) => c.collaboratorType === 'nutritionist');
+
   // --- Calcolo ricavi per coach ---
   const getCoachRevenueData = (): BarData[] => {
-    return collaborators.map((collab) => {
+    return coaches.map((collab) => {
       // Ricavi associati a questo coach (pagamenti dei suoi allievi)
       const coachIncome = transactions
         .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
@@ -175,7 +182,7 @@ export const AnalyticsScreen: React.FC = () => {
 
   // --- KPI Coach ---
   const getCoachKPIs = (): { name: string; kpis: KPIData[] }[] => {
-    return collaborators.map((collab) => {
+    return coaches.map((collab) => {
       const coachSessions = sessions.filter((s) => s.collaboratorId === collab.id);
       const completedSessions = coachSessions.filter((s) => s.status === 'completed');
       const assignedStudents = students.filter((s) => s.assignedCollaboratorId === collab.id);
@@ -238,52 +245,81 @@ export const AnalyticsScreen: React.FC = () => {
     });
   };
 
-  // --- KPI Nutrizionista ---
-  const getNutritionistKPIs = (): KPIData[] => {
-    // Consulenze nutrizionali aggregate
-    const totalConsultations = students.reduce(
-      (sum, s) => sum + (s.nutritionalConsultations || 0),
-      0
-    );
-    const studentsWithNutrition = students.filter((s) => (s.nutritionalConsultations || 0) > 0);
-    const avgConsultations = students.length > 0
-      ? (totalConsultations / students.length).toFixed(1)
-      : '0';
+  // --- KPI Nutrizionista (per persona) ---
+  const getNutritionistKPIs = (): { name: string; kpis: KPIData[] }[] => {
+    return nutritionists.map((nutri) => {
+      const nutriAppointments = appointments.filter((a) => a.nutritionistId === nutri.id);
+      const completedAppts = nutriAppointments.filter(
+        (a) => a.status === 'completed' || a.isCountedAsCompleted
+      );
+      const cancelledAppts = nutriAppointments.filter(
+        (a) => a.status === 'cancelled' || a.status === 'cancelled_late'
+      );
+      const assignedStudents = students.filter((s) => s.assignedNutritionistId === nutri.id);
+      const activeStudents = assignedStudents.filter((s) => s.isActive);
 
-    return [
-      {
-        label: 'Consulenze totali',
-        value: totalConsultations,
-        target: Math.max(totalConsultations + 10, 50),
-        trend: totalConsultations > 0 ? 'up' as const : 'stable' as const,
-      },
-      {
-        label: 'Allievi seguiti',
-        value: studentsWithNutrition.length,
-        target: students.length,
-        trend: studentsWithNutrition.length > students.length / 2 ? 'up' as const : 'down' as const,
-      },
-      {
-        label: 'Media consulenze per allievo',
-        value: avgConsultations,
-        target: 3,
-      },
-      {
-        label: 'Copertura allievi',
-        value: students.length > 0
-          ? Math.round((studentsWithNutrition.length / students.length) * 100)
-          : 0,
-        target: 80,
-        unit: '%',
-        trend: studentsWithNutrition.length > students.length * 0.5 ? 'up' as const : 'down' as const,
-      },
-      {
-        label: 'Allievi senza consulenza',
-        value: students.length - studentsWithNutrition.length,
-        color: students.length - studentsWithNutrition.length > 5 ? colors.warning : colors.success,
-        trend: students.length - studentsWithNutrition.length > 5 ? 'down' as const : 'up' as const,
-      },
-    ];
+      const completionRate = nutriAppointments.length > 0
+        ? Math.round((completedAppts.length / nutriAppointments.length) * 100)
+        : 0;
+
+      const nutriIncome = transactions
+        .filter((t) => t.type === 'income' && t.collaboratorId === nutri.id)
+        .reduce((sum, t) => sum + t.amount, 0);
+      const nutriEarnings = nutriIncome * (nutri.commissionPercentage / 100);
+
+      return {
+        name: `${nutri.name} ${nutri.surname}`,
+        kpis: [
+          {
+            label: 'Allievi seguiti',
+            value: assignedStudents.length,
+            target: Math.max(assignedStudents.length + 3, 10),
+            trend: assignedStudents.length > 0 ? 'up' as const : 'stable' as const,
+          },
+          {
+            label: 'Allievi attivi',
+            value: activeStudents.length,
+            target: assignedStudents.length || 1,
+            trend: activeStudents.length === assignedStudents.length ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Consulenze completate',
+            value: completedAppts.length,
+            target: Math.max(nutriAppointments.length, 1),
+            trend: completedAppts.length > cancelledAppts.length ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Tasso completamento',
+            value: completionRate,
+            target: 85,
+            unit: '%',
+            trend: completionRate >= 85 ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Consulenze cancellate',
+            value: cancelledAppts.length,
+            color: cancelledAppts.length > 3 ? colors.error : colors.success,
+            trend: cancelledAppts.length > 3 ? 'down' as const : 'up' as const,
+          },
+          {
+            label: 'Guadagni (commissione)',
+            value: nutriEarnings,
+            unit: '€',
+            color: colors.success,
+            trend: nutriEarnings > 0 ? 'up' as const : 'stable' as const,
+          },
+          {
+            label: 'Commissione',
+            value: nutri.commissionPercentage,
+            unit: '%',
+          },
+          {
+            label: 'Specializzazioni',
+            value: nutri.specializations?.join(', ') || 'N/A',
+          },
+        ],
+      };
+    });
   };
 
   const periods = [
@@ -434,11 +470,21 @@ export const AnalyticsScreen: React.FC = () => {
       {/* ================================================== */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>KPI Nutrizionista</Text>
-        <KPICard
-          title="Consulenze Nutrizionali"
-          kpis={nutritionistKPIs}
-          accentColor={colors.warning}
-        />
+        {nutritionistKPIs.length > 0 ? (
+          nutritionistKPIs.map((nutri, index) => (
+            <View key={index} style={styles.kpiBlock}>
+              <KPICard
+                title={nutri.name}
+                kpis={nutri.kpis}
+                accentColor={colors.warning}
+              />
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyText}>Nessun nutrizionista registrato</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.bottomSpacer} />

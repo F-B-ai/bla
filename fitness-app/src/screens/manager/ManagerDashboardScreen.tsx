@@ -15,10 +15,11 @@ import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { BarChart, BarData } from '../../components/charts/BarChart';
 import { KPICard, KPIData } from '../../components/charts/KPICard';
-import { Collaborator, Student, TrainingSession, Manager, FinancialTransaction } from '../../types';
+import { Collaborator, Student, TrainingSession, Manager, FinancialTransaction, NutritionistAppointment } from '../../types';
 import { getCollaborators, getStudents } from '../../services/authService';
 import { getAllSessions } from '../../services/sessionService';
 import { getTransactions } from '../../services/financialService';
+import { getAllAppointments } from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
 
 export const ManagerDashboardScreen: React.FC = () => {
@@ -30,6 +31,7 @@ export const ManagerDashboardScreen: React.FC = () => {
   const [teamSessions, setTeamSessions] = useState<TrainingSession[]>([]);
   const [directStudents, setDirectStudents] = useState<Student[]>([]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [appointments, setAppointments] = useState<NutritionistAppointment[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
 
   const manager = user as Manager | null;
@@ -37,11 +39,12 @@ export const ManagerDashboardScreen: React.FC = () => {
   const loadData = useCallback(async () => {
     if (!manager) return;
     try {
-      const [allCollabs, allStudents, allSessions, allTxs] = await Promise.all([
+      const [allCollabs, allStudents, allSessions, allTxs, allAppts] = await Promise.all([
         getCollaborators(),
         getStudents(),
         getAllSessions(),
         getTransactions(),
+        getAllAppointments(),
       ]);
 
       // Filtra solo i collaboratori assegnati a questo manager
@@ -77,6 +80,7 @@ export const ManagerDashboardScreen: React.FC = () => {
         (t) => allTeamIds.includes(t.collaboratorId || '')
       );
       setTransactions(myTxs);
+      setAppointments(allAppts);
     } catch (err) {
       console.error('Errore caricamento dashboard manager:', err);
     }
@@ -117,9 +121,12 @@ export const ManagerDashboardScreen: React.FC = () => {
 
   const managerEarnings = totalTeamRevenue * ((manager?.commissionPercentage || 0) / 100);
 
+  const teamCoaches = teamCollaborators.filter((c) => c.collaboratorType !== 'nutritionist');
+  const teamNutritionists = teamCollaborators.filter((c) => c.collaboratorType === 'nutritionist');
+
   // --- Grafico ricavi per coach del team ---
   const getRevenueByCoach = (): BarData[] => {
-    return teamCollaborators.map((collab) => {
+    return teamCoaches.map((collab) => {
       const coachIncome = transactions
         .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
         .reduce((sum, t) => sum + t.amount, 0);
@@ -136,7 +143,7 @@ export const ManagerDashboardScreen: React.FC = () => {
 
   // --- Grafico allievi per coach ---
   const getStudentsByCoach = (): BarData[] => {
-    return teamCollaborators.map((collab) => ({
+    return teamCoaches.map((collab) => ({
       label: `${collab.name} ${collab.surname?.charAt(0) || ''}.`,
       value: collab.assignedStudents.length,
       color: colors.accent,
@@ -153,9 +160,79 @@ export const ManagerDashboardScreen: React.FC = () => {
     ];
   };
 
+  // --- KPI per nutrizionista ---
+  const getNutritionistKPIs = (): { name: string; kpis: KPIData[] }[] => {
+    return teamNutritionists.map((nutri) => {
+      const nutriAppts = appointments.filter((a) => a.nutritionistId === nutri.id);
+      const completedAppts = nutriAppts.filter(
+        (a) => a.status === 'completed' || a.isCountedAsCompleted
+      );
+      const cancelledAppts = nutriAppts.filter(
+        (a) => a.status === 'cancelled' || a.status === 'cancelled_late'
+      );
+      const assignedStudents = teamStudents.filter((s) => s.assignedNutritionistId === nutri.id);
+      const activeStudents = assignedStudents.filter((s) => s.isActive);
+      const completionRate = nutriAppts.length > 0
+        ? Math.round((completedAppts.length / nutriAppts.length) * 100)
+        : 0;
+      const nutriIncome = transactions
+        .filter((t) => t.type === 'income' && t.collaboratorId === nutri.id)
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      return {
+        name: `${nutri.name} ${nutri.surname}`,
+        kpis: [
+          {
+            label: 'Allievi seguiti',
+            value: assignedStudents.length,
+            target: Math.max(assignedStudents.length + 3, 10),
+            trend: assignedStudents.length > 0 ? 'up' as const : 'stable' as const,
+          },
+          {
+            label: 'Allievi attivi',
+            value: activeStudents.length,
+            target: assignedStudents.length || 1,
+            trend: activeStudents.length === assignedStudents.length ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Consulenze completate',
+            value: completedAppts.length,
+            target: Math.max(nutriAppts.length, 1),
+            trend: completedAppts.length > cancelledAppts.length ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Tasso completamento',
+            value: completionRate,
+            target: 85,
+            unit: '%',
+            trend: completionRate >= 85 ? 'up' as const : 'down' as const,
+          },
+          {
+            label: 'Consulenze cancellate',
+            value: cancelledAppts.length,
+            color: cancelledAppts.length > 3 ? colors.error : colors.success,
+            trend: cancelledAppts.length > 3 ? 'down' as const : 'up' as const,
+          },
+          {
+            label: 'Ricavi generati',
+            value: nutriIncome,
+            unit: '€',
+            color: colors.success,
+            trend: nutriIncome > 0 ? 'up' as const : 'stable' as const,
+          },
+          {
+            label: 'Commissione',
+            value: nutri.commissionPercentage,
+            unit: '%',
+          },
+        ],
+      };
+    });
+  };
+
   // --- KPI per coach ---
   const getCoachKPIs = (): { name: string; kpis: KPIData[] }[] => {
-    return teamCollaborators.map((collab) => {
+    return teamCoaches.map((collab) => {
       const coachSessions = teamSessions.filter((s) => s.collaboratorId === collab.id);
       const coachCompleted = coachSessions.filter((s) => s.status === 'completed');
       const coachCancelled = coachSessions.filter(
@@ -240,6 +317,7 @@ export const ManagerDashboardScreen: React.FC = () => {
   const studentsByCoachData = getStudentsByCoach();
   const sessionsData = getSessionsByStatus();
   const coachKPIs = getCoachKPIs();
+  const nutriKPIs = getNutritionistKPIs();
 
   return (
     <ScrollView
@@ -407,8 +485,8 @@ export const ManagerDashboardScreen: React.FC = () => {
         ))
       )}
 
-      {/* Rendimento Collaboratori del Team */}
-      <Text style={styles.sectionTitle}>Rendimento Team</Text>
+      {/* Rendimento Coach del Team */}
+      <Text style={styles.sectionTitle}>Rendimento Coach</Text>
       {coachKPIs.length > 0 ? (
         coachKPIs.map((coach, index) => (
           <View key={index} style={styles.kpiBlock}>
@@ -425,6 +503,22 @@ export const ManagerDashboardScreen: React.FC = () => {
         </Card>
       )}
 
+      {/* Rendimento Nutrizionisti del Team */}
+      {teamNutritionists.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Rendimento Nutrizionisti</Text>
+          {nutriKPIs.map((nutri, index) => (
+            <View key={index} style={styles.kpiBlock}>
+              <KPICard
+                title={nutri.name}
+                kpis={nutri.kpis}
+                accentColor={colors.warning}
+              />
+            </View>
+          ))}
+        </>
+      )}
+
       {/* Riepilogo Rendimento (card sintetiche) */}
       <Text style={styles.sectionTitle}>Rendimento Collaboratori</Text>
       {teamCollaborators.length === 0 ? (
@@ -433,14 +527,23 @@ export const ManagerDashboardScreen: React.FC = () => {
         </Card>
       ) : (
         teamCollaborators.map((collab) => {
-          const coachSessions = teamSessions.filter((s) => s.collaboratorId === collab.id);
-          const coachCompleted = coachSessions.filter((s) => s.status === 'completed');
-          const completionRate = coachSessions.length > 0
-            ? Math.round((coachCompleted.length / coachSessions.length) * 100)
+          const isNutri = collab.collaboratorType === 'nutritionist';
+          const collabAppts = isNutri
+            ? appointments.filter((a) => a.nutritionistId === collab.id)
+            : [];
+          const coachSessions = isNutri
+            ? []
+            : teamSessions.filter((s) => s.collaboratorId === collab.id);
+          const completedCount = isNutri
+            ? collabAppts.filter((a) => a.status === 'completed' || a.isCountedAsCompleted).length
+            : coachSessions.filter((s) => s.status === 'completed').length;
+          const totalCount = isNutri ? collabAppts.length : coachSessions.length;
+          const completionRate = totalCount > 0
+            ? Math.round((completedCount / totalCount) * 100)
             : 0;
-          const coachStudentCount = teamStudents.filter(
-            (s) => s.assignedCollaboratorId === collab.id
-          ).length;
+          const studentCount = isNutri
+            ? teamStudents.filter((s) => s.assignedNutritionistId === collab.id).length
+            : teamStudents.filter((s) => s.assignedCollaboratorId === collab.id).length;
 
           return (
             <Card key={collab.id} variant="elevated">
@@ -450,7 +553,7 @@ export const ManagerDashboardScreen: React.FC = () => {
                     {collab.name} {collab.surname}
                   </Text>
                   <Text style={styles.collabStudents}>
-                    {coachStudentCount} allievi · {coachCompleted.length}/{coachSessions.length} sessioni
+                    {isNutri ? 'Nutrizionista' : 'Coach'} · {studentCount} allievi · {completedCount}/{totalCount} {isNutri ? 'consulenze' : 'sessioni'}
                   </Text>
                 </View>
                 <View style={styles.collabEarnings}>
