@@ -1,26 +1,24 @@
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  Timestamp,
-} from 'firebase/firestore';
+import { doc, updateDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-const KPI_TARGETS_COLLECTION = 'kpiTargets';
-
-export interface KPITargets {
-  userId: string;
-  targets: Record<string, number>;
-  updatedAt: Date;
-}
-
 export const getAllKPITargets = async (): Promise<Record<string, Record<string, number>>> => {
-  const snapshot = await getDocs(collection(db, KPI_TARGETS_COLLECTION));
   const result: Record<string, Record<string, number>> = {};
-  for (const d of snapshot.docs) {
-    result[d.id] = (d.data().targets as Record<string, number>) || {};
+
+  const queries = [
+    query(collection(db, 'users'), where('role', '==', 'collaborator')),
+    query(collection(db, 'users'), where('role', '==', 'manager')),
+  ];
+
+  for (const q of queries) {
+    const snapshot = await getDocs(q);
+    for (const d of snapshot.docs) {
+      const data = d.data();
+      if (data.kpiTargets) {
+        result[d.id] = data.kpiTargets as Record<string, number>;
+      }
+    }
   }
+
   return result;
 };
 
@@ -28,9 +26,5 @@ export const saveKPITargets = async (
   userId: string,
   targets: Record<string, number>
 ): Promise<void> => {
-  await setDoc(doc(db, KPI_TARGETS_COLLECTION, userId), {
-    userId,
-    targets,
-    updatedAt: Timestamp.now(),
-  });
+  await updateDoc(doc(db, 'users', userId), { kpiTargets: targets });
 };
