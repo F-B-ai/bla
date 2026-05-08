@@ -38,9 +38,23 @@ const createUserWithRestApi = async (email: string, password: string): Promise<s
   const data = await response.json();
 
   if (!response.ok) {
-    // Traduci errori Firebase REST API
     const errorCode = data?.error?.message || '';
+
     if (errorCode === 'EMAIL_EXISTS') {
+      // Account Auth esiste (es. documento Firestore eliminato in precedenza).
+      // Recupera l'UID tramite sign-in REST (non cambia la sessione corrente).
+      const signInRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true }),
+        }
+      );
+      const signInData = await signInRes.json();
+      if (signInRes.ok && signInData.localId) {
+        return signInData.localId;
+      }
       throw { code: 'auth/email-already-in-use' };
     } else if (errorCode === 'WEAK_PASSWORD') {
       throw { code: 'auth/weak-password' };
@@ -50,14 +64,14 @@ const createUserWithRestApi = async (email: string, password: string): Promise<s
     throw new Error(data?.error?.message || 'Errore durante la creazione dell\'utente');
   }
 
-  return data.localId; // UID dell'utente creato
+  return data.localId;
 };
 
 export const signIn = async (email: string, password: string): Promise<User> => {
   const credential = await signInWithEmailAndPassword(auth, email, password);
   const userDoc = await getDoc(doc(db, 'users', credential.user.uid));
   if (!userDoc.exists()) {
-    throw new Error('Utente non trovato nel database');
+    throw new Error('Profilo utente non trovato. Contatta l\'amministratore per ripristinare il tuo account.');
   }
   return { ...userDoc.data(), id: userDoc.id } as User;
 };
