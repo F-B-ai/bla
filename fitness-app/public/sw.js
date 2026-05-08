@@ -1,5 +1,5 @@
 // Service Worker for ESSERE PWA - auto-update on new deploy
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE_NAME = 'essere-' + CACHE_VERSION;
 
 const PRECACHE_URLS = [

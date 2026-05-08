@@ -20,7 +20,8 @@ import { ModalHeader } from '../../components/common/ModalHeader';
 import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
 import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { useAuth } from '../../hooks/useAuth';
-import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
+import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans, addExerciseToLibrary } from '../../services/programService';
+import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 import { getStudents } from '../../services/authService';
 import {
   suggestWorkoutProgression,
@@ -30,6 +31,7 @@ import {
 } from '../../services/aiService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 import { getCustomTemplates, CustomWorkoutTemplate } from '../../services/programService';
+import { Ionicons } from '@expo/vector-icons';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -86,6 +88,13 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiExercisesLoading, setAiExercisesLoading] = useState(false);
 
+  // Exercise Library State
+  const [exerciseLibrary, setExerciseLibrary] = useState<LibraryExercise[]>([]);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+  const [saveToLibrary, setSaveToLibrary] = useState(false);
+
   const loadStudents = useCallback(async () => {
     if (!user) return;
     try {
@@ -112,10 +121,20 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   }, []);
 
+  const loadExerciseLibrary = useCallback(async () => {
+    try {
+      const library = await getFullExerciseLibrary();
+      setExerciseLibrary(library);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   useEffect(() => {
     loadStudents();
     loadCustomTemplates();
-  }, [loadStudents, loadCustomTemplates]);
+    loadExerciseLibrary();
+  }, [loadStudents, loadCustomTemplates, loadExerciseLibrary]);
 
   const formatDate = (date: any) => {
     if (!date) return '';
@@ -326,7 +345,31 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   };
 
-  const addExercise = () => {
+  const selectFromLibrary = (libEx: LibraryExercise) => {
+    setExName(libEx.name);
+    setExDescription(libEx.description);
+    setExSets(String(libEx.sets));
+    setExReps(libEx.reps);
+    setExRest(String(libEx.restSeconds));
+    setExCategory(libEx.category);
+    setExVideoUrl(libEx.videoUrl || '');
+    setExNotes(libEx.notes);
+    setShowLibraryPicker(false);
+    setLibrarySearch('');
+  };
+
+  const filteredLibrary = exerciseLibrary.filter((ex) => {
+    if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
+      return false;
+    }
+    if (librarySearch) {
+      const search = librarySearch.toLowerCase();
+      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+    }
+    return true;
+  });
+
+  const addExercise = async () => {
     if (!exName || !exSets || !exReps) {
       crossAlert('Errore', 'Compila nome, serie e ripetizioni');
       return;
@@ -349,6 +392,24 @@ export const WorkoutPlanScreen: React.FC = () => {
       [selectedDay]: [...(prev[selectedDay] || []), newExercise],
     }));
 
+    if (saveToLibrary && exVideoUrl) {
+      try {
+        await addExerciseToLibrary({
+          name: exName,
+          description: exDescription,
+          sets: parseInt(exSets, 10),
+          reps: exReps,
+          restSeconds: parseInt(exRest, 10) || 60,
+          videoUrl: exVideoUrl || undefined,
+          notes: exNotes,
+          category: exCategory,
+        });
+        loadExerciseLibrary();
+      } catch {
+        // silently handle
+      }
+    }
+
     setExName('');
     setExDescription('');
     setExSets('');
@@ -356,6 +417,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExRest('');
     setExVideoUrl('');
     setExNotes('');
+    setSaveToLibrary(false);
     setShowExerciseModal(false);
   };
 
@@ -612,6 +674,68 @@ export const WorkoutPlanScreen: React.FC = () => {
           <ScrollView style={styles.modalContent}>
             <ModalHeader title="Nuovo Esercizio" onClose={() => setShowExerciseModal(false)} />
 
+            {/* Library Picker */}
+            <TouchableOpacity
+              style={styles.libraryPickerToggle}
+              onPress={() => setShowLibraryPicker(!showLibraryPicker)}
+            >
+              <Ionicons name="library-outline" size={20} color={colors.accent} />
+              <Text style={styles.libraryPickerToggleText}>
+                {showLibraryPicker ? 'Chiudi Libreria' : 'Scegli dalla Libreria Esercizi'}
+              </Text>
+              <Ionicons name={showLibraryPicker ? 'chevron-up' : 'chevron-down'} size={18} color={colors.accent} />
+            </TouchableOpacity>
+
+            {showLibraryPicker && (
+              <View style={styles.libraryPickerContainer}>
+                <InputField
+                  label=""
+                  value={librarySearch}
+                  onChangeText={setLibrarySearch}
+                  placeholder="Cerca esercizio..."
+                />
+                <View style={styles.libraryFilterRow}>
+                  {(['all', 'male', 'female'] as const).map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
+                      onPress={() => setLibraryGenderFilter(f)}
+                    >
+                      <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
+                        {f === 'all' ? 'Tutti' : f === 'male' ? 'Uomo' : 'Donna'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.libraryList}>
+                  {filteredLibrary.length === 0 ? (
+                    <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
+                  ) : (
+                    filteredLibrary.map((libEx) => (
+                      <TouchableOpacity
+                        key={libEx.id}
+                        style={styles.libraryItem}
+                        onPress={() => selectFromLibrary(libEx)}
+                      >
+                        <View style={styles.libraryItemLeft}>
+                          <Text style={styles.libraryItemName}>{libEx.name}</Text>
+                          <Text style={styles.libraryItemDetails}>
+                            {libEx.sets}x{libEx.reps} | {libEx.category}
+                            {libEx.videoUrl ? ' | Video' : ''}
+                          </Text>
+                        </View>
+                        {libEx.videoUrl ? (
+                          <Ionicons name="videocam" size={18} color={colors.success} />
+                        ) : (
+                          <Ionicons name="add-circle-outline" size={18} color={colors.textLight} />
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              </View>
+            )}
+
             <InputField
               label="Nome esercizio"
               value={exName}
@@ -696,6 +820,23 @@ export const WorkoutPlanScreen: React.FC = () => {
                 loading={uploadingVideo}
               />
             )}
+
+            {/* Save to library toggle */}
+            {exVideoUrl ? (
+              <TouchableOpacity
+                style={styles.saveToLibraryRow}
+                onPress={() => setSaveToLibrary(!saveToLibrary)}
+              >
+                <Ionicons
+                  name={saveToLibrary ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={saveToLibrary ? colors.accent : colors.textSecondary}
+                />
+                <Text style={styles.saveToLibraryText}>
+                  Salva nella libreria esercizi (per riuso futuro)
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             {/* AI Exercise Suggestion */}
             <Button
@@ -1395,5 +1536,98 @@ const styles = StyleSheet.create({
     color: colors.info,
     fontSize: fontSize.sm,
     fontWeight: '700',
+  },
+  libraryPickerToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent + '10',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+    marginBottom: spacing.md,
+  },
+  libraryPickerToggleText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  libraryPickerContainer: {
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    backgroundColor: colors.background,
+  },
+  libraryFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  libraryFilterChip: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  libraryFilterChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  libraryFilterText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  libraryFilterTextActive: {
+    color: colors.textOnAccent,
+  },
+  libraryList: {
+    maxHeight: 250,
+  },
+  libraryEmptyText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    padding: spacing.md,
+    fontSize: fontSize.sm,
+  },
+  libraryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  libraryItemLeft: {
+    flex: 1,
+  },
+  libraryItemName: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  libraryItemDetails: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  saveToLibraryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  saveToLibraryText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
   },
 });

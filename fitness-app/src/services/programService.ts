@@ -12,7 +12,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { TrainingProgram, WorkoutPlan, Exercise } from '../types';
+import { TrainingProgram, WorkoutPlan, Exercise, ExerciseCategory } from '../types';
+import { allDefaultExercises, DefaultExercise } from '../data/defaultExercises';
 
 const PROGRAMS_COLLECTION = 'trainingPrograms';
 const PLANS_COLLECTION = 'workoutPlans';
@@ -248,4 +249,68 @@ export const updateCustomTemplate = async (
 
 export const deleteCustomTemplate = async (templateId: string): Promise<void> => {
   await deleteDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId));
+};
+
+// --- Libreria esercizi con defaults ---
+
+export interface LibraryExercise {
+  id: string;
+  name: string;
+  description: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+  category: ExerciseCategory;
+  notes: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  gender: 'male' | 'female' | 'unisex';
+  fromFirestore: boolean;
+}
+
+export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
+  const firestoreExercises = await getExerciseLibrary();
+
+  const firestoreMap = new Map<string, Exercise>();
+  for (const ex of firestoreExercises) {
+    firestoreMap.set(ex.name.toLowerCase().trim(), ex);
+  }
+
+  const result: LibraryExercise[] = [];
+
+  for (const ex of firestoreExercises) {
+    result.push({
+      id: ex.id,
+      name: ex.name,
+      description: ex.description || '',
+      sets: ex.sets,
+      reps: ex.reps,
+      restSeconds: ex.restSeconds,
+      category: ex.category,
+      notes: ex.notes || '',
+      videoUrl: ex.videoUrl,
+      imageUrl: ex.imageUrl,
+      gender: (ex as any).gender || 'unisex',
+      fromFirestore: true,
+    });
+  }
+
+  for (const def of allDefaultExercises) {
+    const key = def.name.toLowerCase().trim();
+    if (firestoreMap.has(key)) continue;
+    result.push({
+      id: `default_${key.replace(/\s+/g, '_')}`,
+      name: def.name,
+      description: def.description,
+      sets: def.sets,
+      reps: def.reps,
+      restSeconds: def.restSeconds,
+      category: def.category,
+      notes: def.notes,
+      gender: def.gender,
+      fromFirestore: false,
+    });
+  }
+
+  return result;
 };
