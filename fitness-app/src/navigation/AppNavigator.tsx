@@ -82,6 +82,8 @@ import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
 import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { subscribeToUnreadCount } from '../services/notificationService';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -111,6 +113,31 @@ const AcademyTabIcon = ({ name, focused }: { name: IoniconsName; focused: boolea
     color={focused ? GOLD : colors.textLight}
   />
 );
+
+const NotificationBellIcon = ({ focused }: { focused: boolean }) => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUnreadCount(user.id, setUnreadCount);
+  }, [user]);
+
+  return (
+    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE, alignItems: 'center' }}>
+      <Ionicons
+        name={focused ? 'notifications' : 'notifications-outline'}
+        size={TAB_ICON_SIZE}
+        color={focused ? colors.accent : colors.textLight}
+      />
+      {unreadCount > 0 && (
+        <View style={notifBadgeStyles.badge}>
+          <Text style={notifBadgeStyles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 // Custom scrollable tab bar for navigators with many tabs
 const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
@@ -313,6 +340,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="TeamChat"
       component={TeamChatScreen}
       options={{
@@ -446,6 +481,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="TeamChat"
       component={TeamChatScreen}
       options={{
@@ -563,6 +606,14 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="TeamChat"
       component={TeamChatScreen}
       options={{
@@ -653,6 +704,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Extra',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'grid' : 'grid-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
       }}
     />
     <StudentTab.Screen
@@ -989,5 +1048,25 @@ const styles = StyleSheet.create({
     color: GOLD,
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+});
+
+const notifBadgeStyles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: colors.accent,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

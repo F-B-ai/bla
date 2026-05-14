@@ -20,6 +20,7 @@ import { SpecialContent, ContentType, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { addContent, getAllContent, deleteContent } from '../../services/contentService';
 import { getStudents } from '../../services/authService';
+import { createBulkNotifications } from '../../services/notificationService';
 
 const CONTENT_TYPES: { value: ContentType; label: string; color: string }[] = [
   { value: 'podcast', label: 'Podcast', color: '#9C27B0' },
@@ -91,6 +92,17 @@ export const ContentManagementScreen: React.FC = () => {
         assignedTo: selectedStudentIds,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       });
+      const notifTargets = selectedStudentIds.length > 0
+        ? selectedStudentIds
+        : students.map((s) => s.id);
+      if (notifTargets.length > 0) {
+        createBulkNotifications(
+          notifTargets.filter((id) => id !== user.id),
+          'new_content',
+          'Nuovo contenuto disponibile',
+          `${title} — ${contentType === 'podcast' ? 'Podcast' : contentType === 'video' ? 'Video' : contentType === 'article' ? 'Articolo' : 'Risorsa'}`
+        ).catch(() => {});
+      }
       crossAlert('Successo', 'Contenuto pubblicato!');
       resetForm();
       setShowModal(false);

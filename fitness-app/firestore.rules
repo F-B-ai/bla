@@ -274,6 +274,20 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+    }
+
     // KPI targets (obiettivi personalizzabili)
     match /kpiTargets/{targetId} {
       allow read: if isAuthenticated();

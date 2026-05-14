@@ -26,6 +26,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans, addExerciseToLibrary } from '../../services/programService';
 import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 import { getStudents } from '../../services/authService';
+import { createNotification } from '../../services/notificationService';
 import {
   suggestWorkoutProgression,
   suggestExercises,
@@ -503,6 +504,12 @@ export const WorkoutPlanScreen: React.FC = () => {
           createdAt: new Date(),
           isActive: true,
         });
+        createNotification(
+          selectedStudentId,
+          'new_program',
+          'Nuova scheda disponibile',
+          `La tua nuova programmazione "${planTitle}" è pronta! Apri l\'app per visualizzarla.`
+        ).catch(() => {});
         crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
       }
 

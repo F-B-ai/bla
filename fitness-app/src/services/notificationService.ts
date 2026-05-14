@@ -1,0 +1,173 @@
+import {
+  collection,
+  doc,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  Timestamp,
+  writeBatch,
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { AppNotification, NotificationType } from '../types';
+
+const NOTIFICATIONS_COLLECTION = 'notifications';
+
+export const createNotification = async (
+  userId: string,
+  type: NotificationType,
+  title: string,
+  body: string,
+  data?: Record<string, string>
+): Promise<string> => {
+  const docRef = await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
+    userId,
+    type,
+    title,
+    body,
+    data: data || {},
+    read: false,
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const createBulkNotifications = async (
+  userIds: string[],
+  type: NotificationType,
+  title: string,
+  body: string,
+  data?: Record<string, string>
+): Promise<void> => {
+  const batch = writeBatch(db);
+  for (const userId of userIds) {
+    const docRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+    batch.set(docRef, {
+      userId,
+      type,
+      title,
+      body,
+      data: data || {},
+      read: false,
+      createdAt: Timestamp.now(),
+    });
+  }
+  await batch.commit();
+};
+
+export const getUserNotifications = async (
+  userId: string
+): Promise<AppNotification[]> => {
+  try {
+    const q = query(
+      collection(db, NOTIFICATIONS_COLLECTION),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as AppNotification));
+  } catch {
+    const q = query(
+      collection(db, NOTIFICATIONS_COLLECTION),
+      where('userId', '==', userId)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map((d) => ({ ...d.data(), id: d.id } as AppNotification))
+      .sort((a, b) => {
+        const ta = (a.createdAt as any)?.seconds || 0;
+        const tb = (b.createdAt as any)?.seconds || 0;
+        return tb - ta;
+      });
+  }
+};
+
+export const subscribeToUnreadCount = (
+  userId: string,
+  callback: (count: number) => void
+): (() => void) => {
+  const q = query(
+    collection(db, NOTIFICATIONS_COLLECTION),
+    where('userId', '==', userId),
+    where('read', '==', false)
+  );
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.size);
+  }, () => {
+    callback(0);
+  });
+};
+
+export const markAsRead = async (notificationId: string): Promise<void> => {
+  await updateDoc(doc(db, NOTIFICATIONS_COLLECTION, notificationId), { read: true });
+};
+
+export const markAllAsRead = async (userId: string): Promise<void> => {
+  const q = query(
+    collection(db, NOTIFICATIONS_COLLECTION),
+    where('userId', '==', userId),
+    where('read', '==', false)
+  );
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+  for (const d of snapshot.docs) {
+    batch.update(d.ref, { read: true });
+  }
+  await batch.commit();
+};
+
+export const deleteNotification = async (notificationId: string): Promise<void> => {
+  await deleteDoc(doc(db, NOTIFICATIONS_COLLECTION, notificationId));
+};
+
+export const getNotificationIcon = (type: NotificationType): string => {
+  switch (type) {
+    case 'payment_due':
+    case 'payment_reminder_week':
+    case 'payment_reminder_3days':
+    case 'payment_reminder_1day':
+      return 'card';
+    case 'session_reminder':
+      return 'calendar';
+    case 'new_program':
+    case 'workout_renewal':
+      return 'fitness';
+    case 'new_message':
+      return 'chatbubble';
+    case 'session_cancelled':
+      return 'close-circle';
+    case 'new_content':
+      return 'folder-open';
+    case 'custom_alert':
+      return 'megaphone';
+    default:
+      return 'notifications';
+  }
+};
+
+export const getNotificationColor = (type: NotificationType): string => {
+  switch (type) {
+    case 'payment_due':
+      return '#FF453A';
+    case 'payment_reminder_week':
+    case 'payment_reminder_3days':
+    case 'payment_reminder_1day':
+      return '#FF9F0A';
+    case 'session_cancelled':
+      return '#FF453A';
+    case 'custom_alert':
+      return '#D40000';
+    case 'new_content':
+    case 'new_program':
+    case 'workout_renewal':
+      return '#34C759';
+    case 'new_message':
+      return '#64D2FF';
+    default:
+      return '#8E8E93';
+  }
+};

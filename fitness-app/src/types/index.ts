@@ -372,7 +372,9 @@ export type NotificationType =
   | 'new_program'
   | 'new_message'
   | 'session_cancelled'
-  | 'new_content';
+  | 'new_content'
+  | 'workout_renewal'
+  | 'custom_alert';
 
 export interface AppNotification {
   id: string;
