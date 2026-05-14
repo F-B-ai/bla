@@ -30,14 +30,107 @@ jobs:
       - name: Write service account key
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: node -e "require('fs').writeFileSync('/tmp/firebase_sa.json', process.env.FIREBASE_SA)"
+        run: |
+          node -e "
+            const sa = JSON.parse(process.env.FIREBASE_SA);
+            require('fs').writeFileSync('/tmp/firebase_sa.json', JSON.stringify(sa));
+            console.log('SA project:', sa.project_id);
+            console.log('SA email:', sa.client_email);
+          "
 
       - name: Deploy Firestore & Storage rules
         run: |
-          npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage:rules --project essere-3fe6f --force
-        working-directory: fitness-app
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+          node -e "
+            const { execSync } = require('child_process');
+            const sa = JSON.parse(require('fs').readFileSync('/tmp/firebase_sa.json', 'utf8'));
+            const { GoogleAuth } = require('google-auth-library');
+            const auth = new GoogleAuth({
+              credentials: sa,
+              scopes: ['https://www.googleapis.com/auth/firebase', 'https://www.googleapis.com/auth/cloud-platform']
+            });
+            async function deploy() {
+              const client = await auth.getClient();
+              const token = await client.getAccessToken();
+              try {
+                execSync(
+                  'npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage:rules --project essere-3fe6f --force --token ' + token.token,
+                  { stdio: 'inherit', cwd: 'fitness-app' }
+                );
+                console.log('Rules deployed successfully!');
+              } catch (e) {
+                console.error('firebase-tools deploy failed, trying REST API...');
+                // Fallback: deploy rules via REST API
+                const rules = require('fs').readFileSync('fitness-app/firestore.rules', 'utf8');
+                const https = require('https');
+                const data = JSON.stringify({
+                  source: { files: [{ name: 'firestore.rules', content: rules, fingerprint: '' }] }
+                });
+                const createOpts = {
+                  hostname: 'firebaserules.googleapis.com',
+                  path: '/v1/projects/essere-3fe6f/rulesets',
+                  method: 'POST',
+                  headers: {
+                    'Authorization': 'Bearer ' + token.token,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(data)
+                  }
+                };
+                const rulesetName = await new Promise((resolve, reject) => {
+                  const req = https.request(createOpts, (res) => {
+                    let body = '';
+                    res.on('data', (d) => body += d);
+                    res.on('end', () => {
+                      if (res.statusCode >= 200 && res.statusCode < 300) {
+                        const result = JSON.parse(body);
+                        console.log('Ruleset created:', result.name);
+                        resolve(result.name);
+                      } else {
+                        console.error('Create ruleset failed:', res.statusCode, body);
+                        reject(new Error(body));
+                      }
+                    });
+                  });
+                  req.on('error', reject);
+                  req.write(data);
+                  req.end();
+                });
+                // Release the ruleset
+                const relData = JSON.stringify({
+                  name: 'projects/essere-3fe6f/releases/cloud.firestore',
+                  rulesetName: rulesetName
+                });
+                const relOpts = {
+                  hostname: 'firebaserules.googleapis.com',
+                  path: '/v1/projects/essere-3fe6f/releases/cloud.firestore',
+                  method: 'PATCH',
+                  headers: {
+                    'Authorization': 'Bearer ' + token.token,
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(relData)
+                  }
+                };
+                await new Promise((resolve, reject) => {
+                  const req = https.request(relOpts, (res) => {
+                    let body = '';
+                    res.on('data', (d) => body += d);
+                    res.on('end', () => {
+                      if (res.statusCode >= 200 && res.statusCode < 300) {
+                        console.log('Rules released successfully!');
+                        resolve(body);
+                      } else {
+                        console.error('Release failed:', res.statusCode, body);
+                        reject(new Error(body));
+                      }
+                    });
+                  });
+                  req.on('error', reject);
+                  req.write(relData);
+                  req.end();
+                });
+              }
+            }
+            deploy().catch(e => { console.error('Deploy failed:', e.message); process.exit(1); });
+          "
         continue-on-error: true
 
       - name: Deploy to Firebase Hosting
