@@ -15,7 +15,7 @@ import {
 import { db } from '../config/firebase';
 import { AppNotification, NotificationType } from '../types';
 
-const NOTIFICATIONS_COLLECTION = 'notifications';
+const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
 export const createNotification = async (
   userId: string,
@@ -25,6 +25,7 @@ export const createNotification = async (
   data?: Record<string, string>
 ): Promise<string> => {
   const docRef = await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
+    docType: 'notification',
     userId,
     type,
     title,
@@ -47,6 +48,7 @@ export const createBulkNotifications = async (
   for (const userId of userIds) {
     const docRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
     batch.set(docRef, {
+      docType: 'notification',
       userId,
       type,
       title,
@@ -62,28 +64,19 @@ export const createBulkNotifications = async (
 export const getUserNotifications = async (
   userId: string
 ): Promise<AppNotification[]> => {
-  try {
-    const q = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as AppNotification));
-  } catch {
-    const q = query(
-      collection(db, NOTIFICATIONS_COLLECTION),
-      where('userId', '==', userId)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map((d) => ({ ...d.data(), id: d.id } as AppNotification))
-      .sort((a, b) => {
-        const ta = (a.createdAt as any)?.seconds || 0;
-        const tb = (b.createdAt as any)?.seconds || 0;
-        return tb - ta;
-      });
-  }
+  const q = query(
+    collection(db, NOTIFICATIONS_COLLECTION),
+    where('docType', '==', 'notification'),
+    where('userId', '==', userId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map((d) => ({ ...d.data(), id: d.id } as AppNotification))
+    .sort((a, b) => {
+      const ta = (a.createdAt as any)?.seconds || 0;
+      const tb = (b.createdAt as any)?.seconds || 0;
+      return tb - ta;
+    });
 };
 
 export const subscribeToUnreadCount = (
@@ -92,6 +85,7 @@ export const subscribeToUnreadCount = (
 ): (() => void) => {
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
+    where('docType', '==', 'notification'),
     where('userId', '==', userId),
     where('read', '==', false)
   );
@@ -109,6 +103,7 @@ export const markAsRead = async (notificationId: string): Promise<void> => {
 export const markAllAsRead = async (userId: string): Promise<void> => {
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
+    where('docType', '==', 'notification'),
     where('userId', '==', userId),
     where('read', '==', false)
   );

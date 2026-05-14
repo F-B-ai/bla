@@ -9,7 +9,7 @@ import {
 import { db } from '../config/firebase';
 import { PaymentPlan, Installment, AppNotification } from '../types';
 
-const NOTIFICATIONS_COLLECTION = 'notifications';
+const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
 const REMINDER_MESSAGES = {
   week: (name: string, amount: number, dueDate: string) =>
@@ -97,12 +97,12 @@ export const sendPaymentReminder = async (
 
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
+    where('docType', '==', 'notification'),
     where('userId', '==', notification.userId),
     where('type', '==', notification.type),
   );
   const existing = await getDocs(q);
 
-  // Evita duplicati nello stesso giorno
   const alreadySentToday = existing.docs.some((d) => {
     const data = d.data();
     const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
@@ -112,6 +112,7 @@ export const sendPaymentReminder = async (
   if (alreadySentToday) return '';
 
   const docRef = await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
+    docType: 'notification',
     ...notification,
     createdAt: Timestamp.now(),
   });
