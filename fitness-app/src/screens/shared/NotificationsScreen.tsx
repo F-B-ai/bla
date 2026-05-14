@@ -136,8 +136,9 @@ export const NotificationsScreen: React.FC = () => {
       setShowSendModal(false);
       setAlertTitle('');
       setAlertBody('');
-    } catch {
-      crossAlert('Errore', 'Impossibile inviare l\'avviso');
+    } catch (err: any) {
+      const msg = err?.message || err?.code || String(err);
+      crossAlert('Errore', `Impossibile inviare l'avviso: ${msg}`);
     } finally {
       setSending(false);
     }

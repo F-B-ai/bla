@@ -30,15 +30,14 @@ jobs:
       - name: Write service account key
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: printenv FIREBASE_SA > /tmp/firebase_sa.json
+        run: node -e "require('fs').writeFileSync('/tmp/firebase_sa.json', process.env.FIREBASE_SA)"
 
       - name: Deploy Firestore & Storage rules
         run: |
-          npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage:rules --project essere-3fe6f --force 2>&1 || echo "::warning::Firestore/Storage rules deploy failed"
+          npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage:rules --project essere-3fe6f --force
         working-directory: fitness-app
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
-        continue-on-error: true
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
