@@ -38,6 +38,7 @@ jobs:
         working-directory: fitness-app
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        continue-on-error: true
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
