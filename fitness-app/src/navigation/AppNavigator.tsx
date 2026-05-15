@@ -139,6 +139,31 @@ const NotificationBellIcon = ({ focused }: { focused: boolean }) => {
   );
 };
 
+const HomeIconWithBadge = ({ focused }: { focused: boolean }) => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUnreadCount(user.id, setUnreadCount);
+  }, [user]);
+
+  return (
+    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE, alignItems: 'center' }}>
+      <Ionicons
+        name={focused ? 'home' : 'home-outline'}
+        size={TAB_ICON_SIZE}
+        color={focused ? colors.accent : colors.textLight}
+      />
+      {unreadCount > 0 && (
+        <View style={notifBadgeStyles.badge}>
+          <Text style={notifBadgeStyles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 // Custom scrollable tab bar for navigators with many tabs
 const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
   <View nativeID="tab-bar-bottom" style={styles.scrollableTabBarContainer}>
@@ -232,7 +257,7 @@ const OwnerTabs = () => (
       component={DashboardScreen}
       options={{
         tabBarLabel: 'Home',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+        tabBarIcon: ({ focused }) => <HomeIconWithBadge focused={focused} />,
       }}
     />
     <OwnerTab.Screen
@@ -389,7 +414,7 @@ const ManagerTabs = () => (
       component={ManagerDashboardScreen}
       options={{
         tabBarLabel: 'Home',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+        tabBarIcon: ({ focused }) => <HomeIconWithBadge focused={focused} />,
       }}
     />
     <ManagerTab.Screen
