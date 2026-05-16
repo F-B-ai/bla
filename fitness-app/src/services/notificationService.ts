@@ -66,11 +66,11 @@ export const getUserNotifications = async (
 ): Promise<AppNotification[]> => {
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
-    where('docType', '==', 'notification'),
     where('userId', '==', userId)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs
+    .filter((d) => d.data().docType === 'notification')
     .map((d) => ({ ...d.data(), id: d.id } as AppNotification))
     .sort((a, b) => {
       const ta = (a.createdAt as any)?.seconds || 0;
@@ -85,12 +85,13 @@ export const subscribeToUnreadCount = (
 ): (() => void) => {
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
-    where('docType', '==', 'notification'),
-    where('userId', '==', userId),
-    where('read', '==', false)
+    where('userId', '==', userId)
   );
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.size);
+    const count = snapshot.docs.filter(
+      (d) => d.data().docType === 'notification' && d.data().read === false
+    ).length;
+    callback(count);
   }, () => {
     callback(0);
   });
@@ -103,16 +104,17 @@ export const markAsRead = async (notificationId: string): Promise<void> => {
 export const markAllAsRead = async (userId: string): Promise<void> => {
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
-    where('docType', '==', 'notification'),
-    where('userId', '==', userId),
-    where('read', '==', false)
+    where('userId', '==', userId)
   );
   const snapshot = await getDocs(q);
+  const unreadDocs = snapshot.docs.filter(
+    (d) => d.data().docType === 'notification' && d.data().read === false
+  );
   const batch = writeBatch(db);
-  for (const d of snapshot.docs) {
+  for (const d of unreadDocs) {
     batch.update(d.ref, { read: true });
   }
-  await batch.commit();
+  if (unreadDocs.length > 0) await batch.commit();
 };
 
 export const deleteNotification = async (notificationId: string): Promise<void> => {

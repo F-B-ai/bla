@@ -97,14 +97,13 @@ export const sendPaymentReminder = async (
 
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
-    where('docType', '==', 'notification'),
-    where('userId', '==', notification.userId),
-    where('type', '==', notification.type),
+    where('userId', '==', notification.userId)
   );
   const existing = await getDocs(q);
 
   const alreadySentToday = existing.docs.some((d) => {
     const data = d.data();
+    if (data.docType !== 'notification' || data.type !== notification.type) return false;
     const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
     return createdAt >= today;
   });
