@@ -115,10 +115,6 @@ export const NotificationsScreen: React.FC = () => {
         ];
       }
 
-      if (user) {
-        targetIds = targetIds.filter((id) => id !== user.id);
-      }
-
       if (targetIds.length === 0) {
         crossAlert('Info', 'Nessun destinatario trovato');
         setSending(false);
