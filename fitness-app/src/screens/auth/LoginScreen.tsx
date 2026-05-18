@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? spacing.md : 60,
+    top: Platform.OS === 'web' ? spacing.md : 70,
     left: spacing.sm,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
