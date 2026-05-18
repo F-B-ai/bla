@@ -124,11 +124,12 @@ const NotificationBellIcon = ({ focused }: { focused: boolean }) => {
   }, [user]);
 
   return (
-    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE, alignItems: 'center' }}>
+    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE + 4, alignItems: 'center', overflow: 'visible' }}>
       <Ionicons
         name={focused ? 'notifications' : 'notifications-outline'}
         size={TAB_ICON_SIZE}
         color={focused ? colors.accent : colors.textLight}
+        style={{ marginTop: 4 }}
       />
       {unreadCount > 0 && (
         <View style={notifBadgeStyles.badge}>
@@ -149,11 +150,12 @@ const HomeIconWithBadge = ({ focused }: { focused: boolean }) => {
   }, [user]);
 
   return (
-    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE, alignItems: 'center' }}>
+    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE + 4, alignItems: 'center', overflow: 'visible' }}>
       <Ionicons
         name={focused ? 'home' : 'home-outline'}
         size={TAB_ICON_SIZE}
         color={focused ? colors.accent : colors.textLight}
+        style={{ marginTop: 4 }}
       />
       {unreadCount > 0 && (
         <View style={notifBadgeStyles.badge}>
@@ -1020,6 +1022,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     minWidth: 64,
     minHeight: 48,
+    overflow: 'visible' as any,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   scrollableTabLabel: {
@@ -1079,8 +1082,8 @@ const styles = StyleSheet.create({
 const notifBadgeStyles = StyleSheet.create({
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -2,
+    right: 0,
     backgroundColor: colors.accent,
     borderRadius: 9,
     minWidth: 18,
