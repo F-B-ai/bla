@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
@@ -76,15 +77,15 @@ export const AcademyLoginScreen: React.FC<AcademyLoginScreenProps> = ({ onBack }
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <SafeAreaView edges={['top']} style={styles.backButtonSafe}>
+        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <Text style={styles.backText}>{'← Indietro'}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Back button */}
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{'← Indietro'}</Text>
-        </TouchableOpacity>
-
         <View style={styles.header}>
           <AcademyLogo size={140} />
           <Text style={styles.title}>MIND MOVEMENT</Text>
@@ -193,13 +194,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
-  backButton: {
+  backButtonSafe: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? spacing.md : 70,
-    left: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    top: 0,
+    left: 0,
     zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  backButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   backText: {
     color: GOLD,

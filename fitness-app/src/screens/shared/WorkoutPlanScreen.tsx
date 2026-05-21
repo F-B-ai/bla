@@ -61,6 +61,7 @@ export const WorkoutPlanScreen: React.FC = () => {
 
   // Editing state
   const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
+  const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
 
   // Form esercizio
   const [exName, setExName] = useState('');
@@ -379,22 +380,33 @@ export const WorkoutPlanScreen: React.FC = () => {
       return;
     }
 
-    const newExercise: Exercise = {
-      id: Date.now().toString(),
+    const exerciseData: Exercise = {
+      id: editingExerciseIndex !== null
+        ? (exercises[selectedDay]?.[editingExerciseIndex]?.id || Date.now().toString())
+        : Date.now().toString(),
       name: exName,
       description: exDescription,
       sets: parseInt(exSets, 10),
       reps: exReps,
       restSeconds: parseInt(exRest, 10) || 60,
-      videoUrl: exVideoUrl || undefined,
       notes: exNotes,
       category: exCategory,
+      ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
     };
 
-    setExercises((prev) => ({
-      ...prev,
-      [selectedDay]: [...(prev[selectedDay] || []), newExercise],
-    }));
+    if (editingExerciseIndex !== null) {
+      setExercises((prev) => ({
+        ...prev,
+        [selectedDay]: (prev[selectedDay] || []).map((ex, i) =>
+          i === editingExerciseIndex ? exerciseData : ex
+        ),
+      }));
+    } else {
+      setExercises((prev) => ({
+        ...prev,
+        [selectedDay]: [...(prev[selectedDay] || []), exerciseData],
+      }));
+    }
 
     if (saveToLibrary && exVideoUrl) {
       try {
@@ -404,7 +416,7 @@ export const WorkoutPlanScreen: React.FC = () => {
           sets: parseInt(exSets, 10),
           reps: exReps,
           restSeconds: parseInt(exRest, 10) || 60,
-          videoUrl: exVideoUrl || undefined,
+          ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
           notes: exNotes,
           category: exCategory,
         });
@@ -422,7 +434,23 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExVideoUrl('');
     setExNotes('');
     setSaveToLibrary(false);
+    setEditingExerciseIndex(null);
     setShowExerciseModal(false);
+  };
+
+  const editExercise = (dayIndex: number, exerciseIndex: number) => {
+    const ex = exercises[dayIndex]?.[exerciseIndex];
+    if (!ex) return;
+    setExName(ex.name);
+    setExDescription(ex.description || '');
+    setExSets(String(ex.sets));
+    setExReps(ex.reps);
+    setExRest(String(ex.restSeconds));
+    setExCategory(ex.category || 'forza');
+    setExVideoUrl(ex.videoUrl || '');
+    setExNotes(ex.notes || '');
+    setEditingExerciseIndex(exerciseIndex);
+    setShowExerciseModal(true);
   };
 
   const removeExercise = (dayIndex: number, exerciseIndex: number) => {
@@ -477,9 +505,16 @@ export const WorkoutPlanScreen: React.FC = () => {
 
     setSaving(true);
     try {
+      const cleanExercise = (ex: Exercise) => {
+        const clean: Record<string, any> = {};
+        for (const [key, value] of Object.entries(ex)) {
+          if (value !== undefined) clean[key] = value;
+        }
+        return clean as Exercise;
+      };
       const weeklySchedule: WeeklyDay[] = Array.from({ length: 7 }, (_, i) => ({
         dayOfWeek: i,
-        exercises: exercises[i] || [],
+        exercises: (exercises[i] || []).map(cleanExercise),
         notes: '',
       }));
 
@@ -623,7 +658,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             </Text>
             <Button
               title="+ Esercizio"
-              onPress={() => setShowExerciseModal(true)}
+              onPress={() => { setEditingExerciseIndex(null); setShowExerciseModal(true); }}
               variant="primary"
             />
           </View>
@@ -637,35 +672,38 @@ export const WorkoutPlanScreen: React.FC = () => {
             </Card>
           ) : (
             exercises[selectedDay].map((ex, index) => (
-              <Card key={ex.id} variant="outlined">
-                <View style={styles.exerciseRow}>
-                  <View style={styles.exerciseNumber}>
-                    <Text style={styles.exerciseNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                    <Text style={styles.exerciseDetails}>
-                      {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
-                    </Text>
-                    {ex.description && (
-                      <Text style={styles.exerciseDesc}>{ex.description}</Text>
-                    )}
-                    {ex.videoUrl && (
-                      <Text style={styles.videoLink}>Video allegato</Text>
-                    )}
-                    {ex.notes && (
-                      <Text style={styles.exerciseNotes}>
-                        Note: {ex.notes}
+              <TouchableOpacity key={ex.id} onPress={() => editExercise(selectedDay, index)} activeOpacity={0.7}>
+                <Card variant="outlined">
+                  <View style={styles.exerciseRow}>
+                    <View style={styles.exerciseNumber}>
+                      <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.exerciseInfo}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <Text style={styles.exerciseDetails}>
+                        {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
                       </Text>
-                    )}
+                      {ex.description ? (
+                        <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                      ) : null}
+                      {ex.videoUrl ? (
+                        <Text style={styles.videoLink}>Video allegato</Text>
+                      ) : null}
+                      {ex.notes ? (
+                        <Text style={styles.exerciseNotes}>
+                          Note: {ex.notes}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.editHint}>Tocca per modificare</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeExercise(selectedDay, index)}
+                    >
+                      <Text style={styles.removeBtn}>X</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => removeExercise(selectedDay, index)}
-                  >
-                    <Text style={styles.removeBtn}>X</Text>
-                  </TouchableOpacity>
-                </View>
-              </Card>
+                </Card>
+              </TouchableOpacity>
             ))
           )}
         </View>
@@ -682,7 +720,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       <Modal visible={showExerciseModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
-            <ModalHeader title="Nuovo Esercizio" onClose={() => setShowExerciseModal(false)} />
+            <ModalHeader title={editingExerciseIndex !== null ? 'Modifica Esercizio' : 'Nuovo Esercizio'} onClose={() => { setEditingExerciseIndex(null); setShowExerciseModal(false); }} />
 
             {/* Library Picker Button */}
             <TouchableOpacity
@@ -821,7 +859,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                 style={styles.modalButton}
               />
               <Button
-                title="Aggiungi"
+                title={editingExerciseIndex !== null ? 'Salva Modifiche' : 'Aggiungi'}
                 onPress={addExercise}
                 style={styles.modalButton}
               />
@@ -1301,6 +1339,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: '700',
     padding: spacing.xs,
+  },
+  editHint: {
+    fontSize: 11,
+    color: colors.accent,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   emptyText: {
     color: colors.textSecondary,

@@ -124,12 +124,12 @@ const NotificationBellIcon = ({ focused }: { focused: boolean }) => {
   }, [user]);
 
   return (
-    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE + 4, alignItems: 'center', overflow: 'visible' }}>
+    <View style={notifBadgeStyles.iconContainer}>
       <Ionicons
         name={focused ? 'notifications' : 'notifications-outline'}
         size={TAB_ICON_SIZE}
         color={focused ? colors.accent : colors.textLight}
-        style={{ marginTop: 4 }}
+        style={notifBadgeStyles.icon}
       />
       {unreadCount > 0 && (
         <View style={notifBadgeStyles.badge}>
@@ -150,12 +150,12 @@ const HomeIconWithBadge = ({ focused }: { focused: boolean }) => {
   }, [user]);
 
   return (
-    <View style={{ width: TAB_ICON_SIZE + 8, height: TAB_ICON_SIZE + 4, alignItems: 'center', overflow: 'visible' }}>
+    <View style={notifBadgeStyles.iconContainer}>
       <Ionicons
         name={focused ? 'home' : 'home-outline'}
         size={TAB_ICON_SIZE}
         color={focused ? colors.accent : colors.textLight}
-        style={{ marginTop: 4 }}
+        style={notifBadgeStyles.icon}
       />
       {unreadCount > 0 && (
         <View style={notifBadgeStyles.badge}>
@@ -1080,9 +1080,18 @@ const styles = StyleSheet.create({
 });
 
 const notifBadgeStyles = StyleSheet.create({
+  iconContainer: {
+    width: TAB_ICON_SIZE + 14,
+    height: TAB_ICON_SIZE + 10,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  icon: {
+    marginTop: 0,
+  },
   badge: {
     position: 'absolute',
-    top: -2,
+    top: 0,
     right: 0,
     backgroundColor: colors.accent,
     borderRadius: 9,

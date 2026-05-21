@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
@@ -77,16 +78,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {onBack && (
+        <SafeAreaView edges={['top']} style={styles.backButtonSafe}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backText}>{'← Indietro'}</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      )}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{'← Indietro'}</Text>
-          </TouchableOpacity>
-        )}
-
         <View style={styles.header}>
           <EnsoLogo size={120} />
           <Text style={styles.title}>Essère</Text>
@@ -250,13 +252,16 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
   },
-  backButton: {
+  backButtonSafe: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? spacing.md : 70,
-    left: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+    top: 0,
+    left: 0,
     zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  backButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   backText: {
     color: colors.accent,
