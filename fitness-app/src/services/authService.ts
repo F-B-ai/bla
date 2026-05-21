@@ -244,7 +244,7 @@ export const registerStudent = async (
   name: string,
   surname: string,
   phone: string,
-  assignedCollaboratorId: string,
+  assignedCollaboratorIds: string | string[],
   goals: string,
   medicalNotes?: string,
   assignedManagerId?: string,
@@ -252,6 +252,7 @@ export const registerStudent = async (
   coachCommissionPercentage?: number
 ): Promise<Student> => {
   const uid = await createUserWithRestApi(email, password);
+  const coachIds = Array.isArray(assignedCollaboratorIds) ? assignedCollaboratorIds : [assignedCollaboratorIds];
 
   const studentData: Omit<Student, 'id'> = {
     email,
@@ -259,8 +260,8 @@ export const registerStudent = async (
     surname,
     phone,
     role: 'student',
-    assignedCollaboratorIds: [assignedCollaboratorId],
-    assignedCollaboratorId: assignedCollaboratorId,
+    assignedCollaboratorIds: coachIds,
+    assignedCollaboratorId: coachIds[0] || '',
     assignedManagerId: assignedManagerId || '',
     managerCommissionPercentage: managerCommissionPercentage ?? 0,
     coachCommissionPercentage: coachCommissionPercentage ?? 0,
@@ -278,10 +279,12 @@ export const registerStudent = async (
     startDate: Timestamp.now(),
   });
 
-  if (assignedCollaboratorId) {
-    await updateDoc(doc(db, 'users', assignedCollaboratorId), {
-      assignedStudents: arrayUnion(uid),
-    });
+  for (const coachId of coachIds) {
+    if (coachId) {
+      await updateDoc(doc(db, 'users', coachId), {
+        assignedStudents: arrayUnion(uid),
+      });
+    }
   }
 
   return { id: uid, ...studentData };
@@ -470,6 +473,36 @@ export const removeStudentFromCollaborator = async (
     await updateDoc(collabRef, {
       assignedStudents: arrayRemove(studentId),
     });
+  }
+};
+
+export const updateStudentCoaches = async (
+  studentId: string,
+  newCoachIds: string[],
+  oldCoachIds: string[]
+): Promise<void> => {
+  const studentRef = doc(db, 'users', studentId);
+  await updateDoc(studentRef, {
+    assignedCollaboratorIds: newCoachIds,
+    assignedCollaboratorId: newCoachIds[0] || '',
+  });
+
+  const removed = oldCoachIds.filter((id) => !newCoachIds.includes(id));
+  const added = newCoachIds.filter((id) => !oldCoachIds.includes(id));
+
+  for (const coachId of removed) {
+    const ref = doc(db, 'users', coachId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { assignedStudents: arrayRemove(studentId) });
+    }
+  }
+  for (const coachId of added) {
+    const ref = doc(db, 'users', coachId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { assignedStudents: arrayUnion(studentId) });
+    }
   }
 };
 

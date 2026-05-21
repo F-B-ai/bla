@@ -6,12 +6,13 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
+import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator, updateStudentCoaches } from '../../services/authService';
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { Collaborator, Student, Manager, Owner } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -37,6 +38,10 @@ export const ManageUsersScreen: React.FC = () => {
     isCollaborator ? 'students' : 'collaborators'
   );
   const [editingUser, setEditingUser] = useState<Student | null>(null);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [coachModalStudent, setCoachModalStudent] = useState<Student | null>(null);
+  const [coachModalSelected, setCoachModalSelected] = useState<string[]>([]);
+  const [savingCoaches, setSavingCoaches] = useState(false);
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -132,6 +137,33 @@ export const ManageUsersScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const openCoachModal = (student: Student) => {
+    setCoachModalStudent(student);
+    setCoachModalSelected(getStudentCoachIds(student));
+    setShowCoachModal(true);
+  };
+
+  const handleSaveCoaches = async () => {
+    if (!coachModalStudent) return;
+    if (coachModalSelected.length === 0) {
+      crossAlert('Errore', 'Seleziona almeno un coach');
+      return;
+    }
+    setSavingCoaches(true);
+    try {
+      const oldIds = getStudentCoachIds(coachModalStudent);
+      await updateStudentCoaches(coachModalStudent.id, coachModalSelected, oldIds);
+      crossAlert('Fatto', 'Coach aggiornati');
+      setShowCoachModal(false);
+      setCoachModalStudent(null);
+      await loadData();
+    } catch (err: any) {
+      crossAlert('Errore', `Impossibile aggiornare: ${err?.message || String(err)}`);
+    } finally {
+      setSavingCoaches(false);
+    }
   };
 
   if (viewMode === 'addManager') {
@@ -456,6 +488,15 @@ export const ManageUsersScreen: React.FC = () => {
                   <View style={styles.userActions}>
                     <TouchableOpacity
                       style={styles.userActionBtn}
+                      onPress={() => openCoachModal(student)}
+                    >
+                      <View style={styles.userActionRow}>
+                        <Ionicons name="people-outline" size={14} color={colors.accent} />
+                        <Text style={[styles.userActionText, { color: colors.accent }]}>Coach</Text>
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
                       onPress={() => {
                         setEditingUser(student);
                         setViewMode('editProfile');
@@ -489,6 +530,107 @@ export const ManageUsersScreen: React.FC = () => {
       )}
 
       <View style={styles.bottomSpacer} />
+
+      {/* Modal Gestisci Coach */}
+      <Modal
+        visible={showCoachModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCoachModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Gestisci Coach
+            </Text>
+            {coachModalStudent && (
+              <Text style={styles.modalSubtitle}>
+                {coachModalStudent.name} {coachModalStudent.surname}
+              </Text>
+            )}
+            <Text style={styles.modalHint}>
+              Seleziona uno o più coach per questo allievo
+            </Text>
+
+            <ScrollView style={styles.modalList}>
+              {owner && (
+                <TouchableOpacity
+                  style={[styles.modalOption, coachModalSelected.includes(owner.id) && styles.modalOptionSelected]}
+                  onPress={() => setCoachModalSelected((prev) =>
+                    prev.includes(owner.id) ? prev.filter((id) => id !== owner.id) : [...prev, owner.id]
+                  )}
+                >
+                  <Ionicons
+                    name={coachModalSelected.includes(owner.id) ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={coachModalSelected.includes(owner.id) ? colors.accent : colors.textSecondary}
+                  />
+                  <Text style={[styles.modalOptionText, coachModalSelected.includes(owner.id) && styles.modalOptionTextSelected]}>
+                    {owner.name} {owner.surname} (Titolare)
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {managers.map((mgr) => (
+                <TouchableOpacity
+                  key={mgr.id}
+                  style={[styles.modalOption, coachModalSelected.includes(mgr.id) && styles.modalOptionSelected]}
+                  onPress={() => setCoachModalSelected((prev) =>
+                    prev.includes(mgr.id) ? prev.filter((id) => id !== mgr.id) : [...prev, mgr.id]
+                  )}
+                >
+                  <Ionicons
+                    name={coachModalSelected.includes(mgr.id) ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={coachModalSelected.includes(mgr.id) ? colors.accent : colors.textSecondary}
+                  />
+                  <Text style={[styles.modalOptionText, coachModalSelected.includes(mgr.id) && styles.modalOptionTextSelected]}>
+                    {mgr.name} {mgr.surname} (Manager)
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {collaborators.map((collab) => (
+                <TouchableOpacity
+                  key={collab.id}
+                  style={[styles.modalOption, coachModalSelected.includes(collab.id) && styles.modalOptionSelected]}
+                  onPress={() => setCoachModalSelected((prev) =>
+                    prev.includes(collab.id) ? prev.filter((id) => id !== collab.id) : [...prev, collab.id]
+                  )}
+                >
+                  <Ionicons
+                    name={coachModalSelected.includes(collab.id) ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={coachModalSelected.includes(collab.id) ? colors.accent : colors.textSecondary}
+                  />
+                  <Text style={[styles.modalOptionText, coachModalSelected.includes(collab.id) && styles.modalOptionTextSelected]}>
+                    {collab.name} {collab.surname} ({collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'})
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.modalSelectedCount}>
+              {coachModalSelected.length} coach selezionati
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.modalSaveBtn, savingCoaches && { opacity: 0.6 }]}
+              onPress={handleSaveCoaches}
+              disabled={savingCoaches}
+            >
+              <Text style={styles.modalSaveBtnText}>
+                {savingCoaches ? 'Salvataggio...' : 'Salva'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setShowCoachModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Annulla</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -671,5 +813,96 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing.xxl,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  modalHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  modalList: {
+    maxHeight: 300,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.xs,
+  },
+  modalOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.primaryLight,
+  },
+  modalOptionText: {
+    fontSize: fontSize.md,
+    color: colors.text,
+    flex: 1,
+  },
+  modalOptionTextSelected: {
+    color: colors.accent,
+    fontWeight: '700',
+  },
+  modalSelectedCount: {
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  modalSaveBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  modalSaveBtnText: {
+    color: '#fff',
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  modalCancelBtn: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+    padding: spacing.sm,
+  },
+  modalCancelText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
   },
 });
