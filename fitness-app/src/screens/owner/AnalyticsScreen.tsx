@@ -13,6 +13,7 @@ import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/t
 import { BarChart, BarData } from '../../components/charts/BarChart';
 import { KPICard, KPIData } from '../../components/charts/KPICard';
 import { getCollaborators, getManagers, getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 import { getTransactions, getFinancialSummary } from '../../services/financialService';
 import { getAllSessions } from '../../services/sessionService';
 import { getAllAppointments } from '../../services/nutritionistService';
@@ -247,7 +248,7 @@ export const AnalyticsScreen: React.FC = () => {
     return coaches.map((collab) => {
       const coachSessions = sessions.filter((s) => s.collaboratorId === collab.id);
       const completedSessions = coachSessions.filter((s) => s.status === 'completed');
-      const assignedStudents = students.filter((s) => s.assignedCollaboratorId === collab.id);
+      const assignedStudents = students.filter((s) => isStudentAssignedTo(s, collab.id));
       const activeStudents = assignedStudents.filter((s) => s.isActive);
 
       const coachIncome = transactions

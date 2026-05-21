@@ -24,6 +24,7 @@ import {
   subscribeToPresence,
 } from '../../services/chatService';
 import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
+import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
 
@@ -114,15 +115,16 @@ export const ChatListScreen: React.FC = () => {
         // Collaboratore/Manager: mostra i propri allievi
         const allStudents = await getStudents();
         const myStudents = allStudents.filter(
-          (s) => (s.assignedCollaboratorId === user.id || (isManager && s.assignedManagerId === user.id)) && s.isActive
+          (s) => (isStudentAssignedTo(s, user.id) || (isManager && s.assignedManagerId === user.id)) && s.isActive
         );
         setAvailableContacts(myStudents);
       } else if (isStudent) {
         // Allievo: mostra il suo collaboratore assegnato
         const studentProfile = user as unknown as Student;
-        if (studentProfile.assignedCollaboratorId) {
-          const collab = await getUserProfile(studentProfile.assignedCollaboratorId);
-          setAvailableContacts(collab ? [collab] : []);
+        const coachIds = getStudentCoachIds(studentProfile);
+        if (coachIds.length > 0) {
+          const coaches = await Promise.all(coachIds.map((id) => getUserProfile(id)));
+          setAvailableContacts(coaches.filter(Boolean) as any[]);
         } else {
           setAvailableContacts([]);
         }
@@ -161,7 +163,8 @@ export const ChatListScreen: React.FC = () => {
         if (contact.role === 'student') {
           const student = contact as unknown as Student;
           studentId = contact.id;
-          collaboratorId = student.assignedCollaboratorId || user.id;
+          const coachIds = getStudentCoachIds(student);
+          collaboratorId = coachIds[0] || user.id;
         } else {
           crossAlert('Info', 'Seleziona un allievo per avviare la chat con il suo collaboratore');
           setCreatingChat(false);

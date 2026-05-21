@@ -17,6 +17,7 @@ import { BarChart, BarData } from '../../components/charts/BarChart';
 import { KPICard, KPIData } from '../../components/charts/KPICard';
 import { Collaborator, Student, TrainingSession, Manager, FinancialTransaction, NutritionistAppointment } from '../../types';
 import { getCollaborators, getStudents } from '../../services/authService';
+import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { getAllSessions } from '../../services/sessionService';
 import { getTransactions } from '../../services/financialService';
 import { getAllAppointments } from '../../services/nutritionistService';
@@ -74,7 +75,7 @@ export const ManagerDashboardScreen: React.FC = () => {
       const teamCollabIds = myCollabs.map((c: Collaborator) => c.id);
       const myTeamStudents = allStudents.filter(
         (s: Student) =>
-          teamCollabIds.includes(s.assignedCollaboratorId) ||
+          getStudentCoachIds(s).some((id) => teamCollabIds.includes(id)) ||
           manager.assignedStudents?.includes(s.id)
       );
       setTeamStudents(myTeamStudents);
@@ -250,7 +251,7 @@ export const ManagerDashboardScreen: React.FC = () => {
         (s) => s.status === 'cancelled_by_student' || s.status === 'cancelled_late'
       );
       const coachNoShows = coachSessions.filter((s) => s.status === 'no_show');
-      const coachStudents = teamStudents.filter((s) => s.assignedCollaboratorId === collab.id);
+      const coachStudents = teamStudents.filter((s) => isStudentAssignedTo(s, collab.id));
       const activeStudents = coachStudents.filter((s) => s.isActive);
 
       const coachIncome = transactions
@@ -554,7 +555,7 @@ export const ManagerDashboardScreen: React.FC = () => {
             : 0;
           const studentCount = isNutri
             ? teamStudents.filter((s) => s.assignedNutritionistId === collab.id).length
-            : teamStudents.filter((s) => s.assignedCollaboratorId === collab.id).length;
+            : teamStudents.filter((s) => isStudentAssignedTo(s, collab.id)).length;
 
           return (
             <Card key={collab.id} variant="elevated">

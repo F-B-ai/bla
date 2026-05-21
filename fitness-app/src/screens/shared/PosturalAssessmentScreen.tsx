@@ -26,6 +26,7 @@ import { uploadPosturalImage, analyzePosture, createAssessment, getStudentAssess
 import { analyzePostureWithAI, AIPosturalAnalysis, ensureAIApiKey } from '../../services/aiService';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 const POSTURAL_AREAS: { value: PosturalArea; label: string }[] = [
   { value: 'head_neck', label: 'Testa/Collo' },
@@ -71,9 +72,9 @@ export const PosturalAssessmentScreen: React.FC = () => {
       if (isOwner) {
         setStudents(allStudents);
       } else if (isManager) {
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id)));
       }
     } catch {
       // Silently handle

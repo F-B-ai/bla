@@ -26,6 +26,7 @@ import {
   updateSessionStatus,
 } from '../../services/sessionService';
 import { getStudents, getCollaborators } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 const TIME_SLOTS = [
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -59,10 +60,9 @@ export const ScheduleSessionScreen: React.FC = () => {
       ]);
 
       if (isCollaborator) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else if (isManager) {
-        // Manager vede allievi assegnati direttamente o tramite assignedManagerId
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }

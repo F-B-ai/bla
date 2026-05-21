@@ -47,6 +47,7 @@ import {
   deleteAppointment,
 } from '../../services/nutritionistService';
 import { getStudents, getCollaborators, getManagers } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -174,9 +175,9 @@ export const CalendarScreen: React.FC = () => {
       ]);
 
       if (isCollaborator) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else if (isManager) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }

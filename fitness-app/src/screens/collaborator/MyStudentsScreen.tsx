@@ -22,6 +22,7 @@ import { Student, TrainingProgram, Exercise, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 import { createProgram, getStudentWorkoutPlans } from '../../services/programService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 export const MyStudentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -65,7 +66,7 @@ export const MyStudentsScreen: React.FC = () => {
       // Collaborator: vede solo i propri allievi
       const myStudents = allStudents.filter(
         (s) =>
-          s.assignedCollaboratorId === user.id ||
+          isStudentAssignedTo(s, user.id) ||
           (isManager && s.assignedManagerId === user.id)
       );
       setStudents(myStudents);

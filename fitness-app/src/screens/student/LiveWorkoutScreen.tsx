@@ -26,6 +26,7 @@ import {
   getStudentWorkoutLogs,
   subscribeToWorkoutLog,
 } from '../../services/workoutLogService';
+import { getStudentCoachIds } from '../../utils/helpers';
 
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
@@ -128,7 +129,7 @@ export const LiveWorkoutScreen: React.FC = () => {
       const logId = await startWorkoutLog({
         studentId: user.id,
         collaboratorId:
-          (student as any)?.assignedCollaboratorId ||
+          getStudentCoachIds(student as any)[0] ||
           (student as any)?.assignedManagerId ||
           '',
         workoutPlanId: activePlan.id,
@@ -148,7 +149,7 @@ export const LiveWorkoutScreen: React.FC = () => {
         id: logId,
         studentId: user.id,
         collaboratorId:
-          (student as any)?.assignedCollaboratorId ||
+          getStudentCoachIds(student as any)[0] ||
           (student as any)?.assignedManagerId ||
           '',
         workoutPlanId: activePlan.id,

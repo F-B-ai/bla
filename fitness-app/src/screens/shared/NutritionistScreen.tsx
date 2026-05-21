@@ -42,6 +42,7 @@ import {
   deleteBiaDocument,
 } from '../../services/nutritionistService';
 import { getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -91,9 +92,9 @@ export const NutritionistScreen: React.FC = () => {
     try {
       const studs = await getStudents();
       if (isCollaborator) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else if (isManager) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }

@@ -50,7 +50,9 @@ export interface Collaborator extends User {
 // --- Allievo ---
 export interface Student extends User {
   role: 'student';
-  assignedCollaboratorId: string; // coach o manager che lo segue direttamente
+  assignedCollaboratorIds: string[]; // coach che lo seguono (può avere più coach)
+  /** @deprecated usa assignedCollaboratorIds - campo legacy per retrocompatibilità Firestore */
+  assignedCollaboratorId?: string;
   assignedManagerId?: string; // manager responsabile (se assegnato a un coach sotto un manager)
   assignedNutritionistId?: string; // nutrizionista coach assegnato
   assignedNutritionManagerId?: string; // manager nutrizionista responsabile

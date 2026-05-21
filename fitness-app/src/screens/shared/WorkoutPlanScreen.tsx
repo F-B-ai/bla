@@ -26,6 +26,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans, addExerciseToLibrary } from '../../services/programService';
 import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 import { getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 import { createNotification } from '../../services/notificationService';
 import {
   suggestWorkoutProgression,
@@ -108,9 +109,9 @@ export const WorkoutPlanScreen: React.FC = () => {
         setStudents(allStudents);
       } else if (isManager) {
         // Manager vede allievi assegnati direttamente o tramite assignedManagerId
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id)));
       }
     } catch {
       // Silently handle

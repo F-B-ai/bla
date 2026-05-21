@@ -12,6 +12,7 @@ import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator } from '../../services/authService';
+import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { Collaborator, Student, Manager, Owner } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
@@ -54,7 +55,7 @@ export const ManageUsersScreen: React.FC = () => {
       setOwner(ownerData);
       // Coach vede solo i propri allievi
       if (isCollaborator && user) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else {
         setStudents(studs);
       }
@@ -114,8 +115,11 @@ export const ManageUsersScreen: React.FC = () => {
             try {
               // Se è uno studente, rimuovilo dalla lista del collaboratore
               const student = students.find((s) => s.id === userId);
-              if (student && student.assignedCollaboratorId) {
-                await removeStudentFromCollaborator(student.assignedCollaboratorId, userId);
+              if (student) {
+                const coachIds = getStudentCoachIds(student);
+                for (const coachId of coachIds) {
+                  await removeStudentFromCollaborator(coachId, userId);
+                }
               }
               await deleteUser(userId);
               await loadData();
@@ -260,7 +264,7 @@ export const ManageUsersScreen: React.FC = () => {
           ) : (
             managers.map((mgr) => {
               const mgrStudents = students.filter(
-                (s) => s.assignedManagerId === mgr.id || s.assignedCollaboratorId === mgr.id
+                (s) => s.assignedManagerId === mgr.id || isStudentAssignedTo(s, mgr.id)
               );
               return (
                 <Card key={mgr.id} variant="elevated">
@@ -333,7 +337,7 @@ export const ManageUsersScreen: React.FC = () => {
           ) : (
             collaborators.map((collab) => {
               const assignedStudents = students.filter(
-                (s) => s.assignedCollaboratorId === collab.id
+                (s) => isStudentAssignedTo(s, collab.id)
               );
               return (
                 <Card key={collab.id} variant="elevated">
@@ -409,16 +413,16 @@ export const ManageUsersScreen: React.FC = () => {
             </Card>
           ) : (
             students.map((student) => {
-              const collab = collaborators.find((c) => c.id === student.assignedCollaboratorId);
-              const mgr = managers.find((m) => m.id === student.assignedCollaboratorId);
-              const isOwnerCoach = owner && owner.id === student.assignedCollaboratorId;
-              const coachName = collab
-                ? `${collab.name} ${collab.surname} (Coach)`
-                : mgr
-                ? `${mgr.name} ${mgr.surname} (Manager)`
-                : isOwnerCoach
-                ? `${owner.name} ${owner.surname} (Titolare)`
-                : null;
+              const coachIds = getStudentCoachIds(student);
+              const coachNames = coachIds.map((cid) => {
+                const c = collaborators.find((co) => co.id === cid);
+                if (c) return `${c.name} ${c.surname} (Coach)`;
+                const m = managers.find((mg) => mg.id === cid);
+                if (m) return `${m.name} ${m.surname} (Manager)`;
+                if (owner && owner.id === cid) return `${owner.name} ${owner.surname} (Titolare)`;
+                return null;
+              }).filter(Boolean);
+              const coachName = coachNames.length > 0 ? coachNames.join(', ') : null;
               return (
                 <Card key={student.id} variant="elevated">
                   <View style={styles.userRow}>

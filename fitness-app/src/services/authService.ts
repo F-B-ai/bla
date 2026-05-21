@@ -259,7 +259,8 @@ export const registerStudent = async (
     surname,
     phone,
     role: 'student',
-    assignedCollaboratorId,
+    assignedCollaboratorIds: [assignedCollaboratorId],
+    assignedCollaboratorId: assignedCollaboratorId,
     assignedManagerId: assignedManagerId || '',
     managerCommissionPercentage: managerCommissionPercentage ?? 0,
     coachCommissionPercentage: coachCommissionPercentage ?? 0,
@@ -277,7 +278,6 @@ export const registerStudent = async (
     startDate: Timestamp.now(),
   });
 
-  // Aggiorna la lista allievi del collaboratore/manager
   if (assignedCollaboratorId) {
     await updateDoc(doc(db, 'users', assignedCollaboratorId), {
       assignedStudents: arrayUnion(uid),
@@ -385,6 +385,7 @@ export const registerStudentWithInvite = async (
     surname: invite.surname,
     phone,
     role: 'student',
+    assignedCollaboratorIds: [invite.assignedCollaboratorId],
     assignedCollaboratorId: invite.assignedCollaboratorId,
     startDate: new Date(),
     goals,
@@ -400,7 +401,6 @@ export const registerStudentWithInvite = async (
     startDate: Timestamp.now(),
   });
 
-  // Aggiorna la lista allievi del collaboratore
   if (invite.assignedCollaboratorId) {
     await updateDoc(doc(db, 'users', invite.assignedCollaboratorId), {
       assignedStudents: arrayUnion(uid),
