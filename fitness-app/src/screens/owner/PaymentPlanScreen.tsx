@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -82,6 +83,9 @@ export const PaymentPlanScreen: React.FC = () => {
   const [editUsedLessons, setEditUsedLessons] = useState(0);
   const [editUsedConsultations, setEditUsedConsultations] = useState(0);
   const [editPaymentType, setEditPaymentType] = useState<PaymentType>('full');
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
 
   // -----------------------------------------------------------------------
   // Load data
@@ -238,15 +242,21 @@ export const PaymentPlanScreen: React.FC = () => {
   // Group plans by student
   // -----------------------------------------------------------------------
   const plansByStudent = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
     const grouped: Record<string, PaymentPlan[]> = {};
     for (const plan of plans) {
+      if (query) {
+        const s = studentMap[plan.studentId];
+        const fullName = s ? `${s.name} ${s.surname}`.toLowerCase() : '';
+        if (!fullName.includes(query)) continue;
+      }
       if (!grouped[plan.studentId]) {
         grouped[plan.studentId] = [];
       }
       grouped[plan.studentId].push(plan);
     }
     return grouped;
-  }, [plans]);
+  }, [plans, searchQuery, studentMap]);
 
   // -----------------------------------------------------------------------
   // Generate installments for create form
@@ -634,6 +644,23 @@ export const PaymentPlanScreen: React.FC = () => {
             color={colors.info}
             icon={<Ionicons name="fitness-outline" size={14} color={colors.info} />}
           />
+        </View>
+
+        {/* Barra di ricerca */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.textLight} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Cerca allievo per nome..."
+            placeholderTextColor={colors.textLight}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Plans grouped by student */}
@@ -1295,6 +1322,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    padding: 0,
   },
   loadingContainer: {
     flex: 1,

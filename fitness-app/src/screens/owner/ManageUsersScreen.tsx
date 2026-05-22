@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   Modal,
+  TextInput,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { crossAlert } from '../../utils/alert';
@@ -42,6 +43,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [coachModalStudent, setCoachModalStudent] = useState<Student | null>(null);
   const [coachModalSelected, setCoachModalSelected] = useState<string[]>([]);
   const [savingCoaches, setSavingCoaches] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -284,6 +286,23 @@ export const ManageUsersScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Barra di ricerca */}
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={colors.textLight} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder={`Cerca ${activeTab === 'managers' ? 'manager' : activeTab === 'collaborators' ? 'coach' : 'allievo'}...`}
+          placeholderTextColor={colors.textLight}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* Lista manager */}
       {activeTab === 'managers' && (
         <>
@@ -294,7 +313,11 @@ export const ManageUsersScreen: React.FC = () => {
               </Text>
             </Card>
           ) : (
-            managers.map((mgr) => {
+            managers.filter((m) => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return `${m.name} ${m.surname}`.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+            }).map((mgr) => {
               const mgrStudents = students.filter(
                 (s) => s.assignedManagerId === mgr.id || isStudentAssignedTo(s, mgr.id)
               );
@@ -367,7 +390,11 @@ export const ManageUsersScreen: React.FC = () => {
               </Text>
             </Card>
           ) : (
-            collaborators.map((collab) => {
+            collaborators.filter((c) => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return `${c.name} ${c.surname}`.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+            }).map((collab) => {
               const assignedStudents = students.filter(
                 (s) => isStudentAssignedTo(s, collab.id)
               );
@@ -444,7 +471,11 @@ export const ManageUsersScreen: React.FC = () => {
               </Text>
             </Card>
           ) : (
-            students.map((student) => {
+            students.filter((s) => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return `${s.name} ${s.surname}`.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
+            }).map((student) => {
               const coachIds = getStudentCoachIds(student);
               const coachNames = coachIds.map((cid) => {
                 const c = collaborators.find((co) => co.id === cid);
@@ -639,6 +670,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    padding: 0,
   },
   header: {
     backgroundColor: colors.primary,
