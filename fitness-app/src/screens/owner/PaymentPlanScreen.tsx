@@ -38,7 +38,9 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 // PaymentPlanScreen
 // ---------------------------------------------------------------------------
 export const PaymentPlanScreen: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
+  const isManager = user?.role === 'manager';
+  const canEdit = isOwner; // only owner can create/edit/delete
 
   // Data
   const [plans, setPlans] = useState<PaymentPlan[]>([]);
@@ -59,12 +61,27 @@ export const PaymentPlanScreen: React.FC = () => {
   const [customInstallments, setCustomInstallments] = useState<
     { amount: string; dueDate: string }[]
   >([]);
+  const [includedLessons, setIncludedLessons] = useState('');
+  const [includedConsultations, setIncludedConsultations] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [courseType, setCourseType] = useState('');
+  const [subscriptionType, setSubscriptionType] = useState('');
 
   // Edit form state
   const [editTotalAmount, setEditTotalAmount] = useState('');
   const [editInstallments, setEditInstallments] = useState<Installment[]>([]);
   const [editCustomAmounts, setEditCustomAmounts] = useState<string[]>([]);
   const [editCustomDates, setEditCustomDates] = useState<string[]>([]);
+  const [editIncludedLessons, setEditIncludedLessons] = useState('');
+  const [editIncludedConsultations, setEditIncludedConsultations] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editCourseType, setEditCourseType] = useState('');
+  const [editSubscriptionType, setEditSubscriptionType] = useState('');
+  const [editUsedLessons, setEditUsedLessons] = useState(0);
+  const [editUsedConsultations, setEditUsedConsultations] = useState(0);
+  const [editPaymentType, setEditPaymentType] = useState<PaymentType>('full');
 
   // -----------------------------------------------------------------------
   // Load data
@@ -151,6 +168,32 @@ export const PaymentPlanScreen: React.FC = () => {
     return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
+  const getPaymentTypeLabel = (type: PaymentType): string => {
+    switch (type) {
+      case 'full':
+        return 'Unica soluzione';
+      case 'installment':
+        return 'Rate';
+      case 'monthly_course':
+        return 'Corso Mensile';
+      default:
+        return type;
+    }
+  };
+
+  const getPaymentTypeBadgeStatus = (type: PaymentType): 'paid' | 'pending' | 'overdue' => {
+    switch (type) {
+      case 'full':
+        return 'paid';
+      case 'installment':
+        return 'pending';
+      case 'monthly_course':
+        return 'overdue';
+      default:
+        return 'pending';
+    }
+  };
+
   // -----------------------------------------------------------------------
   // Stats
   // -----------------------------------------------------------------------
@@ -158,6 +201,9 @@ export const PaymentPlanScreen: React.FC = () => {
     let totalOutstanding = 0;
     let totalPaid = 0;
     let overdueCount = 0;
+    let activePlansCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (const plan of plans) {
       for (const inst of plan.installments) {
@@ -170,9 +216,22 @@ export const PaymentPlanScreen: React.FC = () => {
           totalOutstanding += inst.amount;
         }
       }
+
+      // Check if plan is active (today is between startDate and endDate)
+      const planStart = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate);
+      const planEnd = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate);
+      if (!isNaN(planStart.getTime()) && !isNaN(planEnd.getTime())) {
+        const startNorm = new Date(planStart);
+        startNorm.setHours(0, 0, 0, 0);
+        const endNorm = new Date(planEnd);
+        endNorm.setHours(0, 0, 0, 0);
+        if (today >= startNorm && today <= endNorm) {
+          activePlansCount++;
+        }
+      }
     }
 
-    return { totalOutstanding, totalPaid, overdueCount };
+    return { totalOutstanding, totalPaid, overdueCount, activePlansCount };
   }, [plans]);
 
   // -----------------------------------------------------------------------
@@ -231,6 +290,12 @@ export const PaymentPlanScreen: React.FC = () => {
     setNumInstallments('2');
     setFirstDueDate('');
     setCustomInstallments([]);
+    setIncludedLessons('');
+    setIncludedConsultations('');
+    setStartDate('');
+    setEndDate('');
+    setCourseType('');
+    setSubscriptionType('');
   };
 
   const handleCreate = async () => {
@@ -244,9 +309,22 @@ export const PaymentPlanScreen: React.FC = () => {
       return;
     }
 
+    const parsedStartDate = parseDateString(startDate);
+    const parsedEndDate = parseDateString(endDate);
+
+    if (!parsedStartDate || !parsedEndDate) {
+      crossAlert('Errore', 'Inserisci le date di inizio e fine percorso.');
+      return;
+    }
+
+    if (paymentType === 'monthly_course' && !courseType) {
+      crossAlert('Errore', 'Inserisci il tipo di corso.');
+      return;
+    }
+
     let installments: Installment[] = [];
 
-    if (paymentType === 'full') {
+    if (paymentType === 'full' || paymentType === 'monthly_course') {
       const dueDate = parseDateString(firstDueDate) || new Date();
       installments = [
         {
@@ -281,6 +359,15 @@ export const PaymentPlanScreen: React.FC = () => {
         paymentType,
         installments,
         createdAt: new Date(),
+        includedLessons: parseInt(includedLessons, 10) || 0,
+        usedLessons: 0,
+        includedConsultations: parseInt(includedConsultations, 10) || 0,
+        usedConsultations: 0,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+        ...(paymentType === 'monthly_course'
+          ? { courseType, subscriptionType }
+          : {}),
       });
       resetCreateForm();
       setShowCreateModal(false);
@@ -302,6 +389,15 @@ export const PaymentPlanScreen: React.FC = () => {
     setEditInstallments([...plan.installments]);
     setEditCustomAmounts(plan.installments.map((i) => i.amount.toString()));
     setEditCustomDates(plan.installments.map((i) => formatDateForInput(i.dueDate)));
+    setEditIncludedLessons((plan.includedLessons ?? 0).toString());
+    setEditIncludedConsultations((plan.includedConsultations ?? 0).toString());
+    setEditStartDate(plan.startDate ? formatDateForInput(plan.startDate) : '');
+    setEditEndDate(plan.endDate ? formatDateForInput(plan.endDate) : '');
+    setEditCourseType(plan.courseType || '');
+    setEditSubscriptionType(plan.subscriptionType || '');
+    setEditUsedLessons(plan.usedLessons ?? 0);
+    setEditUsedConsultations(plan.usedConsultations ?? 0);
+    setEditPaymentType(plan.paymentType);
   };
 
   const handleSaveEdit = async () => {
@@ -311,6 +407,9 @@ export const PaymentPlanScreen: React.FC = () => {
       crossAlert('Errore', 'Inserisci un importo valido.');
       return;
     }
+
+    const parsedStartDate = parseDateString(editStartDate);
+    const parsedEndDate = parseDateString(editEndDate);
 
     const updatedInstallments: Installment[] = editInstallments.map((inst, i) => ({
       ...inst,
@@ -323,6 +422,13 @@ export const PaymentPlanScreen: React.FC = () => {
       await updatePaymentPlan(editingPlan.id, {
         totalAmount: amount,
         installments: updatedInstallments,
+        includedLessons: parseInt(editIncludedLessons, 10) || 0,
+        includedConsultations: parseInt(editIncludedConsultations, 10) || 0,
+        ...(parsedStartDate ? { startDate: parsedStartDate } : {}),
+        ...(parsedEndDate ? { endDate: parsedEndDate } : {}),
+        ...(editPaymentType === 'monthly_course'
+          ? { courseType: editCourseType, subscriptionType: editSubscriptionType }
+          : {}),
       });
       setEditingPlan(null);
       await loadData();
@@ -411,6 +517,61 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   // -----------------------------------------------------------------------
+  // Progress bar component
+  // -----------------------------------------------------------------------
+  const ProgressBar: React.FC<{ used: number; total: number; color: string }> = ({
+    used,
+    total,
+    color,
+  }) => {
+    const progress = total > 0 ? Math.min(used / total, 1) : 0;
+    return (
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBarTrack}>
+          <View
+            style={[
+              styles.progressBarFill,
+              { width: `${progress * 100}%`, backgroundColor: color },
+            ]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // -----------------------------------------------------------------------
+  // Payment type selector (reusable for create form)
+  // -----------------------------------------------------------------------
+  const renderPaymentTypeOption = (
+    type: PaymentType,
+    label: string,
+    currentType: PaymentType,
+    onSelect: (t: PaymentType) => void,
+  ) => (
+    <TouchableOpacity
+      style={[
+        styles.typeOption,
+        currentType === type && styles.typeOptionActive,
+      ]}
+      onPress={() => onSelect(type)}
+    >
+      <Ionicons
+        name={currentType === type ? 'radio-button-on' : 'radio-button-off'}
+        size={20}
+        color={currentType === type ? colors.accent : colors.textLight}
+      />
+      <Text
+        style={[
+          styles.typeOptionText,
+          currentType === type && styles.typeOptionTextActive,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // -----------------------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------------------
   if (loading) {
@@ -427,15 +588,17 @@ export const PaymentPlanScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Piani di Pagamento</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => {
-            resetCreateForm();
-            setShowCreateModal(true);
-          }}
-        >
-          <Ionicons name="add-circle" size={28} color={colors.accent} />
-        </TouchableOpacity>
+        {canEdit && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              resetCreateForm();
+              setShowCreateModal(true);
+            }}
+          >
+            <Ionicons name="add-circle" size={28} color={colors.accent} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -457,11 +620,19 @@ export const PaymentPlanScreen: React.FC = () => {
             color={colors.success}
             icon={<Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />}
           />
+        </View>
+        <View style={styles.statsRow}>
           <StatCard
             title="Scadute"
             value={stats.overdueCount}
             color={colors.error}
             icon={<Ionicons name="alert-circle-outline" size={14} color={colors.error} />}
+          />
+          <StatCard
+            title="Piani Attivi"
+            value={stats.activePlansCount}
+            color={colors.info}
+            icon={<Ionicons name="fitness-outline" size={14} color={colors.info} />}
           />
         </View>
 
@@ -472,7 +643,9 @@ export const PaymentPlanScreen: React.FC = () => {
               <Ionicons name="card-outline" size={48} color={colors.textLight} />
               <Text style={styles.emptyText}>Nessun piano di pagamento</Text>
               <Text style={styles.emptySubtext}>
-                Tocca il pulsante + per creare un nuovo piano
+                {canEdit
+                  ? 'Tocca il pulsante + per creare un nuovo piano'
+                  : 'Nessun piano disponibile al momento'}
               </Text>
             </View>
           </Card>
@@ -493,81 +666,166 @@ export const PaymentPlanScreen: React.FC = () => {
                 </Text>
               </View>
 
-              {studentPlans.map((plan) => (
-                <TouchableOpacity
-                  key={plan.id}
-                  activeOpacity={0.7}
-                  onPress={() => openEditModal(plan)}
-                >
-                  <Card style={styles.planCard}>
-                    <View style={styles.planHeader}>
-                      <View style={styles.planInfo}>
-                        <Text style={styles.planAmount}>
-                          {'€'}{plan.totalAmount.toFixed(2)}
-                        </Text>
-                        <Badge
-                          status={plan.paymentType === 'full' ? 'paid' : 'pending'}
-                          label={plan.paymentType === 'full' ? 'Unica soluzione' : `${plan.installments.length} rate`}
-                        />
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleDelete(plan.id)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="trash-outline" size={20} color={colors.error} />
-                      </TouchableOpacity>
-                    </View>
+              {studentPlans.map((plan) => {
+                const planStartDate = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate);
+                const planEndDate = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate);
+                const hasValidDates = !isNaN(planStartDate.getTime()) && !isNaN(planEndDate.getTime());
+                const planIncludedLessons = plan.includedLessons ?? 0;
+                const planUsedLessons = plan.usedLessons ?? 0;
+                const planIncludedConsultations = plan.includedConsultations ?? 0;
+                const planUsedConsultations = plan.usedConsultations ?? 0;
 
-                    {/* Installments summary */}
-                    {plan.installments.map((inst) => {
-                      const dueDate = inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate as unknown as string);
-                      const days = daysUntilDate(new Date(dueDate));
-                      const isUpcoming = inst.status !== 'paid' && days >= 0 && days <= 15;
-
-                      return (
-                        <View key={inst.id} style={styles.installmentRow}>
-                          <View style={styles.installmentInfo}>
-                            <Badge status={inst.status} />
-                            <Text style={styles.installmentAmount}>
-                              {'€'}{inst.amount.toFixed(2)}
-                            </Text>
-                            <Text style={styles.installmentDate}>
-                              {formatDate(dueDate)}
-                            </Text>
-                          </View>
-
-                          <View style={styles.installmentActions}>
-                            {isUpcoming && (
-                              <>
-                                <TouchableOpacity
-                                  style={[styles.reminderBtn, { backgroundColor: '#25D366' + '20' }]}
-                                  onPress={() => sendReminder('whatsapp', plan.studentId, inst)}
-                                >
-                                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[styles.reminderBtn, { backgroundColor: colors.info + '20' }]}
-                                  onPress={() => sendReminder('sms', plan.studentId, inst)}
-                                >
-                                  <Ionicons name="chatbubble-outline" size={14} color={colors.info} />
-                                </TouchableOpacity>
-                              </>
-                            )}
-                            {inst.status !== 'paid' && (
-                              <TouchableOpacity
-                                style={styles.paidBtn}
-                                onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments)}
-                              >
-                                <Ionicons name="checkmark" size={14} color={colors.success} />
-                              </TouchableOpacity>
-                            )}
-                          </View>
+                return (
+                  <TouchableOpacity
+                    key={plan.id}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      if (canEdit) {
+                        openEditModal(plan);
+                      }
+                    }}
+                  >
+                    <Card style={styles.planCard}>
+                      {/* Plan header: amount + badge + delete */}
+                      <View style={styles.planHeader}>
+                        <View style={styles.planInfo}>
+                          <Text style={styles.planAmount}>
+                            {'€'}{plan.totalAmount.toFixed(2)}
+                          </Text>
+                          <Badge
+                            status={getPaymentTypeBadgeStatus(plan.paymentType)}
+                            label={getPaymentTypeLabel(plan.paymentType)}
+                          />
                         </View>
-                      );
-                    })}
-                  </Card>
-                </TouchableOpacity>
-              ))}
+                        {canEdit && (
+                          <TouchableOpacity
+                            onPress={() => handleDelete(plan.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="trash-outline" size={20} color={colors.error} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Date percorso */}
+                      {hasValidDates && (
+                        <View style={styles.planDetailRow}>
+                          <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                          <Text style={styles.planDetailText}>
+                            Date percorso: {formatDate(planStartDate)} - {formatDate(planEndDate)}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Monthly course details */}
+                      {plan.paymentType === 'monthly_course' && (
+                        <View style={styles.planCourseDetails}>
+                          {plan.courseType ? (
+                            <View style={styles.planDetailRow}>
+                              <Ionicons name="barbell-outline" size={14} color={colors.accent} />
+                              <Text style={styles.planDetailText}>
+                                Corso: {plan.courseType}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {plan.subscriptionType ? (
+                            <View style={styles.planDetailRow}>
+                              <Ionicons name="repeat-outline" size={14} color={colors.accent} />
+                              <Text style={styles.planDetailText}>
+                                Abbonamento: {plan.subscriptionType}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      )}
+
+                      {/* Lezioni progress */}
+                      {planIncludedLessons > 0 && (
+                        <View style={styles.planProgressSection}>
+                          <View style={styles.planProgressHeader}>
+                            <Ionicons name="body-outline" size={14} color={colors.info} />
+                            <Text style={styles.planProgressLabel}>Lezioni</Text>
+                            <Text style={styles.planProgressValue}>
+                              {planUsedLessons} / {planIncludedLessons}
+                            </Text>
+                          </View>
+                          <ProgressBar
+                            used={planUsedLessons}
+                            total={planIncludedLessons}
+                            color={colors.info}
+                          />
+                        </View>
+                      )}
+
+                      {/* Consulenze progress */}
+                      {planIncludedConsultations > 0 && (
+                        <View style={styles.planProgressSection}>
+                          <View style={styles.planProgressHeader}>
+                            <Ionicons name="nutrition-outline" size={14} color={colors.warning} />
+                            <Text style={styles.planProgressLabel}>Consulenze</Text>
+                            <Text style={styles.planProgressValue}>
+                              {planUsedConsultations} / {planIncludedConsultations}
+                            </Text>
+                          </View>
+                          <ProgressBar
+                            used={planUsedConsultations}
+                            total={planIncludedConsultations}
+                            color={colors.warning}
+                          />
+                        </View>
+                      )}
+
+                      {/* Installments summary */}
+                      {plan.installments.map((inst) => {
+                        const dueDate = inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate as unknown as string);
+                        const days = daysUntilDate(new Date(dueDate));
+                        const isUpcoming = inst.status !== 'paid' && days >= 0 && days <= 15;
+
+                        return (
+                          <View key={inst.id} style={styles.installmentRow}>
+                            <View style={styles.installmentInfo}>
+                              <Badge status={inst.status} />
+                              <Text style={styles.installmentAmount}>
+                                {'€'}{inst.amount.toFixed(2)}
+                              </Text>
+                              <Text style={styles.installmentDate}>
+                                {formatDate(dueDate)}
+                              </Text>
+                            </View>
+
+                            <View style={styles.installmentActions}>
+                              {isUpcoming && (
+                                <>
+                                  <TouchableOpacity
+                                    style={[styles.reminderBtn, { backgroundColor: '#25D366' + '20' }]}
+                                    onPress={() => sendReminder('whatsapp', plan.studentId, inst)}
+                                  >
+                                    <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={[styles.reminderBtn, { backgroundColor: colors.info + '20' }]}
+                                    onPress={() => sendReminder('sms', plan.studentId, inst)}
+                                  >
+                                    <Ionicons name="chatbubble-outline" size={14} color={colors.info} />
+                                  </TouchableOpacity>
+                                </>
+                              )}
+                              {inst.status !== 'paid' && (
+                                <TouchableOpacity
+                                  style={styles.paidBtn}
+                                  onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments)}
+                                >
+                                  <Ionicons name="checkmark" size={14} color={colors.success} />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </Card>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ))
         )}
@@ -578,166 +836,191 @@ export const PaymentPlanScreen: React.FC = () => {
       {/* ================================================================= */}
       {/* CREATE MODAL                                                      */}
       {/* ================================================================= */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowCreateModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ModalHeader
-              title="Nuovo Piano di Pagamento"
-              onClose={() => setShowCreateModal(false)}
-            />
-
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {/* Student picker */}
-              <StudentSearchPicker
-                students={students}
-                selectedId={selectedStudentId}
-                onSelect={setSelectedStudentId}
-                label="Seleziona Allievo"
+      {canEdit && (
+        <Modal
+          visible={showCreateModal}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowCreateModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <ModalHeader
+                title="Nuovo Piano di Pagamento"
+                onClose={() => setShowCreateModal(false)}
               />
 
-              {/* Total amount */}
-              <InputField
-                label="Importo Totale (€)"
-                value={totalAmount}
-                onChangeText={setTotalAmount}
-                keyboardType="decimal-pad"
-                placeholder="Es. 500.00"
-              />
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* Student picker */}
+                <StudentSearchPicker
+                  students={students}
+                  selectedId={selectedStudentId}
+                  onSelect={setSelectedStudentId}
+                  label="Seleziona Allievo"
+                />
 
-              {/* Payment type */}
-              <Text style={styles.fieldLabel}>Tipo di Pagamento</Text>
-              <View style={styles.typeRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    paymentType === 'full' && styles.typeOptionActive,
-                  ]}
-                  onPress={() => setPaymentType('full')}
-                >
-                  <Ionicons
-                    name={paymentType === 'full' ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={paymentType === 'full' ? colors.accent : colors.textLight}
-                  />
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      paymentType === 'full' && styles.typeOptionTextActive,
-                    ]}
-                  >
-                    Unica soluzione
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.typeOption,
-                    paymentType === 'installment' && styles.typeOptionActive,
-                  ]}
-                  onPress={() => setPaymentType('installment')}
-                >
-                  <Ionicons
-                    name={paymentType === 'installment' ? 'radio-button-on' : 'radio-button-off'}
-                    size={20}
-                    color={paymentType === 'installment' ? colors.accent : colors.textLight}
-                  />
-                  <Text
-                    style={[
-                      styles.typeOptionText,
-                      paymentType === 'installment' && styles.typeOptionTextActive,
-                    ]}
-                  >
-                    Rate
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                {/* Total amount */}
+                <InputField
+                  label="Importo Totale (€)"
+                  value={totalAmount}
+                  onChangeText={setTotalAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="Es. 500.00"
+                />
 
-              {/* Due date (full) or first due date (installment) */}
-              <InputField
-                label={paymentType === 'full' ? 'Data Scadenza (gg/mm/aaaa)' : 'Data Prima Rata (gg/mm/aaaa)'}
-                value={firstDueDate}
-                onChangeText={setFirstDueDate}
-                placeholder="Es. 01/06/2026"
-              />
+                {/* Payment type */}
+                <Text style={styles.fieldLabel}>Tipo di Pagamento</Text>
+                <View style={styles.typeRow}>
+                  {renderPaymentTypeOption('full', 'Unica soluzione', paymentType, setPaymentType)}
+                  {renderPaymentTypeOption('installment', 'Rate', paymentType, setPaymentType)}
+                </View>
+                <View style={styles.typeRowSingle}>
+                  {renderPaymentTypeOption('monthly_course', 'Corso Mensile', paymentType, setPaymentType)}
+                </View>
 
-              {/* Installment config */}
-              {paymentType === 'installment' && (
-                <>
-                  <InputField
-                    label="Numero di Rate"
-                    value={numInstallments}
-                    onChangeText={setNumInstallments}
-                    keyboardType="number-pad"
-                    placeholder="Es. 3"
-                  />
+                {/* Monthly course fields */}
+                {paymentType === 'monthly_course' && (
+                  <>
+                    <InputField
+                      label="Tipo di Corso"
+                      value={courseType}
+                      onChangeText={setCourseType}
+                      placeholder="Es. Pilates, CrossFit, Yoga"
+                    />
+                    <InputField
+                      label="Tipo di Abbonamento"
+                      value={subscriptionType}
+                      onChangeText={setSubscriptionType}
+                      placeholder="Es. Mensile, Trimestrale, Semestrale"
+                    />
+                  </>
+                )}
 
-                  {/* Custom installment overrides */}
-                  {customInstallments.length > 0 && (
-                    <View style={styles.installmentsPreview}>
-                      <Text style={styles.fieldLabel}>Dettaglio Rate</Text>
-                      {customInstallments.map((ci, index) => (
-                        <View key={index} style={styles.customInstRow}>
-                          <Text style={styles.customInstLabel}>Rata {index + 1}</Text>
-                          <View style={styles.customInstFields}>
-                            <View style={styles.customInstField}>
-                              <Text style={styles.customInstFieldLabel}>{'€'}</Text>
-                              <InputField
-                                label=""
-                                value={ci.amount}
-                                onChangeText={(val) => {
-                                  const updated = [...customInstallments];
-                                  updated[index] = { ...updated[index], amount: val };
-                                  setCustomInstallments(updated);
-                                }}
-                                keyboardType="decimal-pad"
-                                style={styles.customInstInput}
-                              />
-                            </View>
-                            <View style={styles.customInstField}>
-                              <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
-                              <InputField
-                                label=""
-                                value={ci.dueDate}
-                                onChangeText={(val) => {
-                                  const updated = [...customInstallments];
-                                  updated[index] = { ...updated[index], dueDate: val };
-                                  setCustomInstallments(updated);
-                                }}
-                                style={styles.customInstInput}
-                              />
+                {/* Due date (full/monthly_course) or first due date (installment) */}
+                <InputField
+                  label={
+                    paymentType === 'installment'
+                      ? 'Data Prima Rata (gg/mm/aaaa)'
+                      : 'Data Scadenza (gg/mm/aaaa)'
+                  }
+                  value={firstDueDate}
+                  onChangeText={setFirstDueDate}
+                  placeholder="Es. 01/06/2026"
+                />
+
+                {/* Installment config */}
+                {paymentType === 'installment' && (
+                  <>
+                    <InputField
+                      label="Numero di Rate"
+                      value={numInstallments}
+                      onChangeText={setNumInstallments}
+                      keyboardType="number-pad"
+                      placeholder="Es. 3"
+                    />
+
+                    {/* Custom installment overrides */}
+                    {customInstallments.length > 0 && (
+                      <View style={styles.installmentsPreview}>
+                        <Text style={styles.fieldLabel}>Dettaglio Rate</Text>
+                        {customInstallments.map((ci, index) => (
+                          <View key={index} style={styles.customInstRow}>
+                            <Text style={styles.customInstLabel}>Rata {index + 1}</Text>
+                            <View style={styles.customInstFields}>
+                              <View style={styles.customInstField}>
+                                <Text style={styles.customInstFieldLabel}>{'€'}</Text>
+                                <InputField
+                                  label=""
+                                  value={ci.amount}
+                                  onChangeText={(val) => {
+                                    const updated = [...customInstallments];
+                                    updated[index] = { ...updated[index], amount: val };
+                                    setCustomInstallments(updated);
+                                  }}
+                                  keyboardType="decimal-pad"
+                                  style={styles.customInstInput}
+                                />
+                              </View>
+                              <View style={styles.customInstField}>
+                                <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                                <InputField
+                                  label=""
+                                  value={ci.dueDate}
+                                  onChangeText={(val) => {
+                                    const updated = [...customInstallments];
+                                    updated[index] = { ...updated[index], dueDate: val };
+                                    setCustomInstallments(updated);
+                                  }}
+                                  style={styles.customInstInput}
+                                />
+                              </View>
                             </View>
                           </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </>
-              )}
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
 
-              <View style={styles.modalActions}>
-                <Button
-                  title="Salva Piano"
-                  onPress={handleCreate}
-                  loading={saving}
-                  icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />}
+                {/* Separator */}
+                <View style={styles.formDivider} />
+                <Text style={styles.fieldLabel}>Dettagli Percorso</Text>
+
+                {/* Included lessons */}
+                <InputField
+                  label="Lezioni incluse"
+                  value={includedLessons}
+                  onChangeText={setIncludedLessons}
+                  keyboardType="number-pad"
+                  placeholder="Es. 12"
                 />
-                <Button
-                  title="Annulla"
-                  variant="outline"
-                  onPress={() => setShowCreateModal(false)}
+
+                {/* Included consultations */}
+                <InputField
+                  label="Consulenze nutrizionali incluse"
+                  value={includedConsultations}
+                  onChangeText={setIncludedConsultations}
+                  keyboardType="number-pad"
+                  placeholder="Es. 3"
                 />
-              </View>
-            </ScrollView>
+
+                {/* Start date */}
+                <InputField
+                  label="Data inizio percorso (gg/mm/aaaa)"
+                  value={startDate}
+                  onChangeText={setStartDate}
+                  placeholder="Es. 01/06/2026"
+                />
+
+                {/* End date */}
+                <InputField
+                  label="Data fine percorso (gg/mm/aaaa)"
+                  value={endDate}
+                  onChangeText={setEndDate}
+                  placeholder="Es. 31/12/2026"
+                />
+
+                <View style={styles.modalActions}>
+                  <Button
+                    title="Salva Piano"
+                    onPress={handleCreate}
+                    loading={saving}
+                    icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />}
+                  />
+                  <Button
+                    title="Annulla"
+                    variant="outline"
+                    onPress={() => setShowCreateModal(false)}
+                  />
+                </View>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* ================================================================= */}
-      {/* EDIT MODAL                                                        */}
+      {/* EDIT MODAL (view-only for managers)                               */}
       {/* ================================================================= */}
       <Modal
         visible={!!editingPlan}
@@ -748,7 +1031,11 @@ export const PaymentPlanScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <ModalHeader
-              title={`Modifica Piano - ${editingPlan ? getStudentName(editingPlan.studentId) : ''}`}
+              title={
+                canEdit
+                  ? `Modifica Piano - ${editingPlan ? getStudentName(editingPlan.studentId) : ''}`
+                  : `Piano - ${editingPlan ? getStudentName(editingPlan.studentId) : ''}`
+              }
               onClose={() => setEditingPlan(null)}
             />
 
@@ -759,8 +1046,122 @@ export const PaymentPlanScreen: React.FC = () => {
                   value={editTotalAmount}
                   onChangeText={setEditTotalAmount}
                   keyboardType="decimal-pad"
+                  editable={canEdit}
                 />
 
+                {/* Payment type (read-only display) */}
+                <View style={styles.editPaymentTypeRow}>
+                  <Text style={styles.fieldLabel}>Tipo di Pagamento</Text>
+                  <Badge
+                    status={getPaymentTypeBadgeStatus(editPaymentType)}
+                    label={getPaymentTypeLabel(editPaymentType)}
+                  />
+                </View>
+
+                {/* Separator - percorso details */}
+                <View style={styles.formDivider} />
+                <Text style={styles.fieldLabel}>Dettagli Percorso</Text>
+
+                {/* Date percorso */}
+                <View style={styles.editFieldRow}>
+                  <View style={{ flex: 1 }}>
+                    <InputField
+                      label="Data inizio (gg/mm/aaaa)"
+                      value={editStartDate}
+                      onChangeText={setEditStartDate}
+                      editable={canEdit}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <InputField
+                      label="Data fine (gg/mm/aaaa)"
+                      value={editEndDate}
+                      onChangeText={setEditEndDate}
+                      editable={canEdit}
+                    />
+                  </View>
+                </View>
+
+                {/* Included lessons */}
+                <View style={styles.editFieldRow}>
+                  <View style={{ flex: 1 }}>
+                    <InputField
+                      label="Lezioni incluse"
+                      value={editIncludedLessons}
+                      onChangeText={setEditIncludedLessons}
+                      keyboardType="number-pad"
+                      editable={canEdit}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.readOnlyField}>
+                      <Text style={styles.readOnlyLabel}>Lezioni utilizzate</Text>
+                      <Text style={styles.readOnlyValue}>{editUsedLessons}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Lezioni progress bar in edit */}
+                {parseInt(editIncludedLessons, 10) > 0 && (
+                  <ProgressBar
+                    used={editUsedLessons}
+                    total={parseInt(editIncludedLessons, 10)}
+                    color={colors.info}
+                  />
+                )}
+
+                {/* Included consultations */}
+                <View style={styles.editFieldRow}>
+                  <View style={{ flex: 1 }}>
+                    <InputField
+                      label="Consulenze incluse"
+                      value={editIncludedConsultations}
+                      onChangeText={setEditIncludedConsultations}
+                      keyboardType="number-pad"
+                      editable={canEdit}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.readOnlyField}>
+                      <Text style={styles.readOnlyLabel}>Consulenze utilizzate</Text>
+                      <Text style={styles.readOnlyValue}>{editUsedConsultations}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Consulenze progress bar in edit */}
+                {parseInt(editIncludedConsultations, 10) > 0 && (
+                  <ProgressBar
+                    used={editUsedConsultations}
+                    total={parseInt(editIncludedConsultations, 10)}
+                    color={colors.warning}
+                  />
+                )}
+
+                {/* Monthly course fields */}
+                {editPaymentType === 'monthly_course' && (
+                  <>
+                    <View style={styles.formDivider} />
+                    <Text style={styles.fieldLabel}>Dettagli Corso Mensile</Text>
+                    <InputField
+                      label="Tipo di Corso"
+                      value={editCourseType}
+                      onChangeText={setEditCourseType}
+                      placeholder="Es. Pilates, CrossFit, Yoga"
+                      editable={canEdit}
+                    />
+                    <InputField
+                      label="Tipo di Abbonamento"
+                      value={editSubscriptionType}
+                      onChangeText={setEditSubscriptionType}
+                      placeholder="Es. Mensile, Trimestrale, Semestrale"
+                      editable={canEdit}
+                    />
+                  </>
+                )}
+
+                {/* Installments */}
+                <View style={styles.formDivider} />
                 <Text style={styles.fieldLabel}>Rate</Text>
                 {editInstallments.map((inst, index) => {
                   const isPaid = inst.status === 'paid';
@@ -790,7 +1191,7 @@ export const PaymentPlanScreen: React.FC = () => {
                               setEditCustomAmounts(updated);
                             }}
                             keyboardType="decimal-pad"
-                            editable={!isPaid}
+                            editable={!isPaid && canEdit}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
@@ -802,7 +1203,7 @@ export const PaymentPlanScreen: React.FC = () => {
                               updated[index] = val;
                               setEditCustomDates(updated);
                             }}
-                            editable={!isPaid}
+                            editable={!isPaid && canEdit}
                           />
                         </View>
                       </View>
@@ -856,18 +1257,22 @@ export const PaymentPlanScreen: React.FC = () => {
                 })}
 
                 <View style={styles.modalActions}>
-                  <Button
-                    title="Salva Modifiche"
-                    onPress={handleSaveEdit}
-                    loading={saving}
-                    icon={<Ionicons name="save" size={18} color="#fff" />}
-                  />
-                  <Button
-                    title="Elimina Piano"
-                    variant="danger"
-                    onPress={() => handleDelete(editingPlan.id)}
-                    icon={<Ionicons name="trash" size={18} color="#fff" />}
-                  />
+                  {canEdit && (
+                    <>
+                      <Button
+                        title="Salva Modifiche"
+                        onPress={handleSaveEdit}
+                        loading={saving}
+                        icon={<Ionicons name="save" size={18} color="#fff" />}
+                      />
+                      <Button
+                        title="Elimina Piano"
+                        variant="danger"
+                        onPress={() => handleDelete(editingPlan.id)}
+                        icon={<Ionicons name="trash" size={18} color="#fff" />}
+                      />
+                    </>
+                  )}
                   <Button
                     title="Chiudi"
                     variant="outline"
@@ -930,7 +1335,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   emptyState: {
     alignItems: 'center',
@@ -1001,6 +1406,55 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xl,
     fontWeight: '700',
     color: colors.text,
+  },
+
+  // Plan detail rows
+  planDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  planDetailText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  planCourseDetails: {
+    marginBottom: spacing.xs,
+  },
+
+  // Progress bars on plan cards
+  planProgressSection: {
+    marginBottom: spacing.sm,
+  },
+  planProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  planProgressLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  planProgressValue: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  progressBarContainer: {
+    marginBottom: spacing.xs,
+  },
+  progressBarTrack: {
+    height: 4,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
   },
 
   // Installment row
@@ -1076,6 +1530,10 @@ const styles = StyleSheet.create({
   typeRow: {
     flexDirection: 'row',
     gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  typeRowSingle: {
+    flexDirection: 'row',
     marginBottom: spacing.lg,
   },
   typeOption: {
@@ -1100,6 +1558,13 @@ const styles = StyleSheet.create({
   },
   typeOptionTextActive: {
     color: colors.accent,
+  },
+
+  // Form divider
+  formDivider: {
+    height: 1,
+    backgroundColor: colors.divider,
+    marginVertical: spacing.lg,
   },
 
   // Custom installments
@@ -1147,6 +1612,38 @@ const styles = StyleSheet.create({
   },
 
   // Edit modal
+  editPaymentTypeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  editFieldRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  readOnlyField: {
+    marginBottom: spacing.md,
+  },
+  readOnlyLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  readOnlyValue: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+
   editInstCard: {
     marginBottom: spacing.sm,
   },
