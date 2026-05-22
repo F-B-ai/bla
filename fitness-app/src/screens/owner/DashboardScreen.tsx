@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -202,6 +202,46 @@ export const DashboardScreen: React.FC = () => {
     { key: 'year' as const, label: 'Anno' },
   ];
 
+  const planStats = useMemo(() => {
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let overdueCount = 0;
+    let activePlans = 0;
+    let totalLessons = 0;
+    let usedLessons = 0;
+    let totalConsultations = 0;
+    let usedConsultations = 0;
+    let activeCourses = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const plan of allPaymentPlans) {
+      for (const inst of plan.installments) {
+        if (inst.status === 'paid') totalCollected += inst.amount;
+        else {
+          totalOutstanding += inst.amount;
+          if (inst.status === 'overdue') overdueCount++;
+        }
+      }
+      const start = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as unknown as string);
+      const end = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as unknown as string);
+      const s = new Date(start); s.setHours(0, 0, 0, 0);
+      const e = new Date(end); e.setHours(0, 0, 0, 0);
+      if (s <= today && e >= today) {
+        activePlans++;
+        if (plan.paymentType === 'monthly_course') activeCourses++;
+      }
+      totalLessons += plan.includedLessons || 0;
+      usedLessons += plan.usedLessons || 0;
+      totalConsultations += plan.includedConsultations || 0;
+      usedConsultations += plan.usedConsultations || 0;
+    }
+    return { totalCollected, totalOutstanding, overdueCount, activePlans, totalLessons, usedLessons, totalConsultations, usedConsultations, activeCourses };
+  }, [allPaymentPlans]);
+
+  const combinedIncome = totalRevenue + planStats.totalCollected;
+  const combinedProfit = combinedIncome - totalExpenses;
+
   const coachRevenueData = getRevenueByCoach();
   const sessionsData = getSessionsByStatus();
   const studentsByCoachData = getStudentsByCoach();
@@ -264,9 +304,9 @@ export const DashboardScreen: React.FC = () => {
       {/* Statistiche rapide */}
       <View style={styles.statsRow}>
         <StatCard
-          title="Ricavi"
-          value={`€${totalRevenue.toLocaleString()}`}
-          subtitle="Questo mese"
+          title="Ricavi Totali"
+          value={`€${combinedIncome.toLocaleString()}`}
+          subtitle={`Transazioni €${totalRevenue.toLocaleString()} + Piani €${planStats.totalCollected.toLocaleString()}`}
           color={colors.success}
         />
         <StatCard
@@ -308,39 +348,43 @@ export const DashboardScreen: React.FC = () => {
       <View style={styles.statsRow}>
         <StatCard
           title="Incassato"
-          value={`€${allPaymentPlans
-            .flatMap((p) => p.installments)
-            .filter((i) => i.status === 'paid')
-            .reduce((sum, i) => sum + i.amount, 0)
-            .toLocaleString()}`}
+          value={`€${planStats.totalCollected.toLocaleString()}`}
           subtitle="Da piani pagamento"
           color={colors.success}
         />
         <StatCard
           title="Da incassare"
-          value={`€${allPaymentPlans
-            .flatMap((p) => p.installments)
-            .filter((i) => i.status !== 'paid')
-            .reduce((sum, i) => sum + i.amount, 0)
-            .toLocaleString()}`}
+          value={`€${planStats.totalOutstanding.toLocaleString()}`}
           subtitle="In sospeso"
           color={colors.warning}
         />
       </View>
       <View style={styles.statsRow}>
         <StatCard
-          title="Rate scadute"
-          value={allPaymentPlans
-            .flatMap((p) => p.installments)
-            .filter((i) => i.status === 'overdue').length}
+          title="Piani Attivi"
+          value={planStats.activePlans}
+          subtitle={planStats.activeCourses > 0 ? `${planStats.activeCourses} corsi` : undefined}
+          color={colors.info}
+        />
+        <StatCard
+          title="Rate Scadute"
+          value={planStats.overdueCount}
           subtitle="Da sollecitare"
           color={colors.error}
         />
+      </View>
+      <View style={styles.statsRow}>
         <StatCard
-          title="Consulenze nutrizionali"
-          value={studentsData.reduce((sum, s) => sum + (s.nutritionalConsultations || 0), 0)}
-          subtitle="Totale allievi"
+          title="Lezioni"
+          value={`${planStats.usedLessons}/${planStats.totalLessons}`}
+          subtitle={`${planStats.totalLessons - planStats.usedLessons} rimanenti`}
           color={colors.info}
+        />
+        <StatCard
+          title="Consulenze"
+          value={`${planStats.usedConsultations}/${planStats.totalConsultations}`}
+          subtitle={`${planStats.totalConsultations - planStats.usedConsultations} rimanenti`}
+          color={colors.warning}
         />
       </View>
 
@@ -349,16 +393,16 @@ export const DashboardScreen: React.FC = () => {
         <Text style={styles.profitLabel}>Profitto Netto</Text>
         <Text style={[
           styles.profitValue,
-          { color: totalRevenue - totalExpenses >= 0 ? colors.success : colors.error },
+          { color: combinedProfit >= 0 ? colors.success : colors.error },
         ]}>
-          €{(totalRevenue - totalExpenses).toLocaleString()}
+          €{combinedProfit.toLocaleString()}
         </Text>
         <View style={styles.profitBar}>
           <View style={[
             styles.profitBarFill,
             {
-              width: totalRevenue > 0
-                ? `${Math.min((totalRevenue / (totalRevenue + totalExpenses)) * 100, 100)}%`
+              width: combinedIncome > 0
+                ? `${Math.min((combinedIncome / (combinedIncome + totalExpenses)) * 100, 100)}%`
                 : '0%',
               backgroundColor: colors.success,
             },
@@ -366,7 +410,7 @@ export const DashboardScreen: React.FC = () => {
         </View>
         <View style={styles.profitLegend}>
           <Text style={[styles.profitLegendText, { color: colors.success }]}>
-            Ricavi €{totalRevenue.toLocaleString()}
+            Ricavi €{combinedIncome.toLocaleString()}
           </Text>
           <Text style={[styles.profitLegendText, { color: colors.error }]}>
             Spese €{totalExpenses.toLocaleString()}
