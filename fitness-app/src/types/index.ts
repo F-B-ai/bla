@@ -269,11 +269,16 @@ export interface PosturalAssessment {
   assessorId: string; // chi fa la valutazione
   date: Date;
   frontImageUrl: string;
-  sideImageUrl: string;
+  sideLeftImageUrl: string;
+  sideRightImageUrl: string;
   backImageUrl: string;
   findings: PosturalFinding[];
   overallNotes: string;
   recommendations: string;
+  aiAnalysis?: string;
+  aiRecommendations?: string[];
+  aiExerciseProgram?: string[];
+  comparisonNotes?: string;
 }
 
 export interface PosturalFinding {
