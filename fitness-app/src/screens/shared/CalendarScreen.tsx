@@ -8,6 +8,7 @@ import {
   Modal,
   FlatList,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
@@ -24,6 +25,8 @@ import {
   Student,
   Collaborator,
   Manager,
+  DailyTask,
+  TaskPriority,
 } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -48,6 +51,13 @@ import {
 } from '../../services/nutritionistService';
 import { getStudents, getCollaborators, getManagers } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
+import {
+  createTask,
+  getTasksByOwner,
+  toggleTaskComplete,
+  updateTask,
+  deleteTask,
+} from '../../services/taskService';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -115,6 +125,18 @@ const buildCalendarGrid = (year: number, month: number): (number | null)[][] => 
   return grid;
 };
 
+const PRIORITY_COLORS: Record<TaskPriority, string> = {
+  low: colors.info,
+  medium: colors.warning,
+  high: colors.error,
+};
+
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: 'Bassa',
+  medium: 'Media',
+  high: 'Alta',
+};
+
 export const CalendarScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const canSeeAll = isOwner;
@@ -130,12 +152,13 @@ export const CalendarScreen: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
+  const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // Staff filter (owner only)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
 
-  // Create/Edit modal
+  // Create/Edit appointment modal
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<AppointmentItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -150,8 +173,19 @@ export const CalendarScreen: React.FC = () => {
   const [formCost, setFormCost] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
+  // Task modal (owner only)
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<DailyTask | null>(null);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDescription, setTaskDescription] = useState('');
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>('medium');
+  const [savingTask, setSavingTask] = useState(false);
+
   // Student detail modal
   const [studentDetailId, setStudentDetailId] = useState<string | null>(null);
+
+  // View mode: 'agenda' shows daily list first, 'calendar' shows calendar grid
+  const [viewMode, setViewMode] = useState<'agenda' | 'calendar'>('agenda');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -193,11 +227,16 @@ export const CalendarScreen: React.FC = () => {
       ]);
       setSessions(trainingSessions);
       setNutritionAppts(nutrAppts);
+
+      if (isOwner) {
+        const ownerTasks = await getTasksByOwner(user.id).catch(() => []);
+        setTasks(ownerTasks);
+      }
     } catch (err) {
       console.error('Errore caricamento calendario:', err);
       crossAlert('Errore', 'Impossibile caricare i dati.');
     }
-  }, [user, canSeeAll, isCollaborator, isManager, isStudent]);
+  }, [user, canSeeAll, isCollaborator, isManager, isStudent, isOwner]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -248,6 +287,20 @@ export const CalendarScreen: React.FC = () => {
   }, [filteredAppointments]);
 
   const selectedDayItems = appointmentsByDate[selectedDate] || [];
+
+  // Tasks grouped by date
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, DailyTask[]> = {};
+    tasks.forEach((t) => {
+      const d = toSafeDate(t.date);
+      const ds = toDateStr(d);
+      if (!map[ds]) map[ds] = [];
+      map[ds].push(t);
+    });
+    return map;
+  }, [tasks]);
+
+  const selectedDayTasks = tasksByDate[selectedDate] || [];
 
   const staffList = useMemo(() => {
     if (!canSeeAll) return [];
@@ -320,7 +373,7 @@ export const CalendarScreen: React.FC = () => {
     else setCurrentMonth((m) => m + 1);
   };
 
-  // Form
+  // Appointment form
   const resetForm = () => {
     setFormKind('training');
     setFormStudentId('');
@@ -506,6 +559,88 @@ export const CalendarScreen: React.FC = () => {
     ]);
   };
 
+  // Task handlers
+  const resetTaskForm = () => {
+    setTaskTitle('');
+    setTaskDescription('');
+    setTaskPriority('medium');
+    setEditingTask(null);
+  };
+
+  const openCreateTask = () => {
+    resetTaskForm();
+    setShowTaskModal(true);
+  };
+
+  const openEditTask = (task: DailyTask) => {
+    setEditingTask(task);
+    setTaskTitle(task.title);
+    setTaskDescription(task.description);
+    setTaskPriority(task.priority);
+    setShowTaskModal(true);
+  };
+
+  const handleSaveTask = async () => {
+    if (!taskTitle.trim() || !user) {
+      crossAlert('Errore', 'Inserisci un titolo per il task');
+      return;
+    }
+    setSavingTask(true);
+    try {
+      if (editingTask) {
+        await updateTask(editingTask.id, {
+          title: taskTitle.trim(),
+          description: taskDescription.trim(),
+          priority: taskPriority,
+        });
+        crossAlert('Successo', 'Task aggiornato!');
+      } else {
+        await createTask({
+          ownerId: user.id,
+          date: new Date(selectedDate + 'T00:00:00'),
+          title: taskTitle.trim(),
+          description: taskDescription.trim(),
+          priority: taskPriority,
+          isCompleted: false,
+          createdAt: new Date(),
+        });
+        crossAlert('Successo', 'Task creato!');
+      }
+      resetTaskForm();
+      setShowTaskModal(false);
+      loadData();
+    } catch {
+      crossAlert('Errore', 'Impossibile salvare il task');
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
+  const handleToggleTask = async (task: DailyTask) => {
+    try {
+      await toggleTaskComplete(task.id, !task.isCompleted);
+      loadData();
+    } catch {
+      crossAlert('Errore', 'Impossibile aggiornare il task');
+    }
+  };
+
+  const handleDeleteTask = (task: DailyTask) => {
+    crossAlert('Conferma', 'Eliminare questo task?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteTask(task.id);
+            loadData();
+          } catch { crossAlert('Errore', 'Impossibile eliminare'); }
+        },
+      },
+    ]);
+  };
+
   // Next 30 days for date picker
   const nextDays = useMemo(() => {
     const days: { label: string; value: string }[] = [];
@@ -541,6 +676,10 @@ export const CalendarScreen: React.FC = () => {
 
   const todayStr = toDateStr(now);
 
+  // Today's agenda for quick view
+  const todayAppointments = appointmentsByDate[todayStr] || [];
+  const todayTasks = tasksByDate[todayStr] || [];
+
   // Render calendar cell
   const renderDayCell = (day: number | null, colIdx: number) => {
     if (day === null) return <View key={`empty-${colIdx}`} style={styles.dayCell} />;
@@ -548,23 +687,81 @@ export const CalendarScreen: React.FC = () => {
     const isSelected = dateStr === selectedDate;
     const isToday = dateStr === todayStr;
     const dayItems = appointmentsByDate[dateStr] || [];
+    const dayTaskItems = tasksByDate[dateStr] || [];
     const hasTraining = dayItems.some((a) => a.kind === 'training');
     const hasNutrition = dayItems.some((a) => a.kind === 'nutrition');
+    const hasTasks = isOwner && dayTaskItems.length > 0;
 
     return (
       <TouchableOpacity
         key={day}
-        style={[styles.dayCell, isToday && styles.dayCellToday, isSelected && styles.dayCellSelected]}
+        style={{
+          ...styles.dayCell,
+          ...(isToday ? styles.dayCellToday : {}),
+          ...(isSelected ? styles.dayCellSelected : {}),
+        }}
         onPress={() => setSelectedDate(dateStr)}
       >
-        <Text style={[styles.dayText, isToday && styles.dayTextToday, isSelected && styles.dayTextSelected]}>
+        <Text style={{
+          ...styles.dayText,
+          ...(isToday ? styles.dayTextToday : {}),
+          ...(isSelected ? styles.dayTextSelected : {}),
+        }}>
           {day}
         </Text>
         <View style={styles.dotRow}>
-          {hasTraining && <View style={[styles.calDot, { backgroundColor: colors.accent }]} />}
-          {hasNutrition && <View style={[styles.calDot, { backgroundColor: colors.success }]} />}
+          {hasTraining && <View style={{ ...styles.calDot, backgroundColor: colors.accent }} />}
+          {hasNutrition && <View style={{ ...styles.calDot, backgroundColor: colors.success }} />}
+          {hasTasks && <View style={{ ...styles.calDot, backgroundColor: colors.info }} />}
         </View>
       </TouchableOpacity>
+    );
+  };
+
+  // Render task card
+  const renderTaskCard = (task: DailyTask) => {
+    const priorityColor = PRIORITY_COLORS[task.priority];
+    return (
+      <View key={task.id} style={{
+        ...styles.taskCard,
+        ...(task.isCompleted ? styles.taskCardCompleted : {}),
+        borderLeftColor: priorityColor,
+      }}>
+        <TouchableOpacity
+          style={styles.taskCheckbox}
+          onPress={() => handleToggleTask(task)}
+        >
+          <Ionicons
+            name={task.isCompleted ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={task.isCompleted ? colors.success : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <View style={styles.taskContent}>
+          <Text style={{
+            ...styles.taskTitle,
+            ...(task.isCompleted ? styles.taskTitleDone : {}),
+          }}>{task.title}</Text>
+          {task.description ? (
+            <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
+          ) : null}
+          <View style={styles.taskMeta}>
+            <View style={{ ...styles.priorityBadge, backgroundColor: priorityColor + '20' }}>
+              <Text style={{ ...styles.priorityText, color: priorityColor }}>
+                {PRIORITY_LABELS[task.priority]}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.taskActions}>
+          <TouchableOpacity onPress={() => openEditTask(task)} style={styles.taskActionBtn}>
+            <Ionicons name="create-outline" size={16} color={colors.info} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeleteTask(task)} style={styles.taskActionBtn}>
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
@@ -574,7 +771,6 @@ export const CalendarScreen: React.FC = () => {
     const isFuture = item.date >= new Date();
     const canStudentCancel = isScheduled && isFuture;
     const canStaffAct = isScheduled;
-    const isCancelledOrDone = item.status !== 'scheduled';
     const staffName = getStaffName(item.staffId);
 
     return (
@@ -586,7 +782,7 @@ export const CalendarScreen: React.FC = () => {
               size={14}
               color={item.kind === 'training' ? colors.accent : colors.success}
             />
-            <Text style={[styles.kindText, { color: item.kind === 'training' ? colors.accent : colors.success }]}>
+            <Text style={{ ...styles.kindText, color: item.kind === 'training' ? colors.accent : colors.success }}>
               {item.kind === 'training' ? 'Training' : 'Nutrizione'}
             </Text>
           </View>
@@ -626,15 +822,15 @@ export const CalendarScreen: React.FC = () => {
               <>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
                   <Ionicons name="create-outline" size={18} color={colors.info} />
-                  <Text style={[styles.actionText, { color: colors.info }]}>Modifica</Text>
+                  <Text style={{ ...styles.actionText, color: colors.info }}>Modifica</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => handleComplete(item)}>
                   <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
-                  <Text style={[styles.actionText, { color: colors.success }]}>Completato</Text>
+                  <Text style={{ ...styles.actionText, color: colors.success }}>Completato</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
                   <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
-                  <Text style={[styles.actionText, { color: colors.warning }]}>Annulla</Text>
+                  <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -647,11 +843,50 @@ export const CalendarScreen: React.FC = () => {
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
               <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-              <Text style={[styles.actionText, { color: colors.error }]}>Annulla Sessione</Text>
+              <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
             </TouchableOpacity>
           </View>
         )}
       </Card>
+    );
+  };
+
+  // Render compact appointment row for agenda
+  const renderAgendaRow = (item: AppointmentItem) => {
+    const staffName = getStaffName(item.staffId);
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.agendaRow}
+        onPress={() => {
+          setSelectedDate(item.dateStr);
+          setViewMode('calendar');
+        }}
+      >
+        <View style={{
+          ...styles.agendaTimeCol,
+          borderLeftColor: item.kind === 'training' ? colors.accent : colors.success,
+        }}>
+          <Text style={styles.agendaTime}>{item.startTime}</Text>
+          <Text style={styles.agendaTimeSep}>-</Text>
+          <Text style={styles.agendaTime}>{item.endTime}</Text>
+        </View>
+        <View style={styles.agendaInfo}>
+          <Text style={styles.agendaStudentName}>{getStudentName(item.studentId)}</Text>
+          <View style={styles.agendaMetaRow}>
+            <Ionicons
+              name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+              size={12}
+              color={item.kind === 'training' ? colors.accent : colors.success}
+            />
+            <Text style={styles.agendaKind}>
+              {item.kind === 'training' ? 'Training' : 'Nutrizione'}
+            </Text>
+            {staffName ? <Text style={styles.agendaStaff}> · {staffName}</Text> : null}
+          </View>
+        </View>
+        <Badge status={item.status} />
+      </TouchableOpacity>
     );
   };
 
@@ -660,6 +895,170 @@ export const CalendarScreen: React.FC = () => {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
+  const todayLabel = now.toLocaleDateString('it-IT', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+
+  // ========== AGENDA VIEW ==========
+  if (viewMode === 'agenda') {
+    const scheduledToday = todayAppointments.filter((a) => a.status === 'scheduled');
+    const pendingTasks = todayTasks.filter((t) => !t.isCompleted);
+    const completedTasks = todayTasks.filter((t) => t.isCompleted);
+
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.listContent}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.headerTopRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>
+                  {isStudent ? 'I Miei Appuntamenti' : 'Agenda'}
+                </Text>
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {todayLabel}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.viewToggle}
+                onPress={() => setViewMode('calendar')}
+              >
+                <Ionicons name="calendar" size={20} color={colors.textOnPrimary} />
+                <Text style={styles.viewToggleText}>Calendario</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Staff filter (owner only) */}
+          {canSeeAll && staffList.length > 0 && (
+            <View style={styles.staffFilterSection}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.staffFilterRow}>
+                  <TouchableOpacity
+                    style={{
+                      ...styles.staffFilterChip,
+                      ...(!selectedStaffId ? styles.staffFilterChipActive : {}),
+                    }}
+                    onPress={() => setSelectedStaffId(null)}
+                  >
+                    <Ionicons name="people" size={14} color={!selectedStaffId ? colors.textOnAccent : colors.textSecondary} />
+                    <Text style={{
+                      ...styles.staffFilterChipText,
+                      ...(!selectedStaffId ? styles.staffFilterChipTextActive : {}),
+                    }}>Tutti</Text>
+                  </TouchableOpacity>
+                  {staffList.map((s) => (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={{
+                        ...styles.staffFilterChip,
+                        ...(selectedStaffId === s.id ? styles.staffFilterChipActive : {}),
+                      }}
+                      onPress={() => setSelectedStaffId(selectedStaffId === s.id ? null : s.id)}
+                    >
+                      <Text style={{
+                        ...styles.staffFilterChipText,
+                        ...(selectedStaffId === s.id ? styles.staffFilterChipTextActive : {}),
+                      }}>
+                        {s.name}
+                      </Text>
+                      <Text style={{
+                        ...styles.staffFilterChipRole,
+                        ...(selectedStaffId === s.id ? { color: colors.textOnAccent } : {}),
+                      }}>
+                        {s.role}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Quick stats */}
+          <View style={styles.agendaStats}>
+            <View style={styles.agendaStatBox}>
+              <Text style={styles.agendaStatValue}>{scheduledToday.length}</Text>
+              <Text style={styles.agendaStatLabel}>Appuntamenti</Text>
+            </View>
+            {isOwner && (
+              <>
+                <View style={styles.agendaStatBox}>
+                  <Text style={{ ...styles.agendaStatValue, color: colors.info }}>{pendingTasks.length}</Text>
+                  <Text style={styles.agendaStatLabel}>Task da fare</Text>
+                </View>
+                <View style={styles.agendaStatBox}>
+                  <Text style={{ ...styles.agendaStatValue, color: colors.success }}>{completedTasks.length}</Text>
+                  <Text style={styles.agendaStatLabel}>Task fatti</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Today's appointments */}
+          <View style={styles.agendaSection}>
+            <View style={styles.agendaSectionHeader}>
+              <Ionicons name="time-outline" size={18} color={colors.accent} />
+              <Text style={styles.agendaSectionTitle}>Appuntamenti di Oggi</Text>
+              <Text style={styles.agendaSectionCount}>{scheduledToday.length}</Text>
+            </View>
+            {scheduledToday.length === 0 ? (
+              <Text style={styles.agendaEmpty}>Nessun appuntamento programmato per oggi</Text>
+            ) : (
+              scheduledToday.map(renderAgendaRow)
+            )}
+          </View>
+
+          {/* Owner tasks section */}
+          {isOwner && (
+            <View style={styles.agendaSection}>
+              <View style={styles.agendaSectionHeader}>
+                <Ionicons name="checkbox-outline" size={18} color={colors.info} />
+                <Text style={styles.agendaSectionTitle}>Task di Oggi</Text>
+                <Text style={styles.agendaSectionCount}>
+                  {pendingTasks.length}{completedTasks.length > 0 ? ` + ${completedTasks.length} ✓` : ''}
+                </Text>
+              </View>
+              {pendingTasks.length === 0 && completedTasks.length === 0 ? (
+                <Text style={styles.agendaEmpty}>Nessun task per oggi</Text>
+              ) : (
+                <>
+                  {pendingTasks.map(renderTaskCard)}
+                  {completedTasks.length > 0 && (
+                    <>
+                      <Text style={styles.completedHeader}>Completati</Text>
+                      {completedTasks.map(renderTaskCard)}
+                    </>
+                  )}
+                </>
+              )}
+              <TouchableOpacity style={styles.addTaskBtn} onPress={openCreateTask}>
+                <Ionicons name="add-circle" size={20} color={colors.info} />
+                <Text style={styles.addTaskText}>Aggiungi Task</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Action buttons */}
+          <View style={styles.footerSpacer}>
+            {isStaff && <Button title="+ Nuovo Appuntamento" onPress={openCreate} />}
+          </View>
+        </ScrollView>
+
+        {/* Task modal */}
+        {renderTaskModal()}
+        {/* Appointment modal */}
+        {renderAppointmentModal()}
+        {/* Student detail modal */}
+        {renderStudentDetailModal()}
+      </View>
+    );
+  }
+
+  // ========== CALENDAR VIEW ==========
   return (
     <View style={styles.container}>
       <FlatList
@@ -670,11 +1069,22 @@ export const CalendarScreen: React.FC = () => {
           <View>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.title}>{isStudent ? 'I Miei Appuntamenti' : 'Calendario'}</Text>
-              <Text style={styles.subtitle}>
-                {filteredAppointments.length} appuntament{filteredAppointments.length === 1 ? 'o' : 'i'} totali
-                {' · '}{filteredAppointments.filter(a => a.status === 'scheduled').length} in programma
-              </Text>
+              <View style={styles.headerTopRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>{isStudent ? 'I Miei Appuntamenti' : 'Calendario'}</Text>
+                  <Text style={styles.subtitle}>
+                    {filteredAppointments.length} appuntament{filteredAppointments.length === 1 ? 'o' : 'i'} totali
+                    {' · '}{filteredAppointments.filter(a => a.status === 'scheduled').length} in programma
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewToggle}
+                  onPress={() => setViewMode('agenda')}
+                >
+                  <Ionicons name="list" size={20} color={colors.textOnPrimary} />
+                  <Text style={styles.viewToggleText}>Agenda</Text>
+                </TouchableOpacity>
+              </View>
               {isStudent && (
                 <Text style={styles.cancelHint}>
                   Disdetta gratuita entro 10 ore prima
@@ -688,22 +1098,37 @@ export const CalendarScreen: React.FC = () => {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.staffFilterRow}>
                     <TouchableOpacity
-                      style={[styles.staffFilterChip, !selectedStaffId && styles.staffFilterChipActive]}
+                      style={{
+                        ...styles.staffFilterChip,
+                        ...(!selectedStaffId ? styles.staffFilterChipActive : {}),
+                      }}
                       onPress={() => setSelectedStaffId(null)}
                     >
                       <Ionicons name="people" size={14} color={!selectedStaffId ? colors.textOnAccent : colors.textSecondary} />
-                      <Text style={[styles.staffFilterChipText, !selectedStaffId && styles.staffFilterChipTextActive]}>Tutti</Text>
+                      <Text style={{
+                        ...styles.staffFilterChipText,
+                        ...(!selectedStaffId ? styles.staffFilterChipTextActive : {}),
+                      }}>Tutti</Text>
                     </TouchableOpacity>
                     {staffList.map((s) => (
                       <TouchableOpacity
                         key={s.id}
-                        style={[styles.staffFilterChip, selectedStaffId === s.id && styles.staffFilterChipActive]}
+                        style={{
+                          ...styles.staffFilterChip,
+                          ...(selectedStaffId === s.id ? styles.staffFilterChipActive : {}),
+                        }}
                         onPress={() => setSelectedStaffId(selectedStaffId === s.id ? null : s.id)}
                       >
-                        <Text style={[styles.staffFilterChipText, selectedStaffId === s.id && styles.staffFilterChipTextActive]}>
+                        <Text style={{
+                          ...styles.staffFilterChipText,
+                          ...(selectedStaffId === s.id ? styles.staffFilterChipTextActive : {}),
+                        }}>
                           {s.name}
                         </Text>
-                        <Text style={[styles.staffFilterChipRole, selectedStaffId === s.id && { color: colors.textOnAccent }]}>
+                        <Text style={{
+                          ...styles.staffFilterChipRole,
+                          ...(selectedStaffId === s.id ? { color: colors.textOnAccent } : {}),
+                        }}>
                           {s.role}
                         </Text>
                       </TouchableOpacity>
@@ -741,13 +1166,19 @@ export const CalendarScreen: React.FC = () => {
             {/* Legend */}
             <View style={styles.legend}>
               <View style={styles.legendItem}>
-                <View style={[styles.calDot, { backgroundColor: colors.accent }]} />
+                <View style={{ ...styles.calDot, backgroundColor: colors.accent }} />
                 <Text style={styles.legendText}>Training</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.calDot, { backgroundColor: colors.success }]} />
+                <View style={{ ...styles.calDot, backgroundColor: colors.success }} />
                 <Text style={styles.legendText}>Nutrizione</Text>
               </View>
+              {isOwner && (
+                <View style={styles.legendItem}>
+                  <View style={{ ...styles.calDot, backgroundColor: colors.info }} />
+                  <Text style={styles.legendText}>Task</Text>
+                </View>
+              )}
             </View>
 
             {/* Staff stats (owner only) */}
@@ -778,8 +1209,28 @@ export const CalendarScreen: React.FC = () => {
               <Text style={styles.dayHeaderText}>{selectedDateLabel}</Text>
               <Text style={styles.dayHeaderCount}>
                 {selectedDayItems.length} appuntament{selectedDayItems.length === 1 ? 'o' : 'i'}
+                {isOwner && selectedDayTasks.length > 0 ? ` · ${selectedDayTasks.length} task` : ''}
               </Text>
             </View>
+
+            {/* Tasks for selected day (owner only) */}
+            {isOwner && (
+              <View style={styles.dayTasksSection}>
+                {selectedDayTasks.length > 0 && (
+                  <>
+                    <View style={styles.dayTasksHeader}>
+                      <Ionicons name="checkbox-outline" size={16} color={colors.info} />
+                      <Text style={styles.dayTasksTitle}>Task</Text>
+                    </View>
+                    {selectedDayTasks.map(renderTaskCard)}
+                  </>
+                )}
+                <TouchableOpacity style={styles.addTaskBtn} onPress={openCreateTask}>
+                  <Ionicons name="add-circle" size={18} color={colors.info} />
+                  <Text style={styles.addTaskText}>Aggiungi Task</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => renderAppointmentCard(item)}
@@ -796,7 +1247,90 @@ export const CalendarScreen: React.FC = () => {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Create/Edit modal */}
+      {/* Task modal */}
+      {renderTaskModal()}
+      {/* Appointment modal */}
+      {renderAppointmentModal()}
+      {/* Student detail modal */}
+      {renderStudentDetailModal()}
+    </View>
+  );
+
+  // ========== MODALS ==========
+
+  function renderTaskModal() {
+    return (
+      <Modal visible={showTaskModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ModalHeader
+              title={editingTask ? 'Modifica Task' : 'Nuovo Task'}
+              onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
+            />
+            <ScrollView>
+              <InputField
+                label="Titolo"
+                value={taskTitle}
+                onChangeText={setTaskTitle}
+                placeholder="Es: Chiamare fornitore"
+              />
+              <InputField
+                label="Descrizione (opzionale)"
+                value={taskDescription}
+                onChangeText={setTaskDescription}
+                placeholder="Dettagli..."
+                multiline
+                numberOfLines={3}
+              />
+              <Text style={styles.fieldLabel}>Priorità</Text>
+              <View style={styles.priorityRow}>
+                {(['low', 'medium', 'high'] as TaskPriority[]).map((p) => (
+                  <TouchableOpacity
+                    key={p}
+                    style={{
+                      ...styles.priorityChip,
+                      ...(taskPriority === p ? {
+                        backgroundColor: PRIORITY_COLORS[p] + '20',
+                        borderColor: PRIORITY_COLORS[p],
+                      } : {}),
+                    }}
+                    onPress={() => setTaskPriority(p)}
+                  >
+                    <View style={{ ...styles.priorityDot, backgroundColor: PRIORITY_COLORS[p] }} />
+                    <Text style={{
+                      ...styles.priorityChipText,
+                      ...(taskPriority === p ? { color: PRIORITY_COLORS[p] } : {}),
+                    }}>
+                      {PRIORITY_LABELS[p]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.modalButtons}>
+                <Button
+                  title="Annulla"
+                  onPress={() => { setShowTaskModal(false); resetTaskForm(); }}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+                <Button
+                  title={savingTask ? 'Salvataggio...' : editingTask ? 'Aggiorna' : 'Crea'}
+                  onPress={handleSaveTask}
+                  style={styles.modalButton}
+                  loading={savingTask}
+                />
+              </View>
+              <View style={{ height: 60 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  function renderAppointmentModal() {
+    return (
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
@@ -811,18 +1345,24 @@ export const CalendarScreen: React.FC = () => {
                 <Text style={styles.fieldLabel}>Tipo</Text>
                 <View style={styles.typeRow}>
                   <TouchableOpacity
-                    style={[styles.typeChip, formKind === 'training' && styles.typeChipActive]}
+                    style={{
+                      ...styles.typeChip,
+                      ...(formKind === 'training' ? styles.typeChipActive : {}),
+                    }}
                     onPress={() => setFormKind('training')}
                   >
                     <Ionicons name="barbell" size={16} color={formKind === 'training' ? colors.accent : colors.textSecondary} />
-                    <Text style={[styles.typeChipText, formKind === 'training' && { color: colors.accent }]}>Training</Text>
+                    <Text style={{ ...styles.typeChipText, ...(formKind === 'training' ? { color: colors.accent } : {}) }}>Training</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.typeChip, formKind === 'nutrition' && styles.typeChipActiveGreen]}
+                    style={{
+                      ...styles.typeChip,
+                      ...(formKind === 'nutrition' ? styles.typeChipActiveGreen : {}),
+                    }}
                     onPress={() => setFormKind('nutrition')}
                   >
                     <Ionicons name="nutrition" size={16} color={formKind === 'nutrition' ? colors.success : colors.textSecondary} />
-                    <Text style={[styles.typeChipText, formKind === 'nutrition' && { color: colors.success }]}>Nutrizione</Text>
+                    <Text style={{ ...styles.typeChipText, ...(formKind === 'nutrition' ? { color: colors.success } : {}) }}>Nutrizione</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -847,10 +1387,16 @@ export const CalendarScreen: React.FC = () => {
                     {collaborators.map((c) => (
                       <TouchableOpacity
                         key={c.id}
-                        style={[styles.chip, formCollabId === c.id && styles.chipActive]}
+                        style={{
+                          ...styles.chip,
+                          ...(formCollabId === c.id ? styles.chipActive : {}),
+                        }}
                         onPress={() => setFormCollabId(c.id)}
                       >
-                        <Text style={[styles.chipText, formCollabId === c.id && styles.chipTextActive]}>
+                        <Text style={{
+                          ...styles.chipText,
+                          ...(formCollabId === c.id ? styles.chipTextActive : {}),
+                        }}>
                           {c.name} {c.surname}
                         </Text>
                       </TouchableOpacity>
@@ -867,10 +1413,16 @@ export const CalendarScreen: React.FC = () => {
                 {nextDays.map((d) => (
                   <TouchableOpacity
                     key={d.value}
-                    style={[styles.dateChip, formDate === d.value && styles.chipActive]}
+                    style={{
+                      ...styles.dateChip,
+                      ...(formDate === d.value ? styles.chipActive : {}),
+                    }}
                     onPress={() => setFormDate(d.value)}
                   >
-                    <Text style={[styles.chipText, formDate === d.value && styles.chipTextActive]}>
+                    <Text style={{
+                      ...styles.chipText,
+                      ...(formDate === d.value ? styles.chipTextActive : {}),
+                    }}>
                       {d.label}
                     </Text>
                   </TouchableOpacity>
@@ -887,10 +1439,16 @@ export const CalendarScreen: React.FC = () => {
                     {TIME_SLOTS.map((t) => (
                       <TouchableOpacity
                         key={`s-${t}`}
-                        style={[styles.timeChip, formStartTime === t && styles.chipActive]}
+                        style={{
+                          ...styles.timeChip,
+                          ...(formStartTime === t ? styles.chipActive : {}),
+                        }}
                         onPress={() => setFormStartTime(t)}
                       >
-                        <Text style={[styles.chipText, formStartTime === t && styles.chipTextActive]}>{t}</Text>
+                        <Text style={{
+                          ...styles.chipText,
+                          ...(formStartTime === t ? styles.chipTextActive : {}),
+                        }}>{t}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -903,10 +1461,16 @@ export const CalendarScreen: React.FC = () => {
                     {TIME_SLOTS.map((t) => (
                       <TouchableOpacity
                         key={`e-${t}`}
-                        style={[styles.timeChip, formEndTime === t && styles.chipActive]}
+                        style={{
+                          ...styles.timeChip,
+                          ...(formEndTime === t ? styles.chipActive : {}),
+                        }}
                         onPress={() => setFormEndTime(t)}
                       >
-                        <Text style={[styles.chipText, formEndTime === t && styles.chipTextActive]}>{t}</Text>
+                        <Text style={{
+                          ...styles.chipText,
+                          ...(formEndTime === t ? styles.chipTextActive : {}),
+                        }}>{t}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -952,8 +1516,11 @@ export const CalendarScreen: React.FC = () => {
           </ScrollView>
         </View>
       </Modal>
+    );
+  }
 
-      {/* Student detail modal */}
+  function renderStudentDetailModal() {
+    return (
       <Modal visible={studentDetailId !== null} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
@@ -969,15 +1536,15 @@ export const CalendarScreen: React.FC = () => {
                 <Text style={styles.statLabel}>Totali</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={[styles.statValue, { color: colors.success }]}>{studentDetailItems.stats.completed}</Text>
+                <Text style={{ ...styles.statValue, color: colors.success }}>{studentDetailItems.stats.completed}</Text>
                 <Text style={styles.statLabel}>Completati</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={[styles.statValue, { color: colors.error }]}>{studentDetailItems.stats.cancelled}</Text>
+                <Text style={{ ...styles.statValue, color: colors.error }}>{studentDetailItems.stats.cancelled}</Text>
                 <Text style={styles.statLabel}>Annullati</Text>
               </View>
               <View style={styles.statBox}>
-                <Text style={[styles.statValue, { color: colors.info }]}>{studentDetailItems.stats.remaining}</Text>
+                <Text style={{ ...styles.statValue, color: colors.info }}>{studentDetailItems.stats.remaining}</Text>
                 <Text style={styles.statLabel}>Rimanenti</Text>
               </View>
             </View>
@@ -1035,8 +1602,8 @@ export const CalendarScreen: React.FC = () => {
           </ScrollView>
         </View>
       </Modal>
-    </View>
-  );
+    );
+  }
 };
 
 const styles = StyleSheet.create({
@@ -1047,9 +1614,28 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingTop: spacing.xxl,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
   cancelHint: { fontSize: fontSize.xs, color: colors.warning, marginTop: spacing.xs },
+  viewToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+  },
+  viewToggleText: {
+    fontSize: fontSize.sm,
+    color: colors.textOnPrimary,
+    fontWeight: '600',
+  },
 
   staffFilterSection: {
     backgroundColor: colors.surface,
@@ -1170,7 +1756,206 @@ const styles = StyleSheet.create({
   },
   dayHeaderCount: { fontSize: fontSize.sm, color: colors.textSecondary },
 
-  // Card
+  // Tasks section (calendar view)
+  dayTasksSection: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  dayTasksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  dayTasksTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+
+  // Task card
+  taskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderLeftWidth: 3,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  taskCardCompleted: {
+    opacity: 0.6,
+  },
+  taskCheckbox: {
+    marginRight: spacing.sm,
+  },
+  taskContent: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  taskTitleDone: {
+    textDecorationLine: 'line-through',
+    color: colors.textSecondary,
+  },
+  taskDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  taskMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  priorityBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  priorityText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+  },
+  taskActions: {
+    flexDirection: 'column',
+    gap: spacing.xs,
+  },
+  taskActionBtn: {
+    padding: 4,
+  },
+  addTaskBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  addTaskText: {
+    fontSize: fontSize.sm,
+    color: colors.info,
+    fontWeight: '600',
+  },
+  completedHeader: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+
+  // Agenda view
+  agendaStats: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  agendaStatBox: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  agendaStatValue: {
+    fontSize: fontSize.xxl,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  agendaStatLabel: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  agendaSection: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.divider,
+  },
+  agendaSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  agendaSectionTitle: {
+    flex: 1,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  agendaSectionCount: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  agendaEmpty: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
+  },
+  agendaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  agendaTimeCol: {
+    borderLeftWidth: 3,
+    paddingLeft: spacing.sm,
+    marginRight: spacing.md,
+    alignItems: 'center',
+  },
+  agendaTime: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  agendaTimeSep: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+  },
+  agendaInfo: {
+    flex: 1,
+  },
+  agendaStudentName: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  agendaMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  agendaKind: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
+  agendaStaff: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+  },
+
+  // Appointment card
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1287,6 +2072,35 @@ const styles = StyleSheet.create({
   },
   modalButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   modalButton: { flex: 1 },
+
+  // Priority chips
+  priorityRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  priorityChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  priorityChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
 
   // Student detail modal
   statsRow: {

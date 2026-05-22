@@ -379,6 +379,21 @@ export interface NutritionTeamNote {
   updatedAt: Date;
 }
 
+// --- Task giornalieri (solo owner) ---
+export type TaskPriority = 'low' | 'medium' | 'high';
+
+export interface DailyTask {
+  id: string;
+  ownerId: string;
+  date: Date;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  isCompleted: boolean;
+  completedAt?: Date;
+  createdAt: Date;
+}
+
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'
