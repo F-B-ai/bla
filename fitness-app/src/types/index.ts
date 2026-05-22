@@ -144,7 +144,7 @@ export interface WeeklyDay {
 }
 
 // --- Pagamenti e rate ---
-export type PaymentType = 'full' | 'installment';
+export type PaymentType = 'full' | 'installment' | 'monthly_course';
 export type PaymentStatus = 'pending' | 'paid' | 'overdue';
 
 export interface PaymentPlan {
@@ -155,6 +155,16 @@ export interface PaymentPlan {
   paymentType: PaymentType;
   installments: Installment[];
   createdAt: Date;
+  // Percorso: lezioni e consulenze incluse
+  includedLessons: number;
+  usedLessons: number;
+  includedConsultations: number;
+  usedConsultations: number;
+  startDate: Date;
+  endDate: Date;
+  // Corso mensile (only for paymentType === 'monthly_course')
+  courseType?: string;
+  subscriptionType?: string;
 }
 
 export interface Installment {

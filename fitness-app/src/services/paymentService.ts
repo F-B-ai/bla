@@ -159,3 +159,28 @@ export const getPaymentReminderMessage = (
   }
   return `Ciao ${studentName}, domani scade la rata di €${amount}. Ricordati di effettuare il pagamento!`;
 };
+
+// Decrement a lesson from a payment plan
+export const decrementPlanLesson = async (planId: string, currentUsed: number): Promise<void> => {
+  await updateDoc(doc(db, PAYMENTS_COLLECTION, planId), {
+    usedLessons: currentUsed + 1,
+  });
+};
+
+// Decrement a consultation from a payment plan
+export const decrementPlanConsultation = async (planId: string, currentUsed: number): Promise<void> => {
+  await updateDoc(doc(db, PAYMENTS_COLLECTION, planId), {
+    usedConsultations: currentUsed + 1,
+  });
+};
+
+// Get active plan for student (the one within date range and not fully used)
+export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPlan | null> => {
+  const plans = await getStudentPaymentPlans(studentId);
+  const now = new Date();
+  return plans.find((p) => {
+    const start = p.startDate instanceof Date ? p.startDate : new Date(p.startDate as unknown as string);
+    const end = p.endDate instanceof Date ? p.endDate : new Date(p.endDate as unknown as string);
+    return start <= now && end >= now;
+  }) || null;
+};
