@@ -83,6 +83,7 @@ import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { subscribeToUnreadCount } from '../services/notificationService';
 
 const RootStack = createStackNavigator();
@@ -367,6 +368,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Pagamenti"
+      component={PaymentPlanScreen}
+      options={{
+        tabBarLabel: 'Pagamenti',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Notifiche"
       component={NotificationsScreen}
       options={{
@@ -505,6 +514,14 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Contenuti',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Pagamenti"
+      component={PaymentPlanScreen}
+      options={{
+        tabBarLabel: 'Pagamenti',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen

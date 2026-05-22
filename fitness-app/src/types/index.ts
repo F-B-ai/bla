@@ -557,6 +557,7 @@ export type OwnerTabParamList = {
   Team: undefined;
   Sessions: undefined;
   Financial: undefined;
+  Pagamenti: undefined;
   Content: undefined;
   Chat: undefined;
 };
@@ -565,6 +566,7 @@ export type ManagerTabParamList = {
   Dashboard: undefined;
   Team: undefined;
   Sessions: undefined;
+  Pagamenti: undefined;
   Content: undefined;
   Chat: undefined;
 };

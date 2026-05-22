@@ -130,6 +130,7 @@ export const registerManager = async (
     role: 'manager',
     assignedCollaborators: [],
     assignedStudents: [],
+    assignedNutritionists: [],
     commissionPercentage,
     specializations,
     createdAt: new Date(),
