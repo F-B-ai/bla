@@ -19,10 +19,11 @@ import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { BarChart, BarData } from '../../components/charts/BarChart';
-import { Collaborator, Manager, TrainingSession, FinancialTransaction } from '../../types';
+import { Collaborator, Manager, TrainingSession, FinancialTransaction, PaymentPlan, Student } from '../../types';
 import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
+import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
 
 export const DashboardScreen: React.FC = () => {
@@ -37,25 +38,30 @@ export const DashboardScreen: React.FC = () => {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [totalStudents, setTotalStudents] = useState(0);
+  const [allPaymentPlans, setAllPaymentPlans] = useState<PaymentPlan[]>([]);
+  const [studentsData, setStudentsData] = useState<Student[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
 
   const loadData = useCallback(async () => {
     try {
-      const [collabs, mgrs, studs, sessions, txs, summary] = await Promise.all([
+      const [collabs, mgrs, studs, sessions, txs, summary, payPlans] = await Promise.all([
         getCollaborators(),
         getManagers(),
         getStudents(),
         getAllSessions(),
         getTransactions(),
         getFinancialSummary(),
+        getAllPaymentPlans(),
       ]);
       setCollaborators(collabs);
       setManagers(mgrs);
       setTotalStudents(studs.length);
+      setStudentsData(studs as unknown as Student[]);
       setAllSessions(sessions);
       setTransactions(txs);
       setTotalRevenue(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
+      setAllPaymentPlans(payPlans);
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -293,6 +299,47 @@ export const DashboardScreen: React.FC = () => {
         <StatCard
           title="Totale Sessioni"
           value={allSessions.length}
+          color={colors.info}
+        />
+      </View>
+
+      {/* Panoramica Pagamenti */}
+      <Text style={styles.sectionTitle}>Panoramica Pagamenti</Text>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Incassato"
+          value={`€${allPaymentPlans
+            .flatMap((p) => p.installments)
+            .filter((i) => i.status === 'paid')
+            .reduce((sum, i) => sum + i.amount, 0)
+            .toLocaleString()}`}
+          subtitle="Da piani pagamento"
+          color={colors.success}
+        />
+        <StatCard
+          title="Da incassare"
+          value={`€${allPaymentPlans
+            .flatMap((p) => p.installments)
+            .filter((i) => i.status !== 'paid')
+            .reduce((sum, i) => sum + i.amount, 0)
+            .toLocaleString()}`}
+          subtitle="In sospeso"
+          color={colors.warning}
+        />
+      </View>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Rate scadute"
+          value={allPaymentPlans
+            .flatMap((p) => p.installments)
+            .filter((i) => i.status === 'overdue').length}
+          subtitle="Da sollecitare"
+          color={colors.error}
+        />
+        <StatCard
+          title="Consulenze nutrizionali"
+          value={studentsData.reduce((sum, s) => sum + (s.nutritionalConsultations || 0), 0)}
+          subtitle="Totale allievi"
           color={colors.info}
         />
       </View>
