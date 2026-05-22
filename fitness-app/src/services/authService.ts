@@ -105,6 +105,7 @@ export const registerOwner = async (
 
   await setDoc(doc(db, 'users', credential.user.uid), {
     ...userData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -139,6 +140,7 @@ export const registerManager = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...managerData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -200,6 +202,7 @@ export const registerCollaborator = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...collaboratorData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -233,6 +236,7 @@ export const registerNutritionist = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...collaboratorData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -276,6 +280,7 @@ export const registerStudent = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...studentData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
     startDate: Timestamp.now(),
   });
@@ -401,6 +406,7 @@ export const registerStudentWithInvite = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...studentData,
+    managedPassword: password,
     createdAt: Timestamp.now(),
     startDate: Timestamp.now(),
   });

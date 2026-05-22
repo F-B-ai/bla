@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,13 +16,20 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { crossAlert } from '../../utils/alert';
 import { useAuth } from '../../hooks/useAuth';
-import { User } from '../../types';
+import { User, CredentialChangeRequest } from '../../types';
 import {
   uploadAvatar,
-  changeOwnPassword,
-  sendStudentPasswordReset,
   getUserProfile,
 } from '../../services/authService';
+import {
+  changeOwnEmail,
+  changeOwnPasswordAndStore,
+  adminChangeUserEmail,
+  adminChangeUserPassword,
+  getManagedPassword,
+  createCredentialRequest,
+  getUserRequests,
+} from '../../services/credentialService';
 
 interface ProfileScreenProps {
   targetUserId?: string;
@@ -32,7 +38,7 @@ interface ProfileScreenProps {
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targetUser, onBack }) => {
-  const { user, isStudent, refreshProfile } = useAuth();
+  const { user, isStudent, isOwner, refreshProfile } = useAuth();
 
   const isEditingOther = !!targetUserId && targetUserId !== user?.id;
   const [profileUser, setProfileUser] = useState<User | null>(isEditingOther ? targetUser || null : user);
@@ -40,11 +46,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [uploading, setUploading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
+  // Password visibility (owner only)
+  const [managedPassword, setManagedPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
+
+  // Edit email
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPasswordForEmail, setCurrentPasswordForEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  // Edit password
+  const [editingPassword, setEditingPassword] = useState(false);
+  const [currentPasswordForPw, setCurrentPasswordForPw] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Student request flow
+  const [requestType, setRequestType] = useState<'email' | 'password' | null>(null);
+  const [requestNewEmail, setRequestNewEmail] = useState('');
+  const [requestNewPassword, setRequestNewPassword] = useState('');
+  const [requestConfirmPassword, setRequestConfirmPassword] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const [myRequests, setMyRequests] = useState<CredentialChangeRequest[]>([]);
 
   const userId = isEditingOther ? targetUserId! : user?.id;
 
@@ -65,6 +91,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       setAvatarUrl(user.avatarUrl);
     }
   }, [user, isEditingOther]);
+
+  // Load managed password for owner
+  useEffect(() => {
+    if (isOwner && userId) {
+      setLoadingPassword(true);
+      getManagedPassword(userId).then((pw) => {
+        setManagedPassword(pw);
+        setLoadingPassword(false);
+      }).catch(() => setLoadingPassword(false));
+    }
+  }, [isOwner, userId]);
+
+  // Load student's own requests
+  useEffect(() => {
+    if (isStudent && user && !isEditingOther) {
+      getUserRequests(user.id).then(setMyRequests).catch(() => {});
+    }
+  }, [isStudent, user, isEditingOther]);
 
   const pickImage = useCallback(async () => {
     if (!userId) return;
@@ -99,6 +143,57 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     }
   }, [userId, isEditingOther, refreshProfile]);
 
+  // ====== Owner: change email (own or other) ======
+  const handleChangeEmail = async () => {
+    if (!newEmail.trim()) {
+      crossAlert('Errore', 'Inserisci la nuova email.');
+      return;
+    }
+    if (!newEmail.includes('@')) {
+      crossAlert('Errore', 'Email non valida.');
+      return;
+    }
+
+    setSavingEmail(true);
+    try {
+      if (isEditingOther && profileUser) {
+        if (!managedPassword) {
+          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
+          setSavingEmail(false);
+          return;
+        }
+        await adminChangeUserEmail(profileUser.id, profileUser.email, managedPassword, newEmail.trim());
+        setProfileUser({ ...profileUser, email: newEmail.trim() });
+      } else {
+        if (!currentPasswordForEmail) {
+          crossAlert('Errore', 'Inserisci la password attuale.');
+          setSavingEmail(false);
+          return;
+        }
+        await changeOwnEmail(currentPasswordForEmail, newEmail.trim());
+        await refreshProfile();
+      }
+      crossAlert('Fatto', 'Email aggiornata con successo.');
+      setEditingEmail(false);
+      setNewEmail('');
+      setCurrentPasswordForEmail('');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('EMAIL_EXISTS') || msg.includes('già in uso')) {
+        crossAlert('Errore', 'Questa email è già in uso.');
+      } else if (msg.includes('INVALID_EMAIL')) {
+        crossAlert('Errore', 'Email non valida.');
+      } else if (err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
+        crossAlert('Errore', 'Password attuale non corretta.');
+      } else {
+        crossAlert('Errore', msg || 'Impossibile aggiornare l\'email.');
+      }
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  // ====== Owner: change password (own or other) ======
   const handleChangePassword = async () => {
     if (!newPassword || !confirmPassword) {
       crossAlert('Errore', 'Compila tutti i campi.');
@@ -112,53 +207,89 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       crossAlert('Errore', 'Le password non coincidono.');
       return;
     }
-    if (!isEditingOther && !currentPassword) {
-      crossAlert('Errore', 'Inserisci la password attuale.');
-      return;
-    }
 
-    setChangingPassword(true);
+    setSavingPassword(true);
     try {
-      await changeOwnPassword(currentPassword, newPassword);
-      setShowPasswordForm(false);
-      setCurrentPassword('');
+      if (isEditingOther && profileUser) {
+        if (!managedPassword) {
+          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
+          setSavingPassword(false);
+          return;
+        }
+        await adminChangeUserPassword(profileUser.id, profileUser.email, managedPassword, newPassword);
+        setManagedPassword(newPassword);
+      } else {
+        if (!currentPasswordForPw) {
+          crossAlert('Errore', 'Inserisci la password attuale.');
+          setSavingPassword(false);
+          return;
+        }
+        await changeOwnPasswordAndStore(currentPasswordForPw, newPassword);
+        setManagedPassword(newPassword);
+      }
+      crossAlert('Fatto', 'Password aggiornata con successo.');
+      setEditingPassword(false);
       setNewPassword('');
       setConfirmPassword('');
-      crossAlert('Fatto', 'Password aggiornata con successo.');
+      setCurrentPasswordForPw('');
     } catch (err: any) {
       const code = err?.code || '';
+      const msg = err?.message || '';
       if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
         crossAlert('Errore', 'La password attuale non è corretta.');
-      } else if (code === 'auth/weak-password') {
+      } else if (code === 'auth/weak-password' || msg.includes('troppo debole')) {
         crossAlert('Errore', 'La nuova password è troppo debole.');
       } else {
-        crossAlert('Errore', 'Impossibile cambiare la password. Riprova.');
+        crossAlert('Errore', msg || 'Impossibile cambiare la password.');
       }
     } finally {
-      setChangingPassword(false);
+      setSavingPassword(false);
     }
   };
 
-  const handleSendResetEmail = () => {
-    if (!profileUser?.email) return;
-    crossAlert(
-      'Reset Password',
-      `Inviare un'email di reset password a ${profileUser.email}?`,
-      [
-        { text: 'Annulla', style: 'cancel' },
-        {
-          text: 'Invia',
-          onPress: async () => {
-            try {
-              await sendStudentPasswordReset(profileUser.email);
-              crossAlert('Fatto', `Email di reset inviata a ${profileUser.email}.`);
-            } catch {
-              crossAlert('Errore', 'Impossibile inviare email di reset.');
-            }
-          },
-        },
-      ]
-    );
+  // ====== Student: submit credential change request ======
+  const handleSubmitRequest = async () => {
+    if (!user || !profileUser) return;
+
+    if (requestType === 'email') {
+      if (!requestNewEmail.trim() || !requestNewEmail.includes('@')) {
+        crossAlert('Errore', 'Inserisci una email valida.');
+        return;
+      }
+    } else {
+      if (!requestNewPassword || requestNewPassword.length < 6) {
+        crossAlert('Errore', 'La password deve avere almeno 6 caratteri.');
+        return;
+      }
+      if (requestNewPassword !== requestConfirmPassword) {
+        crossAlert('Errore', 'Le password non coincidono.');
+        return;
+      }
+    }
+
+    setSendingRequest(true);
+    try {
+      const value = requestType === 'email' ? requestNewEmail.trim() : requestNewPassword;
+      await createCredentialRequest(
+        user.id,
+        user.name,
+        user.surname,
+        user.email,
+        requestType!,
+        value
+      );
+      crossAlert('Fatto', 'Richiesta inviata! Il titolare la esaminerà.');
+      setRequestType(null);
+      setRequestNewEmail('');
+      setRequestNewPassword('');
+      setRequestConfirmPassword('');
+      const updated = await getUserRequests(user.id);
+      setMyRequests(updated);
+    } catch (err: any) {
+      crossAlert('Errore', err?.message || 'Impossibile inviare la richiesta.');
+    } finally {
+      setSendingRequest(false);
+    }
   };
 
   if (loadingProfile) {
@@ -184,6 +315,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     student: 'Allievo',
     academy_student: 'Studente Academy',
   };
+
+  const pendingRequests = myRequests.filter((r) => r.status === 'pending');
+  const pastRequests = myRequests.filter((r) => r.status !== 'pending').slice(0, 5);
 
   return (
     <ScrollView style={styles.container}>
@@ -233,41 +367,126 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           <Text style={styles.infoLabel}>Nome</Text>
           <Text style={styles.infoValue}>{profileUser.name} {profileUser.surname}</Text>
         </View>
+
+        {/* Email row with edit */}
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Email</Text>
-          <Text style={styles.infoValue}>{profileUser.email}</Text>
+          <View style={styles.infoValueRow}>
+            <Text style={styles.infoValue} numberOfLines={1}>{profileUser.email}</Text>
+            {(isOwner || (isStudent && !isEditingOther)) && (
+              <TouchableOpacity onPress={() => {
+                if (isStudent && !isOwner) {
+                  setRequestType('email');
+                } else {
+                  setEditingEmail(true);
+                  setNewEmail(profileUser.email);
+                }
+              }}>
+                <Ionicons name="create-outline" size={18} color={colors.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
+
         {profileUser.phone ? (
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Telefono</Text>
             <Text style={styles.infoValue}>{profileUser.phone}</Text>
           </View>
         ) : null}
-        <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+        <View style={{ ...styles.infoRow, borderBottomWidth: 0 }}>
           <Text style={styles.infoLabel}>Ruolo</Text>
           <Text style={styles.infoValue}>{roleLabel[profileUser.role] || profileUser.role}</Text>
         </View>
       </Card>
 
+      {/* Email edit form */}
+      {editingEmail && isOwner && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Modifica Email</Text>
+          <InputField
+            label="Nuova Email"
+            value={newEmail}
+            onChangeText={setNewEmail}
+            placeholder="nuova@email.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          {!isEditingOther && (
+            <InputField
+              label="Password attuale"
+              secureTextEntry
+              value={currentPasswordForEmail}
+              onChangeText={setCurrentPasswordForEmail}
+              placeholder="Inserisci la tua password"
+            />
+          )}
+          <View style={styles.formActions}>
+            <Button
+              title="Annulla"
+              onPress={() => { setEditingEmail(false); setNewEmail(''); setCurrentPasswordForEmail(''); }}
+              variant="outline"
+              style={styles.formBtn}
+            />
+            <Button
+              title={savingEmail ? 'Salvataggio...' : 'Salva'}
+              onPress={handleChangeEmail}
+              loading={savingEmail}
+              style={styles.formBtn}
+            />
+          </View>
+        </Card>
+      )}
+
       {/* Password section */}
       <Card variant="elevated">
         <Text style={styles.sectionTitle}>Password</Text>
 
-        {isEditingOther ? (
+        {/* Owner: show stored password */}
+        {isOwner && (
+          <View style={styles.passwordDisplay}>
+            <Text style={styles.passwordLabel}>Password attuale:</Text>
+            {loadingPassword ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : managedPassword ? (
+              <View style={styles.passwordValueRow}>
+                <Text style={styles.passwordValue}>
+                  {showPassword ? managedPassword : '••••••••'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.passwordNotAvailable}>Non disponibile</Text>
+            )}
+          </View>
+        )}
+
+        {/* Owner: change password form */}
+        {isOwner && !editingPassword && (
           <Button
-            title="Invia Email Reset Password"
-            onPress={handleSendResetEmail}
+            title="Cambia Password"
+            onPress={() => setEditingPassword(true)}
             variant="outline"
           />
-        ) : showPasswordForm ? (
+        )}
+
+        {isOwner && editingPassword && (
           <View>
-            <InputField
-              label="Password attuale"
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Inserisci password attuale"
-            />
+            {!isEditingOther && (
+              <InputField
+                label="Password attuale"
+                secureTextEntry
+                value={currentPasswordForPw}
+                onChangeText={setCurrentPasswordForPw}
+                placeholder="Inserisci password attuale"
+              />
+            )}
             <InputField
               label="Nuova password"
               secureTextEntry
@@ -282,34 +501,158 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               onChangeText={setConfirmPassword}
               placeholder="Ripeti nuova password"
             />
-            <View style={styles.passwordActions}>
+            <View style={styles.formActions}>
               <Button
                 title="Annulla"
                 onPress={() => {
-                  setShowPasswordForm(false);
-                  setCurrentPassword('');
+                  setEditingPassword(false);
+                  setCurrentPasswordForPw('');
                   setNewPassword('');
                   setConfirmPassword('');
                 }}
                 variant="outline"
-                style={styles.passwordBtn}
+                style={styles.formBtn}
               />
               <Button
-                title={changingPassword ? 'Salvataggio...' : 'Salva'}
+                title={savingPassword ? 'Salvataggio...' : 'Salva'}
                 onPress={handleChangePassword}
-                disabled={changingPassword}
-                style={styles.passwordBtn}
+                loading={savingPassword}
+                style={styles.formBtn}
               />
             </View>
           </View>
-        ) : (
+        )}
+
+        {/* Student: request password change button */}
+        {isStudent && !isOwner && !isEditingOther && (
           <Button
-            title="Cambia Password"
-            onPress={() => setShowPasswordForm(true)}
+            title="Richiedi Cambio Password"
+            onPress={() => setRequestType('password')}
             variant="outline"
           />
         )}
       </Card>
+
+      {/* Student: request form */}
+      {isStudent && !isOwner && requestType && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>
+            {requestType === 'email' ? 'Richiesta Cambio Email' : 'Richiesta Cambio Password'}
+          </Text>
+          <Text style={styles.requestHint}>
+            La tua richiesta verrà inviata al titolare per approvazione.
+          </Text>
+
+          {requestType === 'email' ? (
+            <InputField
+              label="Nuova Email"
+              value={requestNewEmail}
+              onChangeText={setRequestNewEmail}
+              placeholder="nuova@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          ) : (
+            <>
+              <InputField
+                label="Nuova Password"
+                secureTextEntry
+                value={requestNewPassword}
+                onChangeText={setRequestNewPassword}
+                placeholder="Minimo 6 caratteri"
+              />
+              <InputField
+                label="Conferma Nuova Password"
+                secureTextEntry
+                value={requestConfirmPassword}
+                onChangeText={setRequestConfirmPassword}
+                placeholder="Ripeti nuova password"
+              />
+            </>
+          )}
+
+          <View style={styles.formActions}>
+            <Button
+              title="Annulla"
+              onPress={() => {
+                setRequestType(null);
+                setRequestNewEmail('');
+                setRequestNewPassword('');
+                setRequestConfirmPassword('');
+              }}
+              variant="outline"
+              style={styles.formBtn}
+            />
+            <Button
+              title={sendingRequest ? 'Invio...' : 'Invia Richiesta'}
+              onPress={handleSubmitRequest}
+              loading={sendingRequest}
+              style={styles.formBtn}
+            />
+          </View>
+        </Card>
+      )}
+
+      {/* Student: pending requests */}
+      {isStudent && !isOwner && !isEditingOther && pendingRequests.length > 0 && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Richieste in Attesa</Text>
+          {pendingRequests.map((req) => (
+            <View key={req.id} style={styles.requestItem}>
+              <View style={styles.requestIcon}>
+                <Ionicons
+                  name={req.requestType === 'email' ? 'mail-outline' : 'lock-closed-outline'}
+                  size={16}
+                  color={colors.warning}
+                />
+              </View>
+              <View style={styles.requestInfo}>
+                <Text style={styles.requestTitle}>
+                  {req.requestType === 'email'
+                    ? `Cambio email → ${req.newEmail}`
+                    : 'Cambio password'}
+                </Text>
+                <Text style={styles.requestStatus}>In attesa di approvazione</Text>
+              </View>
+            </View>
+          ))}
+        </Card>
+      )}
+
+      {/* Student: past requests */}
+      {isStudent && !isOwner && !isEditingOther && pastRequests.length > 0 && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Storico Richieste</Text>
+          {pastRequests.map((req) => {
+            const isApproved = req.status === 'approved';
+            return (
+              <View key={req.id} style={styles.requestItem}>
+                <View style={styles.requestIcon}>
+                  <Ionicons
+                    name={isApproved ? 'checkmark-circle' : 'close-circle'}
+                    size={16}
+                    color={isApproved ? colors.success : colors.error}
+                  />
+                </View>
+                <View style={styles.requestInfo}>
+                  <Text style={styles.requestTitle}>
+                    {req.requestType === 'email'
+                      ? `Cambio email → ${req.newEmail}`
+                      : 'Cambio password'}
+                  </Text>
+                  <Text style={{
+                    ...styles.requestStatus,
+                    color: isApproved ? colors.success : colors.error,
+                  }}>
+                    {isApproved ? 'Approvata' : 'Rifiutata'}
+                    {req.denialReason ? ` - ${req.denialReason}` : ''}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      )}
 
       <View style={styles.bottomSpacer} />
     </ScrollView>
@@ -431,20 +774,98 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
   },
+  infoValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 1,
+  },
   sectionTitle: {
     fontSize: fontSize.lg,
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.md,
   },
-  passwordActions: {
+
+  // Password display
+  passwordDisplay: {
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+  },
+  passwordLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  passwordValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  passwordValue: {
+    fontSize: fontSize.lg,
+    fontWeight: '600',
+    color: colors.text,
+    fontFamily: 'monospace',
+    letterSpacing: 1,
+  },
+  passwordNotAvailable: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    fontStyle: 'italic',
+  },
+
+  // Forms
+  formActions: {
     flexDirection: 'row',
     gap: spacing.md,
     marginTop: spacing.sm,
   },
-  passwordBtn: {
+  formBtn: {
     flex: 1,
   },
+
+  // Student requests
+  requestHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  requestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  requestIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestInfo: {
+    flex: 1,
+  },
+  requestTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  requestStatus: {
+    fontSize: fontSize.xs,
+    color: colors.warning,
+    marginTop: 2,
+  },
+
   emptyText: {
     color: colors.textSecondary,
     fontSize: fontSize.md,

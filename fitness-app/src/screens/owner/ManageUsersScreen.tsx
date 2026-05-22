@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { crossAlert } from '../../utils/alert';
@@ -15,7 +16,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator, updateStudentCoaches } from '../../services/authService';
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
-import { Collaborator, Student, Manager, Owner } from '../../types';
+import { Collaborator, Student, Manager, Owner, CredentialChangeRequest } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
@@ -24,6 +25,11 @@ import { AddNutritionistScreen } from './AddNutritionistScreen';
 import { InviteStudentScreen } from './InviteStudentScreen';
 import { ProfileScreen } from '../shared/ProfileScreen';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  getPendingRequests,
+  approveRequest,
+  denyRequest,
+} from '../../services/credentialService';
 
 type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent' | 'editProfile';
 
@@ -44,6 +50,8 @@ export const ManageUsersScreen: React.FC = () => {
   const [coachModalSelected, setCoachModalSelected] = useState<string[]>([]);
   const [savingCoaches, setSavingCoaches] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [credentialRequests, setCredentialRequests] = useState<CredentialChangeRequest[]>([]);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -60,16 +68,19 @@ export const ManageUsersScreen: React.FC = () => {
       setManagers(mgrs);
       setCollaborators(collabs);
       setOwner(ownerData);
-      // Coach vede solo i propri allievi
       if (isCollaborator && user) {
         setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else {
         setStudents(studs);
       }
+      if (isOwner) {
+        const pending = await getPendingRequests().catch(() => []);
+        setCredentialRequests(pending);
+      }
     } catch {
       // Silently handle - data will show empty
     }
-  }, [isCollaborator, user]);
+  }, [isCollaborator, isOwner, user]);
 
   useEffect(() => {
     loadData();
@@ -166,6 +177,53 @@ export const ManageUsersScreen: React.FC = () => {
     } finally {
       setSavingCoaches(false);
     }
+  };
+
+  const handleApproveRequest = (req: CredentialChangeRequest) => {
+    const label = req.requestType === 'email'
+      ? `Approvare il cambio email da ${req.currentEmail} a ${req.newEmail}?`
+      : `Approvare il cambio password per ${req.userName} ${req.userSurname}?`;
+
+    crossAlert('Approva Richiesta', label, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Approva',
+        onPress: async () => {
+          setProcessingRequestId(req.id);
+          try {
+            await approveRequest(req, user!.id);
+            crossAlert('Fatto', 'Richiesta approvata e credenziali aggiornate.');
+            await loadData();
+          } catch (err: any) {
+            crossAlert('Errore', err?.message || 'Impossibile approvare la richiesta.');
+          } finally {
+            setProcessingRequestId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDenyRequest = (req: CredentialChangeRequest) => {
+    crossAlert('Rifiuta Richiesta', `Rifiutare la richiesta di ${req.userName} ${req.userSurname}?`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Rifiuta',
+        style: 'destructive',
+        onPress: async () => {
+          setProcessingRequestId(req.id);
+          try {
+            await denyRequest(req.id, user!.id);
+            crossAlert('Fatto', 'Richiesta rifiutata.');
+            await loadData();
+          } catch {
+            crossAlert('Errore', 'Impossibile rifiutare la richiesta.');
+          } finally {
+            setProcessingRequestId(null);
+          }
+        },
+      },
+    ]);
   };
 
   if (viewMode === 'addManager') {
@@ -302,6 +360,70 @@ export const ManageUsersScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Richieste modifica credenziali (owner only) */}
+      {isOwner && credentialRequests.length > 0 && (
+        <Card variant="elevated" style={styles.requestsSection}>
+          <View style={styles.requestsHeader}>
+            <View style={styles.requestsBadge}>
+              <Ionicons name="alert-circle" size={18} color={colors.warning} />
+              <Text style={styles.requestsTitle}>
+                Richieste Modifica Credenziali ({credentialRequests.length})
+              </Text>
+            </View>
+          </View>
+          {credentialRequests.map((req) => {
+            const isProcessing = processingRequestId === req.id;
+            return (
+              <View key={req.id} style={styles.requestCard}>
+                <View style={styles.requestCardHeader}>
+                  <View style={styles.requestCardIcon}>
+                    <Ionicons
+                      name={req.requestType === 'email' ? 'mail-outline' : 'lock-closed-outline'}
+                      size={16}
+                      color={colors.warning}
+                    />
+                  </View>
+                  <View style={styles.requestCardInfo}>
+                    <Text style={styles.requestCardName}>
+                      {req.userName} {req.userSurname}
+                    </Text>
+                    <Text style={styles.requestCardDetail}>
+                      {req.requestType === 'email'
+                        ? `${req.currentEmail} → ${req.newEmail}`
+                        : `Cambio password`}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.requestCardActions}>
+                  <TouchableOpacity
+                    style={[styles.requestActionBtn, styles.requestApproveBtn]}
+                    onPress={() => handleApproveRequest(req)}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Text style={styles.requestActionText}>Approva</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.requestActionBtn, styles.requestDenyBtn]}
+                    onPress={() => handleDenyRequest(req)}
+                    disabled={isProcessing}
+                  >
+                    <Ionicons name="close" size={16} color={colors.error} />
+                    <Text style={[styles.requestActionText, { color: colors.error }]}>Rifiuta</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      )}
 
       {/* Lista manager */}
       {activeTab === 'managers' && (
@@ -954,5 +1076,86 @@ const styles = StyleSheet.create({
   modalCancelText: {
     color: colors.textSecondary,
     fontSize: fontSize.md,
+  },
+  // Credential requests
+  requestsSection: {
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+  },
+  requestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  requestsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  requestsTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  requestCard: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  requestCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  requestCardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.warning + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  requestCardInfo: {
+    flex: 1,
+  },
+  requestCardName: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  requestCardDetail: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  requestCardActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  requestActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  requestApproveBtn: {
+    backgroundColor: colors.success,
+  },
+  requestDenyBtn: {
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  requestActionText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

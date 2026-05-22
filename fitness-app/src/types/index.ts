@@ -379,6 +379,26 @@ export interface NutritionTeamNote {
   updatedAt: Date;
 }
 
+// --- Richieste modifica credenziali ---
+export type CredentialRequestStatus = 'pending' | 'approved' | 'denied';
+export type CredentialRequestType = 'email' | 'password';
+
+export interface CredentialChangeRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userSurname: string;
+  requestType: CredentialRequestType;
+  currentEmail: string;
+  newEmail?: string;
+  newPassword?: string;
+  status: CredentialRequestStatus;
+  createdAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  denialReason?: string;
+}
+
 // --- Task giornalieri (solo owner) ---
 export type TaskPriority = 'low' | 'medium' | 'high';
 
