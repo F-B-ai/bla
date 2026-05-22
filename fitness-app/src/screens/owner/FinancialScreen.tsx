@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -17,8 +18,10 @@ import {
   FinancialTransaction,
   TransactionType,
   TransactionCategory,
+  PaymentPlan,
 } from '../../types';
 import { addTransaction, getTransactions, getFinancialSummary, deleteTransaction } from '../../services/financialService';
+import { getAllPaymentPlans } from '../../services/paymentService';
 
 const CATEGORIES: { value: TransactionCategory; label: string }[] = [
   { value: 'student_payment', label: 'Pagamento allievi' },
@@ -40,20 +43,76 @@ export const FinancialScreen: React.FC = () => {
   const [newCategory, setNewCategory] = useState<TransactionCategory>('other');
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [txs, summary] = await Promise.all([
+      const [txs, summary, plans] = await Promise.all([
         getTransactions(),
         getFinancialSummary(),
+        getAllPaymentPlans(),
       ]);
       setTransactions(txs);
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
+      setPaymentPlans(plans);
     } catch {
       // Silently handle
     }
   }, []);
+
+  const planStats = useMemo(() => {
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let overdueCount = 0;
+    let activePlans = 0;
+    let totalLessons = 0;
+    let usedLessons = 0;
+    let totalConsultations = 0;
+    let usedConsultations = 0;
+    let activeCourses = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const plan of paymentPlans) {
+      for (const inst of plan.installments) {
+        if (inst.status === 'paid') {
+          totalCollected += inst.amount;
+        } else {
+          totalOutstanding += inst.amount;
+          if (inst.status === 'overdue') overdueCount++;
+        }
+      }
+
+      const start = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as unknown as string);
+      const end = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as unknown as string);
+      const s = new Date(start); s.setHours(0, 0, 0, 0);
+      const e = new Date(end); e.setHours(0, 0, 0, 0);
+      if (s <= today && e >= today) {
+        activePlans++;
+        if (plan.paymentType === 'monthly_course') activeCourses++;
+      }
+
+      totalLessons += plan.includedLessons || 0;
+      usedLessons += plan.usedLessons || 0;
+      totalConsultations += plan.includedConsultations || 0;
+      usedConsultations += plan.usedConsultations || 0;
+    }
+
+    return {
+      totalCollected,
+      totalOutstanding,
+      overdueCount,
+      activePlans,
+      totalLessons,
+      usedLessons,
+      remainingLessons: totalLessons - usedLessons,
+      totalConsultations,
+      usedConsultations,
+      remainingConsultations: totalConsultations - usedConsultations,
+      activeCourses,
+    };
+  }, [paymentPlans]);
 
   useEffect(() => {
     loadData();
@@ -139,6 +198,132 @@ export const FinancialScreen: React.FC = () => {
           color={totalIncome - totalExpenses >= 0 ? colors.success : colors.error}
         />
       </View>
+
+      {/* Panoramica Piani di Pagamento */}
+      <Text style={styles.sectionTitle}>Panoramica Piani</Text>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Incassato"
+          value={`€${planStats.totalCollected.toLocaleString()}`}
+          color={colors.success}
+          icon={<Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />}
+        />
+        <StatCard
+          title="Da incassare"
+          value={`€${planStats.totalOutstanding.toLocaleString()}`}
+          color={colors.warning}
+          icon={<Ionicons name="time-outline" size={14} color={colors.warning} />}
+        />
+      </View>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Piani Attivi"
+          value={planStats.activePlans}
+          color={colors.info}
+        />
+        <StatCard
+          title="Rate Scadute"
+          value={planStats.overdueCount}
+          color={colors.error}
+        />
+      </View>
+
+      {/* Lezioni e Consulenze */}
+      <Text style={styles.sectionTitle}>Lezioni e Consulenze</Text>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Lezioni erogate"
+          value={`${planStats.usedLessons}/${planStats.totalLessons}`}
+          subtitle={`${planStats.remainingLessons} rimanenti`}
+          color={colors.info}
+        />
+        <StatCard
+          title="Consulenze erogate"
+          value={`${planStats.usedConsultations}/${planStats.totalConsultations}`}
+          subtitle={`${planStats.remainingConsultations} rimanenti`}
+          color={colors.warning}
+        />
+      </View>
+
+      {/* Progress bar lezioni */}
+      {planStats.totalLessons > 0 && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Lezioni</Text>
+            <Text style={styles.progressValue}>
+              {planStats.usedLessons}/{planStats.totalLessons}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={{
+                ...styles.progressFill,
+                width: `${Math.min((planStats.usedLessons / planStats.totalLessons) * 100, 100)}%`,
+                backgroundColor: colors.info,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Progress bar consulenze */}
+      {planStats.totalConsultations > 0 && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Consulenze Nutrizionali</Text>
+            <Text style={styles.progressValue}>
+              {planStats.usedConsultations}/{planStats.totalConsultations}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={{
+                ...styles.progressFill,
+                width: `${Math.min((planStats.usedConsultations / planStats.totalConsultations) * 100, 100)}%`,
+                backgroundColor: colors.warning,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Corsi Attivi */}
+      {planStats.activeCourses > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Corsi Attivi</Text>
+          {paymentPlans
+            .filter((p) => {
+              if (p.paymentType !== 'monthly_course') return false;
+              const today = new Date();
+              const start = p.startDate instanceof Date ? p.startDate : new Date(p.startDate as unknown as string);
+              const end = p.endDate instanceof Date ? p.endDate : new Date(p.endDate as unknown as string);
+              return start <= today && end >= today;
+            })
+            .map((plan) => (
+              <Card key={plan.id} style={styles.courseCard}>
+                <View style={styles.courseRow}>
+                  <Ionicons name="school-outline" size={20} color={colors.accent} />
+                  <View style={styles.courseInfo}>
+                    <Text style={styles.courseType}>{plan.courseType || 'Corso'}</Text>
+                    <Text style={styles.courseSubscription}>
+                      {plan.subscriptionType || 'Mensile'} · €{plan.totalAmount.toLocaleString()}
+                    </Text>
+                    <Text style={styles.courseDates}>
+                      {new Date(plan.startDate as unknown as string).toLocaleDateString('it-IT')} -{' '}
+                      {new Date(plan.endDate as unknown as string).toLocaleDateString('it-IT')}
+                    </Text>
+                  </View>
+                  <View style={styles.courseLessons}>
+                    <Text style={styles.courseLessonsValue}>
+                      {(plan.includedLessons || 0) - (plan.usedLessons || 0)}
+                    </Text>
+                    <Text style={styles.courseLessonsLabel}>lezioni rim.</Text>
+                  </View>
+                </View>
+              </Card>
+            ))}
+        </>
+      )}
 
       {/* Aggiungi transazione */}
       <Button
@@ -473,6 +658,75 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
+  },
+  progressSection: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  progressLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  progressValue: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%' as const,
+    borderRadius: 3,
+  },
+  courseCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  courseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  courseInfo: {
+    flex: 1,
+  },
+  courseType: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  courseSubscription: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    marginTop: 2,
+  },
+  courseDates: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  courseLessons: {
+    alignItems: 'center',
+  },
+  courseLessonsValue: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.info,
+  },
+  courseLessonsLabel: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
   },
   bottomSpacer: {
     height: spacing.xxl,
