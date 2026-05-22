@@ -171,17 +171,23 @@ export const FinancialScreen: React.FC = () => {
     );
   };
 
+  const combinedIncome = totalIncome + planStats.totalCollected;
+  const combinedProfit = combinedIncome - totalExpenses;
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Gestione Economica</Text>
       </View>
 
-      {/* Riepilogo */}
+      {/* Riepilogo generale */}
       <View style={styles.statsRow}>
         <StatCard
-          title="Ricavi"
-          value={`€${totalIncome.toLocaleString()}`}
+          title="Ricavi Totali"
+          value={`€${combinedIncome.toLocaleString()}`}
+          subtitle={totalIncome > 0 && planStats.totalCollected > 0
+            ? `Transazioni €${totalIncome.toLocaleString()} + Piani €${planStats.totalCollected.toLocaleString()}`
+            : undefined}
           color={colors.success}
         />
         <StatCard
@@ -194,8 +200,8 @@ export const FinancialScreen: React.FC = () => {
       <View style={styles.netProfitContainer}>
         <StatCard
           title="Profitto Netto"
-          value={`€${(totalIncome - totalExpenses).toLocaleString()}`}
-          color={totalIncome - totalExpenses >= 0 ? colors.success : colors.error}
+          value={`€${combinedProfit.toLocaleString()}`}
+          color={combinedProfit >= 0 ? colors.success : colors.error}
         />
       </View>
 
@@ -203,7 +209,7 @@ export const FinancialScreen: React.FC = () => {
       <Text style={styles.sectionTitle}>Panoramica Piani</Text>
       <View style={styles.statsRow}>
         <StatCard
-          title="Incassato"
+          title="Incassato dai Piani"
           value={`€${planStats.totalCollected.toLocaleString()}`}
           color={colors.success}
           icon={<Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />}
