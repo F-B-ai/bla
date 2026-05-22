@@ -132,3 +132,30 @@ export const getUpcomingInstallments = async (
 export const deletePaymentPlan = async (planId: string): Promise<void> => {
   await deleteDoc(doc(db, PAYMENTS_COLLECTION, planId));
 };
+
+export const updatePaymentPlan = async (
+  planId: string,
+  data: Partial<Omit<PaymentPlan, 'id'>>
+): Promise<void> => {
+  await updateDoc(doc(db, PAYMENTS_COLLECTION, planId), data);
+};
+
+export const getAllPaymentPlans = async (): Promise<PaymentPlan[]> => {
+  const snapshot = await getDocs(collection(db, PAYMENTS_COLLECTION));
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as PaymentPlan));
+};
+
+export const getPaymentReminderMessage = (
+  studentName: string,
+  amount: number,
+  dueDate: Date,
+  daysUntil: number
+): string => {
+  if (daysUntil === 15) {
+    return `Ciao ${studentName}! Ti ricordiamo che tra 15 giorni (${dueDate.toLocaleDateString('it-IT')}) è previsto il pagamento della rata di €${amount}. Organizzati per tempo!`;
+  }
+  if (daysUntil <= 7 && daysUntil > 1) {
+    return `Ciao ${studentName}, mancano ${daysUntil} giorni al pagamento della rata di €${amount} (${dueDate.toLocaleDateString('it-IT')}). Non dimenticare!`;
+  }
+  return `Ciao ${studentName}, domani scade la rata di €${amount}. Ricordati di effettuare il pagamento!`;
+};
