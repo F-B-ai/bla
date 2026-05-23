@@ -12,6 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -40,6 +41,7 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 // ---------------------------------------------------------------------------
 export const PaymentPlanScreen: React.FC = () => {
   const { user, isOwner } = useAuth();
+  const insets = useSafeAreaInsets();
   const isManager = user?.role === 'manager';
   const canEdit = isOwner; // only owner can create/edit/delete
 
@@ -596,7 +598,7 @@ export const PaymentPlanScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
         <Text style={styles.headerTitle}>Piani di Pagamento</Text>
         {canEdit && (
           <TouchableOpacity
