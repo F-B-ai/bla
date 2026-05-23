@@ -58,6 +58,11 @@ import {
   updateTask,
   deleteTask,
 } from '../../services/taskService';
+import {
+  getActiveStudentPlan,
+  decrementPlanLesson,
+  decrementPlanConsultation,
+} from '../../services/paymentService';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -477,6 +482,24 @@ export const CalendarScreen: React.FC = () => {
     }
   };
 
+  const decrementStudentPlan = async (studentId: string, kind: AppointmentKind) => {
+    try {
+      const plan = await getActiveStudentPlan(studentId);
+      if (!plan) return;
+      if (kind === 'training') {
+        if (plan.includedLessons > 0 && plan.usedLessons < plan.includedLessons) {
+          await decrementPlanLesson(plan.id, plan.usedLessons);
+        }
+      } else {
+        if (plan.includedConsultations > 0 && plan.usedConsultations < plan.includedConsultations) {
+          await decrementPlanConsultation(plan.id, plan.usedConsultations);
+        }
+      }
+    } catch (err) {
+      console.error('Errore aggiornamento piano:', err);
+    }
+  };
+
   const handleComplete = (item: AppointmentItem) => {
     crossAlert('Conferma', 'Segna come completato?', [
       { text: 'Annulla', style: 'cancel' },
@@ -486,6 +509,7 @@ export const CalendarScreen: React.FC = () => {
           try {
             if (item.kind === 'training') await updateSessionStatus(item.id, 'completed');
             else await updateAppointmentStatus(item.id, 'completed');
+            await decrementStudentPlan(item.studentId, item.kind);
             loadData();
           } catch { crossAlert('Errore', 'Impossibile aggiornare'); }
         },
@@ -511,6 +535,7 @@ export const CalendarScreen: React.FC = () => {
                 try {
                   if (item.kind === 'training') await cancelSession(item.id, item.date);
                   else await cancelAppointment(item.id, item.date);
+                  await decrementStudentPlan(item.studentId, item.kind);
                   loadData();
                 } catch { crossAlert('Errore', 'Impossibile annullare'); }
               },
