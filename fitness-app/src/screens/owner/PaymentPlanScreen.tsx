@@ -39,6 +39,15 @@ type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 // ---------------------------------------------------------------------------
 // PaymentPlanScreen
 // ---------------------------------------------------------------------------
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 export const PaymentPlanScreen: React.FC = () => {
   const { user, isOwner } = useAuth();
   const insets = useSafeAreaInsets();
@@ -152,13 +161,13 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   const formatDate = (date: Date | string | any): string => {
-    const d = date instanceof Date ? date : new Date(date);
+    const d = toSafeDate(date);
     if (isNaN(d.getTime())) return '-';
     return d.toLocaleDateString('it-IT');
   };
 
   const formatDateForInput = (date: Date | string | any): string => {
-    const d = date instanceof Date ? date : new Date(date);
+    const d = toSafeDate(date);
     if (isNaN(d.getTime())) return '';
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -167,7 +176,7 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   const daysUntilDate = (date: Date | string | any): number => {
-    const d = date instanceof Date ? date : new Date(date);
+    const d = toSafeDate(date);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     d.setHours(0, 0, 0, 0);
@@ -224,8 +233,8 @@ export const PaymentPlanScreen: React.FC = () => {
       }
 
       // Check if plan is active (today is between startDate and endDate)
-      const planStart = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate);
-      const planEnd = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate);
+      const planStart = toSafeDate(plan.startDate);
+      const planEnd = toSafeDate(plan.endDate);
       if (!isNaN(planStart.getTime()) && !isNaN(planEnd.getTime())) {
         const startNorm = new Date(planStart);
         startNorm.setHours(0, 0, 0, 0);
@@ -696,8 +705,8 @@ export const PaymentPlanScreen: React.FC = () => {
               </View>
 
               {studentPlans.map((plan) => {
-                const planStartDate = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate);
-                const planEndDate = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate);
+                const planStartDate = toSafeDate(plan.startDate);
+                const planEndDate = toSafeDate(plan.endDate);
                 const hasValidDates = !isNaN(planStartDate.getTime()) && !isNaN(planEndDate.getTime());
                 const planIncludedLessons = plan.includedLessons ?? 0;
                 const planUsedLessons = plan.usedLessons ?? 0;

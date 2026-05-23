@@ -34,6 +34,15 @@ const CATEGORIES: { value: TransactionCategory; label: string }[] = [
   { value: 'other', label: 'Altro' },
 ];
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 export const FinancialScreen: React.FC = () => {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -84,8 +93,8 @@ export const FinancialScreen: React.FC = () => {
         }
       }
 
-      const start = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as unknown as string);
-      const end = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as unknown as string);
+      const start = toSafeDate(plan.startDate);
+      const end = toSafeDate(plan.endDate);
       const s = new Date(start); s.setHours(0, 0, 0, 0);
       const e = new Date(end); e.setHours(0, 0, 0, 0);
       if (s <= today && e >= today) {
@@ -301,8 +310,8 @@ export const FinancialScreen: React.FC = () => {
             .filter((p) => {
               if (p.paymentType !== 'monthly_course') return false;
               const today = new Date();
-              const start = p.startDate instanceof Date ? p.startDate : new Date(p.startDate as unknown as string);
-              const end = p.endDate instanceof Date ? p.endDate : new Date(p.endDate as unknown as string);
+              const start = toSafeDate(p.startDate);
+              const end = toSafeDate(p.endDate);
               return start <= today && end >= today;
             })
             .map((plan) => (
@@ -315,8 +324,8 @@ export const FinancialScreen: React.FC = () => {
                       {plan.subscriptionType || 'Mensile'} · €{plan.totalAmount.toLocaleString()}
                     </Text>
                     <Text style={styles.courseDates}>
-                      {new Date(plan.startDate as unknown as string).toLocaleDateString('it-IT')} -{' '}
-                      {new Date(plan.endDate as unknown as string).toLocaleDateString('it-IT')}
+                      {toSafeDate(plan.startDate).toLocaleDateString('it-IT')} -{' '}
+                      {toSafeDate(plan.endDate).toLocaleDateString('it-IT')}
                     </Text>
                   </View>
                   <View style={styles.courseLessons}>

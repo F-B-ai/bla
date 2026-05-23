@@ -26,6 +26,15 @@ import { getFinancialSummary, getTransactions } from '../../services/financialSe
 import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { logout, user } = useAuth();
@@ -223,8 +232,8 @@ export const DashboardScreen: React.FC = () => {
           if (inst.status === 'overdue') overdueCount++;
         }
       }
-      const start = plan.startDate instanceof Date ? plan.startDate : new Date(plan.startDate as unknown as string);
-      const end = plan.endDate instanceof Date ? plan.endDate : new Date(plan.endDate as unknown as string);
+      const start = toSafeDate(plan.startDate);
+      const end = toSafeDate(plan.endDate);
       const s = new Date(start); s.setHours(0, 0, 0, 0);
       const e = new Date(end); e.setHours(0, 0, 0, 0);
       if (s <= today && e >= today) {
