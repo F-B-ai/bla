@@ -11,6 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -144,6 +145,7 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 
 export const CalendarScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
+  const insets = useSafeAreaInsets();
   const canSeeAll = isOwner;
   const isStaff = isOwner || isManager || isCollaborator;
 
@@ -937,7 +939,7 @@ export const CalendarScreen: React.FC = () => {
           contentContainerStyle={styles.listContent}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
             <View style={styles.headerTopRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.title}>
@@ -1093,7 +1095,7 @@ export const CalendarScreen: React.FC = () => {
         ListHeaderComponent={
           <View>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
               <View style={styles.headerTopRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title}>{isStudent ? 'I Miei Appuntamenti' : 'Calendario'}</Text>
