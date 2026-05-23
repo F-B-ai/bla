@@ -30,6 +30,7 @@ import {
   approveRequest,
   denyRequest,
 } from '../../services/credentialService';
+import { createNotification } from '../../services/notificationService';
 
 type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent' | 'editProfile';
 
@@ -192,6 +193,12 @@ export const ManageUsersScreen: React.FC = () => {
           setProcessingRequestId(req.id);
           try {
             await approveRequest(req, user!.id);
+            createNotification(
+              req.userId,
+              'custom_alert',
+              'Richiesta approvata',
+              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : 'password'} è stata approvata.`
+            ).catch(() => {});
             crossAlert('Fatto', 'Richiesta approvata e credenziali aggiornate.');
             await loadData();
           } catch (err: any) {
@@ -214,6 +221,12 @@ export const ManageUsersScreen: React.FC = () => {
           setProcessingRequestId(req.id);
           try {
             await denyRequest(req.id, user!.id);
+            createNotification(
+              req.userId,
+              'custom_alert',
+              'Richiesta rifiutata',
+              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : 'password'} è stata rifiutata.`
+            ).catch(() => {});
             crossAlert('Fatto', 'Richiesta rifiutata.');
             await loadData();
           } catch {

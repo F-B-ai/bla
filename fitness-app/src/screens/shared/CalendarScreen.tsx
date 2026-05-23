@@ -50,7 +50,7 @@ import {
   cancelAppointment,
   deleteAppointment,
 } from '../../services/nutritionistService';
-import { getStudents, getCollaborators, getManagers } from '../../services/authService';
+import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   createTask,
@@ -64,6 +64,7 @@ import {
   decrementPlanLesson,
   decrementPlanConsultation,
 } from '../../services/paymentService';
+import { createNotification } from '../../services/notificationService';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -473,6 +474,24 @@ export const CalendarScreen: React.FC = () => {
           });
         }
         crossAlert('Successo', 'Appuntamento creato!');
+        const studentName = getStudentName(formStudentId);
+        const dateLabel = new Date(formDate).toLocaleDateString('it-IT');
+        createNotification(
+          formStudentId,
+          'session_reminder',
+          'Nuovo appuntamento',
+          `Hai un nuovo appuntamento il ${dateLabel} alle ${formStartTime}.`
+        ).catch(() => {});
+        if (!isOwner) {
+          getOwner().then((owner) => {
+            if (owner) createNotification(
+              owner.id,
+              'session_reminder',
+              'Nuovo appuntamento creato',
+              `${getStaffName(staffId)} ha fissato un appuntamento con ${studentName} il ${dateLabel} alle ${formStartTime}.`
+            ).catch(() => {});
+          }).catch(() => {});
+        }
       }
       resetForm();
       setShowModal(false);
@@ -516,6 +535,24 @@ export const CalendarScreen: React.FC = () => {
             if (item.kind === 'training') await updateSessionStatus(item.id, 'completed');
             else await updateAppointmentStatus(item.id, 'completed');
             await decrementStudentPlan(item.studentId, item.kind);
+            const studentName = getStudentName(item.studentId);
+            const dateLabel = item.date.toLocaleDateString('it-IT');
+            createNotification(
+              item.studentId,
+              'session_reminder',
+              'Sessione completata',
+              `La tua sessione del ${dateLabel} è stata completata. Ottimo lavoro!`
+            ).catch(() => {});
+            if (!isOwner) {
+              getOwner().then((owner) => {
+                if (owner) createNotification(
+                  owner.id,
+                  'session_reminder',
+                  'Sessione completata',
+                  `Sessione con ${studentName} del ${dateLabel} completata da ${getStaffName(item.staffId)}.`
+                ).catch(() => {});
+              }).catch(() => {});
+            }
             loadData();
           } catch { crossAlert('Errore', 'Impossibile aggiornare'); }
         },
@@ -542,6 +579,15 @@ export const CalendarScreen: React.FC = () => {
                   if (item.kind === 'training') await cancelSession(item.id, item.date);
                   else await cancelAppointment(item.id, item.date);
                   await decrementStudentPlan(item.studentId, item.kind);
+                  const dateLabel = item.date.toLocaleDateString('it-IT');
+                  getOwner().then((owner) => {
+                    if (owner) createNotification(
+                      owner.id,
+                      'session_cancelled',
+                      'Appuntamento annullato (tardivo)',
+                      `${getStudentName(item.studentId)} ha annullato l'appuntamento del ${dateLabel} a meno di 10 ore. Sessione addebitata.`
+                    ).catch(() => {});
+                  }).catch(() => {});
                   loadData();
                 } catch { crossAlert('Errore', 'Impossibile annullare'); }
               },
@@ -565,6 +611,25 @@ export const CalendarScreen: React.FC = () => {
             } else {
               if (item.kind === 'training') await cancelSession(item.id, item.date);
               else await cancelAppointment(item.id, item.date);
+            }
+            const dateLabel = item.date.toLocaleDateString('it-IT');
+            if (isStaff) {
+              createNotification(
+                item.studentId,
+                'session_cancelled',
+                'Appuntamento annullato',
+                `Il tuo appuntamento del ${dateLabel} è stato annullato.`
+              ).catch(() => {});
+            }
+            if (!isOwner) {
+              getOwner().then((owner) => {
+                if (owner) createNotification(
+                  owner.id,
+                  'session_cancelled',
+                  'Appuntamento annullato',
+                  `Appuntamento con ${getStudentName(item.studentId)} del ${dateLabel} annullato.`
+                ).catch(() => {});
+              }).catch(() => {});
             }
             loadData();
           } catch { crossAlert('Errore', 'Impossibile annullare'); }

@@ -92,7 +92,8 @@ export const subscribeToUnreadCount = (
       (d) => d.data().docType === 'notification' && d.data().read === false
     ).length;
     callback(count);
-  }, () => {
+  }, (error) => {
+    console.warn('subscribeToUnreadCount error:', error);
     callback(0);
   });
 };
