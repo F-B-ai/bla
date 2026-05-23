@@ -174,13 +174,23 @@ export const decrementPlanConsultation = async (planId: string, currentUsed: num
   });
 };
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 // Get active plan for student (the one within date range and not fully used)
 export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPlan | null> => {
   const plans = await getStudentPaymentPlans(studentId);
   const now = new Date();
   return plans.find((p) => {
-    const start = p.startDate instanceof Date ? p.startDate : new Date(p.startDate as unknown as string);
-    const end = p.endDate instanceof Date ? p.endDate : new Date(p.endDate as unknown as string);
+    const start = toSafeDate(p.startDate);
+    const end = toSafeDate(p.endDate);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
     return start <= now && end >= now;
   }) || null;
 };

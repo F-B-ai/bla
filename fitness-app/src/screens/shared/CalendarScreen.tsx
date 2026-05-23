@@ -488,13 +488,17 @@ export const CalendarScreen: React.FC = () => {
     try {
       const plan = await getActiveStudentPlan(studentId);
       if (!plan) return;
+      const usedL = plan.usedLessons || 0;
+      const inclL = plan.includedLessons || 0;
+      const usedC = plan.usedConsultations || 0;
+      const inclC = plan.includedConsultations || 0;
       if (kind === 'training') {
-        if (plan.includedLessons > 0 && plan.usedLessons < plan.includedLessons) {
-          await decrementPlanLesson(plan.id, plan.usedLessons);
+        if (inclL > 0 && usedL < inclL) {
+          await decrementPlanLesson(plan.id, usedL);
         }
       } else {
-        if (plan.includedConsultations > 0 && plan.usedConsultations < plan.includedConsultations) {
-          await decrementPlanConsultation(plan.id, plan.usedConsultations);
+        if (inclC > 0 && usedC < inclC) {
+          await decrementPlanConsultation(plan.id, usedC);
         }
       }
     } catch (err) {
