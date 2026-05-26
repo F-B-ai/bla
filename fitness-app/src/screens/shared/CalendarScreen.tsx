@@ -689,24 +689,25 @@ export const CalendarScreen: React.FC = () => {
           description: taskDescription.trim(),
           priority: taskPriority,
         });
-        crossAlert('Successo', 'Task aggiornato!');
       } else {
         await createTask({
           ownerId: user.id,
-          date: new Date(selectedDate + 'T00:00:00'),
+          date: new Date(),
           title: taskTitle.trim(),
           description: taskDescription.trim(),
           priority: taskPriority,
           isCompleted: false,
           createdAt: new Date(),
         });
-        crossAlert('Successo', 'Task creato!');
       }
+      crossAlert('Successo', editingTask ? 'Task aggiornato!' : 'Task creato!');
       resetTaskForm();
       setShowTaskModal(false);
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare il task');
+    } catch (err: any) {
+      const msg = err?.message || err?.code || String(err);
+      console.error('Task save error:', err);
+      crossAlert('Errore', `Impossibile salvare il task: ${msg}`);
     } finally {
       setSavingTask(false);
     }
