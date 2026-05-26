@@ -480,7 +480,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     setViewingPlan(null);
   };
 
-  const saveAsTemplate = (plan: WorkoutPlan) => {
+  const saveAsTemplate = (plan: { title: string; studentId?: string; weeklySchedule: { dayOfWeek: number; exercises: (Exercise | Omit<Exercise, 'id'>)[]; notes?: string }[] }) => {
     crossAlert('Salva come Template', `Vuoi salvare "${plan.title}" come template riutilizzabile?`, [
       { text: 'Annulla', style: 'cancel' },
       {
@@ -490,12 +490,18 @@ export const WorkoutPlanScreen: React.FC = () => {
             const weeklySchedule = plan.weeklySchedule.map((day) => ({
               dayOfWeek: day.dayOfWeek,
               dayName: DAYS[day.dayOfWeek] || '',
-              exercises: day.exercises.map(({ id, ...rest }) => rest),
+              exercises: day.exercises.map((ex) => {
+                const { id: _id, ...rest } = ex as Exercise;
+                return rest;
+              }),
               notes: day.notes || '',
             }));
+            const desc = plan.studentId
+              ? `Template creato dalla programmazione di ${getStudentName(plan.studentId)}`
+              : 'Template personalizzato';
             await createCustomTemplate({
               name: plan.title,
-              description: `Template creato dalla programmazione di ${getStudentName(plan.studentId)}`,
+              description: desc,
               gender: 'male',
               category: 'personalizzato',
               weeklySchedule,
@@ -752,6 +758,28 @@ export const WorkoutPlanScreen: React.FC = () => {
           style={styles.saveButton}
           loading={saving}
         />
+
+        {planTitle.trim() && Object.values(exercises).some((exs) => exs.length > 0) && (
+          <TouchableOpacity
+            style={styles.saveAsTemplateBtnMain}
+            onPress={() => {
+              const weeklySchedule = DAYS.map((_, i) => ({
+                dayOfWeek: i,
+                dayName: DAYS[i],
+                exercises: (exercises[i] || []).map(({ id, ...rest }) => rest),
+                notes: '',
+              }));
+              saveAsTemplate({
+                title: planTitle,
+                studentId: selectedStudentId || undefined,
+                weeklySchedule,
+              });
+            }}
+          >
+            <Ionicons name="copy-outline" size={18} color={colors.accent} />
+            <Text style={styles.saveAsTemplateMainText}>Salva come Template</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Modale Aggiungi Esercizio */}
@@ -1684,9 +1712,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
   },
+  saveAsTemplateBtnMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.md,
+  },
   saveAsTemplateText: {
     color: colors.textOnAccent,
     fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  saveAsTemplateMainText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
     fontWeight: '700',
   },
   libraryPickerToggle: {
