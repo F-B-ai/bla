@@ -1,28 +1,38 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+let Notifications: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {}
+}
 
 export const requestNotificationPermissions = async (): Promise<boolean> => {
-  if (Platform.OS === 'web') return false;
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  if (!Notifications) return false;
+  try {
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    if (existing === 'granted') return true;
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
 };
 
 export const registerPushToken = async (userId: string): Promise<string | null> => {
-  if (Platform.OS === 'web') return null;
+  if (!Notifications) return null;
   try {
     const granted = await requestNotificationPermissions();
     if (!granted) return null;
@@ -40,7 +50,7 @@ export const showLocalNotification = async (
   body: string,
   data?: Record<string, string>
 ): Promise<void> => {
-  if (Platform.OS === 'web') return;
+  if (!Notifications) return;
   try {
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -55,7 +65,7 @@ export const showLocalNotification = async (
 };
 
 export const updateBadgeCount = async (count: number): Promise<void> => {
-  if (Platform.OS === 'web') return;
+  if (!Notifications) return;
   try {
     await Notifications.setBadgeCountAsync(count);
   } catch {}
