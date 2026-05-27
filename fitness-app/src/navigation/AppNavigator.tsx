@@ -84,7 +84,8 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
-import { subscribeToUnreadCount } from '../services/notificationService';
+import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
+import { registerPushToken } from '../services/pushNotificationService';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -911,6 +912,16 @@ export const AppNavigator: React.FC = () => {
       loginModeSetByUser.current = false;
     }
   }, [isAuthenticated]);
+
+  // Initialize push notifications and set current user ID for badge/push
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      setCurrentUserId(user.id);
+      registerPushToken(user.id).catch(() => {});
+    } else {
+      setCurrentUserId(null);
+    }
+  }, [isAuthenticated, user]);
 
   // Clean up stale loginMode from storage when not authenticated
   useEffect(() => {
