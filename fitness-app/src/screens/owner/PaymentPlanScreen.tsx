@@ -32,7 +32,6 @@ import {
   getPaymentReminderMessage,
 } from '../../services/paymentService';
 import { crossAlert } from '../../utils/alert';
-import { createNotification } from '../../services/notificationService';
 import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student } from '../../types';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
@@ -391,12 +390,6 @@ export const PaymentPlanScreen: React.FC = () => {
           ? { courseType, subscriptionType }
           : {}),
       });
-      createNotification(
-        selectedStudentId,
-        'payment_due',
-        'Nuovo piano di pagamento',
-        `Ti è stato assegnato un nuovo piano di pagamento di €${amount}. Controlla i dettagli nella sezione Pagamenti.`
-      ).catch(() => {});
       resetCreateForm();
       setShowCreateModal(false);
       await loadData();
@@ -468,19 +461,10 @@ export const PaymentPlanScreen: React.FC = () => {
     }
   };
 
-  const handleMarkPaid = async (planId: string, installmentId: string, installments: Installment[], studentId?: string) => {
+  const handleMarkPaid = async (planId: string, installmentId: string, installments: Installment[]) => {
     try {
       setSaving(true);
       await markInstallmentPaid(planId, installmentId, installments);
-      if (studentId) {
-        const inst = installments.find((i) => i.id === installmentId);
-        createNotification(
-          studentId,
-          'payment_due',
-          'Pagamento registrato',
-          `Il tuo pagamento${inst ? ` di €${inst.amount}` : ''} è stato registrato. Grazie!`
-        ).catch(() => {});
-      }
       await loadData();
       // Also refresh edit modal if open
       if (editingPlan && editingPlan.id === planId) {
@@ -867,7 +851,7 @@ export const PaymentPlanScreen: React.FC = () => {
                               {inst.status !== 'paid' && (
                                 <TouchableOpacity
                                   style={styles.paidBtn}
-                                  onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments)}
                                 >
                                   <Ionicons name="checkmark" size={14} color={colors.success} />
                                 </TouchableOpacity>
@@ -1272,7 +1256,7 @@ export const PaymentPlanScreen: React.FC = () => {
                         <View style={styles.editInstActions}>
                           <TouchableOpacity
                             style={styles.markPaidButton}
-                            onPress={() => handleMarkPaid(editingPlan.id, inst.id, editingPlan.installments, editingPlan.studentId)}
+                            onPress={() => handleMarkPaid(editingPlan.id, inst.id, editingPlan.installments)}
                           >
                             <Ionicons name="checkmark-circle" size={18} color={colors.success} />
                             <Text style={styles.markPaidText}>Segna come pagato</Text>

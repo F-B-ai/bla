@@ -35,7 +35,7 @@ import {
   ensureAIApiKey,
 } from '../../services/aiService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
-import { getCustomTemplates, CustomWorkoutTemplate, createCustomTemplate } from '../../services/programService';
+import { getCustomTemplates, CustomWorkoutTemplate } from '../../services/programService';
 import { Ionicons } from '@expo/vector-icons';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -480,49 +480,6 @@ export const WorkoutPlanScreen: React.FC = () => {
     setViewingPlan(null);
   };
 
-  const saveAsTemplate = (plan: { title: string; studentId?: string; weeklySchedule: { dayOfWeek: number; exercises: (Exercise | Omit<Exercise, 'id'>)[]; notes?: string }[] }) => {
-    crossAlert('Salva come Template', `Vuoi salvare "${plan.title}" come template riutilizzabile?`, [
-      { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Salva',
-        onPress: async () => {
-          try {
-            const weeklySchedule = plan.weeklySchedule.map((day) => ({
-              dayOfWeek: day.dayOfWeek,
-              dayName: DAYS[day.dayOfWeek] || '',
-              exercises: day.exercises.map((ex) => {
-                const { id: _id, ...rest } = ex as Exercise;
-                return rest;
-              }),
-              notes: day.notes || '',
-            }));
-            const desc = plan.studentId
-              ? `Template creato dalla programmazione di ${getStudentName(plan.studentId)}`
-              : 'Template personalizzato';
-            await createCustomTemplate({
-              name: plan.title,
-              description: desc,
-              gender: 'male',
-              category: 'personalizzato',
-              weeklySchedule,
-              createdBy: user?.id || '',
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
-            crossAlert('Successo', 'Template salvato! Lo trovi nella sezione Template e in "Carica da Template".');
-          } catch {
-            crossAlert('Errore', 'Impossibile salvare il template.');
-          }
-        },
-      },
-    ]);
-  };
-
-  const getStudentName = (studentId: string) => {
-    const s = students.find((st) => st.id === studentId);
-    return s ? `${s.name} ${s.surname}` : 'Allievo';
-  };
-
   const resetForm = () => {
     setEditingPlan(null);
     setPlanTitle('');
@@ -758,28 +715,6 @@ export const WorkoutPlanScreen: React.FC = () => {
           style={styles.saveButton}
           loading={saving}
         />
-
-        {planTitle.trim() && Object.values(exercises).some((exs) => exs.length > 0) && (
-          <TouchableOpacity
-            style={styles.saveAsTemplateBtnMain}
-            onPress={() => {
-              const weeklySchedule = DAYS.map((_, i) => ({
-                dayOfWeek: i,
-                dayName: DAYS[i],
-                exercises: (exercises[i] || []).map(({ id, ...rest }) => rest),
-                notes: '',
-              }));
-              saveAsTemplate({
-                title: planTitle,
-                studentId: selectedStudentId || undefined,
-                weeklySchedule,
-              });
-            }}
-          >
-            <Ionicons name="copy-outline" size={18} color={colors.accent} />
-            <Text style={styles.saveAsTemplateMainText}>Salva come Template</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Modale Aggiungi Esercizio */}
@@ -1122,13 +1057,6 @@ export const WorkoutPlanScreen: React.FC = () => {
                       <View style={styles.historyActions}>
                         <TouchableOpacity
                           style={styles.historyEditBtn}
-                          onPress={() => saveAsTemplate(plan)}
-                        >
-                          <Ionicons name="copy-outline" size={14} color={colors.accent} />
-                          <Text style={{ ...styles.historyEditText, color: colors.accent, marginLeft: 4 }}>Template</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.historyEditBtn}
                           onPress={() => loadPlanForEditing(plan)}
                         >
                           <Text style={styles.historyEditText}>Modifica</Text>
@@ -1152,21 +1080,12 @@ export const WorkoutPlanScreen: React.FC = () => {
                   )}
                 </Card>
 
-                <View style={styles.historyDetailActions}>
-                  <TouchableOpacity
-                    style={styles.historyBackBtn}
-                    onPress={() => setViewingPlan(null)}
-                  >
-                    <Text style={styles.historyBackText}>Torna alla lista</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.saveAsTemplateBtn}
-                    onPress={() => saveAsTemplate(viewingPlan)}
-                  >
-                    <Ionicons name="copy-outline" size={16} color={colors.textOnAccent} />
-                    <Text style={styles.saveAsTemplateText}>Salva come Template</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={styles.historyBackBtn}
+                  onPress={() => setViewingPlan(null)}
+                >
+                  <Text style={styles.historyBackText}>Torna alla lista</Text>
+                </TouchableOpacity>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll}>
                   {DAYS.map((day, index) => (
@@ -1679,59 +1598,18 @@ const styles = StyleSheet.create({
   historyActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    alignItems: 'center',
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.divider,
-    gap: spacing.sm,
   },
   historyEditBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
   },
   historyEditText: {
     color: colors.info,
     fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-  historyDetailActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: spacing.sm,
-  },
-  saveAsTemplateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  saveAsTemplateBtnMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginTop: spacing.md,
-  },
-  saveAsTemplateText: {
-    color: colors.textOnAccent,
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-  },
-  saveAsTemplateMainText: {
-    color: colors.accent,
-    fontSize: fontSize.md,
     fontWeight: '700',
   },
   libraryPickerToggle: {

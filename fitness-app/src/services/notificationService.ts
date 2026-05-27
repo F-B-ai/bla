@@ -14,10 +14,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { AppNotification, NotificationType } from '../types';
-import { showLocalNotification, updateBadgeCount } from './pushNotificationService';
-
-let _currentUserId: string | null = null;
-export const setCurrentUserId = (uid: string | null) => { _currentUserId = uid; };
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
@@ -87,30 +83,16 @@ export const subscribeToUnreadCount = (
   userId: string,
   callback: (count: number) => void
 ): (() => void) => {
-  let isFirstSnapshot = true;
   const q = query(
     collection(db, NOTIFICATIONS_COLLECTION),
     where('userId', '==', userId)
   );
   return onSnapshot(q, (snapshot) => {
-    const unread = snapshot.docs.filter(
+    const count = snapshot.docs.filter(
       (d) => d.data().docType === 'notification' && d.data().read === false
-    );
-    callback(unread.length);
-    updateBadgeCount(unread.length).catch(() => {});
-    if (!isFirstSnapshot) {
-      for (const change of snapshot.docChanges()) {
-        if (change.type === 'added') {
-          const data = change.doc.data();
-          if (data.docType === 'notification' && data.read === false) {
-            showLocalNotification(data.title || 'Notifica', data.body || '').catch(() => {});
-          }
-        }
-      }
-    }
-    isFirstSnapshot = false;
-  }, (error) => {
-    console.warn('subscribeToUnreadCount error:', error);
+    ).length;
+    callback(count);
+  }, () => {
     callback(0);
   });
 };

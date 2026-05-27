@@ -295,37 +295,5 @@ service cloud.firestore {
       allow update: if isOwnerOrManager();
       allow delete: if isOwner();
     }
-
-    // Daily tasks (owner/manager)
-    match /dailyTasks/{taskId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwnerOrManager();
-      allow update: if isOwnerOrManager();
-      allow delete: if isOwnerOrManager();
-    }
-
-    // Custom workout templates
-    match /customWorkoutTemplates/{templateId} {
-      allow read: if isAuthenticated();
-      allow create: if isStaff();
-      allow update: if isStaff();
-      allow delete: if isStaff();
-    }
-
-    // Credential change requests
-    match /credentialRequests/{requestId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isOwnerOrManager();
-      allow delete: if isOwner();
-    }
-
-    // Nutrition team notes
-    match /nutritionTeamNotes/{noteId} {
-      allow read: if isAuthenticated();
-      allow create: if isStaff();
-      allow update: if isStaff();
-      allow delete: if isStaff();
-    }
   }
 }

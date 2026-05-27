@@ -20,7 +20,6 @@ import { User, CredentialChangeRequest } from '../../types';
 import {
   uploadAvatar,
   getUserProfile,
-  getOwner,
 } from '../../services/authService';
 import {
   changeOwnEmail,
@@ -31,7 +30,6 @@ import {
   createCredentialRequest,
   getUserRequests,
 } from '../../services/credentialService';
-import { createNotification } from '../../services/notificationService';
 
 interface ProfileScreenProps {
   targetUserId?: string;
@@ -280,14 +278,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         requestType!,
         value
       );
-      getOwner().then((owner) => {
-        if (owner) createNotification(
-          owner.id,
-          'custom_alert',
-          'Richiesta modifica credenziali',
-          `${user.name} ${user.surname} ha richiesto la modifica della ${requestType === 'email' ? 'email' : 'password'}. Verifica nella sezione Team.`
-        ).catch(() => {});
-      }).catch(() => {});
       crossAlert('Fatto', 'Richiesta inviata! Il titolare la esaminerà.');
       setRequestType(null);
       setRequestNewEmail('');
