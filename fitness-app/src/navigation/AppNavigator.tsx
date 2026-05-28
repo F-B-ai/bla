@@ -84,6 +84,7 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
+import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
 
@@ -329,6 +330,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -470,6 +479,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -603,6 +620,14 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -709,6 +734,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Allenamento',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
