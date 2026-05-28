@@ -412,6 +412,8 @@ export interface DailyTask {
   isCompleted: boolean;
   completedAt?: Date;
   createdAt: Date;
+  startTime?: string;
+  endTime?: string;
 }
 
 // --- Notifiche ---

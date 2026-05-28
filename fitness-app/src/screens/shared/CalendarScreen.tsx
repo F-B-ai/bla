@@ -192,8 +192,12 @@ export const CalendarScreen: React.FC = () => {
   // Student detail modal
   const [studentDetailId, setStudentDetailId] = useState<string | null>(null);
 
-  // View mode: 'agenda' shows daily list first, 'calendar' shows calendar grid
-  const [viewMode, setViewMode] = useState<'agenda' | 'calendar'>('agenda');
+  // View mode
+  const [viewMode, setViewMode] = useState<'agenda' | 'calendar' | 'timeline'>('agenda');
+
+  // Task time fields
+  const [taskStartTime, setTaskStartTime] = useState('');
+  const [taskEndTime, setTaskEndTime] = useState('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -660,6 +664,8 @@ export const CalendarScreen: React.FC = () => {
     setTaskTitle('');
     setTaskDescription('');
     setTaskPriority('medium');
+    setTaskStartTime('');
+    setTaskEndTime('');
     setEditingTask(null);
   };
 
@@ -673,6 +679,8 @@ export const CalendarScreen: React.FC = () => {
     setTaskTitle(task.title);
     setTaskDescription(task.description);
     setTaskPriority(task.priority);
+    setTaskStartTime(task.startTime || '');
+    setTaskEndTime(task.endTime || '');
     setShowTaskModal(true);
   };
 
@@ -688,6 +696,8 @@ export const CalendarScreen: React.FC = () => {
           title: taskTitle.trim(),
           description: taskDescription.trim(),
           priority: taskPriority,
+          startTime: taskStartTime || undefined,
+          endTime: taskEndTime || undefined,
         });
       } else {
         await createTask({
@@ -698,6 +708,8 @@ export const CalendarScreen: React.FC = () => {
           priority: taskPriority,
           isCompleted: false,
           createdAt: new Date(),
+          startTime: taskStartTime || undefined,
+          endTime: taskEndTime || undefined,
         });
       }
       crossAlert('Successo', editingTask ? 'Task aggiornato!' : 'Task creato!');
@@ -843,6 +855,14 @@ export const CalendarScreen: React.FC = () => {
             <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
           ) : null}
           <View style={styles.taskMeta}>
+            {task.startTime ? (
+              <View style={styles.taskTimeBadge}>
+                <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                <Text style={styles.taskTimeText}>
+                  {task.startTime}{task.endTime ? ` - ${task.endTime}` : ''}
+                </Text>
+              </View>
+            ) : null}
             <View style={{ ...styles.priorityBadge, backgroundColor: priorityColor + '20' }}>
               <Text style={{ ...styles.priorityText, color: priorityColor }}>
                 {PRIORITY_LABELS[task.priority]}
@@ -1019,14 +1039,32 @@ export const CalendarScreen: React.FC = () => {
                   {todayLabel}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.viewToggle}
-                onPress={() => setViewMode('calendar')}
-              >
-                <Ionicons name="calendar" size={20} color={colors.textOnPrimary} />
-                <Text style={styles.viewToggleText}>Calendario</Text>
-              </TouchableOpacity>
             </View>
+          </View>
+
+          {/* View mode tabs */}
+          <View style={styles.viewTabsBar}>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'agenda' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('agenda')}
+            >
+              <Ionicons name="list" size={16} color={viewMode === 'agenda' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'agenda' ? styles.viewTabTextActive : {}) }}>Agenda</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'timeline' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('timeline')}
+            >
+              <Ionicons name="today" size={16} color={viewMode === 'timeline' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'timeline' ? styles.viewTabTextActive : {}) }}>La Mia Giornata</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'calendar' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('calendar')}
+            >
+              <Ionicons name="calendar" size={16} color={viewMode === 'calendar' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'calendar' ? styles.viewTabTextActive : {}) }}>Calendario</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Staff filter (owner only) */}
@@ -1145,11 +1183,210 @@ export const CalendarScreen: React.FC = () => {
           </View>
         </ScrollView>
 
-        {/* Task modal */}
         {renderTaskModal()}
-        {/* Appointment modal */}
         {renderAppointmentModal()}
-        {/* Student detail modal */}
+        {renderStudentDetailModal()}
+      </View>
+    );
+  }
+
+  // ========== TIMELINE VIEW ==========
+  if (viewMode === 'timeline') {
+    const TIMELINE_HOURS = ['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+    const HOUR_HEIGHT = 80;
+    const scheduledToday = todayAppointments.filter((a) => a.status === 'scheduled');
+    const pendingTasks = todayTasks.filter((t) => !t.isCompleted);
+    const completedTasks = todayTasks.filter((t) => t.isCompleted);
+    const noTimeTasks = todayTasks.filter((t) => !t.startTime);
+
+    const getTimeOffset = (time: string) => {
+      const [h, m] = time.split(':').map(Number);
+      const startHour = 6;
+      return (h - startHour) * HOUR_HEIGHT + (m / 60) * HOUR_HEIGHT;
+    };
+    const getBlockHeight = (start: string, end: string) => {
+      const s = getTimeOffset(start);
+      const e = getTimeOffset(end);
+      return Math.max(e - s, 30);
+    };
+
+    const nowHour = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const nowOffset = now.getHours() >= 6 && now.getHours() <= 22 ? getTimeOffset(nowHour) : -1;
+
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.listContent}
+        >
+          {/* Header */}
+          <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
+            <View style={styles.headerTopRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>La Mia Giornata</Text>
+                <Text style={styles.subtitle}>{todayLabel}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* View mode tabs */}
+          <View style={styles.viewTabsBar}>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'agenda' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('agenda')}
+            >
+              <Ionicons name="list" size={16} color={viewMode === 'agenda' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'agenda' ? styles.viewTabTextActive : {}) }}>Agenda</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'timeline' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('timeline')}
+            >
+              <Ionicons name="today" size={16} color={viewMode === 'timeline' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'timeline' ? styles.viewTabTextActive : {}) }}>La Mia Giornata</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ ...styles.viewTab, ...(viewMode === 'calendar' ? styles.viewTabActive : {}) }}
+              onPress={() => setViewMode('calendar')}
+            >
+              <Ionicons name="calendar" size={16} color={viewMode === 'calendar' ? colors.textOnAccent : colors.textSecondary} />
+              <Text style={{ ...styles.viewTabText, ...(viewMode === 'calendar' ? styles.viewTabTextActive : {}) }}>Calendario</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Summary */}
+          <View style={styles.agendaStats}>
+            <View style={styles.agendaStatBox}>
+              <Text style={styles.agendaStatValue}>{scheduledToday.length}</Text>
+              <Text style={styles.agendaStatLabel}>Appuntamenti</Text>
+            </View>
+            {isOwner && (
+              <>
+                <View style={styles.agendaStatBox}>
+                  <Text style={{ ...styles.agendaStatValue, color: colors.info }}>{pendingTasks.length}</Text>
+                  <Text style={styles.agendaStatLabel}>Task da fare</Text>
+                </View>
+                <View style={styles.agendaStatBox}>
+                  <Text style={{ ...styles.agendaStatValue, color: colors.success }}>{completedTasks.length}</Text>
+                  <Text style={styles.agendaStatLabel}>Task fatti</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Timeline */}
+          <View style={styles.timelineContainer}>
+            <View style={{ height: TIMELINE_HOURS.length * HOUR_HEIGHT, position: 'relative' }}>
+              {/* Hour lines */}
+              {TIMELINE_HOURS.map((hour, idx) => (
+                <View key={hour} style={{ position: 'absolute', top: idx * HOUR_HEIGHT, left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <Text style={styles.tlHourLabel}>{hour}</Text>
+                  <View style={styles.tlHourLine} />
+                </View>
+              ))}
+
+              {/* Current time indicator */}
+              {nowOffset >= 0 && (
+                <View style={{ position: 'absolute', top: nowOffset, left: 50, right: 0, zIndex: 10, flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={styles.tlNowDot} />
+                  <View style={styles.tlNowLine} />
+                </View>
+              )}
+
+              {/* Appointment blocks */}
+              {scheduledToday.map((appt) => {
+                const top = getTimeOffset(appt.startTime);
+                const height = getBlockHeight(appt.startTime, appt.endTime);
+                const isTraining = appt.kind === 'training';
+                return (
+                  <View
+                    key={`appt-${appt.id}`}
+                    style={{
+                      position: 'absolute',
+                      top,
+                      left: 60,
+                      right: 12,
+                      height,
+                      backgroundColor: isTraining ? colors.accent + '20' : '#34C75920',
+                      borderLeftWidth: 3,
+                      borderLeftColor: isTraining ? colors.accent : '#34C759',
+                      borderRadius: borderRadius.md,
+                      padding: spacing.sm,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={styles.tlBlockTime}>{appt.startTime} - {appt.endTime}</Text>
+                    <Text style={styles.tlBlockTitle} numberOfLines={1}>
+                      {isTraining ? '🏋️' : '🥗'} {getStudentName(appt.studentId)}
+                    </Text>
+                    {getStaffName(appt.staffId) ? (
+                      <Text style={styles.tlBlockSub} numberOfLines={1}>{getStaffName(appt.staffId)}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+
+              {/* Task blocks (with time) */}
+              {isOwner && todayTasks.filter((t) => t.startTime).map((task) => {
+                const top = getTimeOffset(task.startTime!);
+                const height = task.endTime ? getBlockHeight(task.startTime!, task.endTime) : 30;
+                const priorityColor = PRIORITY_COLORS[task.priority];
+                return (
+                  <TouchableOpacity
+                    key={`task-${task.id}`}
+                    onPress={() => openEditTask(task)}
+                    style={{
+                      position: 'absolute',
+                      top,
+                      left: 60,
+                      right: 12,
+                      height,
+                      backgroundColor: priorityColor + '15',
+                      borderLeftWidth: 3,
+                      borderLeftColor: priorityColor,
+                      borderRadius: borderRadius.md,
+                      borderStyle: task.isCompleted ? 'dashed' as any : 'solid' as any,
+                      padding: spacing.sm,
+                      justifyContent: 'center',
+                      opacity: task.isCompleted ? 0.5 : 1,
+                    }}
+                  >
+                    <Text style={styles.tlBlockTime}>
+                      {task.startTime}{task.endTime ? ` - ${task.endTime}` : ''}
+                    </Text>
+                    <Text style={{
+                      ...styles.tlBlockTitle,
+                      textDecorationLine: task.isCompleted ? 'line-through' : 'none',
+                    }} numberOfLines={1}>
+                      📋 {task.title}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Tasks without time */}
+          {isOwner && noTimeTasks.length > 0 && (
+            <View style={styles.agendaSection}>
+              <View style={styles.agendaSectionHeader}>
+                <Ionicons name="list-outline" size={18} color={colors.textSecondary} />
+                <Text style={styles.agendaSectionTitle}>Task senza orario</Text>
+                <Text style={styles.agendaSectionCount}>{noTimeTasks.length}</Text>
+              </View>
+              {noTimeTasks.map(renderTaskCard)}
+            </View>
+          )}
+
+          {/* Action buttons */}
+          <View style={{ flexDirection: 'row', gap: spacing.sm, padding: spacing.lg }}>
+            {isStaff && <Button title="+ Appuntamento" onPress={openCreate} style={{ flex: 1 }} />}
+            {isOwner && <Button title="+ Task" onPress={openCreateTask} variant="outline" style={{ flex: 1 }} />}
+          </View>
+        </ScrollView>
+
+        {renderTaskModal()}
+        {renderAppointmentModal()}
         {renderStudentDetailModal()}
       </View>
     );
@@ -1174,19 +1411,37 @@ export const CalendarScreen: React.FC = () => {
                     {' · '}{filteredAppointments.filter(a => a.status === 'scheduled').length} in programma
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.viewToggle}
-                  onPress={() => setViewMode('agenda')}
-                >
-                  <Ionicons name="list" size={20} color={colors.textOnPrimary} />
-                  <Text style={styles.viewToggleText}>Agenda</Text>
-                </TouchableOpacity>
               </View>
               {isStudent && (
                 <Text style={styles.cancelHint}>
                   Disdetta gratuita entro 10 ore prima
                 </Text>
               )}
+            </View>
+
+            {/* View mode tabs */}
+            <View style={styles.viewTabsBar}>
+              <TouchableOpacity
+                style={{ ...styles.viewTab, ...(viewMode === 'agenda' ? styles.viewTabActive : {}) }}
+                onPress={() => setViewMode('agenda')}
+              >
+                <Ionicons name="list" size={16} color={viewMode === 'agenda' ? colors.textOnAccent : colors.textSecondary} />
+                <Text style={{ ...styles.viewTabText, ...(viewMode === 'agenda' ? styles.viewTabTextActive : {}) }}>Agenda</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ ...styles.viewTab, ...(viewMode === 'timeline' ? styles.viewTabActive : {}) }}
+                onPress={() => setViewMode('timeline')}
+              >
+                <Ionicons name="today" size={16} color={viewMode === 'timeline' ? colors.textOnAccent : colors.textSecondary} />
+                <Text style={{ ...styles.viewTabText, ...(viewMode === 'timeline' ? styles.viewTabTextActive : {}) }}>La Mia Giornata</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ ...styles.viewTab, ...(viewMode === 'calendar' ? styles.viewTabActive : {}) }}
+                onPress={() => setViewMode('calendar')}
+              >
+                <Ionicons name="calendar" size={16} color={viewMode === 'calendar' ? colors.textOnAccent : colors.textSecondary} />
+                <Text style={{ ...styles.viewTabText, ...(viewMode === 'calendar' ? styles.viewTabTextActive : {}) }}>Calendario</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Staff filter (owner only) */}
@@ -1379,6 +1634,62 @@ export const CalendarScreen: React.FC = () => {
                 multiline
                 numberOfLines={3}
               />
+              <Text style={styles.fieldLabel}>Orario (opzionale)</Text>
+              <View style={styles.timePickerRow}>
+                <View style={styles.timePickerCol}>
+                  <Text style={styles.timePickerLabel}>Inizio</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeChipScroll}>
+                    <View style={styles.timeChipRow}>
+                      {TIME_SLOTS.map((t) => (
+                        <TouchableOpacity
+                          key={`start-${t}`}
+                          style={{
+                            ...styles.timeChip,
+                            ...(taskStartTime === t ? styles.timeChipActive : {}),
+                          }}
+                          onPress={() => {
+                            setTaskStartTime(taskStartTime === t ? '' : t);
+                            if (!taskEndTime && taskStartTime !== t) {
+                              const idx = TIME_SLOTS.indexOf(t);
+                              if (idx < TIME_SLOTS.length - 1) setTaskEndTime(TIME_SLOTS[idx + 1]);
+                            }
+                          }}
+                        >
+                          <Text style={{
+                            ...styles.timeChipText,
+                            ...(taskStartTime === t ? styles.timeChipTextActive : {}),
+                          }}>{t}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+                {taskStartTime ? (
+                  <View style={styles.timePickerCol}>
+                    <Text style={styles.timePickerLabel}>Fine</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeChipScroll}>
+                      <View style={styles.timeChipRow}>
+                        {TIME_SLOTS.filter((t) => t > taskStartTime).map((t) => (
+                          <TouchableOpacity
+                            key={`end-${t}`}
+                            style={{
+                              ...styles.timeChip,
+                              ...(taskEndTime === t ? styles.timeChipActive : {}),
+                            }}
+                            onPress={() => setTaskEndTime(taskEndTime === t ? '' : t)}
+                          >
+                            <Text style={{
+                              ...styles.timeChipText,
+                              ...(taskEndTime === t ? styles.timeChipTextActive : {}),
+                            }}>{t}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                ) : null}
+              </View>
+
               <Text style={styles.fieldLabel}>Priorità</Text>
               <View style={styles.priorityRow}>
                 {(['low', 'medium', 'high'] as TaskPriority[]).map((p) => (
@@ -2291,5 +2602,141 @@ const styles = StyleSheet.create({
     color: colors.accent,
     minWidth: 30,
     textAlign: 'right',
+  },
+
+  // View tabs bar
+  viewTabsBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    gap: spacing.xs,
+  },
+  viewTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    backgroundColor: 'transparent',
+  },
+  viewTabActive: {
+    backgroundColor: colors.accent,
+  },
+  viewTabText: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  viewTabTextActive: {
+    color: colors.textOnAccent,
+  },
+
+  // Timeline
+  timelineContainer: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+  },
+  tlHourLabel: {
+    width: 50,
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    textAlign: 'right',
+    paddingRight: spacing.sm,
+    marginTop: -8,
+  },
+  tlHourLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.divider,
+  },
+  tlNowDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accent,
+    marginLeft: -5,
+  },
+  tlNowLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: colors.accent,
+  },
+  tlBlockTime: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  tlBlockTitle: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  tlBlockSub: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+  },
+
+  // Task time badge
+  taskTimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    marginRight: spacing.xs,
+  },
+  taskTimeText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+
+  // Time picker in modal
+  timePickerRow: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  timePickerCol: {
+    gap: spacing.xs,
+  },
+  timePickerLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  timeChipScroll: {
+    maxHeight: 40,
+  },
+  timeChipRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  timeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  timeChipActive: {
+    backgroundColor: colors.accent + '20',
+    borderColor: colors.accent,
+  },
+  timeChipText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  timeChipTextActive: {
+    color: colors.accent,
+    fontWeight: '600',
   },
 });

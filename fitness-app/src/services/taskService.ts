@@ -26,6 +26,8 @@ export const createTask = async (
     completedAt: null,
     date: Timestamp.now(),
     createdAt: Timestamp.now(),
+    startTime: task.startTime || null,
+    endTime: task.endTime || null,
   });
   return docRef.id;
 };
@@ -48,6 +50,8 @@ export const updateTask = async (
   if (updates.description !== undefined) data.description = updates.description;
   if (updates.priority !== undefined) data.priority = updates.priority;
   if (updates.isCompleted !== undefined) data.isCompleted = updates.isCompleted;
+  if (updates.startTime !== undefined) data.startTime = updates.startTime || null;
+  if (updates.endTime !== undefined) data.endTime = updates.endTime || null;
   if (updates.completedAt) data.completedAt = Timestamp.fromDate(updates.completedAt);
   if (updates.date) {
     const d = updates.date instanceof Date ? updates.date : new Date(updates.date as unknown as string);
