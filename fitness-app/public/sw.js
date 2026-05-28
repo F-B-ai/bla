@@ -1,7 +1,8 @@
 // Service Worker for ESSERE PWA - auto-update on new deploy
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v__BUILD_TS__';
 const CACHE_NAME = 'essere-' + CACHE_VERSION;
 
+// Assets to pre-cache on install
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
@@ -13,6 +14,7 @@ const PRECACHE_URLS = [
   '/Ionicons.ttf'
 ];
 
+// Install: pre-cache shell, skip waiting immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -21,6 +23,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Activate: clean old caches, claim clients immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -31,13 +34,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Fetch strategy:
+// - HTML/navigation: network-first (always get latest), fallback to cache
+// - JS/CSS/fonts/images: stale-while-revalidate (fast from cache, update in background)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Only handle same-origin requests
   if (url.origin !== location.origin) return;
 
-  // Font files: cache-first, update in background
+  // Font files: cache-first (serve from cache immediately, update in background)
   if (request.url.endsWith('.ttf') || request.url.endsWith('.woff') || request.url.endsWith('.woff2') || request.destination === 'font') {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -52,8 +59,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML/navigation + JS bundles: always network-first
-  if (request.mode === 'navigate' || request.destination === 'document' || request.destination === 'script' || request.url.endsWith('.js')) {
+  // Navigation requests (HTML): network-first
+  if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -61,12 +68,26 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match(request) || caches.match('/'))
+        .catch(() => caches.match(request).then((r) => r || caches.match('/')))
     );
     return;
   }
 
-  // Other assets: stale-while-revalidate
+  // JS bundles: always network-first (hash in filename ensures correct version)
+  if (request.url.includes('/_expo/static/js/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // All other assets: stale-while-revalidate
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetchPromise = fetch(request).then((response) => {
@@ -74,7 +95,39 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return response;
       }).catch(() => cached);
+
       return cached || fetchPromise;
+    })
+  );
+});
+
+// Push notification received
+self.addEventListener('push', (event) => {
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'ESSĒRE';
+  const options = {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: data.data || {},
+    vibrate: [200, 100, 200],
+    tag: 'essere-push',
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Click on notification -> open app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow('/');
     })
   );
 });

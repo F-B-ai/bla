@@ -19,7 +19,30 @@ if (Platform.OS !== 'web') {
   } catch {}
 }
 
+const isWeb = Platform.OS === 'web';
+
+const webNotificationsSupported = (): boolean => {
+  if (!isWeb) return false;
+  return typeof window !== 'undefined' && 'Notification' in window;
+};
+
+const webBadgeSupported = (): boolean => {
+  if (!isWeb) return false;
+  return typeof navigator !== 'undefined' && 'setAppBadge' in navigator;
+};
+
 export const requestNotificationPermissions = async (): Promise<boolean> => {
+  if (isWeb) {
+    if (!webNotificationsSupported()) return false;
+    try {
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      const result = await Notification.requestPermission();
+      return result === 'granted';
+    } catch {
+      return false;
+    }
+  }
   if (!Notifications) return false;
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
@@ -32,6 +55,10 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
 };
 
 export const registerPushToken = async (userId: string): Promise<string | null> => {
+  if (isWeb) {
+    await requestNotificationPermissions();
+    return null;
+  }
   if (!Notifications) return null;
   try {
     const granted = await requestNotificationPermissions();
@@ -50,21 +77,48 @@ export const showLocalNotification = async (
   body: string,
   data?: Record<string, string>
 ): Promise<void> => {
+  if (isWeb) {
+    if (!webNotificationsSupported()) return;
+    try {
+      if (Notification.permission !== 'granted') return;
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification(title, {
+          body,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          data: data || {},
+          tag: 'essere-' + Date.now(),
+          renotify: true,
+          vibrate: [200, 100, 200],
+        });
+      } else {
+        new Notification(title, { body, icon: '/icon-192.png' });
+      }
+    } catch {}
+    return;
+  }
   if (!Notifications) return;
   try {
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: data || {},
-        sound: 'default',
-      },
+      content: { title, body, data: data || {}, sound: 'default' },
       trigger: null,
     });
   } catch {}
 };
 
 export const updateBadgeCount = async (count: number): Promise<void> => {
+  if (isWeb) {
+    if (!webBadgeSupported()) return;
+    try {
+      if (count > 0) {
+        await (navigator as any).setAppBadge(count);
+      } else {
+        await (navigator as any).clearAppBadge();
+      }
+    } catch {}
+    return;
+  }
   if (!Notifications) return;
   try {
     await Notifications.setBadgeCountAsync(count);
