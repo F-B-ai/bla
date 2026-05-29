@@ -31,9 +31,29 @@ const webBadgeSupported = (): boolean => {
   return typeof navigator !== 'undefined' && 'setAppBadge' in navigator;
 };
 
+const isIOSWeb = (): boolean => {
+  if (!isWeb || typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
+const isStandalonePWA = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return (window as any).navigator?.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+};
+
+export const getNotificationStatus = (): 'granted' | 'denied' | 'default' | 'unsupported' => {
+  if (!isWeb) return 'unsupported';
+  if (!webNotificationsSupported()) return 'unsupported';
+  if (isIOSWeb() && !isStandalonePWA()) return 'unsupported';
+  return Notification.permission as 'granted' | 'denied' | 'default';
+};
+
 export const requestNotificationPermissions = async (): Promise<boolean> => {
   if (isWeb) {
     if (!webNotificationsSupported()) return false;
+    if (isIOSWeb() && !isStandalonePWA()) return false;
     try {
       if (Notification.permission === 'granted') return true;
       if (Notification.permission === 'denied') return false;
@@ -56,7 +76,11 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
 
 export const registerPushToken = async (userId: string): Promise<string | null> => {
   if (isWeb) {
-    await requestNotificationPermissions();
+    if (webNotificationsSupported() && Notification.permission === 'default') {
+      if (!isIOSWeb() || isStandalonePWA()) {
+        await requestNotificationPermissions();
+      }
+    }
     return null;
   }
   if (!Notifications) return null;
@@ -91,7 +115,8 @@ export const showLocalNotification = async (
           tag: 'essere-' + Date.now(),
           renotify: true,
           vibrate: [200, 100, 200],
-        });
+          silent: false,
+        } as NotificationOptions);
       } else {
         new Notification(title, { body, icon: '/icon-192.png' });
       }

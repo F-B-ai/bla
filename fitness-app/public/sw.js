@@ -103,7 +103,12 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification received
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    try { data = { body: event.data.text() }; } catch (_) {}
+  }
   const title = data.title || 'ESSĒRE';
   const options = {
     body: data.body || '',
@@ -111,8 +116,10 @@ self.addEventListener('push', (event) => {
     badge: '/icon-192.png',
     data: data.data || {},
     vibrate: [200, 100, 200],
-    tag: 'essere-push',
+    tag: data.tag || 'essere-push-' + Date.now(),
     renotify: true,
+    requireInteraction: false,
+    silent: false,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
@@ -120,6 +127,7 @@ self.addEventListener('push', (event) => {
 // Click on notification -> open app
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const urlToOpen = event.notification.data?.url || '/';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
@@ -127,7 +135,7 @@ self.addEventListener('notificationclick', (event) => {
           return client.focus();
         }
       }
-      return clients.openWindow('/');
+      return clients.openWindow(urlToOpen);
     })
   );
 });

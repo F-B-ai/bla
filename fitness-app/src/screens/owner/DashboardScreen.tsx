@@ -25,6 +25,7 @@ import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
 import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -286,6 +287,8 @@ export const DashboardScreen: React.FC = () => {
         </View>
         <Text style={styles.roleBadge}>Ruolo: {user?.role?.toUpperCase()}</Text>
       </View>
+
+      <NotificationPrompt />
 
       {/* Filtro periodo */}
       <View style={styles.periodFilter}>

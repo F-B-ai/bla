@@ -17,6 +17,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { WorkoutPlan, Exercise, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
@@ -136,6 +137,8 @@ export const MyProgramScreen: React.FC = () => {
           <Text style={styles.planTitle}>{activePlan.title}</Text>
         )}
       </View>
+
+      <NotificationPrompt />
 
       {/* Statistiche */}
       <View style={styles.statsRow}>
