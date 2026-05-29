@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -41,6 +42,7 @@ export const ChatListScreen: React.FC = () => {
   const [availableContacts, setAvailableContacts] = useState<User[]>([]);
   const [creatingChat, setCreatingChat] = useState(false);
   const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
     const userIds = new Set<string>();
@@ -245,6 +247,14 @@ export const ChatListScreen: React.FC = () => {
     return contact.role;
   };
 
+  const filteredRooms = rooms.filter((room) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = getOtherParticipantName(room).toLowerCase();
+    const lastMsg = room.lastMessage?.text?.toLowerCase() || '';
+    return name.includes(q) || lastMsg.includes(q);
+  });
+
   if (selectedRoom) {
     return (
       <ChatConversationScreen
@@ -304,8 +314,24 @@ export const ChatListScreen: React.FC = () => {
         </View>
       )}
 
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color={colors.textLight} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cerca chat..."
+          placeholderTextColor={colors.textLight}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textLight} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
-        data={rooms}
+        data={filteredRooms}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -540,6 +566,26 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.warning,
     fontWeight: '700',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
   },
   deleteBtn: {
     padding: spacing.sm,

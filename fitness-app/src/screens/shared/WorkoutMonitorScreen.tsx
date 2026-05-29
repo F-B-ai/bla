@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +41,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [studentHistoryLogs, setStudentHistoryLogs] = useState<WorkoutLog[]>([]);
   const [showStudentHistory, setShowStudentHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   const unsubActiveRef = useRef<(() => void) | null>(null);
   const unsubDetailRef = useRef<(() => void) | null>(null);
@@ -317,7 +319,23 @@ export const WorkoutMonitorScreen: React.FC = () => {
       <Modal visible={showHistory} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
-            <ModalHeader title="Storico Allenamenti" onClose={() => { setShowHistory(false); setShowStudentHistory(false); }} />
+            <ModalHeader title="Storico Allenamenti" onClose={() => { setShowHistory(false); setShowStudentHistory(false); setHistorySearch(''); }} />
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Cerca allievo..."
+                placeholderTextColor={colors.textLight}
+                value={historySearch}
+                onChangeText={setHistorySearch}
+              />
+              {historySearch.length > 0 && (
+                <TouchableOpacity onPress={() => setHistorySearch('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.textLight} />
+                </TouchableOpacity>
+              )}
+            </View>
 
             {!showStudentHistory ? (
               <>
@@ -329,7 +347,10 @@ export const WorkoutMonitorScreen: React.FC = () => {
                     grouped[log.studentId].push(log);
                   });
 
-                  return Object.entries(grouped).map(([studentId, logs]) => (
+                  const q = historySearch.toLowerCase();
+                  return Object.entries(grouped)
+                    .filter(([studentId]) => !q || (studentNames[studentId] || '').toLowerCase().includes(q))
+                    .map(([studentId, logs]) => (
                     <TouchableOpacity
                       key={studentId}
                       onPress={() => handleShowStudentHistory(studentId)}
@@ -475,6 +496,24 @@ const styles = StyleSheet.create({
   },
   miniProgressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 2 },
   workoutStats: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
+  },
   historyButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -40,6 +41,7 @@ export const TeamChatScreen: React.FC = () => {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
     const userIds = new Set<string>();
@@ -189,6 +191,14 @@ export const TeamChatScreen: React.FC = () => {
     return u.role;
   };
 
+  const filteredRooms = rooms.filter((room) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const title = getRoomTitle(room).toLowerCase();
+    const lastMsg = room.lastMessage?.text?.toLowerCase() || '';
+    return title.includes(q) || lastMsg.includes(q);
+  });
+
   if (selectedRoom) {
     return (
       <ChatConversationScreen
@@ -215,8 +225,24 @@ export const TeamChatScreen: React.FC = () => {
         <Button title="+ Nuovo Gruppo" onPress={handleNewGroup} />
       </View>
 
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color={colors.textLight} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cerca chat team..."
+          placeholderTextColor={colors.textLight}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textLight} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
-        data={rooms}
+        data={filteredRooms}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -364,6 +390,25 @@ const styles = StyleSheet.create({
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
   newChatContainer: { padding: spacing.md },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
+  },
   list: { padding: spacing.md, paddingBottom: spacing.xxl },
 
   roomRow: { flexDirection: 'row', alignItems: 'center' },

@@ -8,6 +8,7 @@ import {
   Modal,
   RefreshControl,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,9 +20,11 @@ import {
   getStudentWorkoutLogs,
   getAllWorkoutLogs,
   getCollaboratorWorkoutLogs,
+  deleteWorkoutLog,
 } from '../../services/workoutLogService';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
+import { crossAlert } from '../../utils/alert';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -57,6 +60,33 @@ export const WorkoutHistoryScreen: React.FC = () => {
   const [selectedLog, setSelectedLog] = useState<WorkoutLog | null>(null);
   const [showProgressionModal, setShowProgressionModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleDeleteLog = (log: WorkoutLog) => {
+    const logDate = toSafeDate(log.startedAt || log.date);
+    const dateStr = logDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+    crossAlert(
+      'Elimina sessione',
+      `Eliminare la sessione del ${dateStr}${isStaff ? ` di ${getStudentName(log.studentId)}` : ''}? L'operazione non è reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWorkoutLog(log.id);
+              setLogs((prev) => prev.filter((l) => l.id !== log.id));
+              if (selectedLog?.id === log.id) setSelectedLog(null);
+              crossAlert('Successo', 'Sessione eliminata');
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare la sessione');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -107,8 +137,16 @@ export const WorkoutHistoryScreen: React.FC = () => {
     if (isStaff && selectedStudentId) {
       result = result.filter(l => l.studentId === selectedStudentId);
     }
+    if (searchQuery.trim() && isStaff) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(l => {
+        const name = getStudentName(l.studentId).toLowerCase();
+        const exerciseNames = l.exerciseLogs.map(e => e.exerciseName.toLowerCase()).join(' ');
+        return name.includes(q) || exerciseNames.includes(q);
+      });
+    }
     return result;
-  }, [logs, selectedStudentId, isStaff]);
+  }, [logs, selectedStudentId, isStaff, searchQuery]);
 
   const studentList = useMemo(() => {
     if (isStudent) return [];
@@ -360,12 +398,11 @@ export const WorkoutHistoryScreen: React.FC = () => {
     const exerciseCount = log.exerciseLogs.filter(e => e.sets.length > 0).length;
 
     return (
-      <TouchableOpacity
-        key={log.id}
-        style={styles.logCard}
-        onPress={() => setSelectedLog(log)}
-      >
-        <View style={styles.logCardHeader}>
+      <View key={log.id} style={styles.logCard}>
+        <TouchableOpacity
+          style={styles.logCardHeader}
+          onPress={() => setSelectedLog(log)}
+        >
           <View style={styles.logDateBadge}>
             <Text style={styles.logDateDay}>{logDate.getDate()}</Text>
             <Text style={styles.logDateMonth}>
@@ -399,8 +436,17 @@ export const WorkoutHistoryScreen: React.FC = () => {
             </View>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textLight} />
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+        {isStaff && (
+          <TouchableOpacity
+            style={styles.logDeleteBtn}
+            onPress={() => handleDeleteLog(log)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
     );
   };
 
@@ -418,6 +464,25 @@ export const WorkoutHistoryScreen: React.FC = () => {
             {filteredLogs.length} allenament{filteredLogs.length === 1 ? 'o' : 'i'} completat{filteredLogs.length === 1 ? 'o' : 'i'}
           </Text>
         </View>
+
+        {/* Search bar for staff */}
+        {isStaff && (
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={18} color={colors.textLight} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cerca per allievo o esercizio..."
+              placeholderTextColor={colors.textLight}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={colors.textLight} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Student filter for staff */}
         {isStaff && studentList.length > 0 && (
@@ -523,6 +588,25 @@ const styles = StyleSheet.create({
   title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
 
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
+  },
   filterSection: {
     backgroundColor: colors.surface,
     paddingVertical: spacing.sm,
@@ -583,6 +667,12 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  logDeleteBtn: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    padding: spacing.xs,
   },
   logCardHeader: { flexDirection: 'row', alignItems: 'center' },
   logDateBadge: {
