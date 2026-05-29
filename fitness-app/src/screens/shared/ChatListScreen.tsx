@@ -9,6 +9,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -22,6 +23,7 @@ import {
   subscribeToUserChatRooms,
   subscribeToAllChatRooms,
   subscribeToPresence,
+  deleteChatRoom,
 } from '../../services/chatService';
 import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
@@ -191,6 +193,25 @@ export const ChatListScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteChat = (room: ChatRoom) => {
+    const name = getOtherParticipantName(room);
+    crossAlert('Elimina Chat', `Eliminare la conversazione con ${name}? Tutti i messaggi saranno cancellati.`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteChatRoom(room.id);
+            crossAlert('Successo', 'Chat eliminata');
+          } catch {
+            crossAlert('Errore', 'Impossibile eliminare la chat');
+          }
+        },
+      },
+    ]);
+  };
+
   const getOtherParticipantName = (room: ChatRoom): string => {
     if (!user) return '';
     const otherId = room.participants.find((id) => id !== user.id);
@@ -325,6 +346,15 @@ export const ChatListScreen: React.FC = () => {
                     <View style={styles.anonBadge}>
                       <Text style={styles.anonBadgeText}>Anon</Text>
                     </View>
+                  )}
+                  {(isOwner || isManager) && (
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteChat(item)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
                   )}
                 </View>
               </Card>
@@ -510,6 +540,10 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.warning,
     fontWeight: '700',
+  },
+  deleteBtn: {
+    padding: spacing.sm,
+    marginLeft: spacing.xs,
   },
   emptyText: {
     color: colors.textSecondary,

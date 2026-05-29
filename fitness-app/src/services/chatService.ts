@@ -15,6 +15,7 @@ import {
   serverTimestamp,
   Timestamp,
   Unsubscribe,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ChatRoom, ChatMessage } from '../types';
@@ -376,5 +377,34 @@ export const addParticipantToRoom = async (
   await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
     participants: arrayUnion(userId),
   });
+};
+
+export const deleteChatRoom = async (roomId: string): Promise<void> => {
+  const messagesQuery = query(
+    collection(db, MESSAGES_COLLECTION),
+    where('chatRoomId', '==', roomId)
+  );
+  const msgSnapshot = await getDocs(messagesQuery);
+
+  const batchSize = 400;
+  const docs = msgSnapshot.docs;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + batchSize).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  const typingQuery = query(
+    collection(db, 'chatTyping'),
+    where('chatRoomId', '==', roomId)
+  );
+  const typingSnapshot = await getDocs(typingQuery);
+  if (!typingSnapshot.empty) {
+    const batch = writeBatch(db);
+    typingSnapshot.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await deleteDoc(doc(db, ROOMS_COLLECTION, roomId));
 };
 

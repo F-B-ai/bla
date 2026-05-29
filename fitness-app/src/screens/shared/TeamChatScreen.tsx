@@ -21,6 +21,7 @@ import {
   createTeamChatRoom,
   subscribeToTeamChatRooms,
   subscribeToPresence,
+  deleteChatRoom,
 } from '../../services/chatService';
 import { getUserProfile, getCollaborators, getManagers } from '../../services/authService';
 import { ChatConversationScreen } from './ChatConversationScreen';
@@ -141,6 +142,25 @@ export const TeamChatScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteTeamChat = (room: ChatRoom) => {
+    const name = room.name || 'Chat Team';
+    crossAlert('Elimina Chat', `Eliminare il gruppo "${name}"? Tutti i messaggi saranno cancellati.`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteChatRoom(room.id);
+            crossAlert('Successo', 'Chat di team eliminata');
+          } catch {
+            crossAlert('Errore', 'Impossibile eliminare la chat');
+          }
+        },
+      },
+    ]);
+  };
+
   const getRoomTitle = (room: ChatRoom): string => {
     if (room.name) return room.name;
     const names = room.participants
@@ -226,6 +246,15 @@ export const TeamChatScreen: React.FC = () => {
                       </Text>
                     )}
                   </View>
+                  {isOwner && (
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteTeamChat(item)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </Card>
             </TouchableOpacity>
@@ -355,6 +384,10 @@ const styles = StyleSheet.create({
   roomRole: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 1 },
   lastMessage: { fontSize: fontSize.sm, color: colors.textLight, marginTop: 4 },
 
+  deleteBtn: {
+    padding: spacing.sm,
+    marginLeft: spacing.xs,
+  },
   emptyText: {
     color: colors.textSecondary, textAlign: 'center',
     padding: spacing.lg, lineHeight: 22,
