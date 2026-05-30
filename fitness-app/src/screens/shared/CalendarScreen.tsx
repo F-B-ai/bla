@@ -65,6 +65,7 @@ import {
   decrementPlanConsultation,
 } from '../../services/paymentService';
 import { createNotification } from '../../services/notificationService';
+import { addTransaction } from '../../services/financialService';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -480,6 +481,20 @@ export const CalendarScreen: React.FC = () => {
             isCountedAsCompleted: isPastDate,
             createdAt: new Date(),
           });
+        }
+        if (isPastDate) {
+          await decrementStudentPlan(formStudentId, formKind);
+          if (cost && cost > 0) {
+            await addTransaction({
+              type: 'income',
+              category: 'student_payment',
+              amount: cost,
+              description: `${formKind === 'training' ? 'Sessione' : 'Consulenza'} - ${getStudentName(formStudentId)} (${new Date(formDate).toLocaleDateString('it-IT')})`,
+              date: new Date(formDate),
+              collaboratorId: staffId,
+              studentId: formStudentId,
+            });
+          }
         }
         crossAlert('Successo', isPastDate ? 'Appuntamento passato registrato!' : 'Appuntamento creato!');
         if (!isPastDate) {
