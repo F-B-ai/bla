@@ -1160,7 +1160,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                   >
                     <Text style={styles.historyBackText}>Torna alla lista</Text>
                   </TouchableOpacity>
-                  {Platform.OS === 'web' && (
+                  {Platform.OS === 'web' && isOwner && (
                     <TouchableOpacity
                       style={[styles.saveAsTemplateBtn, { backgroundColor: colors.info }]}
                       onPress={() => printWorkoutPlan({ studentName: getStudentName(viewingPlan.studentId), plan: viewingPlan })}

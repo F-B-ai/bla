@@ -36,7 +36,7 @@ import { getTransactions } from '../../services/financialService';
 import { crossAlert } from '../../utils/alert';
 import { createNotification } from '../../services/notificationService';
 import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
-import { printPlanDetail } from '../../utils/printUtils';
+import { printPlanDetail, printPaymentReceipt } from '../../utils/printUtils';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -479,8 +479,8 @@ export const PaymentPlanScreen: React.FC = () => {
     try {
       setSaving(true);
       await markInstallmentPaid(planId, installmentId, installments);
+      const inst = installments.find((i) => i.id === installmentId);
       if (studentId) {
-        const inst = installments.find((i) => i.id === installmentId);
         createNotification(
           studentId,
           'payment_due',
@@ -488,8 +488,26 @@ export const PaymentPlanScreen: React.FC = () => {
           `Il tuo pagamento${inst ? ` di €${inst.amount}` : ''} è stato registrato. Grazie!`
         ).catch(() => {});
       }
+
+      // Generate payment receipt
+      if (Platform.OS === 'web' && inst) {
+        const plan = plans.find((p) => p.id === planId);
+        const instIndex = installments.findIndex((i) => i.id === installmentId);
+        printPaymentReceipt({
+          studentName: studentId ? getStudentName(studentId) : '',
+          amount: inst.amount,
+          dueDate: inst.dueDate,
+          paidDate: new Date(),
+          installmentNumber: instIndex + 1,
+          totalInstallments: installments.length,
+          planTotal: plan?.totalAmount ?? inst.amount,
+          paymentType: plan?.paymentType ?? 'full',
+          planStartDate: plan?.startDate,
+          planEndDate: plan?.endDate,
+        });
+      }
+
       await loadData();
-      // Also refresh edit modal if open
       if (editingPlan && editingPlan.id === planId) {
         const refreshedPlans = await getAllPaymentPlans();
         const refreshedPlan = refreshedPlans.find((p) => p.id === planId);

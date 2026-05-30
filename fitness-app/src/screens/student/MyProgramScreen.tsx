@@ -8,23 +8,19 @@ import {
   Linking,
   Modal,
   RefreshControl,
-  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { ModalHeader } from '../../components/common/ModalHeader';
-import { Button } from '../../components/common/Button';
 import { WorkoutPlan, Exercise, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
-import { printWorkoutPlan } from '../../utils/printUtils';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -213,18 +209,6 @@ export const MyProgramScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Stampa programma */}
-      {Platform.OS === 'web' && activePlan && (
-        <View style={styles.printSection}>
-          <Button
-            title="Stampa Programma"
-            variant="outline"
-            onPress={() => printWorkoutPlan({ studentName: user?.name || 'Allievo', plan: activePlan })}
-            icon={<Ionicons name="print-outline" size={18} color={colors.accent} />}
-          />
-        </View>
-      )}
-
       {/* Storico programmi */}
       {pastPlans.length > 0 && (
         <View style={styles.historySection}>
@@ -284,23 +268,12 @@ export const MyProgramScreen: React.FC = () => {
                   )}
                 </Card>
 
-                <View style={styles.historyActions}>
-                  <TouchableOpacity
-                    style={styles.backToList}
-                    onPress={() => setViewingPlan(null)}
-                  >
-                    <Text style={styles.backToListText}>Torna alla lista</Text>
-                  </TouchableOpacity>
-                  {Platform.OS === 'web' && (
-                    <TouchableOpacity
-                      style={styles.printBtn}
-                      onPress={() => printWorkoutPlan({ studentName: user?.name || 'Allievo', plan: viewingPlan })}
-                    >
-                      <Ionicons name="print-outline" size={16} color={colors.accent} />
-                      <Text style={styles.backToListText}>Stampa</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={styles.backToList}
+                  onPress={() => setViewingPlan(null)}
+                >
+                  <Text style={styles.backToListText}>Torna alla lista</Text>
+                </TouchableOpacity>
 
                 {/* Selettore giorno nel dettaglio storico */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
@@ -564,21 +537,5 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing.xxl,
-  },
-  printSection: {
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  historyActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  printBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    padding: spacing.sm,
   },
 });

@@ -399,3 +399,121 @@ export function printWorkoutPlan({ studentName, plan }: PrintWorkoutPlanParams) 
 
   openPrintWindow(`Programma ${studentName}`, html, `Programma di allenamento – ${studentName}`, `${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}`);
 }
+
+// ─── 6. Payment receipt ────────────────────────────────────────────────
+
+const RECEIPT_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 32px; font-size: 14px; line-height: 1.6; max-width: 600px; margin: 0 auto; }
+  .receipt { border: 2px solid #D40000; border-radius: 12px; padding: 32px; }
+  .receipt-header { text-align: center; border-bottom: 2px solid #D40000; padding-bottom: 20px; margin-bottom: 24px; }
+  .receipt-header h1 { font-size: 28px; color: #D40000; letter-spacing: 3px; margin-bottom: 4px; }
+  .receipt-header .doc-type { font-size: 16px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  .receipt-header .doc-number { font-size: 12px; color: #999; margin-top: 4px; }
+  .receipt-body { margin-bottom: 24px; }
+  .receipt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .receipt-row:last-child { border-bottom: none; }
+  .receipt-label { font-weight: 600; color: #555; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .receipt-value { font-weight: 700; color: #1a1a1a; font-size: 15px; text-align: right; }
+  .receipt-amount { text-align: center; margin: 24px 0; padding: 20px; background: #f8f8f8; border-radius: 8px; border: 1px solid #eee; }
+  .receipt-amount .amount { font-size: 36px; font-weight: 800; color: #D40000; }
+  .receipt-amount .amount-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .receipt-status { text-align: center; margin: 16px 0; }
+  .receipt-status .paid-badge { display: inline-block; background: #d4edda; color: #155724; padding: 8px 24px; border-radius: 20px; font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+  .receipt-note { text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px dashed #ddd; }
+  .receipt-note p { font-size: 11px; color: #999; line-height: 1.6; }
+  .receipt-note .important { font-size: 12px; color: #666; font-weight: 600; margin-bottom: 4px; }
+  .receipt-footer { text-align: center; margin-top: 16px; font-size: 11px; color: #bbb; }
+  @media print { body { padding: 16px; } }
+`;
+
+interface PrintPaymentReceiptParams {
+  studentName: string;
+  amount: number;
+  dueDate: any;
+  paidDate: Date;
+  installmentNumber: number;
+  totalInstallments: number;
+  planTotal: number;
+  paymentType: string;
+  planStartDate?: any;
+  planEndDate?: any;
+}
+
+export function printPaymentReceipt({
+  studentName, amount, dueDate, paidDate, installmentNumber, totalInstallments,
+  planTotal, paymentType, planStartDate, planEndDate,
+}: PrintPaymentReceiptParams) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  const receiptNumber = `ESS-${paidDate.getFullYear()}${String(paidDate.getMonth() + 1).padStart(2, '0')}${String(paidDate.getDate()).padStart(2, '0')}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+
+  const typeLabels: Record<string, string> = {
+    full: 'Pagamento unica soluzione',
+    installment: `Rata ${installmentNumber} di ${totalInstallments}`,
+    monthly_course: 'Pagamento corso mensile',
+  };
+
+  const bodyHtml = `
+    <div class="receipt">
+      <div class="receipt-header">
+        <h1>${LOGO_CHAR}</h1>
+        <div class="doc-type">Promemoria di Pagamento</div>
+        <div class="doc-number">Rif. ${receiptNumber}</div>
+      </div>
+
+      <div class="receipt-amount">
+        <div class="amount-label">Importo pagato</div>
+        <div class="amount">${fmtCurrency(amount)}</div>
+      </div>
+
+      <div class="receipt-status">
+        <span class="paid-badge">PAGATO</span>
+      </div>
+
+      <div class="receipt-body">
+        <div class="receipt-row">
+          <span class="receipt-label">Allievo</span>
+          <span class="receipt-value">${studentName}</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Tipo</span>
+          <span class="receipt-value">${typeLabels[paymentType] || paymentType}</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Data scadenza</span>
+          <span class="receipt-value">${fmtDate(dueDate)}</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Data pagamento</span>
+          <span class="receipt-value">${fmtDate(paidDate)}</span>
+        </div>
+        <div class="receipt-row">
+          <span class="receipt-label">Importo totale piano</span>
+          <span class="receipt-value">${fmtCurrency(planTotal)}</span>
+        </div>
+        ${planStartDate && planEndDate ? `
+        <div class="receipt-row">
+          <span class="receipt-label">Periodo percorso</span>
+          <span class="receipt-value">${fmtDate(planStartDate)} – ${fmtDate(planEndDate)}</span>
+        </div>` : ''}
+      </div>
+
+      <div class="receipt-note">
+        <p class="important">Questo documento è un promemoria di pagamento.</p>
+        <p>Non costituisce ricevuta fiscale né documento contabile ufficiale.<br>
+        La ricevuta/fattura ufficiale verrà emessa separatamente.</p>
+      </div>
+
+      <div class="receipt-footer">
+        Generato il ${fmtDate(new Date())} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  `;
+
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ricevuta ${receiptNumber} - ${LOGO_CHAR}</title><style>${RECEIPT_CSS}</style></head><body>${bodyHtml}</body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 400);
+}
