@@ -9,6 +9,7 @@ import {
   FlatList,
   RefreshControl,
   TextInput,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -772,20 +773,6 @@ export const CalendarScreen: React.FC = () => {
   };
 
   // Next 30 days for date picker
-  const selectableDays = useMemo(() => {
-    const days: { label: string; value: string }[] = [];
-    for (let i = -90; i <= 30; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      days.push({
-        value: toDateStr(d),
-        label: d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }),
-      });
-    }
-    return days;
-  }, []);
-
-  const todayIndex = 90;
 
   // Student detail
   const studentDetailItems = useMemo(() => {
@@ -1840,32 +1827,58 @@ export const CalendarScreen: React.FC = () => {
             {/* Date */}
             <Text style={styles.fieldLabel}>Data</Text>
             <View style={styles.customDateRow}>
-              <TextInput
-                style={styles.customDateInput}
-                placeholder="GG/MM/AAAA"
-                placeholderTextColor={colors.textLight}
-                value={formCustomDate}
-                onChangeText={(raw) => {
-                  const digits = raw.replace(/\D/g, '').slice(0, 8);
-                  let formatted = '';
-                  if (digits.length <= 2) formatted = digits;
-                  else if (digits.length <= 4) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                  else formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
-                  setFormCustomDate(formatted);
-                  if (digits.length === 8) {
-                    const dd = digits.slice(0, 2);
-                    const mm = digits.slice(2, 4);
-                    const yyyy = digits.slice(4, 8);
-                    const dateStr = `${yyyy}-${mm}-${dd}`;
-                    const parsed = new Date(dateStr);
-                    if (!isNaN(parsed.getTime())) {
-                      setFormDate(dateStr);
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={formDate}
+                  onChange={(e: any) => {
+                    const val = e.target.value;
+                    if (val) {
+                      setFormDate(val);
+                      const d = new Date(val);
+                      setFormCustomDate(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }));
                     }
-                  }
-                }}
-                keyboardType="number-pad"
-                maxLength={10}
-              />
+                  }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#1A1A1A',
+                    color: '#FFFFFF',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    fontSize: 16,
+                    WebkitAppearance: 'none' as any,
+                    colorScheme: 'dark',
+                  } as any}
+                />
+              ) : (
+                <TextInput
+                  style={styles.customDateInput}
+                  placeholder="GG/MM/AAAA"
+                  placeholderTextColor={colors.textLight}
+                  value={formCustomDate}
+                  onChangeText={(raw) => {
+                    const digits = raw.replace(/\D/g, '').slice(0, 8);
+                    let formatted = '';
+                    if (digits.length <= 2) formatted = digits;
+                    else if (digits.length <= 4) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                    else formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+                    setFormCustomDate(formatted);
+                    if (digits.length === 8) {
+                      const dd = digits.slice(0, 2);
+                      const mm = digits.slice(2, 4);
+                      const yyyy = digits.slice(4, 8);
+                      const dateStr = `${yyyy}-${mm}-${dd}`;
+                      const parsed = new Date(dateStr);
+                      if (!isNaN(parsed.getTime())) {
+                        setFormDate(dateStr);
+                      }
+                    }
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+              )}
               <TouchableOpacity
                 style={styles.todayBtn}
                 onPress={() => {
@@ -1877,35 +1890,12 @@ export const CalendarScreen: React.FC = () => {
                 <Text style={styles.todayBtnText}>Oggi</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentOffset={{ x: todayIndex * 100, y: 0 }}
-            >
-              <View style={styles.chipRow}>
-                {selectableDays.map((d) => {
-                  const isPast = d.value < toDateStr(new Date());
-                  return (
-                    <TouchableOpacity
-                      key={d.value}
-                      style={{
-                        ...styles.dateChip,
-                        ...(formDate === d.value ? styles.chipActive : {}),
-                        ...(isPast && formDate !== d.value ? { opacity: 0.6 } : {}),
-                      }}
-                      onPress={() => { setFormDate(d.value); setFormCustomDate(''); }}
-                    >
-                      <Text style={{
-                        ...styles.chipText,
-                        ...(formDate === d.value ? styles.chipTextActive : {}),
-                      }}>
-                        {d.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            {formDate ? (
+              <Text style={styles.selectedDateLabel}>
+                {new Date(formDate + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                {new Date(formDate) < new Date(toDateStr(new Date())) ? '  (passato)' : ''}
+              </Text>
+            ) : null}
 
             {/* Time */}
             <View style={styles.timeSection}>
@@ -2556,6 +2546,14 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: fontSize.sm,
     fontWeight: '700',
+  },
+  selectedDateLabel: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    textTransform: 'capitalize',
   },
   dateChip: {
     paddingHorizontal: spacing.md,
