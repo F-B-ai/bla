@@ -99,9 +99,13 @@ function App() {
   useEffect(() => {
     const load = Platform.OS === 'web' ? loadIcoFontsWeb : () => Font.loadAsync({ ...Ionicons.font });
     load()
-      .then(() => setFontsLoaded(true))
+      .then(() => {
+        setFontsLoaded(true);
+        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
+      })
       .catch(() => {
         setFontsLoaded(true);
+        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
       });
   }, []);
 
