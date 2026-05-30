@@ -65,7 +65,7 @@ function showPrintOverlay(content: string, css: string) {
     const style = doc.createElement('style');
     style.id = 'print-overlay-style';
     style.textContent = css + `
-      #print-overlay-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #0D0D0D; position: sticky; top: 0; z-index: 10; }
+      #print-overlay-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; padding-top: max(14px, env(safe-area-inset-top, 14px)); background: #0D0D0D; position: sticky; top: 0; z-index: 10; }
       #print-overlay-toolbar button { border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
       @media print { #print-overlay-toolbar { display: none !important; } }
     `;
