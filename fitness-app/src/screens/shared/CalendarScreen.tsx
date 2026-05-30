@@ -180,6 +180,7 @@ export const CalendarScreen: React.FC = () => {
   const [formEndTime, setFormEndTime] = useState('10:00');
   const [formCost, setFormCost] = useState('');
   const [formNotes, setFormNotes] = useState('');
+  const [formCustomDate, setFormCustomDate] = useState('');
 
   // Task modal (owner only)
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -391,6 +392,7 @@ export const CalendarScreen: React.FC = () => {
     setFormStudentId('');
     setFormCollabId('');
     setFormDate('');
+    setFormCustomDate('');
     setFormStartTime('09:00');
     setFormEndTime('10:00');
     setFormCost('');
@@ -451,6 +453,8 @@ export const CalendarScreen: React.FC = () => {
         }
         crossAlert('Successo', 'Appuntamento aggiornato!');
       } else {
+        const isPastDate = new Date(formDate) < new Date(toDateStr(new Date()));
+        const appointmentStatus = isPastDate ? 'completed' : 'scheduled';
         if (formKind === 'training') {
           await createSession({
             studentId: formStudentId,
@@ -458,10 +462,10 @@ export const CalendarScreen: React.FC = () => {
             date: new Date(formDate),
             startTime: formStartTime,
             endTime: formEndTime,
-            status: 'scheduled',
+            status: appointmentStatus,
             notes: formNotes,
             sessionCost: cost,
-            isCountedAsCompleted: false,
+            isCountedAsCompleted: isPastDate,
           });
         } else {
           await createAppointment({
@@ -470,31 +474,33 @@ export const CalendarScreen: React.FC = () => {
             date: new Date(formDate),
             startTime: formStartTime,
             endTime: formEndTime,
-            status: 'scheduled',
+            status: appointmentStatus,
             notes: formNotes,
             sessionCost: cost,
-            isCountedAsCompleted: false,
+            isCountedAsCompleted: isPastDate,
             createdAt: new Date(),
           });
         }
-        crossAlert('Successo', 'Appuntamento creato!');
-        const studentName = getStudentName(formStudentId);
-        const dateLabel = new Date(formDate).toLocaleDateString('it-IT');
-        createNotification(
-          formStudentId,
-          'session_reminder',
-          'Nuovo appuntamento',
-          `Hai un nuovo appuntamento il ${dateLabel} alle ${formStartTime}.`
-        ).catch(() => {});
-        if (!isOwner) {
-          getOwner().then((owner) => {
-            if (owner) createNotification(
-              owner.id,
-              'session_reminder',
-              'Nuovo appuntamento creato',
-              `${getStaffName(staffId)} ha fissato un appuntamento con ${studentName} il ${dateLabel} alle ${formStartTime}.`
-            ).catch(() => {});
-          }).catch(() => {});
+        crossAlert('Successo', isPastDate ? 'Appuntamento passato registrato!' : 'Appuntamento creato!');
+        if (!isPastDate) {
+          const studentName = getStudentName(formStudentId);
+          const dateLabel = new Date(formDate).toLocaleDateString('it-IT');
+          createNotification(
+            formStudentId,
+            'session_reminder',
+            'Nuovo appuntamento',
+            `Hai un nuovo appuntamento il ${dateLabel} alle ${formStartTime}.`
+          ).catch(() => {});
+          if (!isOwner) {
+            getOwner().then((owner) => {
+              if (owner) createNotification(
+                owner.id,
+                'session_reminder',
+                'Nuovo appuntamento creato',
+                `${getStaffName(staffId)} ha fissato un appuntamento con ${studentName} il ${dateLabel} alle ${formStartTime}.`
+              ).catch(() => {});
+            }).catch(() => {});
+          }
         }
       }
       resetForm();
@@ -751,9 +757,9 @@ export const CalendarScreen: React.FC = () => {
   };
 
   // Next 30 days for date picker
-  const nextDays = useMemo(() => {
+  const selectableDays = useMemo(() => {
     const days: { label: string; value: string }[] = [];
-    for (let i = 0; i < 30; i++) {
+    for (let i = -90; i <= 30; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
       days.push({
@@ -763,6 +769,8 @@ export const CalendarScreen: React.FC = () => {
     }
     return days;
   }, []);
+
+  const todayIndex = 90;
 
   // Student detail
   const studentDetailItems = useMemo(() => {
@@ -1816,25 +1824,65 @@ export const CalendarScreen: React.FC = () => {
 
             {/* Date */}
             <Text style={styles.fieldLabel}>Data</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.customDateRow}>
+              <TextInput
+                style={styles.customDateInput}
+                placeholder="GG/MM/AAAA"
+                placeholderTextColor={colors.textLight}
+                value={formCustomDate}
+                onChangeText={(text) => {
+                  setFormCustomDate(text);
+                  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                  if (match) {
+                    const [, dd, mm, yyyy] = match;
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
+                    const parsed = new Date(dateStr);
+                    if (!isNaN(parsed.getTime())) {
+                      setFormDate(dateStr);
+                    }
+                  }
+                }}
+                keyboardType="numeric"
+                maxLength={10}
+              />
+              <TouchableOpacity
+                style={styles.todayBtn}
+                onPress={() => {
+                  const today = toDateStr(new Date());
+                  setFormDate(today);
+                  setFormCustomDate('');
+                }}
+              >
+                <Text style={styles.todayBtnText}>Oggi</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentOffset={{ x: todayIndex * 100, y: 0 }}
+            >
               <View style={styles.chipRow}>
-                {nextDays.map((d) => (
-                  <TouchableOpacity
-                    key={d.value}
-                    style={{
-                      ...styles.dateChip,
-                      ...(formDate === d.value ? styles.chipActive : {}),
-                    }}
-                    onPress={() => setFormDate(d.value)}
-                  >
-                    <Text style={{
-                      ...styles.chipText,
-                      ...(formDate === d.value ? styles.chipTextActive : {}),
-                    }}>
-                      {d.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {selectableDays.map((d) => {
+                  const isPast = d.value < toDateStr(new Date());
+                  return (
+                    <TouchableOpacity
+                      key={d.value}
+                      style={{
+                        ...styles.dateChip,
+                        ...(formDate === d.value ? styles.chipActive : {}),
+                        ...(isPast && formDate !== d.value ? { opacity: 0.6 } : {}),
+                      }}
+                      onPress={() => { setFormDate(d.value); setFormCustomDate(''); }}
+                    >
+                      <Text style={{
+                        ...styles.chipText,
+                        ...(formDate === d.value ? styles.chipTextActive : {}),
+                      }}>
+                        {d.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </ScrollView>
 
@@ -2460,6 +2508,34 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
   chipTextActive: { color: colors.textOnAccent },
+  customDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  customDateInput: {
+    flex: 1,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.md,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  todayBtn: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  todayBtnText: {
+    color: '#FFF',
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
   dateChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
