@@ -489,24 +489,6 @@ export const PaymentPlanScreen: React.FC = () => {
         ).catch(() => {});
       }
 
-      // Generate payment receipt
-      if (Platform.OS === 'web' && inst) {
-        const plan = plans.find((p) => p.id === planId);
-        const instIndex = installments.findIndex((i) => i.id === installmentId);
-        printPaymentReceipt({
-          studentName: studentId ? getStudentName(studentId) : '',
-          amount: inst.amount,
-          dueDate: inst.dueDate,
-          paidDate: new Date(),
-          installmentNumber: instIndex + 1,
-          totalInstallments: installments.length,
-          planTotal: plan?.totalAmount ?? inst.amount,
-          paymentType: plan?.paymentType ?? 'full',
-          planStartDate: plan?.startDate,
-          planEndDate: plan?.endDate,
-        });
-      }
-
       await loadData();
       if (editingPlan && editingPlan.id === planId) {
         const refreshedPlans = await getAllPaymentPlans();
@@ -926,6 +908,28 @@ export const PaymentPlanScreen: React.FC = () => {
                                   <Ionicons name="checkmark" size={14} color={colors.success} />
                                 </TouchableOpacity>
                               )}
+                              {inst.status === 'paid' && Platform.OS === 'web' && (
+                                <TouchableOpacity
+                                  style={[styles.reminderBtn, { backgroundColor: colors.accent + '20' }]}
+                                  onPress={() => {
+                                    const instIndex = plan.installments.findIndex((i) => i.id === inst.id);
+                                    printPaymentReceipt({
+                                      studentName: plan.studentId ? getStudentName(plan.studentId) : '',
+                                      amount: inst.amount,
+                                      dueDate: inst.dueDate,
+                                      paidDate: inst.paidDate ?? new Date(),
+                                      installmentNumber: instIndex + 1,
+                                      totalInstallments: plan.installments.length,
+                                      planTotal: plan.totalAmount ?? inst.amount,
+                                      paymentType: plan.paymentType ?? 'full',
+                                      planStartDate: plan.startDate,
+                                      planEndDate: plan.endDate,
+                                    });
+                                  }}
+                                >
+                                  <Ionicons name="receipt-outline" size={14} color={colors.accent} />
+                                </TouchableOpacity>
+                              )}
                             </View>
                           </View>
                         );
@@ -1317,9 +1321,34 @@ export const PaymentPlanScreen: React.FC = () => {
                       </View>
 
                       {isPaid && inst.paidDate && (
-                        <Text style={styles.paidDateText}>
-                          Pagato il {formatDate(inst.paidDate)}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={styles.paidDateText}>
+                            Pagato il {formatDate(inst.paidDate)}
+                          </Text>
+                          {Platform.OS === 'web' && (
+                            <TouchableOpacity
+                              style={[styles.reminderBtnLarge, { backgroundColor: colors.accent + '20' }]}
+                              onPress={() => {
+                                const instIndex = editingPlan.installments.findIndex((i) => i.id === inst.id);
+                                printPaymentReceipt({
+                                  studentName: editingPlan.studentId ? getStudentName(editingPlan.studentId) : '',
+                                  amount: inst.amount,
+                                  dueDate: inst.dueDate,
+                                  paidDate: inst.paidDate ?? new Date(),
+                                  installmentNumber: instIndex + 1,
+                                  totalInstallments: editingPlan.installments.length,
+                                  planTotal: editingPlan.totalAmount ?? inst.amount,
+                                  paymentType: editingPlan.paymentType ?? 'full',
+                                  planStartDate: editingPlan.startDate,
+                                  planEndDate: editingPlan.endDate,
+                                });
+                              }}
+                            >
+                              <Ionicons name="receipt-outline" size={18} color={colors.accent} />
+                              <Text style={[styles.reminderBtnText, { color: colors.accent }]}>Ricevuta</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       )}
 
                       {!isPaid && (
@@ -1553,6 +1582,28 @@ export const PaymentPlanScreen: React.FC = () => {
                               </Text>
                             </View>
                             <Badge status={inst.status} />
+                            {inst.status === 'paid' && Platform.OS === 'web' && (
+                              <TouchableOpacity
+                                style={[styles.reminderBtn, { backgroundColor: colors.accent + '20', marginLeft: 8 }]}
+                                onPress={() => {
+                                  const instIndex = detailPlan.installments.findIndex((i) => i.id === inst.id);
+                                  printPaymentReceipt({
+                                    studentName: detailPlan.studentId ? getStudentName(detailPlan.studentId) : '',
+                                    amount: inst.amount,
+                                    dueDate: inst.dueDate,
+                                    paidDate: inst.paidDate ?? new Date(),
+                                    installmentNumber: instIndex + 1,
+                                    totalInstallments: detailPlan.installments.length,
+                                    planTotal: detailPlan.totalAmount ?? inst.amount,
+                                    paymentType: detailPlan.paymentType ?? 'full',
+                                    planStartDate: detailPlan.startDate,
+                                    planEndDate: detailPlan.endDate,
+                                  });
+                                }}
+                              >
+                                <Ionicons name="receipt-outline" size={14} color={colors.accent} />
+                              </TouchableOpacity>
+                            )}
                           </View>
                         </Card>
                       );
