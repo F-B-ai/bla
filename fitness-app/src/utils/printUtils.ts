@@ -53,53 +53,57 @@ function openPrintWindow(title: string, bodyHtml: string, subtitle?: string, per
 
 function showPrintOverlay(content: string, css: string) {
   try {
-    const root = document.getElementById('root');
+    const doc = window.document;
+    const root = doc.getElementById('root');
     if (root) root.style.display = 'none';
 
-    const existing = document.getElementById('print-overlay');
+    const existing = doc.getElementById('print-overlay');
     if (existing) existing.remove();
-    const existingStyle = document.getElementById('print-overlay-style');
+    const existingStyle = doc.getElementById('print-overlay-style');
     if (existingStyle) existingStyle.remove();
 
-    const style = document.createElement('style');
+    const style = doc.createElement('style');
     style.id = 'print-overlay-style';
     style.textContent = css + `
       #print-overlay-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #0D0D0D; position: sticky; top: 0; z-index: 10; }
       #print-overlay-toolbar button { border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
       @media print { #print-overlay-toolbar { display: none !important; } }
     `;
-    document.head.appendChild(style);
+    doc.head.appendChild(style);
 
-    const overlay = document.createElement('div');
+    const overlay = doc.createElement('div');
     overlay.id = 'print-overlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;';
 
-    const toolbar = document.createElement('div');
+    const toolbar = doc.createElement('div');
     toolbar.id = 'print-overlay-toolbar';
-    toolbar.innerHTML = `
-      <button style="background:#D40000;color:#fff;" onclick="window.print()">Stampa / Salva PDF</button>
-      <button style="background:#333;color:#fff;" id="print-close-btn">Chiudi</button>
-    `;
 
-    const body = document.createElement('div');
+    const printBtn = doc.createElement('button');
+    printBtn.textContent = 'Stampa / Salva PDF';
+    printBtn.style.cssText = 'background:#D40000;color:#fff;';
+    printBtn.addEventListener('click', () => { window.print(); });
+
+    const closeBtn = doc.createElement('button');
+    closeBtn.textContent = 'Chiudi';
+    closeBtn.style.cssText = 'background:#333;color:#fff;';
+    closeBtn.addEventListener('click', () => {
+      overlay.remove();
+      style.remove();
+      if (root) root.style.display = '';
+    });
+
+    toolbar.appendChild(printBtn);
+    toolbar.appendChild(closeBtn);
+
+    const body = doc.createElement('div');
     body.style.cssText = 'padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#1a1a1a;font-size:13px;line-height:1.5;';
     body.innerHTML = content;
 
     overlay.appendChild(toolbar);
     overlay.appendChild(body);
-    document.body.appendChild(overlay);
-
-    const closeBtn = document.getElementById('print-close-btn');
-    if (closeBtn) {
-      closeBtn.onclick = () => {
-        overlay.remove();
-        style.remove();
-        if (root) root.style.display = '';
-      };
-    }
+    doc.body.appendChild(overlay);
   } catch (e) {
-    // fallback: just alert
-    (window as any).alert('Errore apertura stampa: ' + e);
+    (window as any).alert('Errore apertura stampa: ' + String(e));
   }
 }
 
