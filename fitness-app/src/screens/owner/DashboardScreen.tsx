@@ -362,6 +362,52 @@ export const DashboardScreen: React.FC = () => {
 
       <NotificationPrompt />
 
+      {/* Stampa Report */}
+      {Platform.OS === 'web' && (
+        <View style={styles.printSection}>
+          <Text style={styles.sectionTitle}>Stampa Report</Text>
+          <Card>
+            <View style={styles.printHeader}>
+              <Ionicons name="print-outline" size={20} color={colors.accent} />
+              <Text style={styles.printTitle}>Seleziona periodo</Text>
+            </View>
+            <View style={styles.printDateRow}>
+              <View style={styles.printDateField}>
+                <Text style={styles.printDateLabel}>Da</Text>
+                <input
+                  type="date"
+                  value={printStartDate}
+                  onChange={(e: any) => setPrintStartDate(e.target.value)}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                />
+              </View>
+              <View style={styles.printDateField}>
+                <Text style={styles.printDateLabel}>A</Text>
+                <input
+                  type="date"
+                  value={printEndDate}
+                  onChange={(e: any) => setPrintEndDate(e.target.value)}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                />
+              </View>
+            </View>
+            <View style={styles.printButtons}>
+              <Button
+                title="Le mie lezioni + Staff completo"
+                onPress={handlePrintOwner}
+                icon={<Ionicons name="person" size={16} color="#fff" />}
+              />
+              <Button
+                title="Solo Staff (Manager, Coach, Nutrizionisti)"
+                variant="outline"
+                onPress={handlePrintStaff}
+                icon={<Ionicons name="people-outline" size={16} color={colors.accent} />}
+              />
+            </View>
+          </Card>
+        </View>
+      )}
+
       {/* Filtro periodo */}
       <View style={styles.periodFilter}>
         {periods.map((p) => (
@@ -611,52 +657,6 @@ export const DashboardScreen: React.FC = () => {
             </View>
           </Card>
         ))
-      )}
-
-      {/* Stampa Report */}
-      {Platform.OS === 'web' && (
-        <View style={styles.printSection}>
-          <Text style={styles.sectionTitle}>Stampa Report</Text>
-          <Card>
-            <View style={styles.printHeader}>
-              <Ionicons name="print-outline" size={20} color={colors.accent} />
-              <Text style={styles.printTitle}>Seleziona periodo</Text>
-            </View>
-            <View style={styles.printDateRow}>
-              <View style={styles.printDateField}>
-                <Text style={styles.printDateLabel}>Da</Text>
-                <input
-                  type="date"
-                  value={printStartDate}
-                  onChange={(e: any) => setPrintStartDate(e.target.value)}
-                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
-                />
-              </View>
-              <View style={styles.printDateField}>
-                <Text style={styles.printDateLabel}>A</Text>
-                <input
-                  type="date"
-                  value={printEndDate}
-                  onChange={(e: any) => setPrintEndDate(e.target.value)}
-                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
-                />
-              </View>
-            </View>
-            <View style={styles.printButtons}>
-              <Button
-                title="Le mie lezioni + Staff completo"
-                onPress={handlePrintOwner}
-                icon={<Ionicons name="person" size={16} color="#fff" />}
-              />
-              <Button
-                title="Solo Staff (Manager, Coach, Nutrizionisti)"
-                variant="outline"
-                onPress={handlePrintStaff}
-                icon={<Ionicons name="people-outline" size={16} color={colors.accent} />}
-              />
-            </View>
-          </Card>
-        </View>
       )}
 
       {/* Reset dati */}
