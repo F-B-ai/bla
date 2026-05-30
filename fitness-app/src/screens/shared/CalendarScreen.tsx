@@ -1830,11 +1830,17 @@ export const CalendarScreen: React.FC = () => {
                 placeholder="GG/MM/AAAA"
                 placeholderTextColor={colors.textLight}
                 value={formCustomDate}
-                onChangeText={(text) => {
-                  setFormCustomDate(text);
-                  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                  if (match) {
-                    const [, dd, mm, yyyy] = match;
+                onChangeText={(raw) => {
+                  const digits = raw.replace(/\D/g, '').slice(0, 8);
+                  let formatted = '';
+                  if (digits.length <= 2) formatted = digits;
+                  else if (digits.length <= 4) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
+                  else formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
+                  setFormCustomDate(formatted);
+                  if (digits.length === 8) {
+                    const dd = digits.slice(0, 2);
+                    const mm = digits.slice(2, 4);
+                    const yyyy = digits.slice(4, 8);
                     const dateStr = `${yyyy}-${mm}-${dd}`;
                     const parsed = new Date(dateStr);
                     if (!isNaN(parsed.getTime())) {
@@ -1842,7 +1848,7 @@ export const CalendarScreen: React.FC = () => {
                     }
                   }
                 }}
-                keyboardType="numeric"
+                keyboardType="number-pad"
                 maxLength={10}
               />
               <TouchableOpacity
