@@ -79,9 +79,28 @@ function showPrintOverlay(content: string, css: string) {
     toolbar.id = 'print-overlay-toolbar';
 
     const printBtn = doc.createElement('button');
-    printBtn.textContent = 'Stampa / Salva PDF';
+    printBtn.textContent = 'Condividi / Stampa';
     printBtn.style.cssText = 'background:#D40000;color:#fff;';
-    printBtn.addEventListener('click', () => { window.print(); });
+    printBtn.addEventListener('click', async () => {
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body style="padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#1a1a1a;font-size:13px;line-height:1.5;">${content}</body></html>`;
+      try {
+        if (navigator.share) {
+          const blob = new Blob([fullHtml], { type: 'text/html' });
+          const file = new File([blob], 'ricevuta-essere.html', { type: 'text/html' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Ricevuta ESSĒRE' });
+            return;
+          }
+          await navigator.share({ title: 'Ricevuta ESSĒRE', text: body.innerText });
+          return;
+        }
+        window.print();
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          window.print();
+        }
+      }
+    });
 
     const closeBtn = doc.createElement('button');
     closeBtn.textContent = 'Chiudi';
