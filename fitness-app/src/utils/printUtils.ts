@@ -483,7 +483,7 @@ interface PrintPaymentReceiptParams {
   studentName: string;
   amount: number;
   dueDate: any;
-  paidDate: Date;
+  paidDate: any;
   installmentNumber: number;
   totalInstallments: number;
   planTotal: number;
@@ -498,70 +498,81 @@ export function printPaymentReceipt({
 }: PrintPaymentReceiptParams) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
-  const receiptNumber = `ESS-${paidDate.getFullYear()}${String(paidDate.getMonth() + 1).padStart(2, '0')}${String(paidDate.getDate()).padStart(2, '0')}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+  try {
+    let safeDate: Date;
+    if (paidDate instanceof Date) safeDate = paidDate;
+    else if (paidDate && typeof paidDate === 'object' && 'toDate' in paidDate) safeDate = paidDate.toDate();
+    else if (paidDate && typeof paidDate === 'object' && 'seconds' in paidDate) safeDate = new Date(paidDate.seconds * 1000);
+    else safeDate = new Date(paidDate);
+    if (isNaN(safeDate.getTime())) safeDate = new Date();
 
-  const typeLabels: Record<string, string> = {
-    full: 'Pagamento unica soluzione',
-    installment: `Rata ${installmentNumber} di ${totalInstallments}`,
-    monthly_course: 'Pagamento corso mensile',
-  };
+    const receiptNumber = `ESS-${safeDate.getFullYear()}${String(safeDate.getMonth() + 1).padStart(2, '0')}${String(safeDate.getDate()).padStart(2, '0')}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
 
-  const bodyHtml = `
-    <div class="receipt">
-      <div class="receipt-header">
-        <h1>${LOGO_CHAR}</h1>
-        <div class="doc-type">Promemoria di Pagamento</div>
-        <div class="doc-number">Rif. ${receiptNumber}</div>
-      </div>
+    const typeLabels: Record<string, string> = {
+      full: 'Pagamento unica soluzione',
+      installment: `Rata ${installmentNumber} di ${totalInstallments}`,
+      monthly_course: 'Pagamento corso mensile',
+    };
 
-      <div class="receipt-amount">
-        <div class="amount-label">Importo pagato</div>
-        <div class="amount">${fmtCurrency(amount)}</div>
-      </div>
-
-      <div class="receipt-status">
-        <span class="paid-badge">PAGATO</span>
-      </div>
-
-      <div class="receipt-body">
-        <div class="receipt-row">
-          <span class="receipt-label">Allievo</span>
-          <span class="receipt-value">${studentName}</span>
+    const bodyHtml = `
+      <div class="receipt">
+        <div class="receipt-header">
+          <h1>${LOGO_CHAR}</h1>
+          <div class="doc-type">Promemoria di Pagamento</div>
+          <div class="doc-number">Rif. ${receiptNumber}</div>
         </div>
-        <div class="receipt-row">
-          <span class="receipt-label">Tipo</span>
-          <span class="receipt-value">${typeLabels[paymentType] || paymentType}</span>
-        </div>
-        <div class="receipt-row">
-          <span class="receipt-label">Data scadenza</span>
-          <span class="receipt-value">${fmtDate(dueDate)}</span>
-        </div>
-        <div class="receipt-row">
-          <span class="receipt-label">Data pagamento</span>
-          <span class="receipt-value">${fmtDate(paidDate)}</span>
-        </div>
-        <div class="receipt-row">
-          <span class="receipt-label">Importo totale piano</span>
-          <span class="receipt-value">${fmtCurrency(planTotal)}</span>
-        </div>
-        ${planStartDate && planEndDate ? `
-        <div class="receipt-row">
-          <span class="receipt-label">Periodo percorso</span>
-          <span class="receipt-value">${fmtDate(planStartDate)} – ${fmtDate(planEndDate)}</span>
-        </div>` : ''}
-      </div>
 
-      <div class="receipt-note">
-        <p class="important">Questo documento è un promemoria di pagamento.</p>
-        <p>Non costituisce ricevuta fiscale né documento contabile ufficiale.<br>
-        La ricevuta/fattura ufficiale verrà emessa separatamente.</p>
-      </div>
+        <div class="receipt-amount">
+          <div class="amount-label">Importo pagato</div>
+          <div class="amount">${fmtCurrency(amount)}</div>
+        </div>
 
-      <div class="receipt-footer">
-        Generato il ${fmtDate(new Date())} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-      </div>
-    </div>
-  `;
+        <div class="receipt-status">
+          <span class="paid-badge">PAGATO</span>
+        </div>
 
-  showPrintOverlay(bodyHtml, RECEIPT_CSS);
+        <div class="receipt-body">
+          <div class="receipt-row">
+            <span class="receipt-label">Allievo</span>
+            <span class="receipt-value">${studentName}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Tipo</span>
+            <span class="receipt-value">${typeLabels[paymentType] || paymentType}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Data scadenza</span>
+            <span class="receipt-value">${fmtDate(dueDate)}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Data pagamento</span>
+            <span class="receipt-value">${fmtDate(safeDate)}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Importo totale piano</span>
+            <span class="receipt-value">${fmtCurrency(planTotal)}</span>
+          </div>
+          ${planStartDate && planEndDate ? `
+          <div class="receipt-row">
+            <span class="receipt-label">Periodo percorso</span>
+            <span class="receipt-value">${fmtDate(planStartDate)} – ${fmtDate(planEndDate)}</span>
+          </div>` : ''}
+        </div>
+
+        <div class="receipt-note">
+          <p class="important">Questo documento è un promemoria di pagamento.</p>
+          <p>Non costituisce ricevuta fiscale né documento contabile ufficiale.<br>
+          La ricevuta/fattura ufficiale verrà emessa separatamente.</p>
+        </div>
+
+        <div class="receipt-footer">
+          Generato il ${fmtDate(new Date())} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    `;
+
+    showPrintOverlay(bodyHtml, RECEIPT_CSS);
+  } catch (e) {
+    (window as any).alert('Errore ricevuta: ' + String(e));
+  }
 }
