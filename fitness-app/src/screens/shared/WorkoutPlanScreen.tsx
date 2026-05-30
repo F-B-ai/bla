@@ -37,6 +37,7 @@ import {
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 import { getCustomTemplates, CustomWorkoutTemplate, createCustomTemplate } from '../../services/programService';
 import { Ionicons } from '@expo/vector-icons';
+import { printWorkoutPlan } from '../../utils/printUtils';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -1159,6 +1160,15 @@ export const WorkoutPlanScreen: React.FC = () => {
                   >
                     <Text style={styles.historyBackText}>Torna alla lista</Text>
                   </TouchableOpacity>
+                  {Platform.OS === 'web' && (
+                    <TouchableOpacity
+                      style={[styles.saveAsTemplateBtn, { backgroundColor: colors.info }]}
+                      onPress={() => printWorkoutPlan({ studentName: getStudentName(viewingPlan.studentId), plan: viewingPlan })}
+                    >
+                      <Ionicons name="print-outline" size={16} color="#fff" />
+                      <Text style={styles.saveAsTemplateText}>Stampa</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     style={styles.saveAsTemplateBtn}
                     onPress={() => saveAsTemplate(viewingPlan)}

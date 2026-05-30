@@ -36,6 +36,7 @@ import { getTransactions } from '../../services/financialService';
 import { crossAlert } from '../../utils/alert';
 import { createNotification } from '../../services/notificationService';
 import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
+import { printPlanDetail } from '../../utils/printUtils';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -1542,6 +1543,21 @@ export const PaymentPlanScreen: React.FC = () => {
                 )}
 
                 <View style={styles.modalActions}>
+                  {Platform.OS === 'web' && (
+                    <Button
+                      title="Stampa"
+                      variant="outline"
+                      onPress={() => {
+                        printPlanDetail({
+                          studentName: getStudentName(detailPlan.studentId),
+                          plan: detailPlan,
+                          sessions: detailSessions,
+                          transactions: detailTransactions,
+                        });
+                      }}
+                      icon={<Ionicons name="print-outline" size={18} color={colors.accent} />}
+                    />
+                  )}
                   {canEdit && (
                     <Button
                       title="Modifica Piano"

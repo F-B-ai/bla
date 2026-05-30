@@ -8,10 +8,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Platform,
+  TextInput,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -26,6 +29,7 @@ import { getFinancialSummary, getTransactions } from '../../services/financialSe
 import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -51,6 +55,8 @@ export const DashboardScreen: React.FC = () => {
   const [allPaymentPlans, setAllPaymentPlans] = useState<PaymentPlan[]>([]);
   const [studentsData, setStudentsData] = useState<Student[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
+  const [printStartDate, setPrintStartDate] = useState('');
+  const [printEndDate, setPrintEndDate] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -211,6 +217,72 @@ export const DashboardScreen: React.FC = () => {
     { key: 'month' as const, label: 'Mese' },
     { key: 'year' as const, label: 'Anno' },
   ];
+
+  const parsePrintDate = (str: string): Date | null => {
+    if (!str) return null;
+    if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 3) return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    }
+    if (str.includes('-')) return new Date(str);
+    return null;
+  };
+
+  const getFilteredSessions = () => {
+    const start = parsePrintDate(printStartDate);
+    const end = parsePrintDate(printEndDate);
+    if (!start || !end) return [];
+    end.setHours(23, 59, 59, 999);
+    return allSessions.filter((s) => {
+      const d = toSafeDate(s.date);
+      return d >= start && d <= end;
+    });
+  };
+
+  const handlePrintStaff = () => {
+    const start = parsePrintDate(printStartDate);
+    const end = parsePrintDate(printEndDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      crossAlert('Errore', 'Inserisci date valide');
+      return;
+    }
+    const filtered = getFilteredSessions();
+    end.setHours(23, 59, 59, 999);
+    const filteredTx = transactions.filter((t) => {
+      const d = toSafeDate(t.date);
+      return d >= start && d <= end;
+    });
+    const staff = [
+      ...managers.map((m) => ({ id: m.id, name: m.name, surname: m.surname, role: 'manager', commissionPercentage: m.commissionPercentage })),
+      ...collaborators.map((c) => ({ id: c.id, name: c.name, surname: c.surname, role: 'collaborator', commissionPercentage: c.commissionPercentage, collaboratorType: c.collaboratorType })),
+    ];
+    printStaffReport({ staff, sessions: filtered, transactions: filteredTx, startDate: start.toLocaleDateString('it-IT'), endDate: end.toLocaleDateString('it-IT'), students: studentsData });
+  };
+
+  const handlePrintOwner = () => {
+    const start = parsePrintDate(printStartDate);
+    const end = parsePrintDate(printEndDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      crossAlert('Errore', 'Inserisci date valide');
+      return;
+    }
+    const filtered = getFilteredSessions();
+    end.setHours(23, 59, 59, 999);
+    const filteredTx = transactions.filter((t) => {
+      const d = toSafeDate(t.date);
+      return d >= start && d <= end;
+    });
+    const staff = [
+      ...managers.map((m) => ({ id: m.id, name: m.name, surname: m.surname, role: 'manager', commissionPercentage: m.commissionPercentage })),
+      ...collaborators.map((c) => ({ id: c.id, name: c.name, surname: c.surname, role: 'collaborator', commissionPercentage: c.commissionPercentage, collaboratorType: c.collaboratorType })),
+    ];
+    printOwnerReport({
+      ownerName: `${user?.name || ''} ${(user as any)?.surname || ''}`.trim(),
+      ownerId: user?.id || '',
+      sessions: filtered, transactions: filteredTx, staff, students: studentsData,
+      startDate: start.toLocaleDateString('it-IT'), endDate: end.toLocaleDateString('it-IT'),
+    });
+  };
 
   const planStats = useMemo(() => {
     let totalCollected = 0;
@@ -541,6 +613,52 @@ export const DashboardScreen: React.FC = () => {
         ))
       )}
 
+      {/* Stampa Report */}
+      {Platform.OS === 'web' && (
+        <View style={styles.printSection}>
+          <Text style={styles.sectionTitle}>Stampa Report</Text>
+          <Card>
+            <View style={styles.printHeader}>
+              <Ionicons name="print-outline" size={20} color={colors.accent} />
+              <Text style={styles.printTitle}>Seleziona periodo</Text>
+            </View>
+            <View style={styles.printDateRow}>
+              <View style={styles.printDateField}>
+                <Text style={styles.printDateLabel}>Da</Text>
+                <input
+                  type="date"
+                  value={printStartDate}
+                  onChange={(e: any) => setPrintStartDate(e.target.value)}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                />
+              </View>
+              <View style={styles.printDateField}>
+                <Text style={styles.printDateLabel}>A</Text>
+                <input
+                  type="date"
+                  value={printEndDate}
+                  onChange={(e: any) => setPrintEndDate(e.target.value)}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                />
+              </View>
+            </View>
+            <View style={styles.printButtons}>
+              <Button
+                title="Le mie lezioni + Staff completo"
+                onPress={handlePrintOwner}
+                icon={<Ionicons name="person" size={16} color="#fff" />}
+              />
+              <Button
+                title="Solo Staff (Manager, Coach, Nutrizionisti)"
+                variant="outline"
+                onPress={handlePrintStaff}
+                icon={<Ionicons name="people-outline" size={16} color={colors.accent} />}
+              />
+            </View>
+          </Card>
+        </View>
+      )}
+
       {/* Reset dati */}
       <View style={styles.resetSection}>
         <Text style={styles.resetTitle}>Zona Pericolosa</Text>
@@ -774,5 +892,37 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing.xxl,
+  },
+  printSection: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+  printHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  printTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  printDateRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  printDateField: {
+    flex: 1,
+  },
+  printDateLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  printButtons: {
+    gap: spacing.sm,
   },
 });

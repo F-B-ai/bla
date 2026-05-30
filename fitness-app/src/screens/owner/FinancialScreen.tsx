@@ -6,9 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  Platform,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
+import { printFinancialReport } from '../../utils/printUtils';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -180,6 +183,44 @@ export const FinancialScreen: React.FC = () => {
     );
   };
 
+  const [printStartDate, setPrintStartDate] = useState('');
+  const [printEndDate, setPrintEndDate] = useState('');
+
+  const handlePrintFinancial = () => {
+    const parseDate = (str: string): Date | null => {
+      if (!str) return null;
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      }
+      if (str.includes('-')) return new Date(str);
+      return null;
+    };
+    const start = parseDate(printStartDate);
+    const end = parseDate(printEndDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      crossAlert('Errore', 'Inserisci date valide (gg/mm/aaaa)');
+      return;
+    }
+    end.setHours(23, 59, 59, 999);
+    const filtered = transactions.filter((t) => {
+      const d = toSafeDate(t.date);
+      return d >= start && d <= end;
+    });
+    let inc = 0, exp = 0;
+    for (const t of filtered) {
+      if (t.type === 'income') inc += t.amount;
+      else exp += t.amount;
+    }
+    printFinancialReport({
+      transactions: filtered,
+      startDate: start.toLocaleDateString('it-IT'),
+      endDate: end.toLocaleDateString('it-IT'),
+      totalIncome: inc,
+      totalExpenses: exp,
+    });
+  };
+
   const combinedIncome = totalIncome + planStats.totalCollected;
   const combinedProfit = combinedIncome - totalExpenses;
 
@@ -338,6 +379,56 @@ export const FinancialScreen: React.FC = () => {
               </Card>
             ))}
         </>
+      )}
+
+      {/* Stampa report economico */}
+      {Platform.OS === 'web' && (
+        <Card style={styles.printSection}>
+          <View style={styles.printHeader}>
+            <Ionicons name="print-outline" size={20} color={colors.accent} />
+            <Text style={styles.printTitle}>Stampa Report Economico</Text>
+          </View>
+          <View style={styles.printDateRow}>
+            {Platform.OS === 'web' ? (
+              <>
+                <View style={styles.printDateField}>
+                  <Text style={styles.printDateLabel}>Da</Text>
+                  <input
+                    type="date"
+                    value={printStartDate}
+                    onChange={(e: any) => setPrintStartDate(e.target.value)}
+                    style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                  />
+                </View>
+                <View style={styles.printDateField}>
+                  <Text style={styles.printDateLabel}>A</Text>
+                  <input
+                    type="date"
+                    value={printEndDate}
+                    onChange={(e: any) => setPrintEndDate(e.target.value)}
+                    style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.printDateField}>
+                  <Text style={styles.printDateLabel}>Da (gg/mm/aaaa)</Text>
+                  <TextInput style={styles.printInput} value={printStartDate} onChangeText={setPrintStartDate} placeholder="01/01/2026" placeholderTextColor={colors.textLight} />
+                </View>
+                <View style={styles.printDateField}>
+                  <Text style={styles.printDateLabel}>A (gg/mm/aaaa)</Text>
+                  <TextInput style={styles.printInput} value={printEndDate} onChangeText={setPrintEndDate} placeholder="31/12/2026" placeholderTextColor={colors.textLight} />
+                </View>
+              </>
+            )}
+          </View>
+          <Button
+            title="Stampa Report"
+            onPress={handlePrintFinancial}
+            icon={<Ionicons name="print" size={18} color="#fff" />}
+          />
+        </Card>
       )}
 
       {/* Aggiungi transazione */}
@@ -745,5 +836,42 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: spacing.xxl,
+  },
+  printSection: {
+    margin: spacing.md,
+  },
+  printHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  printTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  printDateRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  printDateField: {
+    flex: 1,
+  },
+  printDateLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  printInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    color: colors.text,
+    fontSize: fontSize.md,
   },
 });
