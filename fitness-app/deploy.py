@@ -124,9 +124,44 @@ def main():
 
     base = f"https://firebasehosting.googleapis.com/v1beta1/sites/{SITE_ID}"
 
-    # 1. Create version
+    # 1. Create version with hosting config
     print("Creating version...")
-    ver = api("POST", f"{base}/versions", token)
+    hosting_config = {
+        "config": {
+            "rewrites": [{"glob": "**", "path": "/index.html"}],
+            "headers": [
+                {
+                    "glob": "index.html",
+                    "headers": {"Cache-Control": "no-cache, no-store, must-revalidate"}
+                },
+                {
+                    "glob": "sw.js",
+                    "headers": {"Cache-Control": "no-cache, no-store, must-revalidate"}
+                },
+                {
+                    "glob": "**/*.js",
+                    "headers": {"Cache-Control": "public, max-age=31536000, immutable"}
+                },
+                {
+                    "glob": "**/*.ttf",
+                    "headers": {
+                        "Access-Control-Allow-Origin": "*",
+                        "Content-Type": "font/ttf",
+                        "Cache-Control": "public, max-age=31536000, immutable"
+                    }
+                },
+                {
+                    "glob": "**/*.woff2",
+                    "headers": {
+                        "Access-Control-Allow-Origin": "*",
+                        "Content-Type": "font/woff2",
+                        "Cache-Control": "public, max-age=31536000, immutable"
+                    }
+                }
+            ]
+        }
+    }
+    ver = api("POST", f"{base}/versions", token, hosting_config)
     ver_name = ver["name"]
     print(f"  Version: {ver_name}")
 
