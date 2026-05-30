@@ -44,59 +44,63 @@ function openPrintWindow(title: string, bodyHtml: string, subtitle?: string, per
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   const periodHtml = period ? `<div class="period">${period}</div>` : '';
   const subtitleHtml = subtitle ? `<div class="subtitle">${subtitle}</div>` : '';
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} - ${LOGO_CHAR}</title><style>${BASE_CSS}</style></head><body>
+  const content = `
     <div class="header"><h1>${LOGO_CHAR}</h1>${subtitleHtml}${periodHtml}</div>
     ${bodyHtml}
-    <div class="footer">Generato da ${LOGO_CHAR} il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>
-  </body></html>`;
-  showPrintOverlay(html);
+    <div class="footer">Generato da ${LOGO_CHAR} il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>`;
+  showPrintOverlay(content, BASE_CSS);
 }
 
-function showPrintOverlay(html: string) {
-  const existing = document.getElementById('print-overlay');
-  if (existing) existing.remove();
+function showPrintOverlay(content: string, css: string) {
+  try {
+    const root = document.getElementById('root');
+    if (root) root.style.display = 'none';
 
-  const overlay = document.createElement('div');
-  overlay.id = 'print-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;display:flex;flex-direction:column;';
+    const existing = document.getElementById('print-overlay');
+    if (existing) existing.remove();
+    const existingStyle = document.getElementById('print-overlay-style');
+    if (existingStyle) existingStyle.remove();
 
-  const toolbar = document.createElement('div');
-  toolbar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:#0D0D0D;flex-shrink:0;';
+    const style = document.createElement('style');
+    style.id = 'print-overlay-style';
+    style.textContent = css + `
+      #print-overlay-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #0D0D0D; position: sticky; top: 0; z-index: 10; }
+      #print-overlay-toolbar button { border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+      @media print { #print-overlay-toolbar { display: none !important; } }
+    `;
+    document.head.appendChild(style);
 
-  const printBtn = document.createElement('button');
-  printBtn.textContent = 'Stampa / Salva PDF';
-  printBtn.style.cssText = 'background:#D40000;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;';
+    const overlay = document.createElement('div');
+    overlay.id = 'print-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;';
 
-  const closeBtn = document.createElement('button');
-  closeBtn.textContent = 'Chiudi';
-  closeBtn.style.cssText = 'background:#333;color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;';
+    const toolbar = document.createElement('div');
+    toolbar.id = 'print-overlay-toolbar';
+    toolbar.innerHTML = `
+      <button style="background:#D40000;color:#fff;" onclick="window.print()">Stampa / Salva PDF</button>
+      <button style="background:#333;color:#fff;" id="print-close-btn">Chiudi</button>
+    `;
 
-  toolbar.appendChild(printBtn);
-  toolbar.appendChild(closeBtn);
+    const body = document.createElement('div');
+    body.style.cssText = 'padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#1a1a1a;font-size:13px;line-height:1.5;';
+    body.innerHTML = content;
 
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'flex:1;border:none;width:100%;';
+    overlay.appendChild(toolbar);
+    overlay.appendChild(body);
+    document.body.appendChild(overlay);
 
-  overlay.appendChild(toolbar);
-  overlay.appendChild(iframe);
-  document.body.appendChild(overlay);
-
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (iframeDoc) {
-    iframeDoc.open();
-    iframeDoc.write(html);
-    iframeDoc.close();
-  }
-
-  printBtn.onclick = () => {
-    if (iframe.contentWindow) {
-      iframe.contentWindow.print();
+    const closeBtn = document.getElementById('print-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = () => {
+        overlay.remove();
+        style.remove();
+        if (root) root.style.display = '';
+      };
     }
-  };
-
-  closeBtn.onclick = () => {
-    overlay.remove();
-  };
+  } catch (e) {
+    // fallback: just alert
+    (window as any).alert('Errore apertura stampa: ' + e);
+  }
 }
 
 const fmtDate = (d: unknown): string => {
@@ -555,6 +559,5 @@ export function printPaymentReceipt({
     </div>
   `;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ricevuta ${receiptNumber} - ${LOGO_CHAR}</title><style>${RECEIPT_CSS}</style></head><body>${bodyHtml}</body></html>`;
-  showPrintOverlay(html);
+  showPrintOverlay(bodyHtml, RECEIPT_CSS);
 }
