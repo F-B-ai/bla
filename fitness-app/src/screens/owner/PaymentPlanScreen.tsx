@@ -31,9 +31,11 @@ import {
   markInstallmentPaid,
   getPaymentReminderMessage,
 } from '../../services/paymentService';
+import { getStudentSessions } from '../../services/sessionService';
+import { getTransactions } from '../../services/financialService';
 import { crossAlert } from '../../utils/alert';
 import { createNotification } from '../../services/notificationService';
-import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student } from '../../types';
+import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -64,6 +66,10 @@ export const PaymentPlanScreen: React.FC = () => {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PaymentPlan | null>(null);
+  const [detailPlan, setDetailPlan] = useState<PaymentPlan | null>(null);
+  const [detailSessions, setDetailSessions] = useState<TrainingSession[]>([]);
+  const [detailTransactions, setDetailTransactions] = useState<FinancialTransaction[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Create form state
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -554,6 +560,39 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   // -----------------------------------------------------------------------
+  // Detail modal – show sessions + transactions for a plan
+  // -----------------------------------------------------------------------
+  const openDetailModal = async (plan: PaymentPlan) => {
+    setDetailPlan(plan);
+    setDetailLoading(true);
+    try {
+      const planStart = toSafeDate(plan.startDate);
+      const planEnd = toSafeDate(plan.endDate);
+      const [sessions, transactions] = await Promise.all([
+        getStudentSessions(plan.studentId),
+        getTransactions(),
+      ]);
+      const filteredSessions = sessions.filter((s) => {
+        if (!s.isCountedAsCompleted && s.status !== 'completed') return false;
+        const sDate = toSafeDate(s.date);
+        return sDate >= planStart && sDate <= planEnd;
+      });
+      const filteredTransactions = transactions.filter((t) => {
+        if (t.studentId !== plan.studentId) return false;
+        const tDate = toSafeDate(t.date);
+        return tDate >= planStart && tDate <= planEnd;
+      });
+      setDetailSessions(filteredSessions);
+      setDetailTransactions(filteredTransactions);
+    } catch {
+      setDetailSessions([]);
+      setDetailTransactions([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Progress bar component
   // -----------------------------------------------------------------------
   const ProgressBar: React.FC<{ used: number; total: number; color: string }> = ({
@@ -733,11 +772,7 @@ export const PaymentPlanScreen: React.FC = () => {
                   <TouchableOpacity
                     key={plan.id}
                     activeOpacity={0.7}
-                    onPress={() => {
-                      if (canEdit) {
-                        openEditModal(plan);
-                      }
-                    }}
+                    onPress={() => openDetailModal(plan)}
                   >
                     <Card style={styles.planCard}>
                       {/* Plan header: amount + badge + delete */}
@@ -1338,6 +1373,197 @@ export const PaymentPlanScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* ================================================================= */}
+      {/* DETAIL MODAL – sessions + payments overview                       */}
+      {/* ================================================================= */}
+      <Modal
+        visible={!!detailPlan}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetailPlan(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ModalHeader
+              title={detailPlan ? getStudentName(detailPlan.studentId) : ''}
+              onClose={() => setDetailPlan(null)}
+            />
+
+            {detailPlan && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Plan overview */}
+                <Card style={styles.detailOverviewCard}>
+                  <View style={styles.planHeader}>
+                    <View style={styles.planInfo}>
+                      <Text style={styles.planAmount}>€{detailPlan.totalAmount.toFixed(2)}</Text>
+                      <Badge
+                        status={getPaymentTypeBadgeStatus(detailPlan.paymentType)}
+                        label={getPaymentTypeLabel(detailPlan.paymentType)}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.planDetailRow}>
+                    <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                    <Text style={styles.planDetailText}>
+                      {formatDate(detailPlan.startDate)} - {formatDate(detailPlan.endDate)}
+                    </Text>
+                  </View>
+                  {(detailPlan.includedLessons ?? 0) > 0 && (
+                    <View style={styles.planProgressSection}>
+                      <View style={styles.planProgressHeader}>
+                        <Ionicons name="body-outline" size={14} color={colors.info} />
+                        <Text style={styles.planProgressLabel}>Lezioni</Text>
+                        <Text style={styles.planProgressValue}>
+                          {detailPlan.usedLessons ?? 0} / {detailPlan.includedLessons}
+                        </Text>
+                      </View>
+                      <ProgressBar used={detailPlan.usedLessons ?? 0} total={detailPlan.includedLessons} color={colors.info} />
+                    </View>
+                  )}
+                  {(detailPlan.includedConsultations ?? 0) > 0 && (
+                    <View style={styles.planProgressSection}>
+                      <View style={styles.planProgressHeader}>
+                        <Ionicons name="nutrition-outline" size={14} color={colors.warning} />
+                        <Text style={styles.planProgressLabel}>Consulenze</Text>
+                        <Text style={styles.planProgressValue}>
+                          {detailPlan.usedConsultations ?? 0} / {detailPlan.includedConsultations}
+                        </Text>
+                      </View>
+                      <ProgressBar used={detailPlan.usedConsultations ?? 0} total={detailPlan.includedConsultations} color={colors.warning} />
+                    </View>
+                  )}
+                </Card>
+
+                {detailLoading ? (
+                  <ActivityIndicator size="small" color={colors.accent} style={{ marginVertical: spacing.lg }} />
+                ) : (
+                  <>
+                    {/* Completed sessions */}
+                    <View style={styles.formDivider} />
+                    <Text style={styles.fieldLabel}>
+                      Lezioni completate ({detailSessions.length})
+                    </Text>
+                    {detailSessions.length === 0 ? (
+                      <Card variant="outlined">
+                        <Text style={styles.detailEmptyText}>Nessuna lezione completata</Text>
+                      </Card>
+                    ) : (
+                      detailSessions.map((session) => {
+                        const sDate = toSafeDate(session.date);
+                        return (
+                          <Card key={session.id} variant="outlined" style={styles.detailItemCard}>
+                            <View style={styles.detailItemRow}>
+                              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                              <View style={styles.detailItemInfo}>
+                                <Text style={styles.detailItemTitle}>
+                                  {formatDate(sDate)}
+                                </Text>
+                                <Text style={styles.detailItemSubtitle}>
+                                  {session.startTime} - {session.endTime}
+                                  {session.sessionCost ? ` · €${session.sessionCost.toFixed(2)}` : ''}
+                                </Text>
+                              </View>
+                              {session.status === 'cancelled_late' && (
+                                <Badge status="overdue" label="Cancellazione tardiva" />
+                              )}
+                            </View>
+                            {session.notes ? (
+                              <Text style={styles.detailItemNotes}>{session.notes}</Text>
+                            ) : null}
+                          </Card>
+                        );
+                      })
+                    )}
+
+                    {/* Financial transactions */}
+                    <View style={styles.formDivider} />
+                    <Text style={styles.fieldLabel}>
+                      Movimenti economici ({detailTransactions.length})
+                    </Text>
+                    {detailTransactions.length === 0 ? (
+                      <Card variant="outlined">
+                        <Text style={styles.detailEmptyText}>Nessun movimento registrato</Text>
+                      </Card>
+                    ) : (
+                      detailTransactions.map((t) => {
+                        const tDate = toSafeDate(t.date);
+                        const isIncome = t.type === 'income';
+                        return (
+                          <Card key={t.id} variant="outlined" style={styles.detailItemCard}>
+                            <View style={styles.detailItemRow}>
+                              <Ionicons
+                                name={isIncome ? 'arrow-down-circle' : 'arrow-up-circle'}
+                                size={18}
+                                color={isIncome ? colors.success : colors.error}
+                              />
+                              <View style={styles.detailItemInfo}>
+                                <Text style={styles.detailItemTitle}>
+                                  {isIncome ? '+' : '-'}€{t.amount.toFixed(2)}
+                                </Text>
+                                <Text style={styles.detailItemSubtitle}>
+                                  {formatDate(tDate)} · {t.description || t.category}
+                                </Text>
+                              </View>
+                            </View>
+                          </Card>
+                        );
+                      })
+                    )}
+
+                    {/* Installments status */}
+                    <View style={styles.formDivider} />
+                    <Text style={styles.fieldLabel}>
+                      Rate ({detailPlan.installments.length})
+                    </Text>
+                    {detailPlan.installments.map((inst) => {
+                      const dueDate = toSafeDate(inst.dueDate);
+                      return (
+                        <Card key={inst.id} variant="outlined" style={styles.detailItemCard}>
+                          <View style={styles.detailItemRow}>
+                            <Ionicons
+                              name={inst.status === 'paid' ? 'checkmark-circle' : inst.status === 'overdue' ? 'alert-circle' : 'time-outline'}
+                              size={18}
+                              color={inst.status === 'paid' ? colors.success : inst.status === 'overdue' ? colors.error : colors.warning}
+                            />
+                            <View style={styles.detailItemInfo}>
+                              <Text style={styles.detailItemTitle}>€{inst.amount.toFixed(2)}</Text>
+                              <Text style={styles.detailItemSubtitle}>
+                                Scadenza: {formatDate(dueDate)}
+                                {inst.status === 'paid' && inst.paidDate ? ` · Pagato il ${formatDate(inst.paidDate)}` : ''}
+                              </Text>
+                            </View>
+                            <Badge status={inst.status} />
+                          </View>
+                        </Card>
+                      );
+                    })}
+                  </>
+                )}
+
+                <View style={styles.modalActions}>
+                  {canEdit && (
+                    <Button
+                      title="Modifica Piano"
+                      onPress={() => {
+                        const plan = detailPlan;
+                        setDetailPlan(null);
+                        openEditModal(plan);
+                      }}
+                      icon={<Ionicons name="create-outline" size={18} color="#fff" />}
+                    />
+                  )}
+                  <Button
+                    title="Chiudi"
+                    variant="outline"
+                    onPress={() => setDetailPlan(null)}
+                  />
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1775,5 +2001,44 @@ const styles = StyleSheet.create({
   reminderBtnText: {
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+
+  // Detail modal
+  detailOverviewCard: {
+    marginBottom: spacing.xs,
+  },
+  detailEmptyText: {
+    color: colors.textLight,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
+    fontSize: fontSize.md,
+  },
+  detailItemCard: {
+    marginBottom: spacing.xs,
+  },
+  detailItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  detailItemInfo: {
+    flex: 1,
+  },
+  detailItemTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  detailItemSubtitle: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  detailItemNotes: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+    marginLeft: spacing.xl + spacing.sm,
   },
 });
