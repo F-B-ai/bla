@@ -52,7 +52,8 @@ function openPrintWindow(title: string, bodyHtml: string, subtitle?: string, per
     <div class="footer">Generato da ${LOGO_CHAR} il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>
   </body></html>`);
   w.document.close();
-  setTimeout(() => w.print(), 400);
+  w.onafterprint = () => w.close();
+  setTimeout(() => { w.print(); }, 400);
 }
 
 const fmtDate = (d: unknown): string => {
@@ -515,5 +516,6 @@ export function printPaymentReceipt({
   if (!w) return;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ricevuta ${receiptNumber} - ${LOGO_CHAR}</title><style>${RECEIPT_CSS}</style></head><body>${bodyHtml}</body></html>`);
   w.document.close();
-  setTimeout(() => w.print(), 400);
+  w.onafterprint = () => w.close();
+  setTimeout(() => { w.print(); }, 400);
 }
