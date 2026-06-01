@@ -181,9 +181,17 @@ export const ManageUsersScreen: React.FC = () => {
   };
 
   const handleApproveRequest = (req: CredentialChangeRequest) => {
-    const label = req.requestType === 'email'
-      ? `Approvare il cambio email da ${req.currentEmail} a ${req.newEmail}?`
-      : `Approvare il cambio password per ${req.userName} ${req.userSurname}?`;
+    let label: string;
+    if (req.requestType === 'email') {
+      label = `Approvare il cambio email da ${req.currentEmail} a ${req.newEmail}?`;
+    } else if (req.requestType === 'info' && req.newInfo) {
+      try {
+        const info = JSON.parse(req.newInfo);
+        label = `Approvare la modifica dati per ${req.userName} ${req.userSurname}?\n\nNuovi dati: ${info.name} ${info.surname}${info.phone ? ', Tel: ' + info.phone : ''}`;
+      } catch { label = `Approvare la modifica dati per ${req.userName} ${req.userSurname}?`; }
+    } else {
+      label = `Approvare il cambio password per ${req.userName} ${req.userSurname}?`;
+    }
 
     crossAlert('Approva Richiesta', label, [
       { text: 'Annulla', style: 'cancel' },
@@ -197,9 +205,9 @@ export const ManageUsersScreen: React.FC = () => {
               req.userId,
               'custom_alert',
               'Richiesta approvata',
-              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : 'password'} è stata approvata.`
+              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : req.requestType === 'info' ? 'dati anagrafici' : 'password'} è stata approvata.`
             ).catch(() => {});
-            crossAlert('Fatto', 'Richiesta approvata e credenziali aggiornate.');
+            crossAlert('Fatto', 'Richiesta approvata e dati aggiornati.');
             await loadData();
           } catch (err: any) {
             crossAlert('Errore', err?.message || 'Impossibile approvare la richiesta.');
@@ -225,7 +233,7 @@ export const ManageUsersScreen: React.FC = () => {
               req.userId,
               'custom_alert',
               'Richiesta rifiutata',
-              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : 'password'} è stata rifiutata.`
+              `La tua richiesta di modifica ${req.requestType === 'email' ? 'email' : req.requestType === 'info' ? 'dati anagrafici' : 'password'} è stata rifiutata.`
             ).catch(() => {});
             crossAlert('Fatto', 'Richiesta rifiutata.');
             await loadData();
@@ -392,7 +400,7 @@ export const ManageUsersScreen: React.FC = () => {
                 <View style={styles.requestCardHeader}>
                   <View style={styles.requestCardIcon}>
                     <Ionicons
-                      name={req.requestType === 'email' ? 'mail-outline' : 'lock-closed-outline'}
+                      name={req.requestType === 'email' ? 'mail-outline' : req.requestType === 'info' ? 'person-outline' : 'lock-closed-outline'}
                       size={16}
                       color={colors.warning}
                     />
@@ -404,6 +412,8 @@ export const ManageUsersScreen: React.FC = () => {
                     <Text style={styles.requestCardDetail}>
                       {req.requestType === 'email'
                         ? `${req.currentEmail} → ${req.newEmail}`
+                        : req.requestType === 'info'
+                        ? (() => { try { const info = JSON.parse(req.newInfo || '{}'); return `Modifica dati: ${[info.name && `Nome: ${info.name}`, info.surname && `Cognome: ${info.surname}`, info.phone !== undefined && `Tel: ${info.phone || 'rimosso'}`].filter(Boolean).join(', ')}`; } catch { return 'Modifica dati anagrafici'; } })()
                         : `Cambio password`}
                     </Text>
                   </View>

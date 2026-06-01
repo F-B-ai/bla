@@ -381,7 +381,7 @@ export interface NutritionTeamNote {
 
 // --- Richieste modifica credenziali ---
 export type CredentialRequestStatus = 'pending' | 'approved' | 'denied';
-export type CredentialRequestType = 'email' | 'password';
+export type CredentialRequestType = 'email' | 'password' | 'info';
 
 export interface CredentialChangeRequest {
   id: string;
@@ -392,6 +392,7 @@ export interface CredentialChangeRequest {
   currentEmail: string;
   newEmail?: string;
   newPassword?: string;
+  newInfo?: string;
   status: CredentialRequestStatus;
   createdAt: Date;
   reviewedAt?: Date;

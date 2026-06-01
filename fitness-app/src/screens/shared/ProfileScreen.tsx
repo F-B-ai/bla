@@ -74,10 +74,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [editPhone, setEditPhone] = useState('');
   const [savingInfo, setSavingInfo] = useState(false);
 
-  const canEditInfo = isOwner || (!isStudent && !isEditingOther);
+  const canEditInfo = isOwner;
+  const needsApproval = !isOwner && !isEditingOther;
 
-  // Student request flow
-  const [requestType, setRequestType] = useState<'email' | 'password' | null>(null);
+  // Request flow (students + staff)
+  const [requestType, setRequestType] = useState<'email' | 'password' | 'info' | null>(null);
+  const [requestName, setRequestName] = useState('');
+  const [requestSurname, setRequestSurname] = useState('');
+  const [requestPhone, setRequestPhone] = useState('');
   const [requestNewEmail, setRequestNewEmail] = useState('');
   const [requestNewPassword, setRequestNewPassword] = useState('');
   const [requestConfirmPassword, setRequestConfirmPassword] = useState('');
@@ -115,12 +119,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     }
   }, [isOwner, userId]);
 
-  // Load student's own requests
+  // Load user's own requests (students + staff)
   useEffect(() => {
-    if (isStudent && user && !isEditingOther) {
+    if (needsApproval && user) {
       getUserRequests(user.id).then(setMyRequests).catch(() => {});
     }
-  }, [isStudent, user, isEditingOther]);
+  }, [needsApproval, user]);
 
   const pickImage = useCallback(async () => {
     if (!userId) return;
@@ -279,7 +283,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     }
   };
 
-  // ====== Student: submit credential change request ======
+  // ====== Submit change request (students + staff) ======
   const handleSubmitRequest = async () => {
     if (!user || !profileUser) return;
 
@@ -288,7 +292,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         crossAlert('Errore', 'Inserisci una email valida.');
         return;
       }
-    } else {
+    } else if (requestType === 'password') {
       if (!requestNewPassword || requestNewPassword.length < 6) {
         crossAlert('Errore', 'La password deve avere almeno 6 caratteri.');
         return;
@@ -297,17 +301,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         crossAlert('Errore', 'Le password non coincidono.');
         return;
       }
+    } else if (requestType === 'info') {
+      if (!requestName.trim() || !requestSurname.trim()) {
+        crossAlert('Errore', 'Nome e cognome sono obbligatori.');
+        return;
+      }
     }
 
     setSendingRequest(true);
     try {
-      const value = requestType === 'email' ? requestNewEmail.trim() : requestNewPassword;
+      let value: string;
+      let typeLabel: string;
+      if (requestType === 'email') {
+        value = requestNewEmail.trim();
+        typeLabel = 'email';
+      } else if (requestType === 'password') {
+        value = requestNewPassword;
+        typeLabel = 'password';
+      } else {
+        value = JSON.stringify({ name: requestName.trim(), surname: requestSurname.trim(), phone: requestPhone.trim() });
+        typeLabel = 'dati anagrafici';
+      }
       await createCredentialRequest(
         user.id,
         user.name,
         user.surname,
         user.email,
-        requestType!,
+        requestType === 'info' ? 'info' : requestType!,
         value
       );
       getOwner().then((owner) => {
@@ -315,7 +335,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           owner.id,
           'custom_alert',
           'Richiesta modifica credenziali',
-          `${user.name} ${user.surname} ha richiesto la modifica della ${requestType === 'email' ? 'email' : 'password'}. Verifica nella sezione Team.`
+          `${user.name} ${user.surname} ha richiesto la modifica di ${typeLabel}. Verifica nella sezione Team.`
         ).catch(() => {});
       }).catch(() => {});
       crossAlert('Fatto', 'Richiesta inviata! Il titolare la esaminerà.');
@@ -323,6 +343,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       setRequestNewEmail('');
       setRequestNewPassword('');
       setRequestConfirmPassword('');
+      setRequestName('');
+      setRequestSurname('');
+      setRequestPhone('');
       const updated = await getUserRequests(user.id);
       setMyRequests(updated);
     } catch (err: any) {
@@ -409,12 +432,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               <Text style={styles.infoLabel}>Nome</Text>
               <View style={styles.infoValueRow}>
                 <Text style={styles.infoValue}>{profileUser.name} {profileUser.surname}</Text>
-                {canEditInfo && (
+                {(canEditInfo || needsApproval) && (
                   <TouchableOpacity onPress={() => {
-                    setEditName(profileUser.name || '');
-                    setEditSurname(profileUser.surname || '');
-                    setEditPhone(profileUser.phone || '');
-                    setEditingInfo(true);
+                    if (needsApproval) {
+                      setRequestName(profileUser.name || '');
+                      setRequestSurname(profileUser.surname || '');
+                      setRequestPhone(profileUser.phone || '');
+                      setRequestType('info');
+                    } else {
+                      setEditName(profileUser.name || '');
+                      setEditSurname(profileUser.surname || '');
+                      setEditPhone(profileUser.phone || '');
+                      setEditingInfo(true);
+                    }
                   }}>
                     <Ionicons name="create-outline" size={18} color={colors.accent} />
                   </TouchableOpacity>
@@ -426,9 +456,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               <Text style={styles.infoLabel}>Email</Text>
               <View style={styles.infoValueRow}>
                 <Text style={styles.infoValue} numberOfLines={1}>{profileUser.email}</Text>
-                {(isOwner || (isStudent && !isEditingOther)) && (
+                {(isOwner || needsApproval) && (
                   <TouchableOpacity onPress={() => {
-                    if (isStudent && !isOwner) {
+                    if (needsApproval) {
                       setRequestType('email');
                     } else {
                       setEditingEmail(true);
@@ -445,12 +475,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               <Text style={styles.infoLabel}>Telefono</Text>
               <View style={styles.infoValueRow}>
                 <Text style={styles.infoValue}>{profileUser.phone || '-'}</Text>
-                {canEditInfo && !editingInfo && (
+                {(canEditInfo || needsApproval) && (
                   <TouchableOpacity onPress={() => {
-                    setEditName(profileUser.name || '');
-                    setEditSurname(profileUser.surname || '');
-                    setEditPhone(profileUser.phone || '');
-                    setEditingInfo(true);
+                    if (needsApproval) {
+                      setRequestName(profileUser.name || '');
+                      setRequestSurname(profileUser.surname || '');
+                      setRequestPhone(profileUser.phone || '');
+                      setRequestType('info');
+                    } else {
+                      setEditName(profileUser.name || '');
+                      setEditSurname(profileUser.surname || '');
+                      setEditPhone(profileUser.phone || '');
+                      setEditingInfo(true);
+                    }
                   }}>
                     <Ionicons name="create-outline" size={18} color={colors.accent} />
                   </TouchableOpacity>
@@ -600,8 +637,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           </View>
         )}
 
-        {/* Student: request password change button */}
-        {isStudent && !isOwner && !isEditingOther && (
+        {/* Non-owner: request password change button */}
+        {needsApproval && (
           <Button
             title="Richiedi Cambio Password"
             onPress={() => setRequestType('password')}
@@ -610,11 +647,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         )}
       </Card>
 
-      {/* Student: request form */}
-      {isStudent && !isOwner && requestType && (
+      {/* Non-owner: request form */}
+      {needsApproval && requestType && (
         <Card variant="elevated">
           <Text style={styles.sectionTitle}>
-            {requestType === 'email' ? 'Richiesta Cambio Email' : 'Richiesta Cambio Password'}
+            {requestType === 'email' ? 'Richiesta Cambio Email' : requestType === 'password' ? 'Richiesta Cambio Password' : 'Richiesta Modifica Dati'}
           </Text>
           <Text style={styles.requestHint}>
             La tua richiesta verrà inviata al titolare per approvazione.
@@ -629,7 +666,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               keyboardType="email-address"
               autoCapitalize="none"
             />
-          ) : (
+          ) : requestType === 'password' ? (
             <>
               <InputField
                 label="Nuova Password"
@@ -646,6 +683,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
                 placeholder="Ripeti nuova password"
               />
             </>
+          ) : (
+            <>
+              <InputField label="Nome" value={requestName} onChangeText={setRequestName} />
+              <InputField label="Cognome" value={requestSurname} onChangeText={setRequestSurname} />
+              <InputField label="Telefono" value={requestPhone} onChangeText={setRequestPhone} keyboardType="phone-pad" />
+            </>
           )}
 
           <View style={styles.formActions}>
@@ -656,6 +699,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
                 setRequestNewEmail('');
                 setRequestNewPassword('');
                 setRequestConfirmPassword('');
+                setRequestName('');
+                setRequestSurname('');
+                setRequestPhone('');
               }}
               variant="outline"
               style={styles.formBtn}
@@ -670,15 +716,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         </Card>
       )}
 
-      {/* Student: pending requests */}
-      {isStudent && !isOwner && !isEditingOther && pendingRequests.length > 0 && (
+      {/* Non-owner: pending requests */}
+      {needsApproval && pendingRequests.length > 0 && (
         <Card variant="elevated">
           <Text style={styles.sectionTitle}>Richieste in Attesa</Text>
           {pendingRequests.map((req) => (
             <View key={req.id} style={styles.requestItem}>
               <View style={styles.requestIcon}>
                 <Ionicons
-                  name={req.requestType === 'email' ? 'mail-outline' : 'lock-closed-outline'}
+                  name={req.requestType === 'email' ? 'mail-outline' : req.requestType === 'info' ? 'person-outline' : 'lock-closed-outline'}
                   size={16}
                   color={colors.warning}
                 />
@@ -687,6 +733,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
                 <Text style={styles.requestTitle}>
                   {req.requestType === 'email'
                     ? `Cambio email → ${req.newEmail}`
+                    : req.requestType === 'info'
+                    ? 'Modifica dati anagrafici'
                     : 'Cambio password'}
                 </Text>
                 <Text style={styles.requestStatus}>In attesa di approvazione</Text>
@@ -696,8 +744,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         </Card>
       )}
 
-      {/* Student: past requests */}
-      {isStudent && !isOwner && !isEditingOther && pastRequests.length > 0 && (
+      {/* Non-owner: past requests */}
+      {needsApproval && pastRequests.length > 0 && (
         <Card variant="elevated">
           <Text style={styles.sectionTitle}>Storico Richieste</Text>
           {pastRequests.map((req) => {
@@ -715,6 +763,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
                   <Text style={styles.requestTitle}>
                     {req.requestType === 'email'
                       ? `Cambio email → ${req.newEmail}`
+                      : req.requestType === 'info'
+                      ? 'Modifica dati anagrafici'
                       : 'Cambio password'}
                   </Text>
                   <Text style={{

@@ -162,6 +162,7 @@ export const createCredentialRequest = async (
     createdAt: Timestamp.now(),
   };
   if (requestType === 'email') data.newEmail = newValue;
+  else if (requestType === 'info') data.newInfo = newValue;
   else data.newPassword = newValue;
 
   const docRef = await addDoc(collection(db, REQUESTS_COLLECTION), data);
@@ -219,6 +220,15 @@ export const approveRequest = async (
       managedPassword,
       request.newPassword
     );
+  } else if (request.requestType === 'info' && request.newInfo) {
+    const info = JSON.parse(request.newInfo);
+    const update: Record<string, string> = {};
+    if (info.name) update.name = info.name;
+    if (info.surname) update.surname = info.surname;
+    if (info.phone !== undefined) update.phone = info.phone;
+    if (Object.keys(update).length > 0) {
+      await updateDoc(doc(db, 'users', request.userId), update);
+    }
   }
 
   await updateDoc(doc(db, REQUESTS_COLLECTION, request.id), {
