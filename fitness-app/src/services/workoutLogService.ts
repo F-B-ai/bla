@@ -8,6 +8,7 @@ import {
   getDoc,
   query,
   where,
+  limit,
   orderBy,
   onSnapshot,
   Timestamp,
@@ -135,10 +136,11 @@ export const getCollaboratorWorkoutLogs = async (
 };
 
 // --- Tutti gli allenamenti (per owner) ---
-export const getAllWorkoutLogs = async (): Promise<WorkoutLog[]> => {
+export const getAllWorkoutLogs = async (maxResults = 200): Promise<WorkoutLog[]> => {
   const q = query(
     collection(db, WORKOUT_LOGS_COLLECTION),
-    orderBy('startedAt', 'desc')
+    orderBy('startedAt', 'desc'),
+    limit(maxResults)
   );
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as WorkoutLog));

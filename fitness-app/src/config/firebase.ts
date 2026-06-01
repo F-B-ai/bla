@@ -1,11 +1,15 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, initializeAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  getFirestore,
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { Platform } from 'react-native';
 
-// Configurazione Firebase
 const firebaseConfig = {
   apiKey: 'AIzaSyDAuKlToc-_GRILEcMzwoD4ysuBYRtPzxE',
   authDomain: 'essere-3fe6f.firebaseapp.com',
@@ -21,10 +25,8 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 let auth: ReturnType<typeof getAuth>;
 
 if (Platform.OS === 'web') {
-  // On web, getAuth uses indexedDB persistence by default
   auth = getAuth(app);
 } else {
-  // On native, use AsyncStorage persistence
   try {
     const { getReactNativePersistence } = require('firebase/auth');
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
@@ -36,7 +38,17 @@ if (Platform.OS === 'web') {
   }
 }
 
-const db = getFirestore(app);
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  });
+} catch {
+  db = getFirestore(app);
+}
+
 const storage = getStorage(app);
 const functions = getFunctions(app, 'europe-west1');
 

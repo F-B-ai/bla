@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -47,44 +47,60 @@ const loadLoginMode = async (): Promise<'app' | 'academy' | null> => {
   }
 };
 
-// Screens
+// Auth screens — loaded immediately (small, needed first)
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { LoginSelectorScreen } from '../screens/auth/LoginSelectorScreen';
 import { AcademyLoginScreen } from '../screens/auth/AcademyLoginScreen';
-import { DashboardScreen } from '../screens/owner/DashboardScreen';
-import { FinancialScreen } from '../screens/owner/FinancialScreen';
-import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
-import { ContentManagementScreen } from '../screens/owner/ContentManagementScreen';
-import { MyStudentsScreen } from '../screens/collaborator/MyStudentsScreen';
-import { EarningsScreen } from '../screens/collaborator/EarningsScreen';
-import { MyProgramScreen } from '../screens/student/MyProgramScreen';
-import { SessionsScreen } from '../screens/student/SessionsScreen';
-import { DiaryScreen } from '../screens/student/DiaryScreen';
-import { PaymentsScreen } from '../screens/student/PaymentsScreen';
-import { ContentScreen } from '../screens/student/ContentScreen';
-import { PosturalAssessmentScreen } from '../screens/shared/PosturalAssessmentScreen';
-import { WorkoutPlanScreen } from '../screens/shared/WorkoutPlanScreen';
-import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
 
-import { ChatListScreen } from '../screens/shared/ChatListScreen';
-import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
-import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
-import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
-import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
-import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
-import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
-import { CalendarScreen } from '../screens/shared/CalendarScreen';
-import { AcademyScreen } from '../screens/shared/AcademyScreen';
-import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
-import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
-import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
-import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
-import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
-import { ProfileScreen } from '../screens/shared/ProfileScreen';
-import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
-import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
-import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
-import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
+// Lazy-loaded screens — deferred until navigation
+const LazyFallback = () => (
+  <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background}}>
+    <ActivityIndicator size="large" color={colors.accent} />
+  </View>
+);
+
+const lazy = (loader: () => Promise<{default: React.ComponentType<any>}>) => {
+  const Component = React.lazy(loader);
+  return (props: any) => (
+    <Suspense fallback={<LazyFallback />}>
+      <Component {...props} />
+    </Suspense>
+  );
+};
+
+const DashboardScreen = lazy(() => import('../screens/owner/DashboardScreen').then(m => ({default: m.DashboardScreen})));
+const FinancialScreen = lazy(() => import('../screens/owner/FinancialScreen').then(m => ({default: m.FinancialScreen})));
+const ManageUsersScreen = lazy(() => import('../screens/owner/ManageUsersScreen').then(m => ({default: m.ManageUsersScreen})));
+const ContentManagementScreen = lazy(() => import('../screens/owner/ContentManagementScreen').then(m => ({default: m.ContentManagementScreen})));
+const MyStudentsScreen = lazy(() => import('../screens/collaborator/MyStudentsScreen').then(m => ({default: m.MyStudentsScreen})));
+const EarningsScreen = lazy(() => import('../screens/collaborator/EarningsScreen').then(m => ({default: m.EarningsScreen})));
+const MyProgramScreen = lazy(() => import('../screens/student/MyProgramScreen').then(m => ({default: m.MyProgramScreen})));
+const SessionsScreen = lazy(() => import('../screens/student/SessionsScreen').then(m => ({default: m.SessionsScreen})));
+const DiaryScreen = lazy(() => import('../screens/student/DiaryScreen').then(m => ({default: m.DiaryScreen})));
+const PaymentsScreen = lazy(() => import('../screens/student/PaymentsScreen').then(m => ({default: m.PaymentsScreen})));
+const ContentScreen = lazy(() => import('../screens/student/ContentScreen').then(m => ({default: m.ContentScreen})));
+const PosturalAssessmentScreen = lazy(() => import('../screens/shared/PosturalAssessmentScreen').then(m => ({default: m.PosturalAssessmentScreen})));
+const WorkoutPlanScreen = lazy(() => import('../screens/shared/WorkoutPlanScreen').then(m => ({default: m.WorkoutPlanScreen})));
+const ScheduleSessionScreen = lazy(() => import('../screens/shared/ScheduleSessionScreen').then(m => ({default: m.ScheduleSessionScreen})));
+const ChatListScreen = lazy(() => import('../screens/shared/ChatListScreen').then(m => ({default: m.ChatListScreen})));
+const AISettingsScreen = lazy(() => import('../screens/shared/AISettingsScreen').then(m => ({default: m.AISettingsScreen})));
+const NutritionistScreen = lazy(() => import('../screens/shared/NutritionistScreen').then(m => ({default: m.NutritionistScreen})));
+const NutritionTeamScreen = lazy(() => import('../screens/shared/NutritionTeamScreen').then(m => ({default: m.NutritionTeamScreen})));
+const AnalyticsScreen = lazy(() => import('../screens/owner/AnalyticsScreen').then(m => ({default: m.AnalyticsScreen})));
+const ManagerDashboardScreen = lazy(() => import('../screens/manager/ManagerDashboardScreen').then(m => ({default: m.ManagerDashboardScreen})));
+const ManageTemplatesScreen = lazy(() => import('../screens/shared/ManageTemplatesScreen').then(m => ({default: m.ManageTemplatesScreen})));
+const CalendarScreen = lazy(() => import('../screens/shared/CalendarScreen').then(m => ({default: m.CalendarScreen})));
+const AcademyScreen = lazy(() => import('../screens/shared/AcademyScreen').then(m => ({default: m.AcademyScreen})));
+const AcademyManagementScreen = lazy(() => import('../screens/owner/AcademyManagementScreen').then(m => ({default: m.AcademyManagementScreen})));
+const AcademyStudentsScreen = lazy(() => import('../screens/owner/AcademyStudentsScreen').then(m => ({default: m.AcademyStudentsScreen})));
+const AcademyAnalyticsScreen = lazy(() => import('../screens/owner/AcademyAnalyticsScreen').then(m => ({default: m.AcademyAnalyticsScreen})));
+const LiveWorkoutScreen = lazy(() => import('../screens/student/LiveWorkoutScreen').then(m => ({default: m.LiveWorkoutScreen})));
+const WorkoutMonitorScreen = lazy(() => import('../screens/shared/WorkoutMonitorScreen').then(m => ({default: m.WorkoutMonitorScreen})));
+const ProfileScreen = lazy(() => import('../screens/shared/ProfileScreen').then(m => ({default: m.ProfileScreen})));
+const TeamChatScreen = lazy(() => import('../screens/shared/TeamChatScreen').then(m => ({default: m.TeamChatScreen})));
+const NotificationsScreen = lazy(() => import('../screens/shared/NotificationsScreen').then(m => ({default: m.NotificationsScreen})));
+const PaymentPlanScreen = lazy(() => import('../screens/owner/PaymentPlanScreen').then(m => ({default: m.PaymentPlanScreen})));
+const WorkoutHistoryScreen = lazy(() => import('../screens/shared/WorkoutHistoryScreen').then(m => ({default: m.WorkoutHistoryScreen})));
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
 

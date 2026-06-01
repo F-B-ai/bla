@@ -7,6 +7,8 @@ import {
   deleteDoc,
   query,
   where,
+  limit,
+  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -83,8 +85,13 @@ export const getCollaboratorSessions = async (
   );
 };
 
-export const getAllSessions = async (): Promise<TrainingSession[]> => {
-  const snapshot = await getDocs(collection(db, SESSIONS_COLLECTION));
+export const getAllSessions = async (maxResults = 500): Promise<TrainingSession[]> => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    orderBy('date', 'desc'),
+    limit(maxResults)
+  );
+  const snapshot = await getDocs(q);
   return sortSessionsByDate(
     snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
   );

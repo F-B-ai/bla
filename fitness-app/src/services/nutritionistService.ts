@@ -8,6 +8,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -82,8 +83,8 @@ export const getStudentAppointments = async (
   );
 };
 
-export const getAllAppointments = async (): Promise<NutritionistAppointment[]> => {
-  const snapshot = await getDocs(collection(db, APPOINTMENTS_COLLECTION));
+export const getAllAppointments = async (maxResults = 500): Promise<NutritionistAppointment[]> => {
+  const snapshot = await getDocs(query(collection(db, APPOINTMENTS_COLLECTION), limit(maxResults)));
   return sortByDateDesc(
     snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
   );

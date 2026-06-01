@@ -16,6 +16,7 @@ import {
   Timestamp,
   Unsubscribe,
   writeBatch,
+  limit,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ChatRoom, ChatMessage } from '../types';
@@ -76,8 +77,8 @@ export const getUserChatRooms = async (userId: string): Promise<ChatRoom[]> => {
 };
 
 // Il titolare può vedere TUTTE le chat
-export const getAllChatRooms = async (): Promise<ChatRoom[]> => {
-  const snapshot = await getDocs(collection(db, ROOMS_COLLECTION));
+export const getAllChatRooms = async (maxResults = 200): Promise<ChatRoom[]> => {
+  const snapshot = await getDocs(query(collection(db, ROOMS_COLLECTION), limit(maxResults)));
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
 };
 
