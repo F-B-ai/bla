@@ -526,6 +526,16 @@ export const uploadAvatar = async (userId: string, imageUri: string): Promise<st
   return downloadUrl;
 };
 
+export const updateUserProfile = async (userId: string, data: { name?: string; surname?: string; phone?: string }): Promise<void> => {
+  const update: Record<string, string> = {};
+  if (data.name !== undefined) update.name = data.name.trim();
+  if (data.surname !== undefined) update.surname = data.surname.trim();
+  if (data.phone !== undefined) update.phone = data.phone.trim();
+  if (Object.keys(update).length > 0) {
+    await updateDoc(doc(db, 'users', userId), update);
+  }
+};
+
 // --- Cambio password (utente loggato) ---
 
 export const changeOwnPassword = async (

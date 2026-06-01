@@ -21,6 +21,7 @@ import {
   uploadAvatar,
   getUserProfile,
   getOwner,
+  updateUserProfile,
 } from '../../services/authService';
 import {
   changeOwnEmail,
@@ -65,6 +66,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  // Edit profile info (name/surname/phone)
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSurname, setEditSurname] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  const canEditInfo = isOwner || (!isStudent && !isEditingOther);
 
   // Student request flow
   const [requestType, setRequestType] = useState<'email' | 'password' | null>(null);
@@ -144,6 +154,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       setUploading(false);
     }
   }, [userId, isEditingOther, refreshProfile]);
+
+  // ====== Save profile info (name/surname/phone) ======
+  const handleSaveInfo = async () => {
+    if (!editName.trim() || !editSurname.trim()) {
+      crossAlert('Errore', 'Nome e cognome sono obbligatori.');
+      return;
+    }
+    setSavingInfo(true);
+    try {
+      await updateUserProfile(userId!, { name: editName, surname: editSurname, phone: editPhone });
+      setProfileUser((prev) => prev ? { ...prev, name: editName.trim(), surname: editSurname.trim(), phone: editPhone.trim() } : prev);
+      if (!isEditingOther) await refreshProfile();
+      setEditingInfo(false);
+      crossAlert('Fatto', 'Profilo aggiornato.');
+    } catch (err: any) {
+      crossAlert('Errore', err?.message || 'Impossibile aggiornare il profilo.');
+    } finally {
+      setSavingInfo(false);
+    }
+  };
 
   // ====== Owner: change email (own or other) ======
   const handleChangeEmail = async () => {
@@ -332,8 +362,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   return (
     <ScrollView style={styles.container}>
       {isEditingOther && onBack && (
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Ionicons name="arrow-back" size={22} color={colors.accent} />
+        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.6}>
+          <Ionicons name="arrow-back" size={24} color={colors.accent} />
           <Text style={styles.backText}>Indietro</Text>
         </TouchableOpacity>
       )}
@@ -373,41 +403,78 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
 
       {/* Info utente */}
       <Card variant="elevated">
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Nome</Text>
-          <Text style={styles.infoValue}>{profileUser.name} {profileUser.surname}</Text>
-        </View>
+        {!editingInfo ? (
+          <>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Nome</Text>
+              <View style={styles.infoValueRow}>
+                <Text style={styles.infoValue}>{profileUser.name} {profileUser.surname}</Text>
+                {canEditInfo && (
+                  <TouchableOpacity onPress={() => {
+                    setEditName(profileUser.name || '');
+                    setEditSurname(profileUser.surname || '');
+                    setEditPhone(profileUser.phone || '');
+                    setEditingInfo(true);
+                  }}>
+                    <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
-        {/* Email row with edit */}
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Email</Text>
-          <View style={styles.infoValueRow}>
-            <Text style={styles.infoValue} numberOfLines={1}>{profileUser.email}</Text>
-            {(isOwner || (isStudent && !isEditingOther)) && (
-              <TouchableOpacity onPress={() => {
-                if (isStudent && !isOwner) {
-                  setRequestType('email');
-                } else {
-                  setEditingEmail(true);
-                  setNewEmail(profileUser.email);
-                }
-              }}>
-                <Ionicons name="create-outline" size={18} color={colors.accent} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Email</Text>
+              <View style={styles.infoValueRow}>
+                <Text style={styles.infoValue} numberOfLines={1}>{profileUser.email}</Text>
+                {(isOwner || (isStudent && !isEditingOther)) && (
+                  <TouchableOpacity onPress={() => {
+                    if (isStudent && !isOwner) {
+                      setRequestType('email');
+                    } else {
+                      setEditingEmail(true);
+                      setNewEmail(profileUser.email);
+                    }
+                  }}>
+                    <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
 
-        {profileUser.phone ? (
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Telefono</Text>
-            <Text style={styles.infoValue}>{profileUser.phone}</Text>
-          </View>
-        ) : null}
-        <View style={{ ...styles.infoRow, borderBottomWidth: 0 }}>
-          <Text style={styles.infoLabel}>Ruolo</Text>
-          <Text style={styles.infoValue}>{roleLabel[profileUser.role] || profileUser.role}</Text>
-        </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Telefono</Text>
+              <View style={styles.infoValueRow}>
+                <Text style={styles.infoValue}>{profileUser.phone || '-'}</Text>
+                {canEditInfo && !editingInfo && (
+                  <TouchableOpacity onPress={() => {
+                    setEditName(profileUser.name || '');
+                    setEditSurname(profileUser.surname || '');
+                    setEditPhone(profileUser.phone || '');
+                    setEditingInfo(true);
+                  }}>
+                    <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={{ ...styles.infoRow, borderBottomWidth: 0 }}>
+              <Text style={styles.infoLabel}>Ruolo</Text>
+              <Text style={styles.infoValue}>{roleLabel[profileUser.role] || profileUser.role}</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Modifica Dati</Text>
+            <InputField label="Nome" value={editName} onChangeText={setEditName} />
+            <InputField label="Cognome" value={editSurname} onChangeText={setEditSurname} />
+            <InputField label="Telefono" value={editPhone} onChangeText={setEditPhone} keyboardType="phone-pad" />
+            <View style={styles.formActions}>
+              <Button title="Annulla" onPress={() => setEditingInfo(false)} variant="outline" style={styles.formBtn} />
+              <Button title={savingInfo ? 'Salvataggio...' : 'Salva'} onPress={handleSaveInfo} loading={savingInfo} style={styles.formBtn} />
+            </View>
+          </>
+        )}
       </Card>
 
       {/* Email edit form */}
@@ -684,8 +751,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.xs,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
+    minHeight: 48,
   },
   backText: {
     color: colors.accent,
