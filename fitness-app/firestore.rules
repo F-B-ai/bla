@@ -1,27 +1,22 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Funzione helper: verifica se l'utente è autenticato
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Funzione helper: ottieni il ruolo dell'utente dal documento
     function getUserRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Funzione helper: verifica se è owner
     function isOwner() {
       return isAuthenticated() && getUserRole() == 'owner';
     }
 
-    // Funzione helper: verifica se è owner o manager
     function isOwnerOrManager() {
-      return isAuthenticated() && (getUserRole() == 'owner' || getUserRole() == 'manager');
+      return isAuthenticated() && getUserRole() in ['owner', 'manager'];
     }
 
-    // Funzione helper: verifica se è owner, manager o collaborator
     function isStaff() {
       return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
@@ -38,7 +33,7 @@ service cloud.firestore {
 
     // Student invites
     match /studentInvites/{inviteId} {
-      allow read: if true; // Necessario per validare codice invito prima del login
+      allow read: if true;
       allow create: if isStaff();
       allow update: if isAuthenticated();
       allow delete: if isOwnerOrManager();
@@ -54,7 +49,7 @@ service cloud.firestore {
 
     // Workout plans
     match /workoutPlans/{planId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -70,37 +65,37 @@ service cloud.firestore {
 
     // Sessions
     match /sessions/{sessionId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
     }
 
-    // Nutritionist appointments
+    // Nutritionist appointments - dati sensibili
     match /nutritionistAppointments/{appointmentId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
     }
 
-    // Body measurements
+    // Body measurements - dati sanitari sensibili
     match /bodyMeasurements/{measurementId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
     }
 
-    // BIA documents
+    // BIA documents - dati sanitari sensibili
     match /biaDocuments/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
     }
 
-    // Workout logs (sessioni di allenamento registrate dagli allievi)
+    // Workout logs
     match /workoutLogs/{logId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.studentId == request.auth.uid
@@ -114,9 +109,9 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // Payment plans
+    // Payment plans - dati finanziari sensibili
     match /paymentPlans/{planId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isAuthenticated();
       allow delete: if isOwnerOrManager();
@@ -124,7 +119,7 @@ service cloud.firestore {
 
     // Collaborator earnings
     match /collaboratorEarnings/{earningId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwnerOrManager() || resource.data.collaboratorId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isOwnerOrManager();
       allow delete: if isOwner();
@@ -162,7 +157,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
-    // User presence (online status)
+    // User presence
     match /userPresence/{userId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
@@ -178,17 +173,19 @@ service cloud.firestore {
       allow delete: if isOwnerOrManager();
     }
 
-    // Diary entries
+    // Diary entries - dati personali sensibili
     match /diaryEntries/{entryId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        isStaff() || request.resource.data.studentId == request.auth.uid
+      );
+      allow update: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow delete: if isStaff() || resource.data.studentId == request.auth.uid;
     }
 
-    // Postural assessments
+    // Postural assessments - dati sanitari sensibili
     match /posturalAssessments/{assessmentId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -196,7 +193,7 @@ service cloud.firestore {
 
     // Nutritional consultations
     match /nutritionalConsultations/{consultationId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -228,7 +225,7 @@ service cloud.firestore {
 
     // Academy progress
     match /academyProgress/{progressId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
@@ -244,7 +241,7 @@ service cloud.firestore {
 
     // Academy quiz attempts
     match /academyQuizAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
@@ -288,7 +285,7 @@ service cloud.firestore {
       );
     }
 
-    // KPI targets (obiettivi personalizzabili)
+    // KPI targets
     match /kpiTargets/{targetId} {
       allow read: if isAuthenticated();
       allow create: if isOwnerOrManager();
@@ -296,9 +293,9 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
-    // Daily tasks (owner/manager)
+    // Daily tasks
     match /dailyTasks/{taskId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwnerOrManager();
       allow create: if isOwnerOrManager();
       allow update: if isOwnerOrManager();
       allow delete: if isOwnerOrManager();
@@ -314,7 +311,7 @@ service cloud.firestore {
 
     // Credential change requests
     match /credentialRequests/{requestId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwnerOrManager() || resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isOwnerOrManager();
       allow delete: if isOwner();
@@ -322,7 +319,7 @@ service cloud.firestore {
 
     // Nutrition team notes
     match /nutritionTeamNotes/{noteId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff();
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();

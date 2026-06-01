@@ -1,34 +1,39 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Academy content: staff can upload, authenticated users can read
+    // Helper: verifica ruolo via custom claims
+    function isStaff() {
+      return request.auth.token.role in ['owner', 'manager', 'collaborator'];
+    }
+
+    // Academy content: staff uploads, authenticated reads
     match /academy/{courseId}/{folder}/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && isStaff();
     }
 
-    // Postural images
+    // Postural images - dati sanitari: solo staff + lo studente stesso
     match /postural/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null && (isStaff() || request.auth.uid == studentId);
+      allow write: if request.auth != null && isStaff();
     }
 
-    // BIA documents
+    // BIA documents - dati sanitari: solo staff + lo studente stesso
     match /bia/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null && (isStaff() || request.auth.uid == studentId);
+      allow write: if request.auth != null && isStaff();
     }
 
-    // Nutrition team attachments
+    // Nutrition team attachments - solo staff
     match /nutritionTeam/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if request.auth != null && isStaff();
+      allow write: if request.auth != null && isStaff();
     }
 
-    // User avatars
+    // User avatars - chiunque legge, solo il proprietario o staff scrive
     match /avatars/{userId}/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || isStaff());
     }
   }
 }

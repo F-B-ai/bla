@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import { Platform } from 'react-native';
 
 // Configurazione Firebase
@@ -37,6 +38,7 @@ if (Platform.OS === 'web') {
 
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app, 'europe-west1');
 
-export { auth, db, storage };
+export { auth, db, storage, functions };
 export default app;
