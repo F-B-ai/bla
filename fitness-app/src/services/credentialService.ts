@@ -14,34 +14,84 @@ import {
   updatePassword,
   updateEmail,
 } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
-import { auth, db, functions } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { CredentialChangeRequest, CredentialRequestType } from '../types';
 
 const REQUESTS_COLLECTION = 'credentialRequests';
 
-// Cloud Functions for admin operations (no more stored passwords)
-const adminChangeEmailFn = httpsCallable(functions, 'adminChangeEmail');
-const adminChangePasswordFn = httpsCallable(functions, 'adminChangePassword');
-
-// Owner changes another user's email via Cloud Function
-export const adminChangeUserEmail = async (
-  userId: string,
-  _currentEmail: string,
-  _currentPassword: string,
-  newEmail: string
-): Promise<void> => {
-  await adminChangeEmailFn({ targetUserId: userId, newEmail });
+const getApiKey = (): string => {
+  const apiKey = auth.app.options.apiKey;
+  if (!apiKey) throw new Error('Firebase API key non trovata');
+  return apiKey;
 };
 
-// Owner changes another user's password via Cloud Function
+const restSignIn = async (
+  email: string,
+  password: string
+): Promise<{ idToken: string; localId: string }> => {
+  const apiKey = getApiKey();
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || 'Errore di autenticazione');
+  return { idToken: data.idToken, localId: data.localId };
+};
+
+const restUpdateAccount = async (
+  idToken: string,
+  updates: { email?: string; password?: string }
+): Promise<void> => {
+  const apiKey = getApiKey();
+  const body: Record<string, unknown> = { idToken, returnSecureToken: false };
+  if (updates.email) body.email = updates.email;
+  if (updates.password) body.password = updates.password;
+
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) {
+    const errMsg = data?.error?.message || '';
+    if (errMsg === 'EMAIL_EXISTS') throw new Error('Questa email è già in uso');
+    if (errMsg === 'WEAK_PASSWORD') throw new Error('Password troppo debole (min 6 caratteri)');
+    if (errMsg === 'INVALID_EMAIL') throw new Error('Email non valida');
+    throw new Error(errMsg || 'Errore aggiornamento credenziali');
+  }
+};
+
+// Owner changes another user's email
+export const adminChangeUserEmail = async (
+  userId: string,
+  currentEmail: string,
+  currentPassword: string,
+  newEmail: string
+): Promise<void> => {
+  const { idToken } = await restSignIn(currentEmail, currentPassword);
+  await restUpdateAccount(idToken, { email: newEmail });
+  await updateDoc(doc(db, 'users', userId), { email: newEmail });
+};
+
+// Owner changes another user's password
 export const adminChangeUserPassword = async (
   userId: string,
-  _currentEmail: string,
-  _currentPassword: string,
+  currentEmail: string,
+  currentPassword: string,
   newPassword: string
 ): Promise<void> => {
-  await adminChangePasswordFn({ targetUserId: userId, newPassword });
+  const { idToken } = await restSignIn(currentEmail, currentPassword);
+  await restUpdateAccount(idToken, { password: newPassword });
+  await updateDoc(doc(db, 'users', userId), { managedPassword: newPassword });
 };
 
 // Owner changes own email
@@ -67,6 +117,16 @@ export const changeOwnPasswordAndStore = async (
   const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
   await reauthenticateWithCredential(fbUser, credential);
   await updatePassword(fbUser, newPassword);
+};
+
+// Get managed password
+export const getManagedPassword = async (
+  userId: string
+): Promise<string | null> => {
+  const { getDoc } = await import('firebase/firestore');
+  const snap = await getDoc(doc(db, 'users', userId));
+  if (!snap.exists()) return null;
+  return snap.data()?.managedPassword || null;
 };
 
 // ==========================================
@@ -130,16 +190,25 @@ export const approveRequest = async (
   request: CredentialChangeRequest,
   reviewerId: string
 ): Promise<void> => {
+  const managedPassword = await getManagedPassword(request.userId);
+  if (!managedPassword) {
+    throw new Error('Password gestita non trovata. Impossibile applicare la modifica.');
+  }
+
   if (request.requestType === 'email' && request.newEmail) {
-    await adminChangeEmailFn({
-      targetUserId: request.userId,
-      newEmail: request.newEmail,
-    });
+    await adminChangeUserEmail(
+      request.userId,
+      request.currentEmail,
+      managedPassword,
+      request.newEmail
+    );
   } else if (request.requestType === 'password' && request.newPassword) {
-    await adminChangePasswordFn({
-      targetUserId: request.userId,
-      newPassword: request.newPassword,
-    });
+    await adminChangeUserPassword(
+      request.userId,
+      request.currentEmail,
+      managedPassword,
+      request.newPassword
+    );
   } else if (request.requestType === 'info' && request.newInfo) {
     try {
       const info = JSON.parse(request.newInfo);

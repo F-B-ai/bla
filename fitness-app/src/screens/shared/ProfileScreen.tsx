@@ -29,6 +29,7 @@ import {
   changeOwnPasswordAndStore,
   adminChangeUserEmail,
   adminChangeUserPassword,
+  getManagedPassword,
   createCredentialRequest,
   getUserRequests,
 } from '../../services/credentialService';
@@ -49,8 +50,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [uploading, setUploading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Password section
+  // Password visibility (owner only)
+  const [managedPassword, setManagedPassword] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [loadingPassword, setLoadingPassword] = useState(false);
 
   // Edit email
   const [editingEmail, setEditingEmail] = useState(false);
@@ -105,6 +108,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       setAvatarUrl(user.avatarUrl);
     }
   }, [user, isEditingOther]);
+
+  // Load managed password for owner
+  useEffect(() => {
+    if (isOwner && userId) {
+      setLoadingPassword(true);
+      getManagedPassword(userId).then((pw) => {
+        setManagedPassword(pw);
+        setLoadingPassword(false);
+      }).catch(() => setLoadingPassword(false));
+    }
+  }, [isOwner, userId]);
 
   // Load user's own requests (students + staff)
   useEffect(() => {
@@ -180,7 +194,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     setSavingEmail(true);
     try {
       if (isEditingOther && profileUser) {
-        await adminChangeUserEmail(profileUser.id, profileUser.email, '', newEmail.trim());
+        if (!managedPassword) {
+          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
+          setSavingEmail(false);
+          return;
+        }
+        await adminChangeUserEmail(profileUser.id, profileUser.email, managedPassword, newEmail.trim());
         setProfileUser({ ...profileUser, email: newEmail.trim() });
       } else {
         if (!currentPasswordForEmail) {
@@ -229,7 +248,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     setSavingPassword(true);
     try {
       if (isEditingOther && profileUser) {
-        await adminChangeUserPassword(profileUser.id, profileUser.email, '', newPassword);
+        if (!managedPassword) {
+          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
+          setSavingPassword(false);
+          return;
+        }
+        await adminChangeUserPassword(profileUser.id, profileUser.email, managedPassword, newPassword);
+        setManagedPassword(newPassword);
       } else {
         if (!currentPasswordForPw) {
           crossAlert('Errore', 'Inserisci la password attuale.');
@@ -237,6 +262,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           return;
         }
         await changeOwnPasswordAndStore(currentPasswordForPw, newPassword);
+        setManagedPassword(newPassword);
       }
       crossAlert('Fatto', 'Password aggiornata con successo.');
       setEditingPassword(false);
@@ -531,6 +557,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       <Card variant="elevated">
         <Text style={styles.sectionTitle}>Password</Text>
 
+        {/* Owner: show stored password */}
+        {isOwner && (
+          <View style={styles.passwordDisplay}>
+            <Text style={styles.passwordLabel}>Password attuale:</Text>
+            {loadingPassword ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : managedPassword ? (
+              <View style={styles.passwordValueRow}>
+                <Text style={styles.passwordValue}>
+                  {showPassword ? managedPassword : '••••••••'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.passwordNotAvailable}>Non disponibile</Text>
+            )}
+          </View>
+        )}
 
         {/* Owner: change password form */}
         {isOwner && !editingPassword && (
