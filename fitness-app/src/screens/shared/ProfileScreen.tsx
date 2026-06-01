@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: Platform.OS === 'ios' ? 54 : spacing.xl,
+    paddingTop: 60,
     paddingBottom: spacing.md,
     gap: spacing.sm,
     minHeight: 48,
