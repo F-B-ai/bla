@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Modal,
   TouchableOpacity,
   ActivityIndicator,
   Linking,
@@ -13,12 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
-import { Button } from '../../components/common/Button';
-import { InputField } from '../../components/common/InputField';
-import { ModalHeader } from '../../components/common/ModalHeader';
-import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { useAuth } from '../../hooks/useAuth';
@@ -37,8 +32,9 @@ import { crossAlert } from '../../utils/alert';
 import { createNotification } from '../../services/notificationService';
 import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
 import { printPlanDetail, printPaymentReceipt } from '../../utils/printUtils';
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+import { CreatePlanModal } from './paymentPlan/CreatePlanModal';
+import { EditPlanModal } from './paymentPlan/EditPlanModal';
+import { PlanDetailModal } from './paymentPlan/PlanDetailModal';
 
 // ---------------------------------------------------------------------------
 // PaymentPlanScreen
@@ -617,38 +613,6 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   // -----------------------------------------------------------------------
-  // Payment type selector (reusable for create form)
-  // -----------------------------------------------------------------------
-  const renderPaymentTypeOption = (
-    type: PaymentType,
-    label: string,
-    currentType: PaymentType,
-    onSelect: (t: PaymentType) => void,
-  ) => (
-    <TouchableOpacity
-      style={[
-        styles.typeOption,
-        currentType === type && styles.typeOptionActive,
-      ]}
-      onPress={() => onSelect(type)}
-    >
-      <Ionicons
-        name={currentType === type ? 'radio-button-on' : 'radio-button-off'}
-        size={20}
-        color={currentType === type ? colors.accent : colors.textLight}
-      />
-      <Text
-        style={[
-          styles.typeOptionText,
-          currentType === type && styles.typeOptionTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // -----------------------------------------------------------------------
   // RENDER
   // -----------------------------------------------------------------------
   if (loading) {
@@ -945,710 +909,97 @@ export const PaymentPlanScreen: React.FC = () => {
         <View style={{ height: 80 }} />
       </ScrollView>
 
-      {/* ================================================================= */}
-      {/* CREATE MODAL                                                      */}
-      {/* ================================================================= */}
+      {/* CREATE MODAL */}
       {canEdit && (
-        <Modal
+        <CreatePlanModal
           visible={showCreateModal}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setShowCreateModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <ModalHeader
-                title="Nuovo Piano di Pagamento"
-                onClose={() => setShowCreateModal(false)}
-              />
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {/* Student picker */}
-                <StudentSearchPicker
-                  students={students}
-                  selectedId={selectedStudentId}
-                  onSelect={setSelectedStudentId}
-                  label="Seleziona Allievo"
-                />
-
-                {/* Total amount */}
-                <InputField
-                  label="Importo Totale (€)"
-                  value={totalAmount}
-                  onChangeText={setTotalAmount}
-                  keyboardType="decimal-pad"
-                  placeholder="Es. 500.00"
-                />
-
-                {/* Payment type */}
-                <Text style={styles.fieldLabel}>Tipo di Pagamento</Text>
-                <View style={styles.typeRow}>
-                  {renderPaymentTypeOption('full', 'Unica soluzione', paymentType, setPaymentType)}
-                  {renderPaymentTypeOption('installment', 'Rate', paymentType, setPaymentType)}
-                </View>
-                <View style={styles.typeRowSingle}>
-                  {renderPaymentTypeOption('monthly_course', 'Corso Mensile', paymentType, setPaymentType)}
-                </View>
-
-                {/* Monthly course fields */}
-                {paymentType === 'monthly_course' && (
-                  <>
-                    <InputField
-                      label="Tipo di Corso"
-                      value={courseType}
-                      onChangeText={setCourseType}
-                      placeholder="Es. Pilates, CrossFit, Yoga"
-                    />
-                    <InputField
-                      label="Tipo di Abbonamento"
-                      value={subscriptionType}
-                      onChangeText={setSubscriptionType}
-                      placeholder="Es. Mensile, Trimestrale, Semestrale"
-                    />
-                  </>
-                )}
-
-                {/* Due date (full/monthly_course) or first due date (installment) */}
-                <InputField
-                  label={
-                    paymentType === 'installment'
-                      ? 'Data Prima Rata (gg/mm/aaaa)'
-                      : 'Data Scadenza (gg/mm/aaaa)'
-                  }
-                  value={firstDueDate}
-                  onChangeText={setFirstDueDate}
-                  placeholder="Es. 01/06/2026"
-                />
-
-                {/* Installment config */}
-                {paymentType === 'installment' && (
-                  <>
-                    <InputField
-                      label="Numero di Rate"
-                      value={numInstallments}
-                      onChangeText={setNumInstallments}
-                      keyboardType="number-pad"
-                      placeholder="Es. 3"
-                    />
-
-                    {/* Custom installment overrides */}
-                    {customInstallments.length > 0 && (
-                      <View style={styles.installmentsPreview}>
-                        <Text style={styles.fieldLabel}>Dettaglio Rate</Text>
-                        {customInstallments.map((ci, index) => (
-                          <View key={index} style={styles.customInstRow}>
-                            <Text style={styles.customInstLabel}>Rata {index + 1}</Text>
-                            <View style={styles.customInstFields}>
-                              <View style={styles.customInstField}>
-                                <Text style={styles.customInstFieldLabel}>{'€'}</Text>
-                                <InputField
-                                  label=""
-                                  value={ci.amount}
-                                  onChangeText={(val) => {
-                                    const updated = [...customInstallments];
-                                    updated[index] = { ...updated[index], amount: val };
-                                    setCustomInstallments(updated);
-                                  }}
-                                  keyboardType="decimal-pad"
-                                  style={styles.customInstInput}
-                                />
-                              </View>
-                              <View style={styles.customInstField}>
-                                <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
-                                <InputField
-                                  label=""
-                                  value={ci.dueDate}
-                                  onChangeText={(val) => {
-                                    const updated = [...customInstallments];
-                                    updated[index] = { ...updated[index], dueDate: val };
-                                    setCustomInstallments(updated);
-                                  }}
-                                  style={styles.customInstInput}
-                                />
-                              </View>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </>
-                )}
-
-                {/* Separator */}
-                <View style={styles.formDivider} />
-                <Text style={styles.fieldLabel}>Dettagli Percorso</Text>
-
-                {/* Included lessons */}
-                <InputField
-                  label="Lezioni incluse"
-                  value={includedLessons}
-                  onChangeText={setIncludedLessons}
-                  keyboardType="number-pad"
-                  placeholder="Es. 12"
-                />
-
-                {/* Included consultations */}
-                <InputField
-                  label="Consulenze nutrizionali incluse"
-                  value={includedConsultations}
-                  onChangeText={setIncludedConsultations}
-                  keyboardType="number-pad"
-                  placeholder="Es. 3"
-                />
-
-                {/* Start date */}
-                <InputField
-                  label="Data inizio percorso (gg/mm/aaaa)"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                  placeholder="Es. 01/06/2026"
-                />
-
-                {/* End date */}
-                <InputField
-                  label="Data fine percorso (gg/mm/aaaa)"
-                  value={endDate}
-                  onChangeText={setEndDate}
-                  placeholder="Es. 31/12/2026"
-                />
-
-                <View style={styles.modalActions}>
-                  <Button
-                    title="Salva Piano"
-                    onPress={handleCreate}
-                    loading={saving}
-                    icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />}
-                  />
-                  <Button
-                    title="Annulla"
-                    variant="outline"
-                    onPress={() => setShowCreateModal(false)}
-                  />
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+          onClose={() => setShowCreateModal(false)}
+          students={students}
+          selectedStudentId={selectedStudentId}
+          onSelectStudent={setSelectedStudentId}
+          totalAmount={totalAmount}
+          onChangeTotalAmount={setTotalAmount}
+          paymentType={paymentType}
+          onChangePaymentType={setPaymentType}
+          courseType={courseType}
+          onChangeCourseType={setCourseType}
+          subscriptionType={subscriptionType}
+          onChangeSubscriptionType={setSubscriptionType}
+          firstDueDate={firstDueDate}
+          onChangeFirstDueDate={setFirstDueDate}
+          numInstallments={numInstallments}
+          onChangeNumInstallments={setNumInstallments}
+          customInstallments={customInstallments}
+          onChangeCustomInstallments={setCustomInstallments}
+          includedLessons={includedLessons}
+          onChangeIncludedLessons={setIncludedLessons}
+          includedConsultations={includedConsultations}
+          onChangeIncludedConsultations={setIncludedConsultations}
+          startDate={startDate}
+          onChangeStartDate={setStartDate}
+          endDate={endDate}
+          onChangeEndDate={setEndDate}
+          saving={saving}
+          onSave={handleCreate}
+        />
       )}
 
-      {/* ================================================================= */}
-      {/* EDIT MODAL (view-only for managers)                               */}
-      {/* ================================================================= */}
-      <Modal
-        visible={!!editingPlan}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setEditingPlan(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ModalHeader
-              title={
-                canEdit
-                  ? `Modifica Piano - ${editingPlan ? getStudentName(editingPlan.studentId) : ''}`
-                  : `Piano - ${editingPlan ? getStudentName(editingPlan.studentId) : ''}`
-              }
-              onClose={() => setEditingPlan(null)}
-            />
+      {/* EDIT MODAL */}
+      <EditPlanModal
+        editingPlan={editingPlan}
+        onClose={() => setEditingPlan(null)}
+        canEdit={canEdit}
+        getStudentName={getStudentName}
+        editTotalAmount={editTotalAmount}
+        onChangeEditTotalAmount={setEditTotalAmount}
+        editPaymentType={editPaymentType}
+        getPaymentTypeBadgeStatus={getPaymentTypeBadgeStatus}
+        getPaymentTypeLabel={getPaymentTypeLabel}
+        editStartDate={editStartDate}
+        onChangeEditStartDate={setEditStartDate}
+        editEndDate={editEndDate}
+        onChangeEditEndDate={setEditEndDate}
+        editIncludedLessons={editIncludedLessons}
+        onChangeEditIncludedLessons={setEditIncludedLessons}
+        editUsedLessons={editUsedLessons}
+        editIncludedConsultations={editIncludedConsultations}
+        onChangeEditIncludedConsultations={setEditIncludedConsultations}
+        editUsedConsultations={editUsedConsultations}
+        editCourseType={editCourseType}
+        onChangeEditCourseType={setEditCourseType}
+        editSubscriptionType={editSubscriptionType}
+        onChangeEditSubscriptionType={setEditSubscriptionType}
+        editInstallments={editInstallments}
+        editCustomAmounts={editCustomAmounts}
+        onChangeEditCustomAmounts={setEditCustomAmounts}
+        editCustomDates={editCustomDates}
+        onChangeEditCustomDates={setEditCustomDates}
+        formatDate={formatDate}
+        daysUntilDate={daysUntilDate}
+        handleMarkPaid={handleMarkPaid}
+        sendReminder={sendReminder}
+        handleSaveEdit={handleSaveEdit}
+        handleDelete={handleDelete}
+        saving={saving}
+        printPaymentReceipt={printPaymentReceipt}
+      />
 
-            {editingPlan && (
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <InputField
-                  label="Importo Totale (€)"
-                  value={editTotalAmount}
-                  onChangeText={setEditTotalAmount}
-                  keyboardType="decimal-pad"
-                  editable={canEdit}
-                />
-
-                {/* Payment type (read-only display) */}
-                <View style={styles.editPaymentTypeRow}>
-                  <Text style={styles.fieldLabel}>Tipo di Pagamento</Text>
-                  <Badge
-                    status={getPaymentTypeBadgeStatus(editPaymentType)}
-                    label={getPaymentTypeLabel(editPaymentType)}
-                  />
-                </View>
-
-                {/* Separator - percorso details */}
-                <View style={styles.formDivider} />
-                <Text style={styles.fieldLabel}>Dettagli Percorso</Text>
-
-                {/* Date percorso */}
-                <View style={styles.editFieldRow}>
-                  <View style={{ flex: 1 }}>
-                    <InputField
-                      label="Data inizio (gg/mm/aaaa)"
-                      value={editStartDate}
-                      onChangeText={setEditStartDate}
-                      editable={canEdit}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <InputField
-                      label="Data fine (gg/mm/aaaa)"
-                      value={editEndDate}
-                      onChangeText={setEditEndDate}
-                      editable={canEdit}
-                    />
-                  </View>
-                </View>
-
-                {/* Included lessons */}
-                <View style={styles.editFieldRow}>
-                  <View style={{ flex: 1 }}>
-                    <InputField
-                      label="Lezioni incluse"
-                      value={editIncludedLessons}
-                      onChangeText={setEditIncludedLessons}
-                      keyboardType="number-pad"
-                      editable={canEdit}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.readOnlyField}>
-                      <Text style={styles.readOnlyLabel}>Lezioni utilizzate</Text>
-                      <Text style={styles.readOnlyValue}>{editUsedLessons}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Lezioni progress bar in edit */}
-                {parseInt(editIncludedLessons, 10) > 0 && (
-                  <ProgressBar
-                    used={editUsedLessons}
-                    total={parseInt(editIncludedLessons, 10)}
-                    color={colors.info}
-                  />
-                )}
-
-                {/* Included consultations */}
-                <View style={styles.editFieldRow}>
-                  <View style={{ flex: 1 }}>
-                    <InputField
-                      label="Consulenze incluse"
-                      value={editIncludedConsultations}
-                      onChangeText={setEditIncludedConsultations}
-                      keyboardType="number-pad"
-                      editable={canEdit}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.readOnlyField}>
-                      <Text style={styles.readOnlyLabel}>Consulenze utilizzate</Text>
-                      <Text style={styles.readOnlyValue}>{editUsedConsultations}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Consulenze progress bar in edit */}
-                {parseInt(editIncludedConsultations, 10) > 0 && (
-                  <ProgressBar
-                    used={editUsedConsultations}
-                    total={parseInt(editIncludedConsultations, 10)}
-                    color={colors.warning}
-                  />
-                )}
-
-                {/* Monthly course fields */}
-                {editPaymentType === 'monthly_course' && (
-                  <>
-                    <View style={styles.formDivider} />
-                    <Text style={styles.fieldLabel}>Dettagli Corso Mensile</Text>
-                    <InputField
-                      label="Tipo di Corso"
-                      value={editCourseType}
-                      onChangeText={setEditCourseType}
-                      placeholder="Es. Pilates, CrossFit, Yoga"
-                      editable={canEdit}
-                    />
-                    <InputField
-                      label="Tipo di Abbonamento"
-                      value={editSubscriptionType}
-                      onChangeText={setEditSubscriptionType}
-                      placeholder="Es. Mensile, Trimestrale, Semestrale"
-                      editable={canEdit}
-                    />
-                  </>
-                )}
-
-                {/* Installments */}
-                <View style={styles.formDivider} />
-                <Text style={styles.fieldLabel}>Rate</Text>
-                {editInstallments.map((inst, index) => {
-                  const isPaid = inst.status === 'paid';
-                  return (
-                    <Card
-                      key={inst.id}
-                      style={{
-                        ...styles.editInstCard,
-                        ...(isPaid ? styles.editInstCardPaid : {}),
-                      }}
-                    >
-                      <View style={styles.editInstHeader}>
-                        <Text style={styles.editInstTitle}>
-                          Rata {index + 1}
-                        </Text>
-                        <Badge status={inst.status} />
-                      </View>
-
-                      <View style={styles.editInstFields}>
-                        <View style={{ flex: 1 }}>
-                          <InputField
-                            label="Importo (€)"
-                            value={editCustomAmounts[index] || ''}
-                            onChangeText={(val) => {
-                              const updated = [...editCustomAmounts];
-                              updated[index] = val;
-                              setEditCustomAmounts(updated);
-                            }}
-                            keyboardType="decimal-pad"
-                            editable={!isPaid && canEdit}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <InputField
-                            label="Scadenza"
-                            value={editCustomDates[index] || ''}
-                            onChangeText={(val) => {
-                              const updated = [...editCustomDates];
-                              updated[index] = val;
-                              setEditCustomDates(updated);
-                            }}
-                            editable={!isPaid && canEdit}
-                          />
-                        </View>
-                      </View>
-
-                      {isPaid && inst.paidDate && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={styles.paidDateText}>
-                            Pagato il {formatDate(inst.paidDate)}
-                          </Text>
-                          {Platform.OS === 'web' && (
-                            <TouchableOpacity
-                              style={[styles.reminderBtnLarge, { backgroundColor: colors.accent + '20' }]}
-                              onPress={() => {
-                                const instIndex = editingPlan.installments.findIndex((i) => i.id === inst.id);
-                                printPaymentReceipt({
-                                  studentName: editingPlan.studentId ? getStudentName(editingPlan.studentId) : '',
-                                  amount: inst.amount,
-                                  dueDate: inst.dueDate,
-                                  paidDate: inst.paidDate ?? new Date(),
-                                  installmentNumber: instIndex + 1,
-                                  totalInstallments: editingPlan.installments.length,
-                                  planTotal: editingPlan.totalAmount ?? inst.amount,
-                                  paymentType: editingPlan.paymentType ?? 'full',
-                                  planStartDate: editingPlan.startDate,
-                                  planEndDate: editingPlan.endDate,
-                                });
-                              }}
-                            >
-                              <Ionicons name="receipt-outline" size={18} color={colors.accent} />
-                              <Text style={[styles.reminderBtnText, { color: colors.accent }]}>Ricevuta</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      )}
-
-                      {!isPaid && (
-                        <View style={styles.editInstActions}>
-                          <TouchableOpacity
-                            style={styles.markPaidButton}
-                            onPress={() => handleMarkPaid(editingPlan.id, inst.id, editingPlan.installments, editingPlan.studentId)}
-                          >
-                            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                            <Text style={styles.markPaidText}>Segna come pagato</Text>
-                          </TouchableOpacity>
-
-                          {/* Reminder buttons */}
-                          {(() => {
-                            const dueDate = inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate as unknown as string);
-                            const days = daysUntilDate(new Date(dueDate));
-                            if (days >= 0 && days <= 15) {
-                              return (
-                                <View style={styles.editReminderRow}>
-                                  <TouchableOpacity
-                                    style={[styles.reminderBtnLarge, { backgroundColor: '#25D366' + '20' }]}
-                                    onPress={() => sendReminder('whatsapp', editingPlan.studentId, inst)}
-                                  >
-                                    <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
-                                    <Text style={[styles.reminderBtnText, { color: '#25D366' }]}>WhatsApp</Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[styles.reminderBtnLarge, { backgroundColor: colors.info + '20' }]}
-                                    onPress={() => sendReminder('sms', editingPlan.studentId, inst)}
-                                  >
-                                    <Ionicons name="chatbubble-outline" size={16} color={colors.info} />
-                                    <Text style={[styles.reminderBtnText, { color: colors.info }]}>SMS</Text>
-                                  </TouchableOpacity>
-                                </View>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </View>
-                      )}
-                    </Card>
-                  );
-                })}
-
-                <View style={styles.modalActions}>
-                  {canEdit && (
-                    <>
-                      <Button
-                        title="Salva Modifiche"
-                        onPress={handleSaveEdit}
-                        loading={saving}
-                        icon={<Ionicons name="save" size={18} color="#fff" />}
-                      />
-                      <Button
-                        title="Elimina Piano"
-                        variant="danger"
-                        onPress={() => handleDelete(editingPlan.id)}
-                        icon={<Ionicons name="trash" size={18} color="#fff" />}
-                      />
-                    </>
-                  )}
-                  <Button
-                    title="Chiudi"
-                    variant="outline"
-                    onPress={() => setEditingPlan(null)}
-                  />
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* ================================================================= */}
-      {/* DETAIL MODAL – sessions + payments overview                       */}
-      {/* ================================================================= */}
-      <Modal
-        visible={!!detailPlan}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setDetailPlan(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ModalHeader
-              title={detailPlan ? getStudentName(detailPlan.studentId) : ''}
-              onClose={() => setDetailPlan(null)}
-            />
-
-            {detailPlan && (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {/* Plan overview */}
-                <Card style={styles.detailOverviewCard}>
-                  <View style={styles.planHeader}>
-                    <View style={styles.planInfo}>
-                      <Text style={styles.planAmount}>€{detailPlan.totalAmount.toFixed(2)}</Text>
-                      <Badge
-                        status={getPaymentTypeBadgeStatus(detailPlan.paymentType)}
-                        label={getPaymentTypeLabel(detailPlan.paymentType)}
-                      />
-                    </View>
-                  </View>
-                  <View style={styles.planDetailRow}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
-                    <Text style={styles.planDetailText}>
-                      {formatDate(detailPlan.startDate)} - {formatDate(detailPlan.endDate)}
-                    </Text>
-                  </View>
-                  {(detailPlan.includedLessons ?? 0) > 0 && (
-                    <View style={styles.planProgressSection}>
-                      <View style={styles.planProgressHeader}>
-                        <Ionicons name="body-outline" size={14} color={colors.info} />
-                        <Text style={styles.planProgressLabel}>Lezioni</Text>
-                        <Text style={styles.planProgressValue}>
-                          {detailPlan.usedLessons ?? 0} / {detailPlan.includedLessons}
-                        </Text>
-                      </View>
-                      <ProgressBar used={detailPlan.usedLessons ?? 0} total={detailPlan.includedLessons} color={colors.info} />
-                    </View>
-                  )}
-                  {(detailPlan.includedConsultations ?? 0) > 0 && (
-                    <View style={styles.planProgressSection}>
-                      <View style={styles.planProgressHeader}>
-                        <Ionicons name="nutrition-outline" size={14} color={colors.warning} />
-                        <Text style={styles.planProgressLabel}>Consulenze</Text>
-                        <Text style={styles.planProgressValue}>
-                          {detailPlan.usedConsultations ?? 0} / {detailPlan.includedConsultations}
-                        </Text>
-                      </View>
-                      <ProgressBar used={detailPlan.usedConsultations ?? 0} total={detailPlan.includedConsultations} color={colors.warning} />
-                    </View>
-                  )}
-                </Card>
-
-                {detailLoading ? (
-                  <ActivityIndicator size="small" color={colors.accent} style={{ marginVertical: spacing.lg }} />
-                ) : (
-                  <>
-                    {/* Completed sessions */}
-                    <View style={styles.formDivider} />
-                    <Text style={styles.fieldLabel}>
-                      Lezioni completate ({detailSessions.length})
-                    </Text>
-                    {detailSessions.length === 0 ? (
-                      <Card variant="outlined">
-                        <Text style={styles.detailEmptyText}>Nessuna lezione completata</Text>
-                      </Card>
-                    ) : (
-                      detailSessions.map((session) => {
-                        const sDate = toSafeDate(session.date);
-                        return (
-                          <Card key={session.id} variant="outlined" style={styles.detailItemCard}>
-                            <View style={styles.detailItemRow}>
-                              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                              <View style={styles.detailItemInfo}>
-                                <Text style={styles.detailItemTitle}>
-                                  {formatDate(sDate)}
-                                </Text>
-                                <Text style={styles.detailItemSubtitle}>
-                                  {session.startTime} - {session.endTime}
-                                  {session.sessionCost ? ` · €${session.sessionCost.toFixed(2)}` : ''}
-                                </Text>
-                              </View>
-                              {session.status === 'cancelled_late' && (
-                                <Badge status="overdue" label="Cancellazione tardiva" />
-                              )}
-                            </View>
-                            {session.notes ? (
-                              <Text style={styles.detailItemNotes}>{session.notes}</Text>
-                            ) : null}
-                          </Card>
-                        );
-                      })
-                    )}
-
-                    {/* Financial transactions */}
-                    <View style={styles.formDivider} />
-                    <Text style={styles.fieldLabel}>
-                      Movimenti economici ({detailTransactions.length})
-                    </Text>
-                    {detailTransactions.length === 0 ? (
-                      <Card variant="outlined">
-                        <Text style={styles.detailEmptyText}>Nessun movimento registrato</Text>
-                      </Card>
-                    ) : (
-                      detailTransactions.map((t) => {
-                        const tDate = toSafeDate(t.date);
-                        const isIncome = t.type === 'income';
-                        return (
-                          <Card key={t.id} variant="outlined" style={styles.detailItemCard}>
-                            <View style={styles.detailItemRow}>
-                              <Ionicons
-                                name={isIncome ? 'arrow-down-circle' : 'arrow-up-circle'}
-                                size={18}
-                                color={isIncome ? colors.success : colors.error}
-                              />
-                              <View style={styles.detailItemInfo}>
-                                <Text style={styles.detailItemTitle}>
-                                  {isIncome ? '+' : '-'}€{t.amount.toFixed(2)}
-                                </Text>
-                                <Text style={styles.detailItemSubtitle}>
-                                  {formatDate(tDate)} · {t.description || t.category}
-                                </Text>
-                              </View>
-                            </View>
-                          </Card>
-                        );
-                      })
-                    )}
-
-                    {/* Installments status */}
-                    <View style={styles.formDivider} />
-                    <Text style={styles.fieldLabel}>
-                      Rate ({detailPlan.installments.length})
-                    </Text>
-                    {detailPlan.installments.map((inst) => {
-                      const dueDate = toSafeDate(inst.dueDate);
-                      return (
-                        <Card key={inst.id} variant="outlined" style={styles.detailItemCard}>
-                          <View style={styles.detailItemRow}>
-                            <Ionicons
-                              name={inst.status === 'paid' ? 'checkmark-circle' : inst.status === 'overdue' ? 'alert-circle' : 'time-outline'}
-                              size={18}
-                              color={inst.status === 'paid' ? colors.success : inst.status === 'overdue' ? colors.error : colors.warning}
-                            />
-                            <View style={styles.detailItemInfo}>
-                              <Text style={styles.detailItemTitle}>€{inst.amount.toFixed(2)}</Text>
-                              <Text style={styles.detailItemSubtitle}>
-                                Scadenza: {formatDate(dueDate)}
-                                {inst.status === 'paid' && inst.paidDate ? ` · Pagato il ${formatDate(inst.paidDate)}` : ''}
-                              </Text>
-                            </View>
-                            <Badge status={inst.status} />
-                            {inst.status === 'paid' && Platform.OS === 'web' && (
-                              <TouchableOpacity
-                                style={[styles.reminderBtn, { backgroundColor: colors.accent + '20', marginLeft: 8 }]}
-                                onPress={() => {
-                                  const instIndex = detailPlan.installments.findIndex((i) => i.id === inst.id);
-                                  printPaymentReceipt({
-                                    studentName: detailPlan.studentId ? getStudentName(detailPlan.studentId) : '',
-                                    amount: inst.amount,
-                                    dueDate: inst.dueDate,
-                                    paidDate: inst.paidDate ?? new Date(),
-                                    installmentNumber: instIndex + 1,
-                                    totalInstallments: detailPlan.installments.length,
-                                    planTotal: detailPlan.totalAmount ?? inst.amount,
-                                    paymentType: detailPlan.paymentType ?? 'full',
-                                    planStartDate: detailPlan.startDate,
-                                    planEndDate: detailPlan.endDate,
-                                  });
-                                }}
-                              >
-                                <Ionicons name="receipt-outline" size={14} color={colors.accent} />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </Card>
-                      );
-                    })}
-                  </>
-                )}
-
-                <View style={styles.modalActions}>
-                  {Platform.OS === 'web' && (
-                    <Button
-                      title="Stampa"
-                      variant="outline"
-                      onPress={() => {
-                        printPlanDetail({
-                          studentName: getStudentName(detailPlan.studentId),
-                          plan: detailPlan,
-                          sessions: detailSessions,
-                          transactions: detailTransactions,
-                        });
-                      }}
-                      icon={<Ionicons name="print-outline" size={18} color={colors.accent} />}
-                    />
-                  )}
-                  {canEdit && (
-                    <Button
-                      title="Modifica Piano"
-                      onPress={() => {
-                        const plan = detailPlan;
-                        setDetailPlan(null);
-                        openEditModal(plan);
-                      }}
-                      icon={<Ionicons name="create-outline" size={18} color="#fff" />}
-                    />
-                  )}
-                  <Button
-                    title="Chiudi"
-                    variant="outline"
-                    onPress={() => setDetailPlan(null)}
-                  />
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* DETAIL MODAL */}
+      <PlanDetailModal
+        detailPlan={detailPlan}
+        onClose={() => setDetailPlan(null)}
+        canEdit={canEdit}
+        getStudentName={getStudentName}
+        getPaymentTypeBadgeStatus={getPaymentTypeBadgeStatus}
+        getPaymentTypeLabel={getPaymentTypeLabel}
+        formatDate={formatDate}
+        detailLoading={detailLoading}
+        detailSessions={detailSessions}
+        detailTransactions={detailTransactions}
+        onEditPlan={openEditModal}
+        printPlanDetail={printPlanDetail}
+        printPaymentReceipt={printPaymentReceipt}
+      />
     </View>
   );
 };
@@ -1885,245 +1236,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
-    maxHeight: '90%',
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
-  },
-
-  // Form fields
-  fieldLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  typeRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  typeRowSingle: {
-    flexDirection: 'row',
-    marginBottom: spacing.lg,
-  },
-  typeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    flex: 1,
-  },
-  typeOptionActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent + '10',
-  },
-  typeOptionText: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  typeOptionTextActive: {
-    color: colors.accent,
-  },
-
-  // Form divider
-  formDivider: {
-    height: 1,
-    backgroundColor: colors.divider,
-    marginVertical: spacing.lg,
-  },
-
-  // Custom installments
-  installmentsPreview: {
-    marginBottom: spacing.md,
-  },
-  customInstRow: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.divider,
-  },
-  customInstLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  customInstFields: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  customInstField: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  customInstFieldLabel: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  customInstInput: {
-    marginBottom: 0,
-  },
-
-  // Modal actions
-  modalActions: {
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xxl,
-  },
-
-  // Edit modal
-  editPaymentTypeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  editFieldRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  readOnlyField: {
-    marginBottom: spacing.md,
-  },
-  readOnlyLabel: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  readOnlyValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-    color: colors.text,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceLight,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-
-  editInstCard: {
-    marginBottom: spacing.sm,
-  },
-  editInstCardPaid: {
-    opacity: 0.7,
-  },
-  editInstHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  editInstTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  editInstFields: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  paidDateText: {
-    fontSize: fontSize.sm,
-    color: colors.success,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-  },
-  editInstActions: {
-    marginTop: spacing.sm,
-    gap: spacing.sm,
-  },
-  markPaidButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  markPaidText: {
-    fontSize: fontSize.md,
-    color: colors.success,
-    fontWeight: '600',
-  },
-  editReminderRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  reminderBtnLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.lg,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  reminderBtnText: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-  },
-
-  // Detail modal
-  detailOverviewCard: {
-    marginBottom: spacing.xs,
-  },
-  detailEmptyText: {
-    color: colors.textLight,
-    textAlign: 'center',
-    paddingVertical: spacing.md,
-    fontSize: fontSize.md,
-  },
-  detailItemCard: {
-    marginBottom: spacing.xs,
-  },
-  detailItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  detailItemInfo: {
-    flex: 1,
-  },
-  detailItemTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  detailItemSubtitle: {
-    fontSize: fontSize.sm,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  detailItemNotes: {
-    fontSize: fontSize.sm,
-    color: colors.textLight,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
-    marginLeft: spacing.xl + spacing.sm,
-  },
 });

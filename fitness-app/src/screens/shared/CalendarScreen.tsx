@@ -5,11 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Modal,
   FlatList,
   RefreshControl,
-  TextInput,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +14,7 @@ import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { InputField } from '../../components/common/InputField';
-import { ModalHeader } from '../../components/common/ModalHeader';
 import { Badge } from '../../components/common/Badge';
-import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import {
   TrainingSession,
   NutritionistAppointment,
@@ -67,6 +61,11 @@ import {
 } from '../../services/paymentService';
 import { createNotification } from '../../services/notificationService';
 import { addTransaction } from '../../services/financialService';
+import { TaskCard } from './calendar/TaskCard';
+import { AppointmentCard } from './calendar/AppointmentCard';
+import { TaskModal } from './calendar/TaskModal';
+import { AppointmentModal } from './calendar/AppointmentModal';
+import { StudentDetailModal } from './calendar/StudentDetailModal';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 const MONTHS = [
@@ -838,145 +837,35 @@ export const CalendarScreen: React.FC = () => {
   };
 
   // Render task card
-  const renderTaskCard = (task: DailyTask) => {
-    const priorityColor = PRIORITY_COLORS[task.priority];
-    return (
-      <View key={task.id} style={{
-        ...styles.taskCard,
-        ...(task.isCompleted ? styles.taskCardCompleted : {}),
-        borderLeftColor: priorityColor,
-      }}>
-        <TouchableOpacity
-          style={styles.taskCheckbox}
-          onPress={() => handleToggleTask(task)}
-        >
-          <Ionicons
-            name={task.isCompleted ? 'checkbox' : 'square-outline'}
-            size={22}
-            color={task.isCompleted ? colors.success : colors.textSecondary}
-          />
-        </TouchableOpacity>
-        <View style={styles.taskContent}>
-          <Text style={{
-            ...styles.taskTitle,
-            ...(task.isCompleted ? styles.taskTitleDone : {}),
-          }}>{task.title}</Text>
-          {task.description ? (
-            <Text style={styles.taskDesc} numberOfLines={2}>{task.description}</Text>
-          ) : null}
-          <View style={styles.taskMeta}>
-            {task.startTime ? (
-              <View style={styles.taskTimeBadge}>
-                <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
-                <Text style={styles.taskTimeText}>
-                  {task.startTime}{task.endTime ? ` - ${task.endTime}` : ''}
-                </Text>
-              </View>
-            ) : null}
-            <View style={{ ...styles.priorityBadge, backgroundColor: priorityColor + '20' }}>
-              <Text style={{ ...styles.priorityText, color: priorityColor }}>
-                {PRIORITY_LABELS[task.priority]}
-              </Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.taskActions}>
-          <TouchableOpacity onPress={() => openEditTask(task)} style={styles.taskActionBtn}>
-            <Ionicons name="create-outline" size={16} color={colors.info} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDeleteTask(task)} style={styles.taskActionBtn}>
-            <Ionicons name="trash-outline" size={16} color={colors.error} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  const renderTaskCard = (task: DailyTask) => (
+    <TaskCard
+      key={task.id}
+      task={task}
+      onToggle={handleToggleTask}
+      onEdit={openEditTask}
+      onDelete={handleDeleteTask}
+    />
+  );
 
   // Render appointment card
-  const renderAppointmentCard = (item: AppointmentItem) => {
-    const isScheduled = item.status === 'scheduled';
-    const isFuture = item.date >= new Date();
-    const canStudentCancel = isScheduled && isFuture;
-    const canStaffAct = isScheduled;
-    const staffName = getStaffName(item.staffId);
-
-    return (
-      <Card key={item.id} variant="elevated">
-        <View style={styles.cardHeader}>
-          <View style={styles.kindBadge}>
-            <Ionicons
-              name={item.kind === 'training' ? 'barbell' : 'nutrition'}
-              size={14}
-              color={item.kind === 'training' ? colors.accent : colors.success}
-            />
-            <Text style={{ ...styles.kindText, color: item.kind === 'training' ? colors.accent : colors.success }}>
-              {item.kind === 'training' ? 'Training' : 'Nutrizione'}
-            </Text>
-          </View>
-          <Badge status={item.status} />
-        </View>
-
-        <View style={styles.cardBody}>
-          <Text style={styles.cardTime}>{item.startTime} - {item.endTime}</Text>
-          {isStaff ? (
-            <TouchableOpacity onPress={() => setStudentDetailId(item.studentId)}>
-              <Text style={styles.cardStudent}>{getStudentName(item.studentId)}</Text>
-            </TouchableOpacity>
-          ) : null}
-          {staffName ? <Text style={styles.cardStaff}>{staffName}</Text> : null}
-          {item.notes ? <Text style={styles.cardNotes}>{item.notes}</Text> : null}
-        </View>
-
-        {/* Owner earnings */}
-        {isOwner && item.sessionCost != null && item.sessionCost > 0 && (
-          <View style={styles.earningsRow}>
-            <Text style={styles.earningsCost}>{'€'}{item.sessionCost}</Text>
-            {(() => {
-              const e = calcEarnings(item.sessionCost!, item.studentId, item.staffId);
-              return (
-                <Text style={styles.earningsDetail}>
-                  Staff: {'€'}{e.coachEarning}{e.managerEarning > 0 ? ` | Mgr: €${e.managerEarning}` : ''} | Tuo: {'€'}{e.ownerEarning}
-                </Text>
-              );
-            })()}
-          </View>
-        )}
-
-        {/* Staff actions */}
-        {isStaff && (
-          <View style={styles.actionRow}>
-            {canStaffAct && (
-              <>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => openEdit(item)}>
-                  <Ionicons name="create-outline" size={18} color={colors.info} />
-                  <Text style={{ ...styles.actionText, color: colors.info }}>Modifica</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleComplete(item)}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
-                  <Text style={{ ...styles.actionText, color: colors.success }}>Completato</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
-                  <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
-                  <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
-              <Ionicons name="trash-outline" size={18} color={colors.error} />
-            </TouchableOpacity>
-          </View>
-        )}
-        {canStudentCancel && isStudent && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleCancel(item)}>
-              <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-              <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </Card>
-    );
-  };
+  const renderAppointmentCard = (item: AppointmentItem) => (
+    <AppointmentCard
+      key={item.id}
+      item={item}
+      isStaff={isStaff}
+      isOwner={isOwner}
+      isStudent={isStudent}
+      getStudentName={getStudentName}
+      getStaffName={getStaffName}
+      calcEarnings={calcEarnings}
+      onEdit={openEdit}
+      onComplete={handleComplete}
+      onCancel={handleCancel}
+      onDelete={handleDelete}
+      onStudentDetail={setStudentDetailId}
+      styles={styles}
+    />
+  );
 
   // Render compact appointment row for agenda
   const renderAgendaRow = (item: AppointmentItem) => {
@@ -1618,457 +1507,76 @@ export const CalendarScreen: React.FC = () => {
     </View>
   );
 
-  // ========== MODALS ==========
+  // ========== MODALS (extracted components) ==========
 
   function renderTaskModal() {
     return (
-      <Modal visible={showTaskModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ModalHeader
-              title={editingTask ? 'Modifica Task' : 'Nuovo Task'}
-              onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
-            />
-            <ScrollView>
-              <InputField
-                label="Titolo"
-                value={taskTitle}
-                onChangeText={setTaskTitle}
-                placeholder="Es: Chiamare fornitore"
-              />
-              <InputField
-                label="Descrizione (opzionale)"
-                value={taskDescription}
-                onChangeText={setTaskDescription}
-                placeholder="Dettagli..."
-                multiline
-                numberOfLines={3}
-              />
-              <Text style={styles.fieldLabel}>Orario (opzionale)</Text>
-              <View style={styles.timePickerRow}>
-                <View style={styles.timePickerCol}>
-                  <Text style={styles.timePickerLabel}>Inizio</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeChipScroll}>
-                    <View style={styles.timeChipRow}>
-                      {TIME_SLOTS.map((t) => (
-                        <TouchableOpacity
-                          key={`start-${t}`}
-                          style={{
-                            ...styles.timeChip,
-                            ...(taskStartTime === t ? styles.timeChipActive : {}),
-                          }}
-                          onPress={() => {
-                            setTaskStartTime(taskStartTime === t ? '' : t);
-                            if (!taskEndTime && taskStartTime !== t) {
-                              const idx = TIME_SLOTS.indexOf(t);
-                              if (idx < TIME_SLOTS.length - 1) setTaskEndTime(TIME_SLOTS[idx + 1]);
-                            }
-                          }}
-                        >
-                          <Text style={{
-                            ...styles.timeChipText,
-                            ...(taskStartTime === t ? styles.timeChipTextActive : {}),
-                          }}>{t}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-                {taskStartTime ? (
-                  <View style={styles.timePickerCol}>
-                    <Text style={styles.timePickerLabel}>Fine</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.timeChipScroll}>
-                      <View style={styles.timeChipRow}>
-                        {TIME_SLOTS.filter((t) => t > taskStartTime).map((t) => (
-                          <TouchableOpacity
-                            key={`end-${t}`}
-                            style={{
-                              ...styles.timeChip,
-                              ...(taskEndTime === t ? styles.timeChipActive : {}),
-                            }}
-                            onPress={() => setTaskEndTime(taskEndTime === t ? '' : t)}
-                          >
-                            <Text style={{
-                              ...styles.timeChipText,
-                              ...(taskEndTime === t ? styles.timeChipTextActive : {}),
-                            }}>{t}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                ) : null}
-              </View>
-
-              <Text style={styles.fieldLabel}>Priorità</Text>
-              <View style={styles.priorityRow}>
-                {(['low', 'medium', 'high'] as TaskPriority[]).map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={{
-                      ...styles.priorityChip,
-                      ...(taskPriority === p ? {
-                        backgroundColor: PRIORITY_COLORS[p] + '20',
-                        borderColor: PRIORITY_COLORS[p],
-                      } : {}),
-                    }}
-                    onPress={() => setTaskPriority(p)}
-                  >
-                    <View style={{ ...styles.priorityDot, backgroundColor: PRIORITY_COLORS[p] }} />
-                    <Text style={{
-                      ...styles.priorityChipText,
-                      ...(taskPriority === p ? { color: PRIORITY_COLORS[p] } : {}),
-                    }}>
-                      {PRIORITY_LABELS[p]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.modalButtons}>
-                <Button
-                  title="Annulla"
-                  onPress={() => { setShowTaskModal(false); resetTaskForm(); }}
-                  variant="outline"
-                  style={styles.modalButton}
-                />
-                <Button
-                  title={savingTask ? 'Salvataggio...' : editingTask ? 'Aggiorna' : 'Crea'}
-                  onPress={handleSaveTask}
-                  style={styles.modalButton}
-                  loading={savingTask}
-                />
-              </View>
-              <View style={{ height: 60 }} />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <TaskModal
+        visible={showTaskModal}
+        editingTask={editingTask}
+        taskTitle={taskTitle}
+        setTaskTitle={setTaskTitle}
+        taskDescription={taskDescription}
+        setTaskDescription={setTaskDescription}
+        taskPriority={taskPriority}
+        setTaskPriority={setTaskPriority}
+        taskStartTime={taskStartTime}
+        setTaskStartTime={setTaskStartTime}
+        taskEndTime={taskEndTime}
+        setTaskEndTime={setTaskEndTime}
+        savingTask={savingTask}
+        onSave={handleSaveTask}
+        onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
+      />
     );
   }
 
   function renderAppointmentModal() {
     return (
-      <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalContent}>
-            <ModalHeader
-              title={editingItem ? 'Modifica Appuntamento' : 'Nuovo Appuntamento'}
-              onClose={() => { setShowModal(false); resetForm(); }}
-            />
-
-            {/* Type */}
-            {!editingItem && (
-              <>
-                <Text style={styles.fieldLabel}>Tipo</Text>
-                <View style={styles.typeRow}>
-                  <TouchableOpacity
-                    style={{
-                      ...styles.typeChip,
-                      ...(formKind === 'training' ? styles.typeChipActive : {}),
-                    }}
-                    onPress={() => setFormKind('training')}
-                  >
-                    <Ionicons name="barbell" size={16} color={formKind === 'training' ? colors.accent : colors.textSecondary} />
-                    <Text style={{ ...styles.typeChipText, ...(formKind === 'training' ? { color: colors.accent } : {}) }}>Training</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      ...styles.typeChip,
-                      ...(formKind === 'nutrition' ? styles.typeChipActiveGreen : {}),
-                    }}
-                    onPress={() => setFormKind('nutrition')}
-                  >
-                    <Ionicons name="nutrition" size={16} color={formKind === 'nutrition' ? colors.success : colors.textSecondary} />
-                    <Text style={{ ...styles.typeChipText, ...(formKind === 'nutrition' ? { color: colors.success } : {}) }}>Nutrizione</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
-            {/* Student */}
-            <StudentSearchPicker
-              students={students}
-              selectedId={formStudentId}
-              onSelect={(id) => setFormStudentId(id)}
-              label="Allievo"
-            />
-
-            {/* Staff picker (owner/manager only) */}
-            {canSeeAll && (
-              <>
-                <Text style={styles.fieldLabel}>
-                  {formKind === 'training' ? 'Collaboratore' : 'Nutrizionista'}
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {collaborators.map((c) => (
-                      <TouchableOpacity
-                        key={c.id}
-                        style={{
-                          ...styles.chip,
-                          ...(formCollabId === c.id ? styles.chipActive : {}),
-                        }}
-                        onPress={() => setFormCollabId(c.id)}
-                      >
-                        <Text style={{
-                          ...styles.chipText,
-                          ...(formCollabId === c.id ? styles.chipTextActive : {}),
-                        }}>
-                          {c.name} {c.surname}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </>
-            )}
-
-            {/* Date */}
-            <Text style={styles.fieldLabel}>Data</Text>
-            <View style={styles.customDateRow}>
-              {Platform.OS === 'web' ? (
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e: any) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setFormDate(val);
-                      const d = new Date(val);
-                      setFormCustomDate(d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }));
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    backgroundColor: '#1A1A1A',
-                    color: '#FFFFFF',
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 8,
-                    padding: '10px 14px',
-                    fontSize: 16,
-                    WebkitAppearance: 'none' as any,
-                    colorScheme: 'dark',
-                  } as any}
-                />
-              ) : (
-                <TextInput
-                  style={styles.customDateInput}
-                  placeholder="GG/MM/AAAA"
-                  placeholderTextColor={colors.textLight}
-                  value={formCustomDate}
-                  onChangeText={(raw) => {
-                    const digits = raw.replace(/\D/g, '').slice(0, 8);
-                    let formatted = '';
-                    if (digits.length <= 2) formatted = digits;
-                    else if (digits.length <= 4) formatted = digits.slice(0, 2) + '/' + digits.slice(2);
-                    else formatted = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4);
-                    setFormCustomDate(formatted);
-                    if (digits.length === 8) {
-                      const dd = digits.slice(0, 2);
-                      const mm = digits.slice(2, 4);
-                      const yyyy = digits.slice(4, 8);
-                      const dateStr = `${yyyy}-${mm}-${dd}`;
-                      const parsed = new Date(dateStr);
-                      if (!isNaN(parsed.getTime())) {
-                        setFormDate(dateStr);
-                      }
-                    }
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={10}
-                />
-              )}
-              <TouchableOpacity
-                style={styles.todayBtn}
-                onPress={() => {
-                  const today = toDateStr(new Date());
-                  setFormDate(today);
-                  setFormCustomDate('');
-                }}
-              >
-                <Text style={styles.todayBtnText}>Oggi</Text>
-              </TouchableOpacity>
-            </View>
-            {formDate ? (
-              <Text style={styles.selectedDateLabel}>
-                {new Date(formDate + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                {new Date(formDate) < new Date(toDateStr(new Date())) ? '  (passato)' : ''}
-              </Text>
-            ) : null}
-
-            {/* Time */}
-            <View style={styles.timeSection}>
-              <View style={styles.timeField}>
-                <Text style={styles.fieldLabel}>Inizio</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {TIME_SLOTS.map((t) => (
-                      <TouchableOpacity
-                        key={`s-${t}`}
-                        style={{
-                          ...styles.timeChip,
-                          ...(formStartTime === t ? styles.chipActive : {}),
-                        }}
-                        onPress={() => setFormStartTime(t)}
-                      >
-                        <Text style={{
-                          ...styles.chipText,
-                          ...(formStartTime === t ? styles.chipTextActive : {}),
-                        }}>{t}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-              <View style={styles.timeField}>
-                <Text style={styles.fieldLabel}>Fine</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {TIME_SLOTS.map((t) => (
-                      <TouchableOpacity
-                        key={`e-${t}`}
-                        style={{
-                          ...styles.timeChip,
-                          ...(formEndTime === t ? styles.chipActive : {}),
-                        }}
-                        onPress={() => setFormEndTime(t)}
-                      >
-                        <Text style={{
-                          ...styles.chipText,
-                          ...(formEndTime === t ? styles.chipTextActive : {}),
-                        }}>{t}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
-
-            {/* Cost */}
-            {(isOwner || isManager) && (
-              <InputField
-                label="Costo sessione (€)"
-                value={formCost}
-                onChangeText={setFormCost}
-                placeholder="0"
-                keyboardType="numeric"
-              />
-            )}
-
-            <InputField
-              label="Note (opzionale)"
-              value={formNotes}
-              onChangeText={setFormNotes}
-              placeholder="Note..."
-              multiline
-              numberOfLines={3}
-            />
-
-            <View style={styles.modalButtons}>
-              <Button
-                title="Annulla"
-                onPress={() => { setShowModal(false); resetForm(); }}
-                variant="outline"
-                style={styles.modalButton}
-              />
-              <Button
-                title={saving ? 'Salvataggio...' : editingItem ? 'Aggiorna' : 'Crea'}
-                onPress={handleSave}
-                style={styles.modalButton}
-                loading={saving}
-              />
-            </View>
-            <View style={{ height: 60 }} />
-          </ScrollView>
-        </View>
-      </Modal>
+      <AppointmentModal
+        visible={showModal}
+        editingItem={editingItem}
+        formKind={formKind}
+        setFormKind={setFormKind}
+        formStudentId={formStudentId}
+        setFormStudentId={setFormStudentId}
+        formCollabId={formCollabId}
+        setFormCollabId={setFormCollabId}
+        formDate={formDate}
+        setFormDate={setFormDate}
+        formCustomDate={formCustomDate}
+        setFormCustomDate={setFormCustomDate}
+        formStartTime={formStartTime}
+        setFormStartTime={setFormStartTime}
+        formEndTime={formEndTime}
+        setFormEndTime={setFormEndTime}
+        formCost={formCost}
+        setFormCost={setFormCost}
+        formNotes={formNotes}
+        setFormNotes={setFormNotes}
+        students={students}
+        collaborators={collaborators}
+        canSeeAll={canSeeAll}
+        isOwner={isOwner}
+        isManager={isManager}
+        saving={saving}
+        onSave={handleSave}
+        onClose={() => { setShowModal(false); resetForm(); }}
+      />
     );
   }
 
   function renderStudentDetailModal() {
     return (
-      <Modal visible={studentDetailId !== null} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <ScrollView style={styles.modalContent}>
-            <ModalHeader
-              title={`Appuntamenti - ${studentDetailId ? getStudentName(studentDetailId) : ''}`}
-              onClose={() => setStudentDetailId(null)}
-            />
-
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{studentDetailItems.stats.total}</Text>
-                <Text style={styles.statLabel}>Totali</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={{ ...styles.statValue, color: colors.success }}>{studentDetailItems.stats.completed}</Text>
-                <Text style={styles.statLabel}>Completati</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={{ ...styles.statValue, color: colors.error }}>{studentDetailItems.stats.cancelled}</Text>
-                <Text style={styles.statLabel}>Annullati</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Text style={{ ...styles.statValue, color: colors.info }}>{studentDetailItems.stats.remaining}</Text>
-                <Text style={styles.statLabel}>Rimanenti</Text>
-              </View>
-            </View>
-
-            {/* Upcoming */}
-            <Text style={styles.sectionTitle}>Prossimi ({studentDetailItems.upcoming.length})</Text>
-            {studentDetailItems.upcoming.length === 0 ? (
-              <Text style={styles.emptySection}>Nessun appuntamento programmato</Text>
-            ) : (
-              studentDetailItems.upcoming.map((item) => (
-                <View key={item.id} style={styles.miniCard}>
-                  <View style={styles.miniCardLeft}>
-                    <Ionicons
-                      name={item.kind === 'training' ? 'barbell' : 'nutrition'}
-                      size={14}
-                      color={item.kind === 'training' ? colors.accent : colors.success}
-                    />
-                    <Text style={styles.miniCardDate}>
-                      {item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                    </Text>
-                    <Text style={styles.miniCardTime}>{item.startTime}</Text>
-                  </View>
-                  <Badge status={item.status} />
-                </View>
-              ))
-            )}
-
-            {/* History */}
-            <Text style={styles.sectionTitle}>Storico ({studentDetailItems.past.length})</Text>
-            {studentDetailItems.past.length === 0 ? (
-              <Text style={styles.emptySection}>Nessuno storico</Text>
-            ) : (
-              studentDetailItems.past.map((item) => (
-                <View key={item.id} style={styles.miniCard}>
-                  <View style={styles.miniCardLeft}>
-                    <Ionicons
-                      name={item.kind === 'training' ? 'barbell' : 'nutrition'}
-                      size={14}
-                      color={item.kind === 'training' ? colors.accent : colors.success}
-                    />
-                    <Text style={styles.miniCardDate}>
-                      {item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
-                    </Text>
-                    <Text style={styles.miniCardTime}>{item.startTime}</Text>
-                    {isOwner && item.sessionCost != null && item.sessionCost > 0 && (
-                      <Text style={styles.miniCardCost}>{'€'}{item.sessionCost}</Text>
-                    )}
-                  </View>
-                  <Badge status={item.status} />
-                </View>
-              ))
-            )}
-
-            <View style={{ height: 60 }} />
-          </ScrollView>
-        </View>
-      </Modal>
+      <StudentDetailModal
+        visible={studentDetailId !== null}
+        studentName={studentDetailId ? getStudentName(studentDetailId) : ''}
+        isOwner={isOwner}
+        stats={studentDetailItems.stats}
+        upcoming={studentDetailItems.upcoming}
+        past={studentDetailItems.past}
+        onClose={() => setStudentDetailId(null)}
+      />
     );
   }
 };
