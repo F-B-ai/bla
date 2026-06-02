@@ -18,6 +18,7 @@ import { ModalHeader } from '../../components/common/ModalHeader';
 import { WorkoutPlan, Exercise, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
@@ -138,6 +139,7 @@ export const MyProgramScreen: React.FC = () => {
         )}
       </View>
 
+      <InstallPrompt />
       <NotificationPrompt />
 
       {/* Statistiche */}

@@ -22,6 +22,8 @@ import { getAllSessions } from '../../services/sessionService';
 import { getTransactions } from '../../services/financialService';
 import { getAllAppointments } from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
 
 export const ManagerDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -362,6 +364,9 @@ export const ManagerDashboardScreen: React.FC = () => {
         </View>
         <Text style={styles.roleBadge}>Manager</Text>
       </View>
+
+      <InstallPrompt />
+      <NotificationPrompt />
 
       {/* Filtro periodo */}
       <View style={styles.periodFilter}>

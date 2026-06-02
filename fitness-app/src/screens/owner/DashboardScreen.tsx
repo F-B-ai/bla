@@ -29,6 +29,7 @@ import { getFinancialSummary, getTransactions } from '../../services/financialSe
 import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 
 const toSafeDate = (d: unknown): Date => {
@@ -360,6 +361,7 @@ export const DashboardScreen: React.FC = () => {
         <Text style={styles.roleBadge}>Ruolo: {user?.role?.toUpperCase()}</Text>
       </View>
 
+      <InstallPrompt />
       <NotificationPrompt />
 
       {/* Stampa Report */}

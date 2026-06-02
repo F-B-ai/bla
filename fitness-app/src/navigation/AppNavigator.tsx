@@ -6,6 +6,8 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, Toucha
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
+import { OfflineIndicator } from '../components/common/OfflineIndicator';
+import { OnboardingOverlay, hasCompletedOnboarding, markOnboardingComplete } from '../components/common/OnboardingOverlay';
 
 // --- Persist loginMode so Academy mode survives refresh ---
 const LOGIN_MODE_KEY = 'essere_login_mode';
@@ -922,6 +924,17 @@ export const AppNavigator: React.FC = () => {
   // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user && (role === 'student' || role === 'collaborator')) {
+      if (!hasCompletedOnboarding(user.id)) {
+        setShowOnboarding(true);
+      }
+    } else {
+      setShowOnboarding(false);
+    }
+  }, [isAuthenticated, user, role]);
 
   // Load persisted loginMode on mount
   useEffect(() => {
@@ -996,55 +1009,64 @@ export const AppNavigator: React.FC = () => {
   );
 
   return (
-    <NavigationContainer
-      documentTitle={{
-        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
-      }}
-    >
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          // Not authenticated: show login selector or specific login
-          effectiveLoginMode === null ? (
-            <RootStack.Screen name="LoginSelector">
-              {() => (
-                <LoginSelectorScreen
-                  onSelectApp={() => setLoginModeAndPersist('app')}
-                  onSelectAcademy={() => setLoginModeAndPersist('academy')}
-                />
-              )}
-            </RootStack.Screen>
-          ) : effectiveLoginMode === 'app' ? (
-            <RootStack.Screen name="Login">
-              {() => (
-                <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
-              )}
-            </RootStack.Screen>
+    <View style={{ flex: 1 }}>
+      <OfflineIndicator />
+      <NavigationContainer
+        documentTitle={{
+          formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+        }}
+      >
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {!isAuthenticated ? (
+            effectiveLoginMode === null ? (
+              <RootStack.Screen name="LoginSelector">
+                {() => (
+                  <LoginSelectorScreen
+                    onSelectApp={() => setLoginModeAndPersist('app')}
+                    onSelectAcademy={() => setLoginModeAndPersist('academy')}
+                  />
+                )}
+              </RootStack.Screen>
+            ) : effectiveLoginMode === 'app' ? (
+              <RootStack.Screen name="Login">
+                {() => (
+                  <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
+                )}
+              </RootStack.Screen>
+            ) : (
+              <RootStack.Screen name="AcademyLogin">
+                {() => (
+                  <AcademyLoginScreen
+                    onBack={() => setLoginModeAndPersist(null)}
+                  />
+                )}
+              </RootStack.Screen>
+            )
+          ) : effectiveLoginMode === 'academy' ? (
+            <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
+          ) : role === 'owner' ? (
+            <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
+          ) : role === 'manager' ? (
+            <RootStack.Screen name="ManagerTabs" component={ManagerTabs} />
+          ) : role === 'collaborator' ? (
+            <RootStack.Screen
+              name="CollaboratorTabs"
+              component={CollaboratorTabs}
+            />
           ) : (
-            <RootStack.Screen name="AcademyLogin">
-              {() => (
-                <AcademyLoginScreen
-                  onBack={() => setLoginModeAndPersist(null)}
-                />
-              )}
-            </RootStack.Screen>
-          )
-        ) : effectiveLoginMode === 'academy' ? (
-          // Authenticated via Academy login: show only Academy tabs with logout
-          <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
-        ) : role === 'owner' ? (
-          <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
-        ) : role === 'manager' ? (
-          <RootStack.Screen name="ManagerTabs" component={ManagerTabs} />
-        ) : role === 'collaborator' ? (
-          <RootStack.Screen
-            name="CollaboratorTabs"
-            component={CollaboratorTabs}
-          />
-        ) : (
-          <RootStack.Screen name="StudentTabs" component={StudentTabs} />
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+            <RootStack.Screen name="StudentTabs" component={StudentTabs} />
+          )}
+        </RootStack.Navigator>
+      </NavigationContainer>
+      {showOnboarding && user && role && (
+        <OnboardingOverlay
+          role={role}
+          userName={user.name}
+          userId={user.id}
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
+    </View>
   );
 };
 

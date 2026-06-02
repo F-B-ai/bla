@@ -23,6 +23,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 import { createProgram, getStudentWorkoutPlans } from '../../services/programService';
 import { isStudentAssignedTo } from '../../utils/helpers';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
 
 export const MyStudentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -208,6 +210,9 @@ export const MyStudentsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      <InstallPrompt />
+      <NotificationPrompt />
 
       {/* Barra di ricerca */}
       {students.length > 0 && (
