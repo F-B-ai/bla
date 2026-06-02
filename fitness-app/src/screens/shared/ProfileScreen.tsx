@@ -16,6 +16,7 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { crossAlert } from '../../utils/alert';
+import { isValidEmail } from '../../utils/helpers';
 import { useAuth } from '../../hooks/useAuth';
 import { User, CredentialChangeRequest } from '../../types';
 import {
@@ -186,7 +187,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       crossAlert('Errore', 'Inserisci la nuova email.');
       return;
     }
-    if (!newEmail.includes('@')) {
+    if (!isValidEmail(newEmail)) {
       crossAlert('Errore', 'Email non valida.');
       return;
     }
@@ -289,7 +290,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     if (!user || !profileUser) return;
 
     if (requestType === 'email') {
-      if (!requestNewEmail.trim() || !requestNewEmail.includes('@')) {
+      if (!requestNewEmail.trim() || !isValidEmail(requestNewEmail)) {
         crossAlert('Errore', 'Inserisci una email valida.');
         return;
       }

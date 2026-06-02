@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import { isValidEmail } from '../../utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -81,6 +82,10 @@ export const AcademyStudentsScreen: React.FC = () => {
   const handleAddStudent = async () => {
     if (!formName.trim() || !formSurname.trim() || !formEmail.trim() || !formPassword.trim()) {
       showAlert('Errore', 'Compila tutti i campi obbligatori');
+      return;
+    }
+    if (!isValidEmail(formEmail)) {
+      showAlert('Errore', 'Inserisci un indirizzo email valido');
       return;
     }
     setSaving(true);

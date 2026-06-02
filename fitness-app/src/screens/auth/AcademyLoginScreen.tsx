@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
+import { isValidEmail } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { useAuth } from '../../hooks/useAuth';
@@ -40,6 +41,10 @@ export const AcademyLoginScreen: React.FC<AcademyLoginScreenProps> = ({ onBack }
       crossAlert('Errore', 'Inserisci email e password');
       return;
     }
+    if (!isValidEmail(email)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
+      return;
+    }
     try {
       await login(email.trim(), password);
     } catch {
@@ -51,6 +56,10 @@ export const AcademyLoginScreen: React.FC<AcademyLoginScreenProps> = ({ onBack }
     const target = resetEmail.trim() || email.trim();
     if (!target) {
       crossAlert('Errore', 'Inserisci la tua email per recuperare la password');
+      return;
+    }
+    if (!isValidEmail(target)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
       return;
     }
     setResetLoading(true);

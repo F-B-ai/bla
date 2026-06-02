@@ -75,6 +75,10 @@ export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
+export const isValidEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+};
+
 /**
  * Calcola la percentuale del collaboratore e del titolare
  */
