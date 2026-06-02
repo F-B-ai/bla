@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     padding: spacing.md,
-    paddingTop: spacing.xxl,
+    paddingTop: 60,
     flexDirection: 'row',
     alignItems: 'center',
   },
