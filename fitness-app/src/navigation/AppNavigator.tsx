@@ -1009,13 +1009,13 @@ export const AppNavigator: React.FC = () => {
   );
 
   return (
-    <View style={{ flex: 1 }}>
-      <OfflineIndicator />
-      <NavigationContainer
-        documentTitle={{
-          formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
-        }}
-      >
+    <NavigationContainer
+      documentTitle={{
+        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+      }}
+    >
+      <View style={{ flex: 1 }}>
+        <OfflineIndicator />
         <RootStack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             effectiveLoginMode === null ? (
@@ -1057,16 +1057,16 @@ export const AppNavigator: React.FC = () => {
             <RootStack.Screen name="StudentTabs" component={StudentTabs} />
           )}
         </RootStack.Navigator>
-      </NavigationContainer>
-      {showOnboarding && user && role && (
-        <OnboardingOverlay
-          role={role}
-          userName={user.name}
-          userId={user.id}
-          onComplete={() => setShowOnboarding(false)}
-        />
-      )}
-    </View>
+        {showOnboarding && user && role && (
+          <OnboardingOverlay
+            role={role}
+            userName={user.name}
+            userId={user.id}
+            onComplete={() => setShowOnboarding(false)}
+          />
+        )}
+      </View>
+    </NavigationContainer>
   );
 };
 
