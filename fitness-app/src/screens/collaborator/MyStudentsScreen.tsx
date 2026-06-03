@@ -29,6 +29,7 @@ import { printStudentProgressReport } from '../../utils/printUtils';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
+import { generateAndSendRemindersForAllStudents } from '../../services/paymentReminderService';
 
 export const MyStudentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -76,6 +77,18 @@ export const MyStudentsScreen: React.FC = () => {
           (isManager && s.assignedManagerId === user.id)
       );
       setStudents(myStudents);
+
+      Promise.all(myStudents.map((s) => getStudentPaymentPlans(s.id)))
+        .then((allPlans) => {
+          const flatPlans = allPlans.flat();
+          if (flatPlans.length > 0) {
+            generateAndSendRemindersForAllStudents(
+              flatPlans,
+              myStudents.map((s) => ({ id: s.id, name: s.name }))
+            ).catch(() => {});
+          }
+        })
+        .catch(() => {});
     } catch {
       // Silently handle
     }

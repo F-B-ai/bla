@@ -142,6 +142,7 @@ export const deleteNotification = async (notificationId: string): Promise<void> 
 export const getNotificationIcon = (type: NotificationType): string => {
   switch (type) {
     case 'payment_due':
+    case 'payment_reminder_15days':
     case 'payment_reminder_week':
     case 'payment_reminder_3days':
     case 'payment_reminder_1day':
@@ -168,6 +169,7 @@ export const getNotificationColor = (type: NotificationType): string => {
   switch (type) {
     case 'payment_due':
       return '#FF453A';
+    case 'payment_reminder_15days':
     case 'payment_reminder_week':
     case 'payment_reminder_3days':
     case 'payment_reminder_1day':

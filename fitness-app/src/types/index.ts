@@ -430,6 +430,7 @@ export interface DailyTask {
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'
+  | 'payment_reminder_15days'
   | 'payment_reminder_week'
   | 'payment_reminder_3days'
   | 'payment_reminder_1day'

@@ -7,26 +7,40 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { PaymentPlan, Installment, AppNotification } from '../types';
+import { PaymentPlan, AppNotification } from '../types';
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
 const REMINDER_MESSAGES = {
+  fifteenDays: (name: string, amount: number, dueDate: string) =>
+    `Ciao ${name}, tra 15 giorni è previsto il rinnovo della tua rata di €${amount} (${dueDate}). ` +
+    `Pensa a quanto sei cambiato da quando hai iniziato questo percorso: ogni allenamento ha costruito ` +
+    `una versione più forte di te. Chi investe con costanza nel proprio corpo ottiene risultati che ` +
+    `chi si ferma non vedrà mai. Il tuo futuro te stesso ti ringrazierà per aver scelto di continuare. ` +
+    `Noi siamo pronti a darti il meglio — e quando tutto è in ordine, possiamo concentrarci solo sui tuoi risultati.`,
+
   week: (name: string, amount: number, dueDate: string) =>
-    `Ciao ${name}! Tra una settimana scade la tua rata di €${amount} (${dueDate}). ` +
-    `Continuando con costanza il tuo percorso, stai investendo nel tuo benessere e nella tua salute. ` +
-    `Ogni sessione ti avvicina ai tuoi obiettivi!`,
-  threeDays: (name: string, amount: number, dueDate: string) =>
-    `${name}, mancano 3 giorni alla scadenza della rata di €${amount} (${dueDate}). ` +
-    `Il tuo impegno sta dando risultati: non fermarti proprio adesso! ` +
-    `Regolarizzando il pagamento potrai continuare senza interruzioni il percorso che hai iniziato.`,
+    `${name}, manca una settimana alla scadenza della tua rata di €${amount} (${dueDate}). ` +
+    `Hai già costruito un ritmo, un'abitudine, una disciplina — e sai quanto è difficile ` +
+    `ricostruirla se si interrompe. Gli allievi più costanti nei pagamenti sono anche quelli che ` +
+    `raggiungono i risultati migliori, perché vivono il percorso con piena responsabilità. ` +
+    `Mantieni il ritmo: la regolarità fuori dalla palestra riflette la regolarità dentro. ` +
+    `Con la tua puntualità, possiamo pianificare al meglio ogni dettaglio del tuo programma.`,
+
   oneDay: (name: string, amount: number, dueDate: string) =>
-    `${name}, domani scade la rata di €${amount} (${dueDate}). ` +
-    `Ricorda che il tuo percorso fitness è un investimento su di te. ` +
-    `Provvedi al pagamento per continuare a goderti le tue sessioni senza interruzioni!`,
+    `${name}, domani scade la tua rata di €${amount} (${dueDate}). ` +
+    `Ogni giorno che hai investito in te stesso ti ha portato fin qui — non lasciare che un ` +
+    `dettaglio amministrativo rallenti il tuo slancio. Provvedi oggi al pagamento e domani ` +
+    `potrai allenarti con la mente libera, concentrato solo su ciò che conta: i tuoi progressi. ` +
+    `Quando sei in regola, possiamo dedicarti il 100% della nostra attenzione e del nostro tempo ` +
+    `senza distrazioni. Il tuo percorso merita continuità.`,
+
   overdue: (name: string, amount: number, dueDate: string) =>
     `${name}, la rata di €${amount} prevista per il ${dueDate} risulta scaduta. ` +
-    `Contattaci per regolarizzare la tua posizione e riprendere il tuo percorso di benessere!`,
+    `Sappiamo che la vita è piena di impegni, ma ogni giorno che passa senza regolarizzare ` +
+    `la posizione è un giorno in cui il tuo percorso perde slancio. I tuoi progressi sono reali ` +
+    `e meritano di essere protetti. Contattaci oggi stesso: insieme troviamo la soluzione migliore ` +
+    `per riprendere senza perdere ciò che hai costruito.`,
 };
 
 export const generatePaymentReminders = async (
@@ -49,7 +63,7 @@ export const generatePaymentReminders = async (
       const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
       let message = '';
-      let type: 'payment_reminder_week' | 'payment_reminder_3days' | 'payment_reminder_1day' | 'payment_due' | null = null;
+      let type: 'payment_reminder_15days' | 'payment_reminder_week' | 'payment_reminder_1day' | 'payment_due' | null = null;
 
       if (diffDays <= 0) {
         message = REMINDER_MESSAGES.overdue(studentName, inst.amount, dueDateStr);
@@ -57,12 +71,12 @@ export const generatePaymentReminders = async (
       } else if (diffDays <= 1) {
         message = REMINDER_MESSAGES.oneDay(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_1day';
-      } else if (diffDays <= 3) {
-        message = REMINDER_MESSAGES.threeDays(studentName, inst.amount, dueDateStr);
-        type = 'payment_reminder_3days';
       } else if (diffDays <= 7) {
         message = REMINDER_MESSAGES.week(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_week';
+      } else if (diffDays <= 15) {
+        message = REMINDER_MESSAGES.fifteenDays(studentName, inst.amount, dueDateStr);
+        type = 'payment_reminder_15days';
       }
 
       if (type && message) {
@@ -91,7 +105,6 @@ export const generatePaymentReminders = async (
 export const sendPaymentReminder = async (
   notification: Omit<AppNotification, 'id'>
 ): Promise<string> => {
-  // Controlla se un reminder simile è già stato inviato oggi
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -104,6 +117,7 @@ export const sendPaymentReminder = async (
   const alreadySentToday = existing.docs.some((d) => {
     const data = d.data();
     if (data.docType !== 'notification' || data.type !== notification.type) return false;
+    if (data.data?.installmentId !== notification.data?.installmentId) return false;
     const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
     return createdAt >= today;
   });
@@ -116,6 +130,28 @@ export const sendPaymentReminder = async (
     createdAt: Timestamp.now(),
   });
   return docRef.id;
+};
+
+export const generateAndSendRemindersForAllStudents = async (
+  plans: PaymentPlan[],
+  students: Array<{ id: string; name: string }>
+): Promise<number> => {
+  let sentCount = 0;
+  const studentMap = new Map(students.map((s) => [s.id, s.name]));
+
+  for (const plan of plans) {
+    const studentName = studentMap.get(plan.studentId);
+    if (!studentName) continue;
+
+    const reminders = await generatePaymentReminders(plan.studentId, studentName, [plan]);
+    for (const reminder of reminders) {
+      const { id, ...reminderData } = reminder;
+      const docId = await sendPaymentReminder(reminderData);
+      if (docId) sentCount++;
+    }
+  }
+
+  return sentCount;
 };
 
 export const getStudentNotifications = async (

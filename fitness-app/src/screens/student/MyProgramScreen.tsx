@@ -22,6 +22,8 @@ import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
+import { getStudentPaymentPlans } from '../../services/paymentService';
+import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -53,6 +55,14 @@ export const MyProgramScreen: React.FC = () => {
       setAllPlans(plans);
       setCompletedSessions(sessionsCount);
       setNutritionalConsultations(student?.nutritionalConsultations ?? consultations.length);
+
+      getStudentPaymentPlans(user.id).then(async (payPlans) => {
+        const reminders = await generatePaymentReminders(user.id, user.name, payPlans);
+        for (const r of reminders) {
+          const { id, ...data } = r;
+          await sendPaymentReminder(data);
+        }
+      }).catch(() => {});
     } catch (err) {
       console.error('Errore caricamento programma:', err);
       crossAlert('Errore', 'Impossibile caricare il programma. Riprova più tardi.');

@@ -33,6 +33,7 @@ import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 import { generateWeeklySummary, ensureAIApiKey } from '../../services/aiService';
+import { generateAndSendRemindersForAllStudents } from '../../services/paymentReminderService';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -84,6 +85,11 @@ export const DashboardScreen: React.FC = () => {
       setTotalRevenue(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
       setAllPaymentPlans(payPlans);
+
+      generateAndSendRemindersForAllStudents(
+        payPlans,
+        studs.map((s: any) => ({ id: s.id, name: s.name }))
+      ).catch(() => {});
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
