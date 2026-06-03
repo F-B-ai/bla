@@ -19,10 +19,17 @@ export interface User {
 }
 
 // --- Titolare (Owner) ---
+export interface BankDetails {
+  iban: string;
+  accountHolder: string;
+  bankName: string;
+}
+
 export interface Owner extends User {
   role: 'owner';
   assignedStudents: string[]; // allievi diretti seguiti dall'owner come Personal
   specializations: string[];
+  bankDetails?: BankDetails;
 }
 
 // --- Manager ---
@@ -173,6 +180,9 @@ export interface Installment {
   dueDate: Date;
   paidDate?: Date;
   status: PaymentStatus;
+  receiptUrl?: string;
+  transferPending?: boolean;
+  transferMarkedAt?: Date;
 }
 
 // --- Calcolo commissione collaboratore ---
