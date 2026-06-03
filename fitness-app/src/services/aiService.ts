@@ -80,7 +80,7 @@ const callClaude = async (
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-4-5',
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: allMessages,
@@ -107,13 +107,10 @@ const callClaude = async (
       throw new Error('Troppe richieste. Attendi qualche secondo e riprova.');
     }
     if (response.status === 400) {
-      if (errorBody.includes('model')) {
-        throw new Error('Modello AI non disponibile. Riprova più tardi.');
-      }
       if (errorBody.includes('image') || errorBody.includes('base64')) {
         throw new Error('Errore nell\'invio delle immagini. Prova con foto più piccole o in formato JPEG.');
       }
-      throw new Error(`Richiesta non valida: ${errorBody.substring(0, 200)}`);
+      throw new Error(`Errore API 400: ${errorBody.substring(0, 300)}`);
     }
     if (response.status >= 500) {
       throw new Error('Il server AI è temporaneamente non disponibile. Riprova tra qualche minuto.');
