@@ -175,6 +175,61 @@ const imageUriToBase64 = async (uri: string): Promise<string> => {
   }
 };
 
+// --- Helper per estrarre JSON dalla risposta AI ---
+const extractJSON = <T>(text: string): T | null => {
+  // Remove markdown code blocks if present
+  let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+
+  // Try direct parse first
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // ignore
+  }
+
+  // Try to find JSON object
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (objMatch) {
+    try {
+      return JSON.parse(objMatch[0]);
+    } catch {
+      // Try to fix truncated JSON by closing open brackets
+      let fixedJson = objMatch[0];
+      const openBraces = (fixedJson.match(/\{/g) || []).length;
+      const closeBraces = (fixedJson.match(/\}/g) || []).length;
+      const openBrackets = (fixedJson.match(/\[/g) || []).length;
+      const closeBrackets = (fixedJson.match(/\]/g) || []).length;
+
+      // Remove trailing comma or incomplete value
+      fixedJson = fixedJson.replace(/,\s*$/, '');
+      fixedJson = fixedJson.replace(/,\s*"[^"]*"?\s*$/, '');
+      fixedJson = fixedJson.replace(/:\s*"[^"]*$/, ': ""');
+      fixedJson = fixedJson.replace(/:\s*$/, ': ""');
+
+      for (let i = 0; i < openBrackets - closeBrackets; i++) fixedJson += ']';
+      for (let i = 0; i < openBraces - closeBraces; i++) fixedJson += '}';
+
+      try {
+        return JSON.parse(fixedJson);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Try to find JSON array
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  if (arrMatch) {
+    try {
+      return JSON.parse(arrMatch[0]) as T;
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+};
+
 // ============================================================
 // 1. ANALISI POSTURALE CON AI VISION
 // ============================================================
@@ -487,7 +542,9 @@ REGOLE:
 - Adatta il volume e l'intensità al livello dell'allievo
 - Se ci sono problematiche posturali o mediche, inserisci esercizi correttivi (categoria "posturale")
 - Tutti i testi in ITALIANO
-- Genera un programma realistico e professionale`;
+- Genera un programma realistico e professionale
+- Usa descrizioni BREVI (max 15 parole per campo)
+- NON aggiungere testo fuori dal JSON`;
 
   let prompt = `Genera una scheda di allenamento settimanale per questo allievo:
 
@@ -509,19 +566,14 @@ REGOLE:
   const responseText = await callClaude(
     [{ role: 'user', content: prompt }],
     systemPrompt,
-    4000
+    8192
   );
 
-  try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Risposta non valida');
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return {
-      title: `Scheda ${params.level} - ${params.goals}`,
-      weeklySchedule: [],
-    };
+  const parsed = extractJSON<AIGeneratedWorkoutPlan>(responseText);
+  if (!parsed || !parsed.weeklySchedule || parsed.weeklySchedule.length === 0) {
+    throw new Error('L\'AI non ha restituito un programma valido. Riprova.');
   }
+  return parsed;
 };
 
 // ============================================================

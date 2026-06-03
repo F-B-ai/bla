@@ -391,7 +391,7 @@ export const WorkoutPlanScreen: React.FC = () => {
         medicalNotes: student.medicalNotes,
       });
 
-      if (result.weeklySchedule.length === 0) {
+      if (!result.weeklySchedule || result.weeklySchedule.length === 0) {
         crossAlert('Errore', 'L\'AI non ha generato una scheda valida. Riprova.');
         return;
       }
