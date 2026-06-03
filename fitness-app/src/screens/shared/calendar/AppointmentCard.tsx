@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../../config/theme';
 import { Card } from '../../../components/common/Card';
@@ -29,6 +29,7 @@ export interface AppointmentCardProps {
   isStudent: boolean;
   getStudentName: (id: string) => string;
   getStaffName: (id: string) => string;
+  getStudentPhone?: (id: string) => string;
   calcEarnings: (cost: number, studentId: string, staffId: string) => {
     coachEarning: number;
     managerEarning: number;
@@ -51,6 +52,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   isStudent,
   getStudentName,
   getStaffName,
+  getStudentPhone,
   calcEarnings,
   onEdit,
   onComplete,
@@ -64,6 +66,18 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const canStudentCancel = isScheduled && isFuture;
   const canStaffAct = isScheduled;
   const staffName = getStaffName(item.staffId);
+
+  const handleWhatsAppReminder = () => {
+    const phone = getStudentPhone ? getStudentPhone(item.studentId) : '';
+    if (!phone) return;
+    const studentName = getStudentName(item.studentId).split(' ')[0];
+    const tipo = item.kind === 'training' ? 'allenamento' : 'nutrizione';
+    const dateLabel = item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+    const message = `Ciao ${studentName}! Ti ricordiamo il tuo appuntamento di ${tipo} il ${dateLabel} alle ${item.startTime}. A presto! - ESSĒRE`;
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    const url = `https://wa.me/${cleanPhone.startsWith('+') ? cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent(message)}`;
+    Linking.openURL(url).catch(() => {});
+  };
 
   return (
     <Card variant="elevated">
@@ -124,6 +138,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
                 <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
               </TouchableOpacity>
+              {isScheduled && getStudentPhone && getStudentPhone(item.studentId) ? (
+                <TouchableOpacity style={styles.actionBtn} onPress={handleWhatsAppReminder}>
+                  <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+                  <Text style={{ ...styles.actionText, color: '#25D366' }}>Promemoria</Text>
+                </TouchableOpacity>
+              ) : null}
             </>
           )}
           <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(item)}>

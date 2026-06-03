@@ -18,7 +18,9 @@ import { InputField } from '../../components/common/InputField';
 import { crossAlert } from '../../utils/alert';
 import { isValidEmail } from '../../utils/helpers';
 import { useAuth } from '../../hooks/useAuth';
-import { User, CredentialChangeRequest } from '../../types';
+import { User, CredentialChangeRequest, BankDetails } from '../../types';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import {
   uploadAvatar,
   getUserProfile,
@@ -76,6 +78,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [editPhone, setEditPhone] = useState('');
   const [savingInfo, setSavingInfo] = useState(false);
 
+  // Bank details (owner only)
+  const [bankIban, setBankIban] = useState('');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [savingBank, setSavingBank] = useState(false);
+  const [loadingBank, setLoadingBank] = useState(false);
+
   const canEditInfo = isOwner;
   const needsApproval = !isOwner && !isEditingOther;
 
@@ -127,6 +136,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       getUserRequests(user.id).then(setMyRequests).catch(() => {});
     }
   }, [needsApproval, user]);
+
+  // Load bank details for owner
+  useEffect(() => {
+    if (isOwner && userId) {
+      setLoadingBank(true);
+      getDoc(doc(db, 'users', userId))
+        .then((snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            const bd = data?.bankDetails as BankDetails | undefined;
+            if (bd) {
+              setBankIban(bd.iban || '');
+              setBankAccountHolder(bd.accountHolder || '');
+              setBankName(bd.bankName || '');
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingBank(false));
+    }
+  }, [isOwner, userId]);
 
   const pickImage = useCallback(async () => {
     if (!userId) return;
@@ -354,6 +384,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       crossAlert('Errore', err?.message || 'Impossibile inviare la richiesta.');
     } finally {
       setSendingRequest(false);
+    }
+  };
+
+  // ====== Save bank details (owner only) ======
+  const handleSaveBankDetails = async () => {
+    if (!bankIban.trim()) {
+      crossAlert('Errore', 'Inserisci l\'IBAN.');
+      return;
+    }
+    if (!bankAccountHolder.trim()) {
+      crossAlert('Errore', 'Inserisci l\'intestatario del conto.');
+      return;
+    }
+    setSavingBank(true);
+    try {
+      await updateDoc(doc(db, 'users', userId!), {
+        bankDetails: {
+          iban: bankIban.trim(),
+          accountHolder: bankAccountHolder.trim(),
+          bankName: bankName.trim(),
+        },
+      });
+      crossAlert('Fatto', 'Dati bancari salvati con successo.');
+    } catch (err: any) {
+      crossAlert('Errore', err?.message || 'Impossibile salvare i dati bancari.');
+    } finally {
+      setSavingBank(false);
     }
   };
 
@@ -783,6 +840,46 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
         </Card>
       )}
 
+      {/* Owner: bank details */}
+      {isOwner && !isEditingOther && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Dati Bancari</Text>
+          <Text style={styles.bankHint}>
+            Questi dati verranno mostrati agli allievi per il pagamento tramite bonifico.
+          </Text>
+          {loadingBank ? (
+            <ActivityIndicator size="small" color={colors.accent} style={{ marginVertical: spacing.md }} />
+          ) : (
+            <>
+              <InputField
+                label="IBAN"
+                value={bankIban}
+                onChangeText={setBankIban}
+                placeholder="IT60X0542811101000000123456"
+                autoCapitalize="characters"
+              />
+              <InputField
+                label="Intestatario"
+                value={bankAccountHolder}
+                onChangeText={setBankAccountHolder}
+                placeholder="Nome e cognome intestatario"
+              />
+              <InputField
+                label="Nome Banca"
+                value={bankName}
+                onChangeText={setBankName}
+                placeholder="Es. Intesa Sanpaolo"
+              />
+              <Button
+                title={savingBank ? 'Salvataggio...' : 'Salva Dati Bancari'}
+                onPress={handleSaveBankDetails}
+                loading={savingBank}
+              />
+            </>
+          )}
+        </Card>
+      )}
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -997,6 +1094,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  bankHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+  },
   emptyText: {
     color: colors.textSecondary,
     fontSize: fontSize.md,

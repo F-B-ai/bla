@@ -10,6 +10,7 @@ import {
   Image,
   Platform,
   TextInput,
+  Modal,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
@@ -31,6 +32,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
+import { generateWeeklySummary, ensureAIApiKey } from '../../services/aiService';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -58,6 +60,9 @@ export const DashboardScreen: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [printStartDate, setPrintStartDate] = useState('');
   const [printEndDate, setPrintEndDate] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryText, setAiSummaryText] = useState('');
+  const [showAiSummaryModal, setShowAiSummaryModal] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -285,6 +290,71 @@ export const DashboardScreen: React.FC = () => {
     });
   };
 
+  const handleAIWeeklySummary = async () => {
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni AI.');
+      return;
+    }
+
+    setAiSummaryLoading(true);
+    setShowAiSummaryModal(true);
+    setAiSummaryText('');
+
+    try {
+      // Build student data from sessions in the last 7 days
+      const now = new Date();
+      const weekAgo = new Date(now);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      const studentSummaries = studentsData.map((student) => {
+        const studentSessions = allSessions.filter(
+          (s) => s.studentId === student.id
+        );
+        const weekSessions = studentSessions.filter((s) => {
+          const d = toSafeDate(s.date);
+          return d >= weekAgo && d <= now;
+        });
+        const completed = weekSessions.filter(
+          (s) => s.status === 'completed'
+        ).length;
+        const planned = weekSessions.length;
+        const noShows = weekSessions.filter(
+          (s) => s.status === 'no_show'
+        ).length;
+        const cancelled = weekSessions.filter(
+          (s) => s.status === 'cancelled_by_student' || s.status === 'cancelled_late'
+        ).length;
+
+        let notes = '';
+        if (noShows > 0) notes += `${noShows} no-show. `;
+        if (cancelled > 0) notes += `${cancelled} cancellazioni. `;
+
+        return {
+          name: `${student.name} ${student.surname}`,
+          sessionsCompleted: completed,
+          sessionsPlanned: planned,
+          notes: notes.trim(),
+        };
+      });
+
+      const periodStr = `${weekAgo.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} - ${now.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+      const summary = await generateWeeklySummary({
+        coachName: `${user?.name || ''} ${(user as any)?.surname || ''}`.trim(),
+        students: studentSummaries,
+        period: periodStr,
+      });
+
+      setAiSummaryText(summary);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore nella generazione del riepilogo';
+      crossAlert('Errore', msg);
+      setShowAiSummaryModal(false);
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
   const planStats = useMemo(() => {
     let totalCollected = 0;
     let totalOutstanding = 0;
@@ -432,6 +502,68 @@ export const DashboardScreen: React.FC = () => {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* AI Weekly Summary */}
+      <TouchableOpacity
+        style={styles.aiSummaryCard}
+        onPress={handleAIWeeklySummary}
+        disabled={aiSummaryLoading}
+      >
+        <View style={styles.aiSummaryCardInner}>
+          <View style={styles.aiSummaryIconContainer}>
+            <Ionicons name="sparkles" size={24} color={colors.textOnAccent} />
+          </View>
+          <View style={styles.aiSummaryCardInfo}>
+            <Text style={styles.aiSummaryCardTitle}>Riepilogo AI Settimanale</Text>
+            <Text style={styles.aiSummaryCardDesc}>
+              Analisi intelligente dell'andamento dei tuoi allievi
+            </Text>
+          </View>
+          {aiSummaryLoading ? (
+            <ActivityIndicator size="small" color={colors.accent} />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color={colors.accent} />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* AI Summary Modal */}
+      <Modal visible={showAiSummaryModal} animationType="slide" transparent>
+        <View style={styles.aiSummaryModalOverlay}>
+          <View style={styles.aiSummaryModalContent}>
+            <View style={styles.aiSummaryModalHeader}>
+              <View style={styles.aiSummaryModalTitleRow}>
+                <Ionicons name="sparkles" size={22} color={colors.accent} />
+                <Text style={styles.aiSummaryModalTitle}>Riepilogo AI Settimanale</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAiSummaryModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.aiSummaryScrollView} showsVerticalScrollIndicator={false}>
+              {aiSummaryLoading ? (
+                <View style={styles.aiSummaryLoadingContainer}>
+                  <ActivityIndicator size="large" color={colors.accent} />
+                  <Text style={styles.aiSummaryLoadingText}>Generazione in corso...</Text>
+                  <Text style={styles.aiSummaryLoadingSubtext}>L'AI sta analizzando i dati della settimana</Text>
+                </View>
+              ) : (
+                <Text style={styles.aiSummaryResultText}>{aiSummaryText}</Text>
+              )}
+            </ScrollView>
+
+            {!aiSummaryLoading && (
+              <TouchableOpacity
+                style={styles.aiSummaryCloseBtn}
+                onPress={() => setShowAiSummaryModal(false)}
+              >
+                <Text style={styles.aiSummaryCloseBtnText}>Chiudi</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Statistiche rapide */}
       <View style={styles.statsRow}>
@@ -926,5 +1058,108 @@ const styles = StyleSheet.create({
   },
   printButtons: {
     gap: spacing.sm,
+  },
+  aiSummaryCard: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+    ...shadows.small,
+  },
+  aiSummaryCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  aiSummaryIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiSummaryCardInfo: {
+    flex: 1,
+  },
+  aiSummaryCardTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  aiSummaryCardDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  aiSummaryModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  aiSummaryModalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    maxHeight: '85%',
+  },
+  aiSummaryModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  aiSummaryModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  aiSummaryModalTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  aiSummaryScrollView: {
+    maxHeight: 500,
+  },
+  aiSummaryLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.sm,
+  },
+  aiSummaryLoadingText: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.accent,
+    marginTop: spacing.sm,
+  },
+  aiSummaryLoadingSubtext: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  aiSummaryResultText: {
+    fontSize: fontSize.md,
+    color: colors.text,
+    lineHeight: 22,
+  },
+  aiSummaryCloseBtn: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  aiSummaryCloseBtnText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
   },
 });

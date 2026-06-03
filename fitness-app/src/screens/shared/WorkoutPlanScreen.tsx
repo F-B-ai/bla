@@ -31,7 +31,9 @@ import { createNotification } from '../../services/notificationService';
 import {
   suggestWorkoutProgression,
   suggestExercises,
+  generateWorkoutPlan,
   AIProgressionSuggestion,
+  AIGeneratedWorkoutPlan,
   ensureAIApiKey,
 } from '../../services/aiService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
@@ -94,6 +96,14 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [aiSuggestion, setAiSuggestion] = useState<AIProgressionSuggestion | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiExercisesLoading, setAiExercisesLoading] = useState(false);
+
+  // AI Generate Plan State
+  const [showAiGenerateModal, setShowAiGenerateModal] = useState(false);
+  const [aiGenGoals, setAiGenGoals] = useState('');
+  const [aiGenLevel, setAiGenLevel] = useState<'principiante' | 'intermedio' | 'avanzato'>('intermedio');
+  const [aiGenDays, setAiGenDays] = useState(3);
+  const [aiGenEquipment, setAiGenEquipment] = useState('Palestra completa');
+  const [aiGenLoading, setAiGenLoading] = useState(false);
 
   // Exercise Library State
   const [exerciseLibrary, setExerciseLibrary] = useState<LibraryExercise[]>([]);
@@ -349,6 +359,69 @@ export const WorkoutPlanScreen: React.FC = () => {
       crossAlert('Errore', 'Impossibile ottenere suggerimenti AI');
     } finally {
       setAiExercisesLoading(false);
+    }
+  };
+
+  // AI: genera scheda completa
+  const handleAIGeneratePlan = async () => {
+    if (!selectedStudentId) {
+      crossAlert('Errore', 'Seleziona prima un allievo');
+      return;
+    }
+    if (!aiGenGoals.trim()) {
+      crossAlert('Errore', 'Inserisci gli obiettivi dell\'allievo');
+      return;
+    }
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+      return;
+    }
+
+    const student = students.find((s) => s.id === selectedStudentId);
+    if (!student) return;
+
+    setAiGenLoading(true);
+    try {
+      const result = await generateWorkoutPlan({
+        studentName: `${student.name} ${student.surname}`,
+        goals: aiGenGoals,
+        level: aiGenLevel,
+        daysPerWeek: aiGenDays,
+        equipment: aiGenEquipment,
+        medicalNotes: student.medicalNotes,
+      });
+
+      if (result.weeklySchedule.length === 0) {
+        crossAlert('Errore', 'L\'AI non ha generato una scheda valida. Riprova.');
+        return;
+      }
+
+      // Populate the form with AI-generated exercises
+      const newExercises: Record<number, Exercise[]> = {};
+      for (const day of result.weeklySchedule) {
+        newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+          id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+          name: ex.name,
+          description: ex.description || '',
+          sets: ex.sets,
+          reps: ex.reps,
+          restSeconds: ex.restSeconds,
+          notes: ex.notes || '',
+          category: (ex.category as ExerciseCategory) || 'forza',
+        }));
+      }
+
+      setExercises(newExercises);
+      if (result.title) {
+        setPlanTitle(result.title);
+      }
+      setShowAiGenerateModal(false);
+      crossAlert('Scheda Generata!', 'La scheda AI è stata creata. Puoi modificarla prima di salvare.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore nella generazione AI';
+      crossAlert('Errore', msg);
+    } finally {
+      setAiGenLoading(false);
     }
   };
 
@@ -655,8 +728,23 @@ export const WorkoutPlanScreen: React.FC = () => {
             onPress={handleAIProgression}
             variant="outline"
             loading={aiLoading}
-            style={{ marginBottom: spacing.md }}
+            style={{ marginBottom: spacing.sm }}
           />
+        )}
+
+        {/* AI Generate Plan Button */}
+        {selectedStudentId && (
+          <TouchableOpacity
+            style={styles.aiGenerateBtn}
+            onPress={() => {
+              const student = students.find((s) => s.id === selectedStudentId);
+              if (student?.goals) setAiGenGoals(student.goals);
+              setShowAiGenerateModal(true);
+            }}
+          >
+            <Ionicons name="sparkles" size={20} color={colors.textOnAccent} />
+            <Text style={styles.aiGenerateBtnText}>AI Genera Scheda</Text>
+          </TouchableOpacity>
         )}
 
         {/* Selettore giorno */}
@@ -1219,6 +1307,110 @@ export const WorkoutPlanScreen: React.FC = () => {
                   ))
                 )}
               </>
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale AI Genera Scheda */}
+      <Modal visible={showAiGenerateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader title="AI Genera Scheda" onClose={() => setShowAiGenerateModal(false)} />
+
+            <Card variant="elevated">
+              <View style={styles.aiGenHeaderRow}>
+                <Ionicons name="sparkles" size={22} color={colors.accent} />
+                <Text style={styles.aiGenHeaderText}>
+                  L'AI creerà una scheda personalizzata basata sui parametri indicati.
+                </Text>
+              </View>
+            </Card>
+
+            <InputField
+              label="Obiettivi"
+              value={aiGenGoals}
+              onChangeText={setAiGenGoals}
+              placeholder="Es: Ipertrofia, dimagrimento, forza..."
+              multiline
+              numberOfLines={2}
+            />
+
+            <Text style={styles.fieldLabel}>Livello</Text>
+            <View style={styles.categoryRow}>
+              {(['principiante', 'intermedio', 'avanzato'] as const).map((lvl) => (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[
+                    styles.categoryChip,
+                    aiGenLevel === lvl && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setAiGenLevel(lvl)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      aiGenLevel === lvl && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Giorni a settimana</Text>
+            <View style={styles.categoryRow}>
+              {[2, 3, 4, 5, 6].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    styles.categoryChip,
+                    aiGenDays === d && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setAiGenDays(d)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      aiGenDays === d && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {d}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <InputField
+              label="Attrezzatura disponibile"
+              value={aiGenEquipment}
+              onChangeText={setAiGenEquipment}
+              placeholder="Es: Palestra completa, manubri, corpo libero..."
+            />
+
+            {aiGenLoading ? (
+              <View style={styles.aiGenLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.accent} />
+                <Text style={styles.aiGenLoadingText}>Generazione in corso...</Text>
+                <Text style={styles.aiGenLoadingSubtext}>L'AI sta creando la scheda personalizzata</Text>
+              </View>
+            ) : (
+              <View style={styles.modalButtons}>
+                <Button
+                  title="Annulla"
+                  onPress={() => setShowAiGenerateModal(false)}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+                <Button
+                  title="Genera"
+                  onPress={handleAIGeneratePlan}
+                  style={styles.modalButton}
+                />
+              </View>
             )}
 
             <View style={styles.bottomSpacer} />
@@ -1897,6 +2089,48 @@ const styles = StyleSheet.create({
   },
   saveToLibraryText: {
     flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  aiGenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    ...shadows.small,
+  },
+  aiGenerateBtnText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  aiGenHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  aiGenHeaderText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  aiGenLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  aiGenLoadingText: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.accent,
+    marginTop: spacing.sm,
+  },
+  aiGenLoadingSubtext: {
     fontSize: fontSize.sm,
     color: colors.textSecondary,
   },

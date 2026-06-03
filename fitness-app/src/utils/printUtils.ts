@@ -154,6 +154,118 @@ const statusBadge = (status: string) => {
   return `<span class="badge ${cls}">${label}</span>`;
 };
 
+// ─── 0. Student progress report ────────────────────────────────────────
+
+export const printStudentProgressReport = (data: {
+  student: { name: string; surname: string; startDate: any; goals: string; phone: string };
+  sessions: { date: any; startTime: string; status: string; notes?: string }[];
+  measurements: { date: any; weight?: number; bodyFat?: number; muscleMass?: number; notes?: string }[];
+  workoutPlan: { title: string; startDate: any; endDate?: any } | null;
+  paymentPlans: { totalAmount: number; paidAmount: number; startDate: any; endDate: any }[];
+}) => {
+  const { student, sessions, measurements, workoutPlan, paymentPlans } = data;
+  const studentFullName = `${student.name} ${student.surname}`;
+
+  let html = '';
+
+  // Section 1: Student Info
+  html += `<h2>Informazioni Allievo</h2>`;
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${studentFullName}</div><div class="stat-label">Nome</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(student.startDate)}</div><div class="stat-label">Data inizio</div></div>
+    <div class="stat-card"><div class="stat-value">${student.phone || '-'}</div><div class="stat-label">Telefono</div></div>
+  </div>`;
+  if (student.goals) {
+    html += `<p style="margin:8px 0;color:#555;"><strong>Obiettivi:</strong> ${student.goals}</p>`;
+  }
+
+  // Section 2: Current Workout Plan
+  html += `<h2>Programma Attuale</h2>`;
+  if (workoutPlan) {
+    html += `<div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${workoutPlan.title}</div><div class="stat-label">Titolo programma</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtDate(workoutPlan.startDate)}</div><div class="stat-label">Inizio</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtDate(workoutPlan.endDate)}</div><div class="stat-label">Fine</div></div>
+    </div>`;
+  } else {
+    html += `<p style="color:#999;">Nessun programma attivo al momento.</p>`;
+  }
+
+  // Section 3: Session Summary
+  html += `<h2>Riepilogo Sessioni</h2>`;
+  const totalSessions = sessions.length;
+  const completedSessions = sessions.filter(s => s.status === 'completed').length;
+  const cancelledSessions = sessions.filter(s => s.status.startsWith('cancelled')).length;
+  const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${totalSessions}</div><div class="stat-label">Sessioni totali</div></div>
+    <div class="stat-card"><div class="stat-value">${completedSessions}</div><div class="stat-label">Completate</div></div>
+    <div class="stat-card"><div class="stat-value">${cancelledSessions}</div><div class="stat-label">Cancellate</div></div>
+    <div class="stat-card"><div class="stat-value">${completionRate}%</div><div class="stat-label">Tasso completamento</div></div>
+  </div>`;
+
+  if (sessions.length > 0) {
+    html += `<table><tr><th>Data</th><th>Orario</th><th>Stato</th><th>Note</th></tr>`;
+    for (const s of sessions) {
+      html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || '-'}</td><td>${statusBadge(s.status)}</td><td>${s.notes || ''}</td></tr>`;
+    }
+    html += `</table>`;
+  } else {
+    html += `<p style="color:#999;">Nessuna sessione registrata.</p>`;
+  }
+
+  // Section 4: Body Measurements
+  if (measurements.length > 0) {
+    html += `<h2>Misure Corporee</h2>`;
+    html += `<table><tr><th>Data</th><th>Peso (kg)</th><th>Massa grassa (%)</th><th>Massa muscolare (kg)</th><th>Note</th></tr>`;
+    for (let i = 0; i < measurements.length; i++) {
+      const m = measurements[i];
+      const prev = i < measurements.length - 1 ? measurements[i + 1] : null;
+
+      const weightTrend = prev && m.weight != null && prev.weight != null
+        ? (m.weight > prev.weight ? ' ↑' : m.weight < prev.weight ? ' ↓' : ' →') : '';
+      const fatTrend = prev && m.bodyFat != null && prev.bodyFat != null
+        ? (m.bodyFat > prev.bodyFat ? ' ↑' : m.bodyFat < prev.bodyFat ? ' ↓' : ' →') : '';
+      const muscleTrend = prev && m.muscleMass != null && prev.muscleMass != null
+        ? (m.muscleMass > prev.muscleMass ? ' ↑' : m.muscleMass < prev.muscleMass ? ' ↓' : ' →') : '';
+
+      html += `<tr>
+        <td>${fmtDate(m.date)}</td>
+        <td>${m.weight != null ? m.weight + weightTrend : '-'}</td>
+        <td>${m.bodyFat != null ? m.bodyFat + '%' + fatTrend : '-'}</td>
+        <td>${m.muscleMass != null ? m.muscleMass + muscleTrend : '-'}</td>
+        <td>${m.notes || ''}</td>
+      </tr>`;
+    }
+    html += `</table>`;
+  }
+
+  // Section 5: Payment Status
+  if (paymentPlans.length > 0) {
+    html += `<h2>Situazione Pagamenti</h2>`;
+    for (const plan of paymentPlans) {
+      const remaining = plan.totalAmount - plan.paidAmount;
+      const pct = plan.totalAmount > 0 ? Math.min(Math.round((plan.paidAmount / plan.totalAmount) * 100), 100) : 0;
+      const barColor = pct >= 100 ? '#28a745' : pct >= 50 ? '#007bff' : '#ffc107';
+
+      html += `<div style="margin-bottom:16px;padding:12px;background:#f8f8f8;border:1px solid #eee;border-radius:8px;">
+        <p style="margin-bottom:4px;"><strong>Periodo:</strong> ${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}</p>
+        <p style="margin-bottom:4px;"><strong>Totale:</strong> ${fmtCurrency(plan.totalAmount)} | <strong>Pagato:</strong> ${fmtCurrency(plan.paidAmount)} | <strong>Rimanente:</strong> ${fmtCurrency(remaining)}</p>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        <p style="font-size:11px;color:#888;text-align:center;">${pct}% completato</p>
+      </div>`;
+    }
+  }
+
+  openPrintWindow(
+    'Report Progressi',
+    html,
+    `Report Progressi – ${studentFullName}`,
+    `Generato il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`
+  );
+};
+
 // ─── 1. Student payment plan detail ────────────────────────────────────
 
 interface PrintPlanDetailParams {

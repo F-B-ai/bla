@@ -30,6 +30,8 @@ import { getStudentSessions } from '../../services/sessionService';
 import { getTransactions } from '../../services/financialService';
 import { crossAlert } from '../../utils/alert';
 import { createNotification } from '../../services/notificationService';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
 import { printPlanDetail, printPaymentReceipt } from '../../utils/printUtils';
 import { CreatePlanModal } from './paymentPlan/CreatePlanModal';
@@ -501,6 +503,49 @@ export const PaymentPlanScreen: React.FC = () => {
   };
 
   // -----------------------------------------------------------------------
+  // Confirm bank transfer (mark paid + clear transferPending)
+  // -----------------------------------------------------------------------
+  const handleConfirmTransfer = async (planId: string, installmentId: string, installments: Installment[], studentId?: string) => {
+    try {
+      setSaving(true);
+      // First clear transferPending on the installment
+      const clearedInstallments = installments.map((inst) =>
+        inst.id === installmentId
+          ? { ...inst, transferPending: false, transferMarkedAt: undefined }
+          : inst
+      );
+      await updateDoc(doc(db, 'paymentPlans', planId), {
+        installments: clearedInstallments,
+      });
+      // Then mark as paid
+      await markInstallmentPaid(planId, installmentId, clearedInstallments);
+      const inst = installments.find((i) => i.id === installmentId);
+      if (studentId) {
+        createNotification(
+          studentId,
+          'payment_due',
+          'Bonifico confermato',
+          `Il tuo bonifico${inst ? ` di €${inst.amount}` : ''} è stato confermato. Grazie!`
+        ).catch(() => {});
+      }
+
+      await loadData();
+      if (editingPlan && editingPlan.id === planId) {
+        const refreshedPlans = await getAllPaymentPlans();
+        const refreshedPlan = refreshedPlans.find((p) => p.id === planId);
+        if (refreshedPlan) {
+          openEditModal(refreshedPlan);
+        }
+      }
+      crossAlert('Fatto', 'Bonifico confermato e pagamento registrato.');
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile confermare il pagamento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Delete plan
   // -----------------------------------------------------------------------
   const handleDelete = (planId: string) => {
@@ -836,65 +881,85 @@ export const PaymentPlanScreen: React.FC = () => {
                         const isUpcoming = inst.status !== 'paid' && days >= 0 && days <= 15;
 
                         return (
-                          <View key={inst.id} style={styles.installmentRow}>
-                            <View style={styles.installmentInfo}>
-                              <Badge status={inst.status} />
-                              <Text style={styles.installmentAmount}>
-                                {'€'}{inst.amount.toFixed(2)}
-                              </Text>
-                              <Text style={styles.installmentDate}>
-                                {formatDate(dueDate)}
-                              </Text>
+                          <View key={inst.id}>
+                            <View style={styles.installmentRow}>
+                              <View style={styles.installmentInfo}>
+                                <Badge status={inst.status} />
+                                <Text style={styles.installmentAmount}>
+                                  {'€'}{inst.amount.toFixed(2)}
+                                </Text>
+                                <Text style={styles.installmentDate}>
+                                  {formatDate(dueDate)}
+                                </Text>
+                              </View>
+
+                              <View style={styles.installmentActions}>
+                                {isUpcoming && (
+                                  <>
+                                    <TouchableOpacity
+                                      style={[styles.reminderBtn, { backgroundColor: '#25D366' + '20' }]}
+                                      onPress={() => sendReminder('whatsapp', plan.studentId, inst)}
+                                    >
+                                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={[styles.reminderBtn, { backgroundColor: colors.info + '20' }]}
+                                      onPress={() => sendReminder('sms', plan.studentId, inst)}
+                                    >
+                                      <Ionicons name="chatbubble-outline" size={14} color={colors.info} />
+                                    </TouchableOpacity>
+                                  </>
+                                )}
+                                {inst.status !== 'paid' && !inst.transferPending && (
+                                  <TouchableOpacity
+                                    style={styles.paidBtn}
+                                    onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  >
+                                    <Ionicons name="checkmark" size={14} color={colors.success} />
+                                  </TouchableOpacity>
+                                )}
+                                {inst.status === 'paid' && Platform.OS === 'web' && (
+                                  <TouchableOpacity
+                                    style={[styles.reminderBtn, { backgroundColor: colors.accent + '20' }]}
+                                    onPress={() => {
+                                      const instIndex = plan.installments.findIndex((i) => i.id === inst.id);
+                                      printPaymentReceipt({
+                                        studentName: plan.studentId ? getStudentName(plan.studentId) : '',
+                                        amount: inst.amount,
+                                        dueDate: inst.dueDate,
+                                        paidDate: inst.paidDate ?? new Date(),
+                                        installmentNumber: instIndex + 1,
+                                        totalInstallments: plan.installments.length,
+                                        planTotal: plan.totalAmount ?? inst.amount,
+                                        paymentType: plan.paymentType ?? 'full',
+                                        planStartDate: plan.startDate,
+                                        planEndDate: plan.endDate,
+                                      });
+                                    }}
+                                  >
+                                    <Ionicons name="receipt-outline" size={14} color={colors.accent} />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
                             </View>
 
-                            <View style={styles.installmentActions}>
-                              {isUpcoming && (
-                                <>
-                                  <TouchableOpacity
-                                    style={[styles.reminderBtn, { backgroundColor: '#25D366' + '20' }]}
-                                    onPress={() => sendReminder('whatsapp', plan.studentId, inst)}
-                                  >
-                                    <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[styles.reminderBtn, { backgroundColor: colors.info + '20' }]}
-                                    onPress={() => sendReminder('sms', plan.studentId, inst)}
-                                  >
-                                    <Ionicons name="chatbubble-outline" size={14} color={colors.info} />
-                                  </TouchableOpacity>
-                                </>
-                              )}
-                              {inst.status !== 'paid' && (
+                            {/* Transfer pending badge + confirm button */}
+                            {inst.transferPending && inst.status !== 'paid' && (
+                              <View style={styles.transferPendingRow}>
+                                <View style={styles.transferPendingBadge}>
+                                  <Ionicons name="time-outline" size={14} color={colors.warning} />
+                                  <Text style={styles.transferPendingText}>Bonifico segnalato</Text>
+                                </View>
                                 <TouchableOpacity
-                                  style={styles.paidBtn}
-                                  onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  style={styles.confirmTransferBtn}
+                                  onPress={() => handleConfirmTransfer(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  activeOpacity={0.7}
                                 >
-                                  <Ionicons name="checkmark" size={14} color={colors.success} />
+                                  <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                                  <Text style={styles.confirmTransferText}>Conferma pagamento</Text>
                                 </TouchableOpacity>
-                              )}
-                              {inst.status === 'paid' && Platform.OS === 'web' && (
-                                <TouchableOpacity
-                                  style={[styles.reminderBtn, { backgroundColor: colors.accent + '20' }]}
-                                  onPress={() => {
-                                    const instIndex = plan.installments.findIndex((i) => i.id === inst.id);
-                                    printPaymentReceipt({
-                                      studentName: plan.studentId ? getStudentName(plan.studentId) : '',
-                                      amount: inst.amount,
-                                      dueDate: inst.dueDate,
-                                      paidDate: inst.paidDate ?? new Date(),
-                                      installmentNumber: instIndex + 1,
-                                      totalInstallments: plan.installments.length,
-                                      planTotal: plan.totalAmount ?? inst.amount,
-                                      paymentType: plan.paymentType ?? 'full',
-                                      planStartDate: plan.startDate,
-                                      planEndDate: plan.endDate,
-                                    });
-                                  }}
-                                >
-                                  <Ionicons name="receipt-outline" size={14} color={colors.accent} />
-                                </TouchableOpacity>
-                              )}
-                            </View>
+                              </View>
+                            )}
                           </View>
                         );
                       })}
@@ -1236,4 +1301,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  // Transfer pending
+  transferPendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  transferPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.warning + '15',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+  },
+  transferPendingText: {
+    fontSize: fontSize.xs,
+    color: colors.warning,
+    fontWeight: '700',
+  },
+  confirmTransferBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.md,
+  },
+  confirmTransferText: {
+    fontSize: fontSize.xs,
+    color: colors.success,
+    fontWeight: '700',
+  },
 });

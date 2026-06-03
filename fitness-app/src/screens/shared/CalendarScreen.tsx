@@ -334,6 +334,10 @@ export const CalendarScreen: React.FC = () => {
     const s = students.find((st) => st.id === id);
     return s ? `${s.name} ${s.surname}` : 'Allievo';
   };
+  const getStudentPhone = (id: string) => {
+    const s = students.find((st) => st.id === id);
+    return s?.phone || '';
+  };
   const getStaffName = (id: string) => {
     if (id === user?.id) return `${user.name} ${user.surname}`;
     const c = collaborators.find((co) => co.id === id);
@@ -857,6 +861,7 @@ export const CalendarScreen: React.FC = () => {
       isStudent={isStudent}
       getStudentName={getStudentName}
       getStaffName={getStaffName}
+      getStudentPhone={getStudentPhone}
       calcEarnings={calcEarnings}
       onEdit={openEdit}
       onComplete={handleComplete}

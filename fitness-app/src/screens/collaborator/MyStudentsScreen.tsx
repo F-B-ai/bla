@@ -21,7 +21,11 @@ import { Badge } from '../../components/common/Badge';
 import { Student, TrainingProgram, Exercise, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
-import { createProgram, getStudentWorkoutPlans } from '../../services/programService';
+import { createProgram, getStudentWorkoutPlans, getActiveWorkoutPlan } from '../../services/programService';
+import { getStudentSessions } from '../../services/sessionService';
+import { getStudentMeasurements } from '../../services/nutritionistService';
+import { getStudentPaymentPlans } from '../../services/paymentService';
+import { printStudentProgressReport } from '../../utils/printUtils';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
@@ -85,6 +89,74 @@ export const MyStudentsScreen: React.FC = () => {
     if (!date) return '';
     const d = date.toDate ? date.toDate() : new Date(date);
     return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  const handleGenerateReport = async (student: Student) => {
+    setGeneratingReport(true);
+    try {
+      const [sessions, measurements, workoutPlan, paymentPlans] = await Promise.all([
+        getStudentSessions(student.id).catch(() => []),
+        getStudentMeasurements(student.id).catch(() => []),
+        getActiveWorkoutPlan(student.id).catch(() => null),
+        getStudentPaymentPlans(student.id).catch(() => []),
+      ]);
+
+      const planData = workoutPlan
+        ? { title: workoutPlan.title, startDate: workoutPlan.startDate, endDate: workoutPlan.endDate }
+        : null;
+
+      const toSafeDate = (d: unknown): Date => {
+        if (d instanceof Date) return d;
+        if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+          return (d as any).toDate();
+        if (d && typeof d === 'object' && 'seconds' in d)
+          return new Date((d as any).seconds * 1000);
+        return new Date(d as string);
+      };
+
+      const paymentData = paymentPlans.map((p: any) => {
+        const paidAmount = (p.installments || [])
+          .filter((inst: any) => inst.status === 'paid')
+          .reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0);
+        return {
+          totalAmount: p.totalAmount || 0,
+          paidAmount,
+          startDate: p.startDate,
+          endDate: p.endDate,
+        };
+      });
+
+      printStudentProgressReport({
+        student: {
+          name: student.name,
+          surname: student.surname,
+          startDate: student.startDate,
+          goals: student.goals,
+          phone: student.phone,
+        },
+        sessions: sessions.map((s: any) => ({
+          date: s.date,
+          startTime: s.startTime,
+          status: s.status,
+          notes: s.notes,
+        })),
+        measurements: measurements.map((m: any) => ({
+          date: m.date,
+          weight: m.weight,
+          bodyFat: m.bodyFat,
+          muscleMass: m.muscleMass,
+          notes: m.notes,
+        })),
+        workoutPlan: planData,
+        paymentPlans: paymentData,
+      });
+    } catch {
+      crossAlert('Errore', 'Impossibile generare il report');
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const handleViewHistory = async (student: Student) => {
@@ -191,6 +263,16 @@ export const MyStudentsScreen: React.FC = () => {
             variant="outline"
             style={styles.actionButton}
           />
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => handleGenerateReport(item)}
+            disabled={generatingReport}
+          >
+            <Ionicons name="document-text-outline" size={16} color={colors.accent} />
+            <Text style={styles.reportButtonText}>
+              {generatingReport ? 'Generando...' : 'Report Progressi'}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </Card>
@@ -554,6 +636,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.md,
     paddingTop: spacing.md,
@@ -562,6 +645,24 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+  },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+    flex: 1,
+  },
+  reportButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.accent,
   },
   emptyText: {
     color: colors.textSecondary,

@@ -424,7 +424,152 @@ Informazioni allievo:
 };
 
 // ============================================================
-// 3. AI SUGGERIMENTO ESERCIZI
+// 3. AI GENERA SCHEDA COMPLETA
+// ============================================================
+
+export interface AIGeneratedWorkoutPlan {
+  title: string;
+  weeklySchedule: Array<{
+    dayOfWeek: number;
+    exercises: Array<{
+      name: string;
+      sets: number;
+      reps: string;
+      restSeconds: number;
+      description: string;
+      notes: string;
+      category: string;
+    }>;
+    notes: string;
+  }>;
+}
+
+export const generateWorkoutPlan = async (params: {
+  studentName: string;
+  goals: string;
+  level: 'principiante' | 'intermedio' | 'avanzato';
+  daysPerWeek: number;
+  equipment: string;
+  medicalNotes?: string;
+  posturalNotes?: string;
+}): Promise<AIGeneratedWorkoutPlan> => {
+  const systemPrompt = `Sei un preparatore atletico e personal trainer esperto italiano. Genera una scheda di allenamento settimanale completa e dettagliata.
+
+RISPONDI SEMPRE in formato JSON valido con questa struttura:
+{
+  "title": "titolo della scheda",
+  "weeklySchedule": [
+    {
+      "dayOfWeek": 0,
+      "exercises": [
+        {
+          "name": "nome esercizio in italiano",
+          "sets": 4,
+          "reps": "8-12",
+          "restSeconds": 90,
+          "description": "descrizione dell'esecuzione",
+          "notes": "note aggiuntive",
+          "category": "forza|cardio|mobilita|stretching|funzionale|posturale|altro"
+        }
+      ],
+      "notes": "note generali per il giorno"
+    }
+  ]
+}
+
+REGOLE:
+- dayOfWeek va da 0 (Lunedì) a 6 (Domenica)
+- Genera SOLO i giorni richiesti, distribuiti bene nella settimana
+- Includi SEMPRE riscaldamento (categoria "mobilita" o "cardio") come primi esercizi
+- Includi defaticamento/stretching (categoria "stretching") come ultimi esercizi
+- Segui i principi del sovraccarico progressivo
+- Equilibra gruppi muscolari agonisti/antagonisti
+- Adatta il volume e l'intensità al livello dell'allievo
+- Se ci sono problematiche posturali o mediche, inserisci esercizi correttivi (categoria "posturale")
+- Tutti i testi in ITALIANO
+- Genera un programma realistico e professionale`;
+
+  let prompt = `Genera una scheda di allenamento settimanale per questo allievo:
+
+- Nome: ${params.studentName}
+- Obiettivi: ${params.goals}
+- Livello: ${params.level}
+- Giorni a settimana: ${params.daysPerWeek}
+- Attrezzatura disponibile: ${params.equipment}`;
+
+  if (params.medicalNotes) {
+    prompt += `\n- Note mediche: ${params.medicalNotes}`;
+  }
+  if (params.posturalNotes) {
+    prompt += `\n- Note posturali: ${params.posturalNotes}`;
+  }
+
+  prompt += `\n\nCrea un programma completo e ben strutturato con esercizi specifici, serie, ripetizioni e tempi di recupero.`;
+
+  const responseText = await callClaude(
+    [{ role: 'user', content: prompt }],
+    systemPrompt,
+    4000
+  );
+
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Risposta non valida');
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return {
+      title: `Scheda ${params.level} - ${params.goals}`,
+      weeklySchedule: [],
+    };
+  }
+};
+
+// ============================================================
+// 4. AI RIEPILOGO SETTIMANALE COACH
+// ============================================================
+
+export const generateWeeklySummary = async (params: {
+  coachName: string;
+  students: { name: string; sessionsCompleted: number; sessionsPlanned: number; notes: string }[];
+  period: string;
+}): Promise<string> => {
+  const systemPrompt = `Sei un assistente AI per un centro di personal training italiano. Genera un riepilogo settimanale conciso e professionale per il titolare/coach.
+
+Il riepilogo deve essere in ITALIANO e includere:
+1. Panoramica generale dell'andamento
+2. Allievi in linea con gli obiettivi vs allievi in ritardo
+3. Pattern di presenza/assenza
+4. Suggerimenti di focus per la settimana successiva
+5. Una breve nota motivazionale
+
+Rispondi in testo semplice, ben formattato con sezioni chiare. Usa emoji sparingly per i punti chiave.`;
+
+  let prompt = `Genera il riepilogo settimanale per ${params.coachName}.
+Periodo: ${params.period}
+
+Allievi:`;
+
+  for (const student of params.students) {
+    const attendance = student.sessionsPlanned > 0
+      ? Math.round((student.sessionsCompleted / student.sessionsPlanned) * 100)
+      : 0;
+    prompt += `\n- ${student.name}: ${student.sessionsCompleted}/${student.sessionsPlanned} sessioni (${attendance}% presenza)`;
+    if (student.notes) {
+      prompt += ` | Note: ${student.notes}`;
+    }
+  }
+
+  prompt += `\n\nGenera un riepilogo utile e pratico.`;
+
+  return await callClaude(
+    [{ role: 'user', content: prompt }],
+    systemPrompt,
+    1500
+  );
+};
+
+// ============================================================
+// 5. AI SUGGERIMENTO ESERCIZI
 // ============================================================
 
 export const suggestExercises = async (

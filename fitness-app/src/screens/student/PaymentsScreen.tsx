@@ -4,17 +4,22 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
-import { PaymentPlan, Installment, AppNotification, Student, WorkoutPlan, WorkoutLog } from '../../types';
+import { BankTransferModal } from '../../components/common/BankTransferModal';
+import { PaymentPlan, Installment, AppNotification, Student, WorkoutPlan, WorkoutLog, BankDetails } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudentPaymentPlans } from '../../services/paymentService';
 import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import { getStudentWorkoutLogs } from '../../services/workoutLogService';
+import { getDocs, query, where, collection } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 /** Safely convert a Firestore Timestamp (or ISO string) to a JS Date. */
 const toDate = (d: any): Date => d?.toDate?.() || new Date(d as any);
@@ -36,6 +41,13 @@ export const PaymentsScreen: React.FC = () => {
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const [completedWorkouts, setCompletedWorkouts] = useState(0);
   const [daysSinceStart, setDaysSinceStart] = useState(0);
+
+  const [ownerBankDetails, setOwnerBankDetails] = useState<BankDetails | null>(null);
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [selectedInstallment, setSelectedInstallment] = useState<Installment | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [selectedAllInstallments, setSelectedAllInstallments] = useState<Installment[]>([]);
+  const [selectedInstallmentIndex, setSelectedInstallmentIndex] = useState(0);
 
   const student = user as unknown as Student;
 
@@ -79,6 +91,41 @@ export const PaymentsScreen: React.FC = () => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  // Fetch owner's bank details
+  useEffect(() => {
+    const fetchOwnerBankDetails = async () => {
+      try {
+        const usersQuery = query(
+          collection(db, 'users'),
+          where('role', '==', 'owner')
+        );
+        const snapshot = await getDocs(usersQuery);
+        if (!snapshot.empty) {
+          const ownerData = snapshot.docs[0].data();
+          if (ownerData.bankDetails) {
+            setOwnerBankDetails(ownerData.bankDetails as BankDetails);
+          }
+        }
+      } catch {
+        // Silently handle
+      }
+    };
+    fetchOwnerBankDetails();
+  }, []);
+
+  const openTransferModal = (
+    installment: Installment,
+    planId: string,
+    allInstallments: Installment[],
+    installmentIndex: number
+  ) => {
+    setSelectedInstallment(installment);
+    setSelectedPlanId(planId);
+    setSelectedAllInstallments(allInstallments);
+    setSelectedInstallmentIndex(installmentIndex);
+    setTransferModalVisible(true);
+  };
 
   const getNextDueInstallment = (
     plan: PaymentPlan
@@ -460,6 +507,23 @@ export const PaymentsScreen: React.FC = () => {
                         €{inst.amount}
                       </Text>
                       <Badge status={inst.status} />
+                      {inst.status !== 'paid' && (
+                        inst.transferPending ? (
+                          <View style={styles.transferPendingBadge}>
+                            <Ionicons name="time-outline" size={12} color={colors.warning} />
+                            <Text style={styles.transferPendingText}>In verifica</Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.transferBtn}
+                            onPress={() => openTransferModal(inst, plan.id, plan.installments, index)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="card-outline" size={14} color={colors.accent} />
+                            <Text style={styles.transferBtnText}>Paga con Bonifico</Text>
+                          </TouchableOpacity>
+                        )
+                      )}
                     </View>
                   </View>
                 ))}
@@ -470,6 +534,18 @@ export const PaymentsScreen: React.FC = () => {
       )}
 
       <View style={styles.bottomSpacer} />
+
+      <BankTransferModal
+        visible={transferModalVisible}
+        onClose={() => setTransferModalVisible(false)}
+        installment={selectedInstallment}
+        planId={selectedPlanId}
+        studentName={user ? `${user.name} ${user.surname}` : ''}
+        bankDetails={ownerBankDetails}
+        allInstallments={selectedAllInstallments}
+        installmentIndex={selectedInstallmentIndex}
+        onTransferMarked={loadPayments}
+      />
     </ScrollView>
   );
 };
@@ -819,6 +895,36 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
     color: colors.text,
+  },
+  transferBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.accent + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.xs,
+  },
+  transferBtnText: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+  },
+  transferPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.warning + '15',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.xs,
+  },
+  transferPendingText: {
+    fontSize: fontSize.xs,
+    color: colors.warning,
+    fontWeight: '600',
   },
   bottomSpacer: {
     height: spacing.xxl,
