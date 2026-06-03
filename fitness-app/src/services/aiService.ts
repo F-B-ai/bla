@@ -374,38 +374,37 @@ export interface AIPosturalComparison {
 }
 
 export const comparePostureWithAI = async (
-  before: { date: string; front?: string; side?: string; back?: string },
-  after: { date: string; front?: string; side?: string; back?: string },
+  before: {
+    date: string;
+    front?: string;
+    side?: string;
+    back?: string;
+    findings?: Array<{ area: string; observation: string; severity: string }>;
+    aiAnalysis?: string;
+  },
+  after: {
+    date: string;
+    front?: string;
+    side?: string;
+    back?: string;
+    findings?: Array<{ area: string; observation: string; severity: string }>;
+    aiAnalysis?: string;
+  },
   studentInfo?: { name: string; goals: string; medicalNotes?: string }
 ): Promise<AIPosturalComparison> => {
   const systemPrompt = `Sei un esperto fisioterapista e posturologo italiano specializzato nel monitoraggio del progresso nel tempo.
 
-Il tuo compito è CONFRONTARE due set di foto posturali dello STESSO paziente scattate in date diverse, per valutare l'EVOLUZIONE della postura e della composizione corporea.
+Il tuo compito è CONFRONTARE due valutazioni posturali dello STESSO paziente fatte in date diverse, per valutare l'EVOLUZIONE della postura e della composizione corporea.
 
 IMPORTANTE:
-- NON valutare ogni foto in modo assoluto. Il focus è il CONFRONTO tra PRIMA e DOPO.
+- NON valutare ogni valutazione in modo assoluto. Il focus è il CONFRONTO tra PRIMA e DOPO.
 - Cerca attivamente i MIGLIORAMENTI: maggiore simmetria, migliore allineamento, tono muscolare aumentato, riduzione asimmetrie, postura più eretta, definizione muscolare, riduzione del grasso.
 - Sii incoraggiante ma onesto. Se c'è un miglioramento evidente, dillo chiaramente e con entusiasmo.
 - Considera anche i cambiamenti estetici e di composizione corporea (tono, definizione, dimagrimento), non solo gli aspetti clinici.
+- Puoi basarti su FOTO (se disponibili) e/o su DATI TESTUALI delle valutazioni precedenti (findings, severità, note AI).
 
-RISPONDI SEMPRE in formato JSON valido con questa struttura:
-{
-  "verdict": "miglioramento|stabile|peggioramento|misto",
-  "summary": "riassunto del confronto in italiano, evidenziando l'andamento generale del percorso",
-  "improvements": ["miglioramento specifico osservato 1", "miglioramento 2", ...],
-  "worsened": ["eventuale peggioramento 1", ...],
-  "unchanged": ["aspetto rimasto stabile 1", ...],
-  "recommendations": ["raccomandazione per continuare i progressi 1", ...]
-}
-
-Confronta attentamente:
-- Simmetria e allineamento delle spalle
-- Allineamento di testa e collo
-- Curve della colonna (cifosi/lordosi)
-- Inclinazione e simmetria del bacino
-- Allineamento degli arti inferiori
-- Tono muscolare e composizione corporea (definizione, dimagrimento, massa)
-- Postura globale (più eretta, più stabile)
+RISPONDI SEMPRE in formato JSON valido:
+{"verdict":"miglioramento|stabile|peggioramento|misto","summary":"riassunto confronto","improvements":["..."],"worsened":["..."],"unchanged":["..."],"recommendations":["..."]}
 
 Sii specifico, professionale e motivante.`;
 
@@ -416,54 +415,90 @@ Sii specifico, professionale e motivante.`;
     back: 'posteriore',
   };
 
-  // PRIMA
-  content.push({ type: 'text', text: `=== FOTO "PRIMA" (data: ${before.date}) ===` });
+  let hasImages = false;
+
+  // PRIMA - foto
   for (const view of ['front', 'side', 'back'] as const) {
     const uri = before[view];
     if (!uri) continue;
     try {
       const base64 = await imageUriToBase64(uri);
+      if (!hasImages) content.push({ type: 'text', text: `=== FOTO "PRIMA" (${before.date}) ===` });
       content.push({ type: 'text', text: `PRIMA - vista ${labels[view]}:` });
       content.push({
         type: 'image',
         source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
       });
+      hasImages = true;
     } catch {
-      // skip
+      // skip failed image
     }
   }
 
-  // DOPO
-  content.push({ type: 'text', text: `=== FOTO "DOPO" (data: ${after.date}) ===` });
+  // DOPO - foto
+  let hasAfterImages = false;
   for (const view of ['front', 'side', 'back'] as const) {
     const uri = after[view];
     if (!uri) continue;
     try {
       const base64 = await imageUriToBase64(uri);
+      if (!hasAfterImages) content.push({ type: 'text', text: `=== FOTO "DOPO" (${after.date}) ===` });
       content.push({ type: 'text', text: `DOPO - vista ${labels[view]}:` });
       content.push({
         type: 'image',
         source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
       });
+      hasAfterImages = true;
+      hasImages = true;
     } catch {
-      // skip
+      // skip failed image
     }
   }
 
-  let contextText = `Confronta queste foto posturali dello stesso paziente. Le foto "PRIMA" sono del ${before.date}, le foto "DOPO" sono del ${after.date}. Valuta l'evoluzione e il progresso nel tempo.`;
+  // Dati testuali - sempre inclusi come contesto aggiuntivo (o unico se le foto non si caricano)
+  let textData = '';
+
+  if (before.findings && before.findings.length > 0) {
+    textData += `\n\n=== VALUTAZIONE "PRIMA" (${before.date}) - Dati ===\n`;
+    for (const f of before.findings) {
+      textData += `- ${f.area}: ${f.observation} (severità: ${f.severity})\n`;
+    }
+  }
+  if (before.aiAnalysis) {
+    textData += `Analisi AI precedente (${before.date}): ${before.aiAnalysis}\n`;
+  }
+
+  if (after.findings && after.findings.length > 0) {
+    textData += `\n=== VALUTAZIONE "DOPO" (${after.date}) - Dati ===\n`;
+    for (const f of after.findings) {
+      textData += `- ${f.area}: ${f.observation} (severità: ${f.severity})\n`;
+    }
+  }
+  if (after.aiAnalysis) {
+    textData += `Analisi AI recente (${after.date}): ${after.aiAnalysis}\n`;
+  }
+
+  const hasTextData = textData.length > 10;
+
+  if (!hasImages && !hasTextData) {
+    throw new Error('Nessun dato disponibile per il confronto. Servono foto o valutazioni salvate.');
+  }
+
+  let contextText = '';
+  if (hasImages) {
+    contextText = `Confronta le foto e i dati posturali dello stesso paziente. PRIMA: ${before.date}. DOPO: ${after.date}. Valuta l'evoluzione e il progresso nel tempo.`;
+  } else {
+    contextText = `Non hai foto disponibili, ma confronta i dati delle valutazioni posturali dello stesso paziente. PRIMA: ${before.date}. DOPO: ${after.date}. Valuta l'evoluzione basandoti sulle severità e le osservazioni.`;
+  }
+  if (textData) contextText += textData;
   if (studentInfo) {
     contextText += `\n\nPaziente: ${studentInfo.name}\nObiettivi: ${studentInfo.goals}`;
     if (studentInfo.medicalNotes) contextText += `\nNote mediche: ${studentInfo.medicalNotes}`;
   }
   content.push({ type: 'text', text: contextText });
 
-  const hasImages = content.some((c) => c.type === 'image');
-  if (!hasImages) {
-    throw new Error('Servono le foto di entrambe le valutazioni per il confronto AI.');
-  }
-
   const responseText = await callClaude(
-    [{ role: 'user', content }],
+    [{ role: 'user', content: hasImages ? content : contextText }],
     systemPrompt,
     3000,
     '{'

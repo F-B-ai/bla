@@ -408,12 +408,16 @@ export const PosturalAssessmentScreen: React.FC = () => {
           front: beforeA.frontImageUrl || undefined,
           side: getSideLeftUrl(beforeA) || getSideRightUrl(beforeA) || undefined,
           back: beforeA.backImageUrl || undefined,
+          findings: beforeA.findings || [],
+          aiAnalysis: beforeA.aiAnalysis || undefined,
         },
         {
           date: toDate(afterA.date).toLocaleDateString('it-IT'),
           front: afterA.frontImageUrl || undefined,
           side: getSideLeftUrl(afterA) || getSideRightUrl(afterA) || undefined,
           back: afterA.backImageUrl || undefined,
+          findings: afterA.findings || [],
+          aiAnalysis: afterA.aiAnalysis || undefined,
         },
         student ? { name: `${student.name} ${student.surname}`, goals: student.goals, medicalNotes: student.medicalNotes } : undefined,
       );
