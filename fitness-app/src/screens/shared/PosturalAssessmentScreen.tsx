@@ -748,6 +748,11 @@ export const PosturalAssessmentScreen: React.FC = () => {
 
               {/* Tabella severità per area */}
               <Text style={styles.compTableTitle}>Severità per Area</Text>
+              {comparisonAssessments.some((a) => a.findings.length === 0) && (
+                <Text style={{ color: colors.warning, fontSize: fontSize.xs, marginBottom: spacing.sm, fontStyle: 'italic' }}>
+                  ⚠ Una o più valutazioni non hanno osservazioni registrate. Il confronto si basa solo sui dati disponibili.
+                </Text>
+              )}
               <View style={styles.compTable}>
                 {/* Header */}
                 <View style={styles.compTableRow}>
@@ -778,9 +783,9 @@ export const PosturalAssessmentScreen: React.FC = () => {
                       </View>
                       {severities.map((sev, i) => (
                         <View key={i} style={styles.compTableCellDate}>
-                          <View style={[styles.compSevDot, { backgroundColor: getSeverityColor(sev) }]} />
-                          <Text style={[styles.compSevText, { color: getSeverityColor(sev) }]}>
-                            {SEVERITY_OPTIONS.find((o) => o.value === sev)?.label || '-'}
+                          <View style={[styles.compSevDot, { backgroundColor: sev === '-' ? colors.textLight + '40' : getSeverityColor(sev) }]} />
+                          <Text style={[styles.compSevText, { color: sev === '-' ? colors.textLight + '80' : getSeverityColor(sev) }]}>
+                            {sev === '-' ? 'N/V' : (SEVERITY_OPTIONS.find((o) => o.value === sev)?.label || '-')}
                           </Text>
                         </View>
                       ))}
@@ -981,19 +986,22 @@ export const PosturalAssessmentScreen: React.FC = () => {
                     );
                     const severities = sorted.map((a) => {
                       const f = a.findings.find((f) => f.area === area.value);
-                      return f?.severity || 'normal';
+                      return f?.severity || '-';
                     });
-                    const first = severities[0];
-                    const last = severities[severities.length - 1];
-                    const improved = SEVERITY_ORDER.indexOf(last) < SEVERITY_ORDER.indexOf(first);
-                    const worsened = SEVERITY_ORDER.indexOf(last) > SEVERITY_ORDER.indexOf(first);
+                    const first = severities.find((s) => s !== '-');
+                    const last = [...severities].reverse().find((s) => s !== '-');
+                    const canCompare = first && last && first !== last;
+                    const improved = canCompare && SEVERITY_ORDER.indexOf(last!) < SEVERITY_ORDER.indexOf(first!);
+                    const worsened = canCompare && SEVERITY_ORDER.indexOf(last!) > SEVERITY_ORDER.indexOf(first!);
 
                     return (
                       <View key={area.value} style={styles.evoDetailRow}>
                         <Text style={styles.evoDetailArea}>{area.label}</Text>
                         <View style={styles.evoDetailDots}>
                           {severities.map((s, i) => (
-                            <View key={i} style={[styles.evoDetailDot, { backgroundColor: getSeverityColor(s) }]} />
+                            <View key={i} style={[styles.evoDetailDot, {
+                              backgroundColor: s === '-' ? colors.textLight + '30' : getSeverityColor(s),
+                            }]} />
                           ))}
                         </View>
                         <Ionicons

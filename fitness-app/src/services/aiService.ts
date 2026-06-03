@@ -402,6 +402,7 @@ IMPORTANTE:
 - Sii incoraggiante ma onesto. Se c'è un miglioramento evidente, dillo chiaramente e con entusiasmo.
 - Considera anche i cambiamenti estetici e di composizione corporea (tono, definizione, dimagrimento), non solo gli aspetti clinici.
 - Puoi basarti su FOTO (se disponibili) e/o su DATI TESTUALI delle valutazioni precedenti (findings, severità, note AI).
+- ATTENZIONE: Se la valutazione "PRIMA" ha pochi o nessun finding registrato, NON significa che il paziente stava meglio. Significa che la valutazione era meno approfondita. In quel caso, NON interpretare nuovi findings come peggioramento — piuttosto valuta lo stato attuale in modo positivo e nota che i dati precedenti erano incompleti.
 
 RISPONDI SEMPRE in formato JSON valido:
 {"verdict":"miglioramento|stabile|peggioramento|misto","summary":"riassunto confronto","improvements":["..."],"worsened":["..."],"unchanged":["..."],"recommendations":["..."]}
