@@ -49,9 +49,9 @@ loadAIApiKey();
 const callClaude = async (
   messages: Array<{ role: string; content: any }>,
   systemPrompt: string,
-  maxTokens: number = 2000
+  maxTokens: number = 2000,
+  prefill?: string
 ): Promise<string> => {
-  // Assicurati che la chiave sia caricata da AsyncStorage
   if (!API_KEY) {
     await loadAIApiKey();
   }
@@ -62,6 +62,11 @@ const callClaude = async (
 
   if (!API_KEY.startsWith('sk-ant-') && !API_KEY.startsWith('sk-')) {
     throw new Error('Chiave API non valida. Deve iniziare con "sk-ant-" o "sk-". Controlla le impostazioni.');
+  }
+
+  const allMessages = [...messages];
+  if (prefill) {
+    allMessages.push({ role: 'assistant', content: prefill });
   }
 
   let response: Response;
@@ -78,7 +83,7 @@ const callClaude = async (
         model: 'claude-sonnet-4-6',
         max_tokens: maxTokens,
         system: systemPrompt,
-        messages,
+        messages: allMessages,
       }),
     });
   } catch (networkError) {
@@ -102,7 +107,6 @@ const callClaude = async (
       throw new Error('Troppe richieste. Attendi qualche secondo e riprova.');
     }
     if (response.status === 400) {
-      // Check for common issues
       if (errorBody.includes('model')) {
         throw new Error('Modello AI non disponibile. Riprova più tardi.');
       }
@@ -129,7 +133,7 @@ const callClaude = async (
     throw new Error('Il server AI ha restituito una risposta vuota. Riprova.');
   }
 
-  return text;
+  return prefill ? prefill + text : text;
 };
 
 // --- Converte immagine URI in base64 ---
@@ -508,65 +512,34 @@ export const generateWorkoutPlan = async (params: {
   medicalNotes?: string;
   posturalNotes?: string;
 }): Promise<AIGeneratedWorkoutPlan> => {
-  const systemPrompt = `Sei un preparatore atletico e personal trainer esperto italiano. Genera una scheda di allenamento settimanale completa e dettagliata.
+  const systemPrompt = `Sei un personal trainer italiano esperto. Genera schede in JSON puro.
 
-RISPONDI SEMPRE in formato JSON valido con questa struttura:
-{
-  "title": "titolo della scheda",
-  "weeklySchedule": [
-    {
-      "dayOfWeek": 0,
-      "exercises": [
-        {
-          "name": "nome esercizio in italiano",
-          "sets": 4,
-          "reps": "8-12",
-          "restSeconds": 90,
-          "description": "descrizione dell'esecuzione",
-          "notes": "note aggiuntive",
-          "category": "forza|cardio|mobilita|stretching|funzionale|posturale|altro"
-        }
-      ],
-      "notes": "note generali per il giorno"
-    }
-  ]
-}
+FORMATO OBBLIGATORIO (JSON puro, nessun testo prima o dopo):
+{"title":"...","weeklySchedule":[{"dayOfWeek":0,"exercises":[{"name":"...","sets":4,"reps":"8-12","restSeconds":90,"description":"...","notes":"...","category":"forza"}],"notes":"..."}]}
 
 REGOLE:
-- dayOfWeek va da 0 (Lunedì) a 6 (Domenica)
-- Genera SOLO i giorni richiesti, distribuiti bene nella settimana
-- Includi SEMPRE riscaldamento (categoria "mobilita" o "cardio") come primi esercizi
-- Includi defaticamento/stretching (categoria "stretching") come ultimi esercizi
-- Segui i principi del sovraccarico progressivo
-- Equilibra gruppi muscolari agonisti/antagonisti
-- Adatta il volume e l'intensità al livello dell'allievo
-- Se ci sono problematiche posturali o mediche, inserisci esercizi correttivi (categoria "posturale")
-- Tutti i testi in ITALIANO
-- Genera un programma realistico e professionale
-- Usa descrizioni BREVI (max 15 parole per campo)
-- NON aggiungere testo fuori dal JSON`;
+- dayOfWeek: 0=Lunedì, 1=Martedì, ..., 6=Domenica
+- category: forza|cardio|mobilita|stretching|funzionale|posturale|altro
+- Genera SOLO ${params.daysPerWeek} giorni distribuiti nella settimana
+- 5-7 esercizi per giorno (incluso riscaldamento e stretching)
+- Descrizioni BREVI (max 10 parole)
+- Testi in ITALIANO
+- SOLO JSON, niente markdown, niente spiegazioni`;
 
-  let prompt = `Genera una scheda di allenamento settimanale per questo allievo:
+  let prompt = `Scheda per: ${params.studentName}
+Obiettivi: ${params.goals}
+Livello: ${params.level}
+Giorni/settimana: ${params.daysPerWeek}
+Attrezzatura: ${params.equipment}`;
 
-- Nome: ${params.studentName}
-- Obiettivi: ${params.goals}
-- Livello: ${params.level}
-- Giorni a settimana: ${params.daysPerWeek}
-- Attrezzatura disponibile: ${params.equipment}`;
-
-  if (params.medicalNotes) {
-    prompt += `\n- Note mediche: ${params.medicalNotes}`;
-  }
-  if (params.posturalNotes) {
-    prompt += `\n- Note posturali: ${params.posturalNotes}`;
-  }
-
-  prompt += `\n\nCrea un programma completo e ben strutturato con esercizi specifici, serie, ripetizioni e tempi di recupero.`;
+  if (params.medicalNotes) prompt += `\nNote mediche: ${params.medicalNotes}`;
+  if (params.posturalNotes) prompt += `\nNote posturali: ${params.posturalNotes}`;
 
   const responseText = await callClaude(
     [{ role: 'user', content: prompt }],
     systemPrompt,
-    8192
+    8192,
+    '{'
   );
 
   const parsed = extractJSON<AIGeneratedWorkoutPlan>(responseText);
