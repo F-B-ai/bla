@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
@@ -30,7 +31,7 @@ import {
   getStudentAssessments,
   generateProgressReport,
 } from '../../services/posturalService';
-import { analyzePostureWithAI, AIPosturalAnalysis, ensureAIApiKey } from '../../services/aiService';
+import { analyzePostureWithAI, comparePostureWithAI, AIPosturalAnalysis, AIPosturalComparison, ensureAIApiKey } from '../../services/aiService';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
@@ -105,6 +106,8 @@ export const PosturalAssessmentScreen: React.FC = () => {
   const [selectedForComparison, setSelectedForComparison] = useState<string[]>([]);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonNotes, setComparisonNotes] = useState('');
+  const [aiComparing, setAiComparing] = useState(false);
+  const [aiComparison, setAiComparison] = useState<AIPosturalComparison | null>(null);
 
   // Evolution report
   const [showEvolution, setShowEvolution] = useState(false);
@@ -349,6 +352,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
   // Comparison helpers
   // -----------------------------------------------------------------------
   const toggleComparisonSelection = (id: string) => {
+    setAiComparison(null);
     setSelectedForComparison((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= 4 ? prev : [...prev, id]
     );
@@ -378,6 +382,66 @@ export const PosturalAssessmentScreen: React.FC = () => {
   const getSeverityColor = (sev: string): string => {
     const opt = SEVERITY_OPTIONS.find((o) => o.value === sev);
     return opt?.color || colors.textLight;
+  };
+
+  const handleAICompare = async () => {
+    if (comparisonAssessments.length < 2) {
+      crossAlert('Errore', 'Seleziona almeno due valutazioni da confrontare.');
+      return;
+    }
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni per usare il confronto AI.');
+      return;
+    }
+
+    // Prima = più vecchia, Dopo = più recente (comparisonAssessments è ordinato per data crescente)
+    const beforeA = comparisonAssessments[0];
+    const afterA = comparisonAssessments[comparisonAssessments.length - 1];
+
+    setAiComparing(true);
+    setAiComparison(null);
+    try {
+      const student = students.find((s) => s.id === selectedStudentId);
+      const result = await comparePostureWithAI(
+        {
+          date: toDate(beforeA.date).toLocaleDateString('it-IT'),
+          front: beforeA.frontImageUrl || undefined,
+          side: getSideLeftUrl(beforeA) || getSideRightUrl(beforeA) || undefined,
+          back: beforeA.backImageUrl || undefined,
+        },
+        {
+          date: toDate(afterA.date).toLocaleDateString('it-IT'),
+          front: afterA.frontImageUrl || undefined,
+          side: getSideLeftUrl(afterA) || getSideRightUrl(afterA) || undefined,
+          back: afterA.backImageUrl || undefined,
+        },
+        student ? { name: `${student.name} ${student.surname}`, goals: student.goals, medicalNotes: student.medicalNotes } : undefined,
+      );
+      setAiComparison(result);
+    } catch (err: unknown) {
+      crossAlert('Errore AI', err instanceof Error ? err.message : 'Errore durante il confronto AI');
+    } finally {
+      setAiComparing(false);
+    }
+  };
+
+  const verdictColor = (v: string): string => {
+    switch (v) {
+      case 'miglioramento': return colors.success;
+      case 'peggioramento': return colors.error;
+      case 'misto': return colors.warning;
+      default: return colors.textLight;
+    }
+  };
+
+  const verdictLabel = (v: string): string => {
+    switch (v) {
+      case 'miglioramento': return '✅ Miglioramento';
+      case 'peggioramento': return '⚠️ Peggioramento';
+      case 'misto': return '➗ Risultati Misti';
+      case 'stabile': return '➖ Stabile';
+      default: return v;
+    }
   };
 
   // -----------------------------------------------------------------------
@@ -735,6 +799,83 @@ export const PosturalAssessmentScreen: React.FC = () => {
                   ))}
                 </>
               )}
+
+              {/* Confronto AI Prima/Dopo */}
+              <Text style={styles.compTableTitle}>Confronto AI nel Tempo</Text>
+              <Card variant="outlined" style={{ marginBottom: spacing.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                  <Ionicons name="sparkles" size={18} color={colors.accent} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.textLight, fontSize: fontSize.sm, flex: 1 }}>
+                    L'AI confronta la prima e l'ultima valutazione selezionata per valutare i progressi reali.
+                  </Text>
+                </View>
+                <Button
+                  title={aiComparing ? 'Analisi in corso...' : 'Confronta con AI'}
+                  onPress={handleAICompare}
+                  disabled={aiComparing}
+                  variant="primary"
+                />
+                {aiComparing && (
+                  <ActivityIndicator color={colors.accent} style={{ marginTop: spacing.sm }} />
+                )}
+
+                {aiComparison && (
+                  <View style={{ marginTop: spacing.md }}>
+                    <View style={{
+                      alignSelf: 'flex-start',
+                      backgroundColor: verdictColor(aiComparison.verdict) + '22',
+                      borderRadius: borderRadius.md,
+                      paddingVertical: 4,
+                      paddingHorizontal: 10,
+                      marginBottom: spacing.sm,
+                    }}>
+                      <Text style={{ color: verdictColor(aiComparison.verdict), fontWeight: '700', fontSize: fontSize.md }}>
+                        {verdictLabel(aiComparison.verdict)}
+                      </Text>
+                    </View>
+
+                    <Text style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20, marginBottom: spacing.sm }}>
+                      {aiComparison.summary}
+                    </Text>
+
+                    {aiComparison.improvements.length > 0 && (
+                      <View style={{ marginBottom: spacing.sm }}>
+                        <Text style={{ color: colors.success, fontWeight: '700', marginBottom: 4 }}>Miglioramenti</Text>
+                        {aiComparison.improvements.map((it, i) => (
+                          <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 19 }}>• {it}</Text>
+                        ))}
+                      </View>
+                    )}
+
+                    {aiComparison.worsened.length > 0 && (
+                      <View style={{ marginBottom: spacing.sm }}>
+                        <Text style={{ color: colors.error, fontWeight: '700', marginBottom: 4 }}>Da monitorare</Text>
+                        {aiComparison.worsened.map((it, i) => (
+                          <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 19 }}>• {it}</Text>
+                        ))}
+                      </View>
+                    )}
+
+                    {aiComparison.unchanged.length > 0 && (
+                      <View style={{ marginBottom: spacing.sm }}>
+                        <Text style={{ color: colors.textLight, fontWeight: '700', marginBottom: 4 }}>Stabile</Text>
+                        {aiComparison.unchanged.map((it, i) => (
+                          <Text key={i} style={{ color: colors.textLight, fontSize: fontSize.sm, lineHeight: 19 }}>• {it}</Text>
+                        ))}
+                      </View>
+                    )}
+
+                    {aiComparison.recommendations.length > 0 && (
+                      <View>
+                        <Text style={{ color: colors.accent, fontWeight: '700', marginBottom: 4 }}>Consigli</Text>
+                        {aiComparison.recommendations.map((it, i) => (
+                          <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 19 }}>• {it}</Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </Card>
 
               {/* Note confronto */}
               <InputField

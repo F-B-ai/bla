@@ -361,6 +361,129 @@ Sii specifico e professionale. Suggerisci esercizi correttivi concreti con serie
 };
 
 // ============================================================
+// 1b. AI CONFRONTO POSTURALE NEL TEMPO (PRIMA/DOPO)
+// ============================================================
+
+export interface AIPosturalComparison {
+  verdict: 'miglioramento' | 'stabile' | 'peggioramento' | 'misto';
+  summary: string;
+  improvements: string[];
+  worsened: string[];
+  unchanged: string[];
+  recommendations: string[];
+}
+
+export const comparePostureWithAI = async (
+  before: { date: string; front?: string; side?: string; back?: string },
+  after: { date: string; front?: string; side?: string; back?: string },
+  studentInfo?: { name: string; goals: string; medicalNotes?: string }
+): Promise<AIPosturalComparison> => {
+  const systemPrompt = `Sei un esperto fisioterapista e posturologo italiano specializzato nel monitoraggio del progresso nel tempo.
+
+Il tuo compito è CONFRONTARE due set di foto posturali dello STESSO paziente scattate in date diverse, per valutare l'EVOLUZIONE della postura e della composizione corporea.
+
+IMPORTANTE:
+- NON valutare ogni foto in modo assoluto. Il focus è il CONFRONTO tra PRIMA e DOPO.
+- Cerca attivamente i MIGLIORAMENTI: maggiore simmetria, migliore allineamento, tono muscolare aumentato, riduzione asimmetrie, postura più eretta, definizione muscolare, riduzione del grasso.
+- Sii incoraggiante ma onesto. Se c'è un miglioramento evidente, dillo chiaramente e con entusiasmo.
+- Considera anche i cambiamenti estetici e di composizione corporea (tono, definizione, dimagrimento), non solo gli aspetti clinici.
+
+RISPONDI SEMPRE in formato JSON valido con questa struttura:
+{
+  "verdict": "miglioramento|stabile|peggioramento|misto",
+  "summary": "riassunto del confronto in italiano, evidenziando l'andamento generale del percorso",
+  "improvements": ["miglioramento specifico osservato 1", "miglioramento 2", ...],
+  "worsened": ["eventuale peggioramento 1", ...],
+  "unchanged": ["aspetto rimasto stabile 1", ...],
+  "recommendations": ["raccomandazione per continuare i progressi 1", ...]
+}
+
+Confronta attentamente:
+- Simmetria e allineamento delle spalle
+- Allineamento di testa e collo
+- Curve della colonna (cifosi/lordosi)
+- Inclinazione e simmetria del bacino
+- Allineamento degli arti inferiori
+- Tono muscolare e composizione corporea (definizione, dimagrimento, massa)
+- Postura globale (più eretta, più stabile)
+
+Sii specifico, professionale e motivante.`;
+
+  const content: any[] = [];
+  const labels: Record<string, string> = {
+    front: 'frontale',
+    side: 'laterale',
+    back: 'posteriore',
+  };
+
+  // PRIMA
+  content.push({ type: 'text', text: `=== FOTO "PRIMA" (data: ${before.date}) ===` });
+  for (const view of ['front', 'side', 'back'] as const) {
+    const uri = before[view];
+    if (!uri) continue;
+    try {
+      const base64 = await imageUriToBase64(uri);
+      content.push({ type: 'text', text: `PRIMA - vista ${labels[view]}:` });
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
+      });
+    } catch {
+      // skip
+    }
+  }
+
+  // DOPO
+  content.push({ type: 'text', text: `=== FOTO "DOPO" (data: ${after.date}) ===` });
+  for (const view of ['front', 'side', 'back'] as const) {
+    const uri = after[view];
+    if (!uri) continue;
+    try {
+      const base64 = await imageUriToBase64(uri);
+      content.push({ type: 'text', text: `DOPO - vista ${labels[view]}:` });
+      content.push({
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: base64 },
+      });
+    } catch {
+      // skip
+    }
+  }
+
+  let contextText = `Confronta queste foto posturali dello stesso paziente. Le foto "PRIMA" sono del ${before.date}, le foto "DOPO" sono del ${after.date}. Valuta l'evoluzione e il progresso nel tempo.`;
+  if (studentInfo) {
+    contextText += `\n\nPaziente: ${studentInfo.name}\nObiettivi: ${studentInfo.goals}`;
+    if (studentInfo.medicalNotes) contextText += `\nNote mediche: ${studentInfo.medicalNotes}`;
+  }
+  content.push({ type: 'text', text: contextText });
+
+  const hasImages = content.some((c) => c.type === 'image');
+  if (!hasImages) {
+    throw new Error('Servono le foto di entrambe le valutazioni per il confronto AI.');
+  }
+
+  const responseText = await callClaude(
+    [{ role: 'user', content }],
+    systemPrompt,
+    3000,
+    '{'
+  );
+
+  const parsed = extractJSON<AIPosturalComparison>(responseText);
+  if (!parsed || !parsed.verdict) {
+    return {
+      verdict: 'misto',
+      summary: responseText.replace(/^\{/, ''),
+      improvements: [],
+      worsened: [],
+      unchanged: [],
+      recommendations: [],
+    };
+  }
+  return parsed;
+};
+
+// ============================================================
 // 2. AI PROGRESSIONI ALLENAMENTO
 // ============================================================
 
