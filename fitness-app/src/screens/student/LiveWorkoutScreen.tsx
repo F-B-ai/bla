@@ -51,6 +51,12 @@ export const LiveWorkoutScreen: React.FC = () => {
   const [inputReps, setInputReps] = useState('');
   const [inputRpe, setInputRpe] = useState('');
 
+  // Edit set
+  const [editingSet, setEditingSet] = useState<{ exIndex: number; setIndex: number } | null>(null);
+  const [editWeight, setEditWeight] = useState('');
+  const [editReps, setEditReps] = useState('');
+  const [editRpe, setEditRpe] = useState('');
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
@@ -224,6 +230,61 @@ export const LiveWorkoutScreen: React.FC = () => {
         }, 500);
       }
     }
+  };
+
+  const handleEditSet = (exIndex: number, setIndex: number) => {
+    const set = exerciseLogs[exIndex].sets[setIndex];
+    setEditWeight(String(set.weight || ''));
+    setEditReps(String(set.reps));
+    setEditRpe(set.rpe ? String(set.rpe) : '');
+    setEditingSet({ exIndex, setIndex });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSet || !activeWorkout) return;
+    const reps = parseInt(editReps, 10);
+    if (!reps || reps <= 0) {
+      crossAlert('Attenzione', 'Inserisci un numero di ripetizioni valido.');
+      return;
+    }
+
+    const newLogs = [...exerciseLogs];
+    const set = newLogs[editingSet.exIndex].sets[editingSet.setIndex];
+    set.reps = reps;
+    set.weight = parseFloat(editWeight) || 0;
+    set.rpe = parseInt(editRpe, 10) || undefined;
+
+    setExerciseLogs(newLogs);
+    setEditingSet(null);
+
+    try {
+      await updateExerciseLogs(activeWorkout.id, newLogs);
+    } catch {
+      crossAlert('Errore', 'Impossibile salvare la modifica.');
+    }
+  };
+
+  const handleDeleteSet = async () => {
+    if (!editingSet || !activeWorkout) return;
+    crossAlert('Elimina Serie', 'Vuoi eliminare questa serie?', [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          const newLogs = [...exerciseLogs];
+          newLogs[editingSet.exIndex].sets.splice(editingSet.setIndex, 1);
+          newLogs[editingSet.exIndex].sets.forEach((s, i) => { s.setNumber = i + 1; });
+          setExerciseLogs(newLogs);
+          setEditingSet(null);
+          try {
+            await updateExerciseLogs(activeWorkout.id, newLogs);
+          } catch {
+            crossAlert('Errore', 'Impossibile eliminare la serie.');
+          }
+        },
+      },
+    ]);
   };
 
   const startRestTimer = (seconds: number) => {
@@ -538,17 +599,91 @@ export const LiveWorkoutScreen: React.FC = () => {
             {currentExercise.sets.length > 0 && (
               <View style={styles.completedSets}>
                 <Text style={styles.completedTitle}>Serie completate:</Text>
-                {currentExercise.sets.map((s, i) => (
-                  <View key={i} style={styles.setRow}>
-                    <View style={styles.setNumber}>
-                      <Text style={styles.setNumberText}>{s.setNumber}</Text>
-                    </View>
-                    <Text style={styles.setText}>
-                      {s.weight > 0 ? `${s.weight} kg` : 'Corpo libero'} x {s.reps} reps
-                    </Text>
-                    {s.rpe && <Text style={styles.rpeText}>RPE {s.rpe}</Text>}
-                  </View>
-                ))}
+                {currentExercise.sets.map((s, i) => {
+                  const isEditing = editingSet?.exIndex === currentExerciseIndex && editingSet?.setIndex === i;
+
+                  if (isEditing) {
+                    return (
+                      <View key={i} style={[styles.setRow, { flexDirection: 'column', backgroundColor: colors.surface, borderRadius: borderRadius.md, padding: spacing.sm }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
+                          <View style={styles.setNumber}>
+                            <Text style={styles.setNumberText}>{s.setNumber}</Text>
+                          </View>
+                          <Text style={{ color: colors.accent, fontWeight: '700', fontSize: fontSize.sm }}>Modifica serie</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                          <View style={{ flex: 2 }}>
+                            <Text style={{ color: colors.textLight, fontSize: fontSize.xs }}>Peso (kg)</Text>
+                            <TextInput
+                              style={[styles.input, { marginTop: 2 }]}
+                              keyboardType="decimal-pad"
+                              value={editWeight}
+                              onChangeText={setEditWeight}
+                              placeholder="0"
+                              placeholderTextColor={colors.textLight}
+                              autoFocus
+                            />
+                          </View>
+                          <View style={{ flex: 2 }}>
+                            <Text style={{ color: colors.textLight, fontSize: fontSize.xs }}>Reps</Text>
+                            <TextInput
+                              style={[styles.input, { marginTop: 2 }]}
+                              keyboardType="number-pad"
+                              value={editReps}
+                              onChangeText={setEditReps}
+                              placeholder="0"
+                              placeholderTextColor={colors.textLight}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: colors.textLight, fontSize: fontSize.xs }}>RPE</Text>
+                            <TextInput
+                              style={[styles.input, { marginTop: 2 }]}
+                              keyboardType="number-pad"
+                              value={editRpe}
+                              onChangeText={setEditRpe}
+                              placeholder="-"
+                              placeholderTextColor={colors.textLight}
+                            />
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: colors.error + '20', borderRadius: borderRadius.md, paddingVertical: 8, alignItems: 'center' }}
+                            onPress={handleDeleteSet}
+                          >
+                            <Ionicons name="trash-outline" size={18} color={colors.error} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 2, backgroundColor: colors.surface, borderRadius: borderRadius.md, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: colors.border }}
+                            onPress={() => setEditingSet(null)}
+                          >
+                            <Text style={{ color: colors.textLight }}>Annulla</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 2, backgroundColor: colors.accent, borderRadius: borderRadius.md, paddingVertical: 8, alignItems: 'center' }}
+                            onPress={handleSaveEdit}
+                          >
+                            <Text style={{ color: '#FFF', fontWeight: '700' }}>Salva</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <TouchableOpacity key={i} style={styles.setRow} onPress={() => handleEditSet(currentExerciseIndex, i)} activeOpacity={0.6}>
+                      <View style={styles.setNumber}>
+                        <Text style={styles.setNumberText}>{s.setNumber}</Text>
+                      </View>
+                      <Text style={styles.setText}>
+                        {s.weight > 0 ? `${s.weight} kg` : 'Corpo libero'} x {s.reps} reps
+                      </Text>
+                      {s.rpe && <Text style={styles.rpeText}>RPE {s.rpe}</Text>}
+                      <Ionicons name="pencil" size={14} color={colors.textLight} style={{ marginLeft: 'auto' }} />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
