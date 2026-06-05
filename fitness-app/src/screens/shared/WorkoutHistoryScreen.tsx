@@ -88,6 +88,32 @@ export const WorkoutHistoryScreen: React.FC = () => {
     );
   };
 
+  const handleClearAll = () => {
+    const target = filteredLogs;
+    if (target.length === 0) return;
+    const label = selectedStudentId ? `di ${getStudentName(selectedStudentId)}` : '';
+    crossAlert(
+      'Pulisci Storico',
+      `Eliminare ${target.length} allenament${target.length === 1 ? 'o' : 'i'} ${label}? L'operazione non è reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina tutti',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(target.map((w) => deleteWorkoutLog(w.id)));
+              const ids = new Set(target.map((w) => w.id));
+              setLogs((prev) => prev.filter((l) => !ids.has(l.id)));
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare alcune sessioni.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
@@ -484,6 +510,16 @@ export const WorkoutHistoryScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Clear all button */}
+        {isStaff && filteredLogs.length > 0 && (
+          <TouchableOpacity onPress={handleClearAll} style={styles.clearAllRow}>
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+            <Text style={styles.clearAllText}>
+              Pulisci {selectedStudentId ? getStudentName(selectedStudentId) : 'tutto'} ({filteredLogs.length})
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Student filter for staff */}
         {isStaff && studentList.length > 0 && (
           <View style={styles.filterSection}>
@@ -777,6 +813,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
   },
+  clearAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error + '15',
+  },
+  clearAllText: { fontSize: fontSize.sm, color: colors.error, fontWeight: '600' },
   progStats: {
     flexDirection: 'row',
     gap: spacing.lg,

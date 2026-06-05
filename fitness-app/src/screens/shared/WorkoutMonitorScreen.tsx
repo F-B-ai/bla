@@ -137,12 +137,60 @@ export const WorkoutMonitorScreen: React.FC = () => {
           onPress: async () => {
             try {
               await deleteWorkoutLog(log.id);
+              setActiveWorkouts((prev) => prev.filter((l) => l.id !== log.id));
               setHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
               setStudentHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
               if (selectedWorkout?.id === log.id) setSelectedWorkout(null);
             } catch (err) {
               console.error('Errore eliminazione sessione:', err);
               crossAlert('Errore', 'Impossibile eliminare la sessione. Riprova.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllActive = () => {
+    if (activeWorkouts.length === 0) return;
+    crossAlert(
+      'Pulisci Monitor',
+      `Eliminare tutti i ${activeWorkouts.length} allenamenti in corso? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina tutti',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(activeWorkouts.map((w) => deleteWorkoutLog(w.id)));
+              setActiveWorkouts([]);
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare alcune sessioni.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllHistory = () => {
+    if (historyLogs.length === 0) return;
+    crossAlert(
+      'Pulisci Storico',
+      `Eliminare tutti i ${historyLogs.length} allenamenti nello storico? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina tutti',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(historyLogs.map((w) => deleteWorkoutLog(w.id)));
+              setHistoryLogs([]);
+              setStudentHistoryLogs([]);
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare alcune sessioni.');
             }
           },
         },
@@ -183,6 +231,12 @@ export const WorkoutMonitorScreen: React.FC = () => {
               <Text style={styles.liveText}>LIVE</Text>
             </View>
           )}
+          {activeWorkouts.length > 0 && (
+            <TouchableOpacity onPress={handleClearAllActive} style={styles.clearBtn}>
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+              <Text style={styles.clearBtnText}>Pulisci</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {activeWorkouts.length === 0 ? (
@@ -218,7 +272,15 @@ export const WorkoutMonitorScreen: React.FC = () => {
                         {doneSets}/{totalSets} serie | {workout.exerciseLogs?.filter((e) => e.sets.length > 0).length || 0}/{workout.exerciseLogs?.length || 0} esercizi
                       </Text>
                     </View>
-                    <Ionicons name="eye-outline" size={24} color={colors.accent} />
+                    <View style={{ alignItems: 'center', gap: spacing.sm }}>
+                      <Ionicons name="eye-outline" size={24} color={colors.accent} />
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); handleDeleteLog(workout); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -320,6 +382,13 @@ export const WorkoutMonitorScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
             <ModalHeader title="Storico Allenamenti" onClose={() => { setShowHistory(false); setShowStudentHistory(false); setHistorySearch(''); }} />
+
+            {historyLogs.length > 0 && !showStudentHistory && (
+              <TouchableOpacity onPress={handleClearAllHistory} style={styles.clearAllRow}>
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+                <Text style={styles.clearAllText}>Pulisci tutto lo storico ({historyLogs.length})</Text>
+              </TouchableOpacity>
+            )}
 
             <View style={styles.searchContainer}>
               <Ionicons name="search" size={18} color={colors.textLight} />
@@ -573,4 +642,25 @@ const styles = StyleSheet.create({
   miniExRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 2, paddingLeft: spacing.md },
   miniExName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.text, width: 100 },
   miniExSets: { fontSize: fontSize.xs, color: colors.textSecondary, flex: 1 },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error + '15',
+  },
+  clearBtnText: { fontSize: fontSize.xs, color: colors.error, fontWeight: '600' },
+  clearAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error + '15',
+  },
+  clearAllText: { fontSize: fontSize.sm, color: colors.error, fontWeight: '600' },
 });
