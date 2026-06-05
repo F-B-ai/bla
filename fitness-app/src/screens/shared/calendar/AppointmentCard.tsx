@@ -112,9 +112,13 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <Text style={styles.earningsCost}>{'€'}{item.sessionCost}</Text>
           {(() => {
             const e = calcEarnings(item.sessionCost!, item.studentId, item.staffId);
+            const parts: string[] = [];
+            if (e.coachEarning > 0) parts.push(`Staff: €${e.coachEarning}`);
+            if (e.managerEarning > 0) parts.push(`Mgr: €${e.managerEarning}`);
+            parts.push(`Tuo: €${e.ownerEarning}`);
             return (
               <Text style={styles.earningsDetail}>
-                Staff: {'€'}{e.coachEarning}{e.managerEarning > 0 ? ` | Mgr: €${e.managerEarning}` : ''} | Tuo: {'€'}{e.ownerEarning}
+                {parts.join(' | ')}
               </Text>
             );
           })()}

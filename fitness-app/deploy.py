@@ -182,8 +182,18 @@ def main():
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/octet-stream",
         }
-        req = urllib.request.Request(url, data=gz_data, headers=headers, method="POST")
-        urllib.request.urlopen(req)
+        for attempt in range(5):
+            try:
+                req = urllib.request.Request(url, data=gz_data, headers=headers, method="POST")
+                urllib.request.urlopen(req)
+                break
+            except (urllib.error.HTTPError, urllib.error.URLError) as e:
+                if attempt == 4:
+                    print(f"  Upload failed after 5 attempts: {e}", file=sys.stderr)
+                    sys.exit(1)
+                wait = 2 ** (attempt + 1)
+                print(f"  Retry {attempt+1}/4 in {wait}s... ({e})")
+                time.sleep(wait)
         print(f"  Uploaded {i+1}/{len(to_upload)}")
 
     # 4. Finalize

@@ -347,6 +347,9 @@ export const CalendarScreen: React.FC = () => {
   };
 
   const calcEarnings = (cost: number, studentId: string, staffId: string) => {
+    if (staffId === user?.id) {
+      return { coachEarning: 0, managerEarning: 0, ownerEarning: cost, coachPct: 0, managerPct: 0 };
+    }
     const student = students.find((s) => s.id === studentId);
     const collab = collaborators.find((c) => c.id === staffId);
     const coachPct = student?.coachCommissionPercentage ?? collab?.commissionPercentage ?? 60;
