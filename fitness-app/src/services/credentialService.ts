@@ -12,7 +12,7 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider,
   updatePassword,
-  updateEmail,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
 import { CredentialChangeRequest, CredentialRequestType } from '../types';
@@ -41,6 +41,32 @@ const restSignIn = async (
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error?.message || 'Errore di autenticazione');
   return { idToken: data.idToken, localId: data.localId };
+};
+
+const restSendVerifyAndChangeEmail = async (
+  idToken: string,
+  newEmail: string
+): Promise<void> => {
+  const apiKey = getApiKey();
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestType: 'VERIFY_AND_CHANGE_EMAIL',
+        idToken,
+        newEmail,
+      }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) {
+    const errMsg = data?.error?.message || '';
+    if (errMsg === 'EMAIL_EXISTS') throw new Error('Questa email è già in uso');
+    if (errMsg === 'INVALID_EMAIL') throw new Error('Email non valida');
+    throw new Error(errMsg || 'Errore invio email di verifica');
+  }
 };
 
 const restUpdateAccount = async (
@@ -78,7 +104,19 @@ export const adminChangeUserEmail = async (
   newEmail: string
 ): Promise<void> => {
   const { idToken } = await restSignIn(currentEmail, currentPassword);
-  await restUpdateAccount(idToken, { email: newEmail });
+  try {
+    await restUpdateAccount(idToken, { email: newEmail });
+  } catch (err: any) {
+    if (err?.message?.includes('OPERATION_NOT_ALLOWED') || err?.message?.includes('verify')) {
+      await restSendVerifyAndChangeEmail(idToken, newEmail);
+      await updateDoc(doc(db, 'users', userId), { email: newEmail });
+      throw new Error(
+        'VERIFY_SENT: Email di verifica inviata a ' + newEmail +
+        '. Il cambio sarà effettivo dopo che l\'utente confermerà cliccando il link nell\'email.'
+      );
+    }
+    throw err;
+  }
   await updateDoc(doc(db, 'users', userId), { email: newEmail });
 };
 
@@ -103,7 +141,7 @@ export const changeOwnEmail = async (
   if (!fbUser || !fbUser.email) throw new Error('Utente non autenticato');
   const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
   await reauthenticateWithCredential(fbUser, credential);
-  await updateEmail(fbUser, newEmail);
+  await verifyBeforeUpdateEmail(fbUser, newEmail);
   await updateDoc(doc(db, 'users', fbUser.uid), { email: newEmail });
 };
 

@@ -210,7 +210,13 @@ export const ManageUsersScreen: React.FC = () => {
             crossAlert('Fatto', 'Richiesta approvata e dati aggiornati.');
             await loadData();
           } catch (err: any) {
-            crossAlert('Errore', err?.message || 'Impossibile approvare la richiesta.');
+            const msg = err?.message || '';
+            if (msg.startsWith('VERIFY_SENT:')) {
+              crossAlert('Email di Verifica Inviata', msg.replace('VERIFY_SENT: ', ''));
+              await loadData();
+            } else {
+              crossAlert('Errore', msg || 'Impossibile approvare la richiesta.');
+            }
           } finally {
             setProcessingRequestId(null);
           }
