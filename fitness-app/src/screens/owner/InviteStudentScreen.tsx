@@ -107,8 +107,8 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
       setName('');
       setSurname('');
       setEmail('');
-    } catch {
-      crossAlert('Errore', 'Impossibile creare l\'invito');
+    } catch (err: any) {
+      crossAlert('Errore', err?.message || 'Impossibile creare l\'invito');
     } finally {
       setLoading(false);
     }

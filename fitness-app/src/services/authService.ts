@@ -342,7 +342,6 @@ export const createStudentInvite = async (
     assignedCollaboratorName,
     createdBy,
     createdByName,
-    managedPassword: password,
     createdAt: Timestamp.now(),
     isUsed: false,
   };
