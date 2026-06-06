@@ -465,8 +465,40 @@ export const toggleUserActive = async (userId: string, isActive: boolean): Promi
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
-  // Rimuove il documento utente da Firestore
-  // Nota: non elimina l'account Firebase Auth (richiede admin SDK lato server)
+  const userSnap = await getDoc(doc(db, 'users', userId));
+  if (userSnap.exists()) {
+    const data = userSnap.data();
+    const email = data?.email;
+    const password = data?.managedPassword;
+    if (email && password) {
+      try {
+        const apiKey = auth.app.options.apiKey;
+        if (apiKey) {
+          const signInRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password, returnSecureToken: true }),
+            }
+          );
+          const signInData = await signInRes.json();
+          if (signInRes.ok && signInData.idToken) {
+            await fetch(
+              `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken: signInData.idToken }),
+              }
+            );
+          }
+        }
+      } catch {
+        // Auth deletion failed — continue with Firestore cleanup
+      }
+    }
+  }
   await deleteDoc(doc(db, 'users', userId));
 };
 
