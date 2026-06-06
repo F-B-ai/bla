@@ -610,6 +610,7 @@ export const PaymentPlanScreen: React.FC = () => {
     try {
       const planStart = toSafeDate(plan.startDate);
       const planEnd = toSafeDate(plan.endDate);
+      const planEndOfDay = new Date(planEnd.getFullYear(), planEnd.getMonth(), planEnd.getDate(), 23, 59, 59, 999);
       const [sessions, transactions] = await Promise.all([
         getStudentSessions(plan.studentId),
         getTransactions(),
@@ -617,12 +618,12 @@ export const PaymentPlanScreen: React.FC = () => {
       const filteredSessions = sessions.filter((s) => {
         if (!s.isCountedAsCompleted && s.status !== 'completed') return false;
         const sDate = toSafeDate(s.date);
-        return sDate >= planStart && sDate <= planEnd;
+        return sDate >= planStart && sDate <= planEndOfDay;
       });
       const filteredTransactions = transactions.filter((t) => {
         if (t.studentId !== plan.studentId) return false;
         const tDate = toSafeDate(t.date);
-        return tDate >= planStart && tDate <= planEnd;
+        return tDate >= planStart && tDate <= planEndOfDay;
       });
       setDetailSessions(filteredSessions);
       setDetailTransactions(filteredTransactions);

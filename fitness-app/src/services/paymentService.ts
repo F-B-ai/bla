@@ -191,6 +191,7 @@ export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPl
     const start = toSafeDate(p.startDate);
     const end = toSafeDate(p.endDate);
     if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-    return start <= now && end >= now;
+    const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+    return start <= now && endOfDay >= now;
   }) || null;
 };
