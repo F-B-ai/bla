@@ -109,6 +109,9 @@ export const PosturalAssessmentScreen: React.FC = () => {
   const [aiComparing, setAiComparing] = useState(false);
   const [aiComparison, setAiComparison] = useState<AIPosturalComparison | null>(null);
 
+  // Detail view
+  const [detailAssessment, setDetailAssessment] = useState<PosturalAssessment | null>(null);
+
   // Evolution report
   const [showEvolution, setShowEvolution] = useState(false);
 
@@ -316,6 +319,11 @@ export const PosturalAssessmentScreen: React.FC = () => {
       if (backImage && isLocalUri(backImage))
         backUrl = await uploadPosturalImage(selectedStudentId, backImage, 'back');
 
+      const baseAnalysis = analyzePosture(findings);
+      const recommendations = aiResult?.recommendations?.length
+        ? aiResult.recommendations.join('\n')
+        : baseAnalysis.recommendations.join('\n');
+
       await createAssessment({
         studentId: selectedStudentId,
         assessorId: user.id,
@@ -326,10 +334,10 @@ export const PosturalAssessmentScreen: React.FC = () => {
         backImageUrl: backUrl,
         findings,
         overallNotes,
-        recommendations: analyzePosture(findings).recommendations.join('\n'),
-        aiAnalysis: aiResult?.summary || undefined,
-        aiRecommendations: aiResult?.recommendations || undefined,
-        aiExerciseProgram: aiResult?.exerciseProgram || undefined,
+        recommendations,
+        aiAnalysis: aiResult?.summary || '',
+        aiRecommendations: aiResult?.recommendations || [],
+        aiExerciseProgram: aiResult?.exerciseProgram || [],
       });
 
       crossAlert('Successo', 'Valutazione posturale salvata!');
@@ -691,6 +699,16 @@ export const PosturalAssessmentScreen: React.FC = () => {
                     {assessment.aiAnalysis && (
                       <Text style={styles.historyAiNote} numberOfLines={2}>AI: {assessment.aiAnalysis}</Text>
                     )}
+                    {assessment.overallNotes ? (
+                      <Text style={styles.historyAiNote} numberOfLines={1}>Note: {assessment.overallNotes}</Text>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.detailBtn}
+                      onPress={(e) => { e.stopPropagation?.(); setDetailAssessment(assessment); }}
+                    >
+                      <Ionicons name="eye-outline" size={14} color={colors.accent} />
+                      <Text style={styles.detailBtnText}>Vedi dettaglio</Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
@@ -901,6 +919,122 @@ export const PosturalAssessmentScreen: React.FC = () => {
       </Modal>
 
       {/* ================================================================= */}
+      {/* MODAL DETTAGLIO VALUTAZIONE                                        */}
+      {/* ================================================================= */}
+      <Modal visible={!!detailAssessment} animationType="slide" transparent onRequestClose={() => setDetailAssessment(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Dettaglio Valutazione</Text>
+              <TouchableOpacity onPress={() => setDetailAssessment(null)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            {detailAssessment && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.historyDate}>
+                  {toDate(detailAssessment.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+
+                {/* Foto */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: spacing.sm }}>
+                  <View style={styles.compImageRow}>
+                    {[
+                      { url: detailAssessment.frontImageUrl, label: 'Frontale' },
+                      { url: getSideLeftUrl(detailAssessment), label: 'Lat. SX' },
+                      { url: getSideRightUrl(detailAssessment), label: 'Lat. DX' },
+                      { url: detailAssessment.backImageUrl, label: 'Posteriore' },
+                    ].filter((p) => !!p.url).map((p, i) => (
+                      <View key={i} style={styles.compImageCol}>
+                        <Image source={{ uri: p.url }} style={styles.compImage} />
+                        <Text style={styles.compImageDate}>{p.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                {/* Osservazioni */}
+                <Text style={styles.compTableTitle}>Osservazioni ({detailAssessment.findings.length})</Text>
+                {detailAssessment.findings.map((f, i) => {
+                  const areaLabel = POSTURAL_AREAS.find((a) => a.value === f.area)?.label || f.area;
+                  const sevInfo = SEVERITY_OPTIONS.find((s) => s.value === f.severity);
+                  return (
+                    <Card key={i} variant="outlined" style={{ marginBottom: spacing.xs }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ color: colors.text, fontWeight: '600', flex: 1 }}>{areaLabel}</Text>
+                        <View style={[styles.severityBadge, { backgroundColor: (sevInfo?.color || colors.textLight) + '20' }]}>
+                          <Text style={[styles.severityBadgeText, { color: sevInfo?.color || colors.textLight }]}>{sevInfo?.label || f.severity}</Text>
+                        </View>
+                      </View>
+                      <Text style={{ color: colors.textSecondary, fontSize: fontSize.sm }}>{f.observation}</Text>
+                    </Card>
+                  );
+                })}
+
+                {/* Note generali */}
+                {detailAssessment.overallNotes ? (
+                  <>
+                    <Text style={styles.compTableTitle}>Note Generali</Text>
+                    <Card variant="outlined">
+                      <Text style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20 }}>{detailAssessment.overallNotes}</Text>
+                    </Card>
+                  </>
+                ) : null}
+
+                {/* Raccomandazioni */}
+                {detailAssessment.recommendations ? (
+                  <>
+                    <Text style={styles.compTableTitle}>Raccomandazioni</Text>
+                    <Card variant="outlined">
+                      {detailAssessment.recommendations.split('\n').filter(Boolean).map((r, i) => (
+                        <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20 }}>{'•'} {r}</Text>
+                      ))}
+                    </Card>
+                  </>
+                ) : null}
+
+                {/* Analisi AI */}
+                {detailAssessment.aiAnalysis ? (
+                  <>
+                    <Text style={styles.compTableTitle}>Analisi AI</Text>
+                    <Card variant="elevated">
+                      <Text style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20 }}>{detailAssessment.aiAnalysis}</Text>
+                    </Card>
+                  </>
+                ) : null}
+
+                {/* Raccomandazioni AI */}
+                {detailAssessment.aiRecommendations && detailAssessment.aiRecommendations.length > 0 ? (
+                  <>
+                    <Text style={styles.compTableTitle}>Raccomandazioni AI</Text>
+                    <Card variant="outlined">
+                      {detailAssessment.aiRecommendations.map((r, i) => (
+                        <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20 }}>{'•'} {r}</Text>
+                      ))}
+                    </Card>
+                  </>
+                ) : null}
+
+                {/* Programma esercizi AI */}
+                {detailAssessment.aiExerciseProgram && detailAssessment.aiExerciseProgram.length > 0 ? (
+                  <>
+                    <Text style={styles.compTableTitle}>Programma Esercizi Correttivi AI</Text>
+                    <Card variant="outlined">
+                      {detailAssessment.aiExerciseProgram.map((ex, i) => (
+                        <Text key={i} style={{ color: colors.text, fontSize: fontSize.sm, lineHeight: 20 }}>{i + 1}. {ex}</Text>
+                      ))}
+                    </Card>
+                  </>
+                ) : null}
+
+                <View style={{ height: 60 }} />
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================================================================= */}
       {/* REPORT EVOLUZIONE                                                  */}
       {/* ================================================================= */}
       {selectedStudentId && previousAssessments.length >= 2 && (
@@ -1105,6 +1239,8 @@ const styles = StyleSheet.create({
   historyThumbnails: { flexDirection: 'row', gap: 4 },
   historyThumb: { width: 36, height: 48, borderRadius: borderRadius.sm },
   historyAiNote: { fontSize: fontSize.xs, color: colors.info, marginTop: spacing.xs, fontStyle: 'italic' },
+  detailBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.xs, alignSelf: 'flex-end' },
+  detailBtnText: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '600' },
 
   // Comparison modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
