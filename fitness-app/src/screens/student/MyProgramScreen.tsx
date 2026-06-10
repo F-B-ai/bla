@@ -93,6 +93,11 @@ export const MyProgramScreen: React.FC = () => {
             {exercise.sets} serie x {exercise.reps} reps
             {exercise.restSeconds > 0 && ` | Recupero: ${exercise.restSeconds}s`}
           </Text>
+          {exercise.technique === 'rest_pause' && (
+            <Text style={styles.restPauseTag}>
+              SERIE INTERROTTE: {exercise.miniSets || 4} mini serie da {exercise.miniReps || '6'} reps, rec {exercise.miniRestSeconds || 20}s tra mini serie
+            </Text>
+          )}
         </View>
       </View>
 
@@ -436,6 +441,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  restPauseTag: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+    marginTop: 4,
   },
   exerciseDescription: {
     fontSize: fontSize.md,

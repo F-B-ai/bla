@@ -338,6 +338,11 @@ export const WorkoutMonitorScreen: React.FC = () => {
                           <Text style={styles.exTarget}>
                             {ex.sets.length}/{ex.targetSets} serie x {ex.targetReps}
                           </Text>
+                          {ex.technique === 'rest_pause' && (
+                            <Text style={styles.restPauseTag}>
+                              SERIE INTERROTTE · {ex.targetMiniSets || 4} mini da {ex.targetMiniReps || '6'} · rec {ex.targetMiniRestSeconds || 20}s
+                            </Text>
+                          )}
                         </View>
                         {done && <Ionicons name="checkmark-circle" size={24} color={colors.success} />}
                       </View>
@@ -350,13 +355,21 @@ export const WorkoutMonitorScreen: React.FC = () => {
                           <Text style={[styles.tableCell, styles.tableHeader]}>RPE</Text>
                         </View>
                         {ex.sets.map((s, si) => (
-                          <View key={si} style={styles.setsTableRow}>
-                            <Text style={styles.tableCell}>{s.setNumber}</Text>
-                            <Text style={[styles.tableCell, { flex: 2 }]}>
-                              {s.weight > 0 ? `${s.weight} kg` : '-'}
-                            </Text>
-                            <Text style={[styles.tableCell, { flex: 2 }]}>{s.reps}</Text>
-                            <Text style={styles.tableCell}>{s.rpe || '-'}</Text>
+                          <View key={si}>
+                            <View style={styles.setsTableRow}>
+                              <Text style={styles.tableCell}>{s.setNumber}</Text>
+                              <Text style={[styles.tableCell, { flex: 2 }]}>
+                                {s.weight > 0 ? `${s.weight} kg` : '-'}
+                              </Text>
+                              <Text style={[styles.tableCell, { flex: 2 }]}>{s.reps}</Text>
+                              <Text style={styles.tableCell}>{s.rpe || '-'}</Text>
+                            </View>
+                            {s.miniSetDetails && s.miniSetDetails.length > 0 && (
+                              <Text style={styles.miniSetDetail}>
+                                {s.miniSetsCompleted} mini serie: {s.miniSetDetails.map((m) => m.reps).join('/')}
+                                {' '}· rec: {s.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
+                              </Text>
+                            )}
                           </View>
                         ))}
                       </View>
@@ -612,6 +625,8 @@ const styles = StyleSheet.create({
   exInfo: { flex: 1 },
   exName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   exTarget: { fontSize: fontSize.sm, color: colors.textSecondary },
+  restPauseTag: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '700', marginTop: 2 },
+  miniSetDetail: { fontSize: fontSize.xs, color: colors.accent, paddingBottom: spacing.xs, paddingLeft: spacing.sm },
   setsTable: { marginTop: spacing.md },
   setsTableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.divider, paddingBottom: spacing.xs },
   setsTableRow: { flexDirection: 'row', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider },

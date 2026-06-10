@@ -302,17 +302,25 @@ export const WorkoutHistoryScreen: React.FC = () => {
                         <Text style={[styles.setTableCell, styles.setTableHeaderText, { width: 50 }]}>RPE</Text>
                       </View>
                       {ex.sets.map((set, si) => (
-                        <View key={si} style={styles.setTableRow}>
-                          <Text style={[styles.setTableCell, { width: 40, color: colors.textSecondary }]}>{set.setNumber}</Text>
-                          <Text style={[styles.setTableCell, { flex: 1, fontWeight: '700', color: colors.text }]}>
-                            {set.weight > 0 ? `${set.weight} kg` : 'BW'}
-                          </Text>
-                          <Text style={[styles.setTableCell, { flex: 1, fontWeight: '600', color: colors.accent }]}>
-                            {set.reps}
-                          </Text>
-                          <Text style={[styles.setTableCell, { width: 50, color: colors.textSecondary }]}>
-                            {set.rpe ? set.rpe : '-'}
-                          </Text>
+                        <View key={si}>
+                          <View style={styles.setTableRow}>
+                            <Text style={[styles.setTableCell, { width: 40, color: colors.textSecondary }]}>{set.setNumber}</Text>
+                            <Text style={[styles.setTableCell, { flex: 1, fontWeight: '700', color: colors.text }]}>
+                              {set.weight > 0 ? `${set.weight} kg` : 'BW'}
+                            </Text>
+                            <Text style={[styles.setTableCell, { flex: 1, fontWeight: '600', color: colors.accent }]}>
+                              {set.reps}
+                            </Text>
+                            <Text style={[styles.setTableCell, { width: 50, color: colors.textSecondary }]}>
+                              {set.rpe ? set.rpe : '-'}
+                            </Text>
+                          </View>
+                          {set.miniSetDetails && set.miniSetDetails.length > 0 && (
+                            <Text style={{ fontSize: fontSize.xs, color: colors.accent, paddingLeft: 40, paddingBottom: 4 }}>
+                              Serie Interrotta · {set.miniSetsCompleted} mini: {set.miniSetDetails.map((m) => m.reps).join('/')}
+                              {' '}· rec: {set.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
+                            </Text>
+                          )}
                         </View>
                       ))}
                     </View>

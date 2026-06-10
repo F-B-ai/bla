@@ -109,6 +109,8 @@ export interface TrainingProgram {
 }
 
 // --- Esercizio ---
+export type ExerciseTechnique = 'standard' | 'rest_pause';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -120,6 +122,11 @@ export interface Exercise {
   imageUrl?: string;
   notes: string;
   category: ExerciseCategory;
+  // Serie Interrotte (rest-pause): ogni serie e' composta da mini serie
+  technique?: ExerciseTechnique;
+  miniSets?: number; // numero di mini serie per serie (es. 4)
+  miniReps?: string; // ripetizioni per mini serie (es. "6")
+  miniRestSeconds?: number; // recupero tra mini serie (es. 15-25s)
 }
 
 export type ExerciseCategory =
@@ -594,6 +601,17 @@ export interface ExerciseLog {
   targetSets: number;
   targetReps: string;
   sets: SetLog[];
+  // Serie Interrotte (rest-pause)
+  technique?: ExerciseTechnique;
+  targetMiniSets?: number;
+  targetMiniReps?: string;
+  targetMiniRestSeconds?: number;
+}
+
+// Dettaglio singola mini serie (per Serie Interrotte)
+export interface MiniSetLog {
+  reps: number;
+  restSeconds: number; // recupero preso dopo questa mini serie (0 per l'ultima)
 }
 
 export interface SetLog {
@@ -604,6 +622,9 @@ export interface SetLog {
   rpe?: number; // Rate of Perceived Exertion 1-10
   notes?: string;
   completedAt: Date;
+  // Serie Interrotte: dettaglio mini serie completate
+  miniSetsCompleted?: number;
+  miniSetDetails?: MiniSetLog[];
 }
 
 // --- Navigation types ---

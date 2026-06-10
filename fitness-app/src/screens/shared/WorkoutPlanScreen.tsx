@@ -78,6 +78,12 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
+  // Tecnica: Serie Interrotte (rest-pause)
+  const [exTechnique, setExTechnique] = useState<'standard' | 'rest_pause'>('standard');
+  const [exMiniSets, setExMiniSets] = useState('4');
+  const [exMiniReps, setExMiniReps] = useState('6');
+  const [exMiniRest, setExMiniRest] = useState('20');
+
   // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateFilter, setTemplateFilter] = useState<'all' | 'male' | 'female'>('all');
@@ -467,6 +473,14 @@ export const WorkoutPlanScreen: React.FC = () => {
       notes: exNotes,
       category: exCategory,
       ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
+      ...(exTechnique === 'rest_pause'
+        ? {
+            technique: 'rest_pause' as const,
+            miniSets: parseInt(exMiniSets, 10) || 4,
+            miniReps: exMiniReps || '6',
+            miniRestSeconds: parseInt(exMiniRest, 10) || 20,
+          }
+        : { technique: 'standard' as const }),
     };
 
     if (editingExerciseIndex !== null) {
@@ -508,6 +522,10 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExRest('');
     setExVideoUrl('');
     setExNotes('');
+    setExTechnique('standard');
+    setExMiniSets('4');
+    setExMiniReps('6');
+    setExMiniRest('20');
     setSaveToLibrary(false);
     setEditingExerciseIndex(null);
     setShowExerciseModal(false);
@@ -524,6 +542,10 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExCategory(ex.category || 'forza');
     setExVideoUrl(ex.videoUrl || '');
     setExNotes(ex.notes || '');
+    setExTechnique(ex.technique === 'rest_pause' ? 'rest_pause' : 'standard');
+    setExMiniSets(String(ex.miniSets || 4));
+    setExMiniReps(ex.miniReps || '6');
+    setExMiniRest(String(ex.miniRestSeconds || 20));
     setEditingExerciseIndex(exerciseIndex);
     setShowExerciseModal(true);
   };
@@ -816,6 +838,11 @@ export const WorkoutPlanScreen: React.FC = () => {
                       <Text style={styles.exerciseDetails}>
                         {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
                       </Text>
+                      {ex.technique === 'rest_pause' ? (
+                        <Text style={styles.restPauseBadge}>
+                          Serie Interrotte: {ex.miniSets || 4} mini serie da {ex.miniReps || '6'} (rec {ex.miniRestSeconds || 20}s)
+                        </Text>
+                      ) : null}
                       {ex.description ? (
                         <Text style={styles.exerciseDesc}>{ex.description}</Text>
                       ) : null}
@@ -930,6 +957,62 @@ export const WorkoutPlanScreen: React.FC = () => {
               keyboardType="number-pad"
               placeholder="90"
             />
+
+            {/* Tecnica */}
+            <Text style={styles.fieldLabel}>Tecnica</Text>
+            <View style={styles.categoryRow}>
+              <TouchableOpacity
+                style={[styles.categoryChip, exTechnique === 'standard' && styles.categoryChipActive]}
+                onPress={() => setExTechnique('standard')}
+              >
+                <Text style={[styles.categoryChipText, exTechnique === 'standard' && styles.categoryChipTextActive]}>
+                  Normale
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.categoryChip, exTechnique === 'rest_pause' && styles.categoryChipActive]}
+                onPress={() => setExTechnique('rest_pause')}
+              >
+                <Text style={[styles.categoryChipText, exTechnique === 'rest_pause' && styles.categoryChipTextActive]}>
+                  Serie Interrotte
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {exTechnique === 'rest_pause' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Ogni serie è composta da mini serie con recupero breve tra loro.
+                  Es: carico da 9-10 reps al limite, 4 mini serie da 6 reps con 15-25s di recupero.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Mini serie"
+                      value={exMiniSets}
+                      onChangeText={setExMiniSets}
+                      keyboardType="number-pad"
+                      placeholder="4"
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Reps per mini serie"
+                      value={exMiniReps}
+                      onChangeText={setExMiniReps}
+                      placeholder="6"
+                    />
+                  </View>
+                </View>
+                <InputField
+                  label="Recupero tra mini serie (secondi)"
+                  value={exMiniRest}
+                  onChangeText={setExMiniRest}
+                  keyboardType="number-pad"
+                  placeholder="20"
+                />
+              </View>
+            )}
 
             <Text style={styles.fieldLabel}>Categoria</Text>
             <View style={styles.categoryRow}>
@@ -1605,6 +1688,26 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  restPauseBadge: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  restPauseBox: {
+    backgroundColor: colors.accent + '10',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+    marginBottom: spacing.sm,
+  },
+  restPauseInfo: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    lineHeight: 17,
   },
   videoLink: {
     fontSize: fontSize.sm,

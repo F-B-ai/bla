@@ -14,7 +14,7 @@ import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { ModalHeader } from '../../components/common/ModalHeader';
-import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, Student } from '../../types';
+import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, MiniSetLog, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import {
@@ -50,6 +50,11 @@ export const LiveWorkoutScreen: React.FC = () => {
   const [inputWeight, setInputWeight] = useState('');
   const [inputReps, setInputReps] = useState('');
   const [inputRpe, setInputRpe] = useState('');
+
+  // Serie Interrotte: mini serie in corso per la serie corrente
+  const [currentMiniSets, setCurrentMiniSets] = useState<MiniSetLog[]>([]);
+  const [miniRepsInput, setMiniRepsInput] = useState('');
+  const [miniRestInput, setMiniRestInput] = useState('');
 
   // Edit set
   const [editingSet, setEditingSet] = useState<{ exIndex: number; setIndex: number } | null>(null);
@@ -129,6 +134,14 @@ export const LiveWorkoutScreen: React.FC = () => {
       targetSets: ex.sets,
       targetReps: ex.reps,
       sets: [],
+      ...(ex.technique === 'rest_pause'
+        ? {
+            technique: 'rest_pause' as const,
+            targetMiniSets: ex.miniSets || 4,
+            targetMiniReps: ex.miniReps || '6',
+            targetMiniRestSeconds: ex.miniRestSeconds || 20,
+          }
+        : {}),
     }));
 
     try {
@@ -198,7 +211,7 @@ export const LiveWorkoutScreen: React.FC = () => {
       reps,
       weight,
       completed: true,
-      rpe,
+      ...(rpe ? { rpe } : {}),
       completedAt: new Date(),
     };
     currentLog.sets.push(newSet);
@@ -227,6 +240,74 @@ export const LiveWorkoutScreen: React.FC = () => {
         setTimeout(() => {
           setCurrentExerciseIndex(currentExerciseIndex + 1);
           setInputWeight('');
+        }, 500);
+      }
+    }
+  };
+
+  // --- Serie Interrotte (rest-pause) ---
+  // Registra una mini serie della serie corrente
+  const handleLogMiniSet = () => {
+    const reps = parseInt(miniRepsInput, 10);
+    if (!reps || reps <= 0) {
+      crossAlert('Attenzione', 'Inserisci le ripetizioni della mini serie.');
+      return;
+    }
+    const rest = parseInt(miniRestInput, 10) || 0;
+    setCurrentMiniSets((prev) => [...prev, { reps, restSeconds: rest }]);
+    setMiniRepsInput('');
+    setMiniRestInput(miniRestInput); // mantieni il recupero come default
+  };
+
+  const handleRemoveMiniSet = (index: number) => {
+    setCurrentMiniSets((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Completa la serie interrotta: salva tutte le mini serie come una serie
+  const handleCompleteRestPauseSet = async () => {
+    if (!activeWorkout) return;
+    if (currentMiniSets.length === 0) {
+      crossAlert('Attenzione', 'Registra almeno una mini serie.');
+      return;
+    }
+    const weight = parseFloat(inputWeight) || 0;
+    const totalReps = currentMiniSets.reduce((sum, m) => sum + m.reps, 0);
+
+    const newLogs = [...exerciseLogs];
+    const currentLog = newLogs[currentExerciseIndex];
+    const newSet: SetLog = {
+      setNumber: currentLog.sets.length + 1,
+      reps: totalReps,
+      weight,
+      completed: true,
+      completedAt: new Date(),
+      miniSetsCompleted: currentMiniSets.length,
+      miniSetDetails: currentMiniSets,
+    };
+    currentLog.sets.push(newSet);
+
+    setExerciseLogs(newLogs);
+    setCurrentMiniSets([]);
+    setMiniRepsInput('');
+
+    try {
+      await updateExerciseLogs(activeWorkout.id, newLogs);
+    } catch (err) {
+      console.error('Errore salvataggio serie:', err);
+    }
+
+    // Recupero tra le serie composte (fino a 2 minuti)
+    const workoutDay = activeWorkout?.dayOfWeek ?? selectedDayIndex;
+    const dayExs = activePlan?.weeklySchedule[workoutDay]?.exercises || [];
+    const restSeconds = dayExs[currentExerciseIndex]?.restSeconds || 120;
+    startRestTimer(restSeconds);
+
+    if (currentLog.sets.length >= currentLog.targetSets) {
+      if (currentExerciseIndex < exerciseLogs.length - 1) {
+        setTimeout(() => {
+          setCurrentExerciseIndex(currentExerciseIndex + 1);
+          setInputWeight('');
+          setCurrentMiniSets([]);
         }, 500);
       }
     }
@@ -567,7 +648,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                 i === currentExerciseIndex && styles.exerciseNavActive,
                 done && styles.exerciseNavDone,
               ]}
-              onPress={() => setCurrentExerciseIndex(i)}
+              onPress={() => { setCurrentExerciseIndex(i); setCurrentMiniSets([]); }}
             >
               <Text style={[
                 styles.exerciseNavText,
@@ -594,6 +675,11 @@ export const LiveWorkoutScreen: React.FC = () => {
             <Text style={styles.exerciseTarget}>
               Obiettivo: {currentExercise.targetSets} x {currentExercise.targetReps}
             </Text>
+            {currentExercise.technique === 'rest_pause' && (
+              <Text style={styles.restPauseTag}>
+                SERIE INTERROTTE · {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} · rec {currentExercise.targetMiniRestSeconds || 20}s
+              </Text>
+            )}
 
             {/* Serie completate */}
             {currentExercise.sets.length > 0 && (
@@ -676,9 +762,17 @@ export const LiveWorkoutScreen: React.FC = () => {
                       <View style={styles.setNumber}>
                         <Text style={styles.setNumberText}>{s.setNumber}</Text>
                       </View>
-                      <Text style={styles.setText}>
-                        {s.weight > 0 ? `${s.weight} kg` : 'Corpo libero'} x {s.reps} reps
-                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.setText}>
+                          {s.weight > 0 ? `${s.weight} kg` : 'Corpo libero'} x {s.reps} reps
+                        </Text>
+                        {s.miniSetDetails && s.miniSetDetails.length > 0 && (
+                          <Text style={styles.miniSetSummary}>
+                            {s.miniSetsCompleted} mini serie: {s.miniSetDetails.map((m) => m.reps).join('/')}
+                            {' '}(rec {s.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'})
+                          </Text>
+                        )}
+                      </View>
                       {s.rpe && <Text style={styles.rpeText}>RPE {s.rpe}</Text>}
                       <Ionicons name="pencil" size={14} color={colors.textLight} style={{ marginLeft: 'auto' }} />
                     </TouchableOpacity>
@@ -700,6 +794,91 @@ export const LiveWorkoutScreen: React.FC = () => {
 
             {/* Input serie (se non ho completato tutte le serie di questo esercizio) */}
             {currentExercise.sets.length < currentExercise.targetSets && (
+              currentExercise.technique === 'rest_pause' ? (
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputTitle}>
+                    Serie Interrotta {currentExercise.sets.length + 1} di {currentExercise.targetSets}
+                  </Text>
+                  <Text style={styles.restPauseHint}>
+                    Obiettivo: {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} reps
+                    {' '}· rec {currentExercise.targetMiniRestSeconds || 20}s tra mini serie
+                  </Text>
+
+                  {/* Peso per la serie */}
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Peso (kg)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="decimal-pad"
+                        value={inputWeight}
+                        onChangeText={setInputWeight}
+                        placeholder="0"
+                        placeholderTextColor={colors.textLight}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Mini serie registrate */}
+                  {currentMiniSets.length > 0 && (
+                    <View style={styles.miniSetList}>
+                      {currentMiniSets.map((m, i) => (
+                        <View key={i} style={styles.miniSetRow}>
+                          <Text style={styles.miniSetRowText}>
+                            Mini {i + 1}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
+                          </Text>
+                          <TouchableOpacity onPress={() => handleRemoveMiniSet(i)}>
+                            <Ionicons name="close-circle" size={18} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Input mini serie */}
+                  <Text style={styles.inputLabel}>
+                    Mini serie {currentMiniSets.length + 1} di {currentExercise.targetMiniSets || 4}
+                  </Text>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Reps fatte</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="number-pad"
+                        value={miniRepsInput}
+                        onChangeText={setMiniRepsInput}
+                        placeholder={currentExercise.targetMiniReps || '6'}
+                        placeholderTextColor={colors.textLight}
+                      />
+                    </View>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Recupero dopo (s)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="number-pad"
+                        value={miniRestInput}
+                        onChangeText={setMiniRestInput}
+                        placeholder={String(currentExercise.targetMiniRestSeconds || 20)}
+                        placeholderTextColor={colors.textLight}
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.miniSetButton} onPress={handleLogMiniSet}>
+                    <Ionicons name="add-circle" size={20} color={colors.accent} />
+                    <Text style={styles.miniSetButtonText}>REGISTRA MINI SERIE</Text>
+                  </TouchableOpacity>
+
+                  {currentMiniSets.length > 0 && (
+                    <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
+                      <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                      <Text style={styles.logSetButtonText}>
+                        COMPLETA SERIE ({currentMiniSets.length} mini)
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
               <View style={styles.inputSection}>
                 <Text style={styles.inputTitle}>
                   Serie {currentExercise.sets.length + 1} di {currentExercise.targetSets}
@@ -746,6 +925,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                   <Text style={styles.logSetButtonText}>REGISTRA SERIE</Text>
                 </TouchableOpacity>
               </View>
+              )
             )}
 
             {/* Tutte le serie completate per questo esercizio */}
@@ -879,6 +1059,53 @@ const styles = StyleSheet.create({
   exerciseNavName: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, maxWidth: 60 },
   exerciseName: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
   exerciseTarget: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: 4 },
+  restPauseTag: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  restPauseHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  miniSetSummary: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    marginTop: 2,
+  },
+  miniSetList: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    gap: 4,
+  },
+  miniSetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  miniSetRowText: { fontSize: fontSize.sm, color: colors.text },
+  miniSetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  miniSetButtonText: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
+    letterSpacing: 1,
+  },
   completedSets: { marginTop: spacing.md },
   completedTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs },
   setRow: {
