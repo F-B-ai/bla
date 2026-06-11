@@ -342,19 +342,59 @@ Sii specifico e professionale. Suggerisci esercizi correttivi concreti con serie
   const responseText = await callClaude(
     [{ role: 'user', content }],
     systemPrompt,
-    3000
+    4096
   );
 
   // Parse JSON dalla risposta
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    // Strip markdown code fences if present
+    const cleaned = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Risposta non valida');
     return JSON.parse(jsonMatch[0]);
   } catch {
+    // Try to extract structured data from truncated/malformed JSON
+    try {
+      const cleaned = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      const findingsMatch = cleaned.match(/"findings"\s*:\s*\[([\s\S]*?)\]/);
+      const summaryMatch = cleaned.match(/"summary"\s*:\s*"([\s\S]*?)"/);
+      const recsMatch = cleaned.match(/"recommendations"\s*:\s*\[([\s\S]*?)\]/);
+
+      const findings: AIPosturalAnalysis['findings'] = [];
+      if (findingsMatch) {
+        const findingBlocks = findingsMatch[1].match(/\{[^}]+\}/g) || [];
+        for (const block of findingBlocks) {
+          try {
+            findings.push(JSON.parse(block));
+          } catch { /* skip malformed finding */ }
+        }
+      }
+
+      const summary = summaryMatch ? summaryMatch[1] : '';
+      const recommendations: string[] = [];
+      if (recsMatch) {
+        const recItems = recsMatch[1].match(/"([^"]+)"/g) || [];
+        for (const item of recItems) {
+          recommendations.push(item.replace(/^"|"$/g, ''));
+        }
+      }
+
+      if (findings.length > 0 || summary) {
+        return { findings, summary, recommendations, exerciseProgram: [] };
+      }
+    } catch { /* fallback below */ }
+
+    // Final fallback: strip JSON artifacts for readable text
+    const readableText = responseText
+      .replace(/```json\s*/g, '').replace(/```\s*/g, '')
+      .replace(/[{}\[\]"]/g, '')
+      .replace(/,\s*$/gm, '')
+      .replace(/^\s*\w+\s*:\s*/gm, '')
+      .trim();
     return {
       findings: [],
-      summary: responseText,
-      recommendations: ['Analisi completata - leggi il riassunto sopra'],
+      summary: readableText || 'Analisi completata',
+      recommendations: [],
       exerciseProgram: [],
     };
   }

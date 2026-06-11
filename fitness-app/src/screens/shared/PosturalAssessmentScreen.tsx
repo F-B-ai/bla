@@ -319,10 +319,35 @@ export const PosturalAssessmentScreen: React.FC = () => {
       if (backImage && isLocalUri(backImage))
         backUrl = await uploadPosturalImage(selectedStudentId, backImage, 'back');
 
-      const baseAnalysis = analyzePosture(findings);
+      // Merge AI findings into manual findings (add AI-found areas not already present)
+      let mergedFindings = [...findings];
+      if (aiResult?.findings?.length) {
+        const manualAreas = new Set(findings.map((f) => f.area));
+        for (const af of aiResult.findings) {
+          if (!manualAreas.has(af.area as any)) {
+            mergedFindings.push({
+              area: af.area as any,
+              observation: af.observation,
+              severity: af.severity as any,
+            });
+          }
+        }
+      }
+
+      const baseAnalysis = analyzePosture(mergedFindings);
       const recommendations = aiResult?.recommendations?.length
         ? aiResult.recommendations.join('\n')
         : baseAnalysis.recommendations.join('\n');
+
+      // Build readable AI summary (avoid saving raw JSON)
+      let aiSummaryText = aiResult?.summary || '';
+      if (aiSummaryText.includes('{') && aiSummaryText.includes('"findings"')) {
+        // Summary contains JSON - build readable text from findings
+        aiSummaryText = aiResult?.findings?.map((f) => {
+          const areaLabel = POSTURAL_AREAS.find((a) => a.value === f.area)?.label || f.area;
+          return `${areaLabel}: ${f.observation}`;
+        }).join('\n') || '';
+      }
 
       await createAssessment({
         studentId: selectedStudentId,
@@ -332,10 +357,10 @@ export const PosturalAssessmentScreen: React.FC = () => {
         sideLeftImageUrl: sideLeftUrl,
         sideRightImageUrl: sideRightUrl,
         backImageUrl: backUrl,
-        findings,
+        findings: mergedFindings,
         overallNotes,
         recommendations,
-        aiAnalysis: aiResult?.summary || '',
+        aiAnalysis: aiSummaryText,
         aiRecommendations: aiResult?.recommendations || [],
         aiExerciseProgram: aiResult?.exerciseProgram || [],
       });
@@ -622,9 +647,33 @@ export const PosturalAssessmentScreen: React.FC = () => {
       {aiResult && (
         <>
           <Text style={styles.sectionTitle}>Risultato Analisi AI</Text>
-          <Card variant="elevated">
-            <Text style={styles.aiSummary}>{aiResult.summary}</Text>
-          </Card>
+          {aiResult.summary ? (
+            <Card variant="elevated">
+              <Text style={styles.aiSummary}>{aiResult.summary}</Text>
+            </Card>
+          ) : null}
+          {aiResult.findings && aiResult.findings.length > 0 && (
+            <Card variant="outlined">
+              <Text style={styles.aiSubtitle}>Osservazioni</Text>
+              {aiResult.findings.map((f, i) => {
+                const areaLabel = POSTURAL_AREAS.find((a) => a.value === f.area)?.label || f.area;
+                const sevOption = SEVERITY_OPTIONS.find((s) => s.value === f.severity);
+                return (
+                  <View key={i} style={{ marginBottom: spacing.sm }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+                      <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text }}>{areaLabel}</Text>
+                      {sevOption && (
+                        <View style={{ backgroundColor: sevOption.color + '20', borderRadius: borderRadius.sm, paddingHorizontal: spacing.xs, paddingVertical: 1 }}>
+                          <Text style={{ fontSize: fontSize.xs, color: sevOption.color, fontWeight: '600' }}>{sevOption.label}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2, lineHeight: 18 }}>{f.observation}</Text>
+                  </View>
+                );
+              })}
+            </Card>
+          )}
           {aiResult.recommendations.length > 0 && (
             <Card variant="outlined">
               <Text style={styles.aiSubtitle}>Raccomandazioni</Text>
