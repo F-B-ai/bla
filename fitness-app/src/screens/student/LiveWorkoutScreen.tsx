@@ -54,7 +54,10 @@ export const LiveWorkoutScreen: React.FC = () => {
   // Serie Interrotte: mini serie in corso per la serie corrente
   const [currentMiniSets, setCurrentMiniSets] = useState<MiniSetLog[]>([]);
   const [miniRepsInput, setMiniRepsInput] = useState('');
-  const [miniRestInput, setMiniRestInput] = useState('');
+  const [isMiniResting, setIsMiniResting] = useState(false);
+  const [miniRestTimer, setMiniRestTimer] = useState(0);
+  const [miniRestElapsed, setMiniRestElapsed] = useState(0);
+  const miniRestTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Stripping: drop set in corso per la serie corrente
   const [currentDropSets, setCurrentDropSets] = useState<DropSetLog[]>([]);
@@ -103,6 +106,7 @@ export const LiveWorkoutScreen: React.FC = () => {
       if (unsubRef.current) unsubRef.current();
       if (timerRef.current) clearInterval(timerRef.current);
       if (restTimerRef.current) clearInterval(restTimerRef.current);
+      if (miniRestTimerRef.current) clearInterval(miniRestTimerRef.current);
     };
   }, [loadData]);
 
@@ -258,17 +262,53 @@ export const LiveWorkoutScreen: React.FC = () => {
   };
 
   // --- Serie Interrotte (rest-pause) ---
-  // Registra una mini serie della serie corrente
+  const startMiniRestTimer = (seconds: number) => {
+    setIsMiniResting(true);
+    setMiniRestTimer(seconds);
+    setMiniRestElapsed(0);
+    if (miniRestTimerRef.current) clearInterval(miniRestTimerRef.current);
+    miniRestTimerRef.current = setInterval(() => {
+      setMiniRestElapsed((e) => e + 1);
+      setMiniRestTimer((t) => {
+        if (t <= 1) {
+          clearInterval(miniRestTimerRef.current!);
+          setIsMiniResting(false);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  };
+
+  const skipMiniRest = () => {
+    if (miniRestTimerRef.current) clearInterval(miniRestTimerRef.current);
+    setIsMiniResting(false);
+    setMiniRestTimer(0);
+  };
+
+  // Registra una mini serie della serie corrente e avvia il timer
   const handleLogMiniSet = () => {
     const reps = parseInt(miniRepsInput, 10);
     if (!reps || reps <= 0) {
       crossAlert('Attenzione', 'Inserisci le ripetizioni della mini serie.');
       return;
     }
-    const rest = parseInt(miniRestInput, 10) || 0;
-    setCurrentMiniSets((prev) => [...prev, { reps, restSeconds: rest }]);
+    // Record actual rest elapsed from previous mini-set timer (0 for the first)
+    const restTaken = miniRestElapsed;
+    // Update the previous mini-set's restSeconds with the actual time taken
+    setCurrentMiniSets((prev) => {
+      const updated = [...prev];
+      if (updated.length > 0) {
+        updated[updated.length - 1] = { ...updated[updated.length - 1], restSeconds: restTaken };
+      }
+      return [...updated, { reps, restSeconds: 0 }];
+    });
     setMiniRepsInput('');
-    setMiniRestInput(miniRestInput); // mantieni il recupero come default
+    setMiniRestElapsed(0);
+
+    // Start countdown for next mini-set rest
+    const targetRest = currentExercise?.targetMiniRestSeconds || 20;
+    startMiniRestTimer(targetRest);
   };
 
   const handleRemoveMiniSet = (index: number) => {
@@ -282,6 +322,12 @@ export const LiveWorkoutScreen: React.FC = () => {
       crossAlert('Attenzione', 'Registra almeno una mini serie.');
       return;
     }
+    // Stop mini rest timer if running
+    if (miniRestTimerRef.current) clearInterval(miniRestTimerRef.current);
+    setIsMiniResting(false);
+    setMiniRestTimer(0);
+    setMiniRestElapsed(0);
+
     const weight = parseFloat(inputWeight) || 0;
     const totalReps = currentMiniSets.reduce((sum, m) => sum + m.reps, 0);
 
@@ -725,7 +771,15 @@ export const LiveWorkoutScreen: React.FC = () => {
                 i === currentExerciseIndex && styles.exerciseNavActive,
                 done && styles.exerciseNavDone,
               ]}
-              onPress={() => { setCurrentExerciseIndex(i); setCurrentMiniSets([]); setCurrentDropSets([]); }}
+              onPress={() => {
+                setCurrentExerciseIndex(i);
+                setCurrentMiniSets([]);
+                setCurrentDropSets([]);
+                if (miniRestTimerRef.current) clearInterval(miniRestTimerRef.current);
+                setIsMiniResting(false);
+                setMiniRestTimer(0);
+                setMiniRestElapsed(0);
+              }}
             >
               <Text style={[
                 styles.exerciseNavText,
@@ -989,39 +1043,47 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </View>
                   )}
 
-                  {/* Input mini serie */}
-                  <Text style={styles.inputLabel}>
-                    Mini serie {currentMiniSets.length + 1} di {currentExercise.targetMiniSets || 4}
-                  </Text>
-                  <View style={styles.inputRow}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Reps fatte</Text>
-                      <TextInput
-                        style={styles.input}
-                        keyboardType="number-pad"
-                        value={miniRepsInput}
-                        onChangeText={setMiniRepsInput}
-                        placeholder={currentExercise.targetMiniReps || '6'}
-                        placeholderTextColor={colors.textLight}
-                      />
+                  {/* Timer recupero tra mini serie */}
+                  {isMiniResting && (
+                    <View style={styles.miniRestContainer}>
+                      <View style={styles.miniRestTimerCircle}>
+                        <Text style={styles.miniRestTimerText}>{miniRestTimer}</Text>
+                        <Text style={styles.miniRestTimerLabel}>sec</Text>
+                      </View>
+                      <Text style={styles.miniRestTitle}>Recupero tra mini serie</Text>
+                      <TouchableOpacity style={styles.skipMiniRestBtn} onPress={skipMiniRest}>
+                        <Ionicons name="play-forward" size={18} color={colors.accent} />
+                        <Text style={styles.skipMiniRestText}>Salta</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Recupero dopo (s)</Text>
-                      <TextInput
-                        style={styles.input}
-                        keyboardType="number-pad"
-                        value={miniRestInput}
-                        onChangeText={setMiniRestInput}
-                        placeholder={String(currentExercise.targetMiniRestSeconds || 20)}
-                        placeholderTextColor={colors.textLight}
-                      />
-                    </View>
-                  </View>
+                  )}
 
-                  <TouchableOpacity style={styles.miniSetButton} onPress={handleLogMiniSet}>
-                    <Ionicons name="add-circle" size={20} color={colors.accent} />
-                    <Text style={styles.miniSetButtonText}>REGISTRA MINI SERIE</Text>
-                  </TouchableOpacity>
+                  {/* Input mini serie (nascosto durante il recupero) */}
+                  {!isMiniResting && (
+                    <>
+                      <Text style={styles.inputLabel}>
+                        Mini serie {currentMiniSets.length + 1} di {currentExercise.targetMiniSets || 4}
+                      </Text>
+                      <View style={styles.inputRow}>
+                        <View style={styles.inputGroup}>
+                          <Text style={styles.inputLabel}>Reps fatte</Text>
+                          <TextInput
+                            style={styles.input}
+                            keyboardType="number-pad"
+                            value={miniRepsInput}
+                            onChangeText={setMiniRepsInput}
+                            placeholder={currentExercise.targetMiniReps || '6'}
+                            placeholderTextColor={colors.textLight}
+                          />
+                        </View>
+                      </View>
+
+                      <TouchableOpacity style={styles.miniSetButton} onPress={handleLogMiniSet}>
+                        <Ionicons name="add-circle" size={20} color={colors.accent} />
+                        <Text style={styles.miniSetButtonText}>REGISTRA MINI SERIE</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
 
                   {currentMiniSets.length > 0 && (
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
@@ -1259,6 +1321,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: fontSize.sm,
     letterSpacing: 1,
+  },
+  miniRestContainer: {
+    alignItems: 'center',
+    backgroundColor: colors.accent + '10',
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+  },
+  miniRestTimerCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  miniRestTimerText: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  miniRestTimerLabel: {
+    fontSize: fontSize.xs,
+    color: '#FFF',
+    marginTop: -4,
+    fontWeight: '600',
+  },
+  miniRestTitle: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  skipMiniRestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  skipMiniRestText: {
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
   },
   completedSets: { marginTop: spacing.md },
   completedTitle: { fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing.xs },
