@@ -109,7 +109,7 @@ export interface TrainingProgram {
 }
 
 // --- Esercizio ---
-export type ExerciseTechnique = 'standard' | 'rest_pause';
+export type ExerciseTechnique = 'standard' | 'rest_pause' | 'stripping';
 
 export interface Exercise {
   id: string;
@@ -127,6 +127,10 @@ export interface Exercise {
   miniSets?: number; // numero di mini serie per serie (es. 4)
   miniReps?: string; // ripetizioni per mini serie (es. "6")
   miniRestSeconds?: number; // recupero tra mini serie (es. 15-25s)
+  // Stripping (drop sets): scalare peso senza pausa
+  stripDrops?: number; // quante volte scalare il carico (es. 3)
+  stripRepsPerDrop?: string; // ripetizioni per ogni livello (es. "8")
+  stripMaxDropPct?: number; // percentuale massima di scarico (es. 50 = 50%)
 }
 
 export type ExerciseCategory =
@@ -606,12 +610,22 @@ export interface ExerciseLog {
   targetMiniSets?: number;
   targetMiniReps?: string;
   targetMiniRestSeconds?: number;
+  // Stripping (drop sets)
+  targetStripDrops?: number;
+  targetStripRepsPerDrop?: string;
+  targetStripMaxDropPct?: number;
 }
 
 // Dettaglio singola mini serie (per Serie Interrotte)
 export interface MiniSetLog {
   reps: number;
   restSeconds: number; // recupero preso dopo questa mini serie (0 per l'ultima)
+}
+
+// Dettaglio singolo drop (per Stripping)
+export interface DropSetLog {
+  weight: number; // peso usato in questo drop (kg)
+  reps: number; // ripetizioni eseguite
 }
 
 export interface SetLog {
@@ -625,6 +639,9 @@ export interface SetLog {
   // Serie Interrotte: dettaglio mini serie completate
   miniSetsCompleted?: number;
   miniSetDetails?: MiniSetLog[];
+  // Stripping: dettaglio drop completati
+  dropSetsCompleted?: number;
+  dropSetDetails?: DropSetLog[];
 }
 
 // --- Navigation types ---

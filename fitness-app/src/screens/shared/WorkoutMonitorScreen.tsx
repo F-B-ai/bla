@@ -343,6 +343,11 @@ export const WorkoutMonitorScreen: React.FC = () => {
                               SERIE INTERROTTE · {ex.targetMiniSets || 4} mini da {ex.targetMiniReps || '6'} · rec {ex.targetMiniRestSeconds || 20}s
                             </Text>
                           )}
+                          {ex.technique === 'stripping' && (
+                            <Text style={styles.restPauseTag}>
+                              STRIPPING · {ex.targetStripDrops || 3} scarichi da {ex.targetStripRepsPerDrop || '8'} · max -{ex.targetStripMaxDropPct || 50}%
+                            </Text>
+                          )}
                         </View>
                         {done && <Ionicons name="checkmark-circle" size={24} color={colors.success} />}
                       </View>
@@ -368,6 +373,11 @@ export const WorkoutMonitorScreen: React.FC = () => {
                               <Text style={styles.miniSetDetail}>
                                 {s.miniSetsCompleted} mini serie: {s.miniSetDetails.map((m) => m.reps).join('/')}
                                 {' '}· rec: {s.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
+                              </Text>
+                            )}
+                            {s.dropSetDetails && s.dropSetDetails.length > 0 && (
+                              <Text style={styles.miniSetDetail}>
+                                Stripping · {s.dropSetsCompleted} drop: {s.dropSetDetails.map((d) => `${d.weight}kg x${d.reps}`).join(' → ')}
                               </Text>
                             )}
                           </View>

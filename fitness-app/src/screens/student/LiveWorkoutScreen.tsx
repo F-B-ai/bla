@@ -14,7 +14,7 @@ import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { ModalHeader } from '../../components/common/ModalHeader';
-import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, MiniSetLog, Student } from '../../types';
+import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, MiniSetLog, DropSetLog, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import {
@@ -55,6 +55,11 @@ export const LiveWorkoutScreen: React.FC = () => {
   const [currentMiniSets, setCurrentMiniSets] = useState<MiniSetLog[]>([]);
   const [miniRepsInput, setMiniRepsInput] = useState('');
   const [miniRestInput, setMiniRestInput] = useState('');
+
+  // Stripping: drop set in corso per la serie corrente
+  const [currentDropSets, setCurrentDropSets] = useState<DropSetLog[]>([]);
+  const [dropWeightInput, setDropWeightInput] = useState('');
+  const [dropRepsInput, setDropRepsInput] = useState('');
 
   // Edit set
   const [editingSet, setEditingSet] = useState<{ exIndex: number; setIndex: number } | null>(null);
@@ -140,6 +145,13 @@ export const LiveWorkoutScreen: React.FC = () => {
             targetMiniSets: ex.miniSets || 4,
             targetMiniReps: ex.miniReps || '6',
             targetMiniRestSeconds: ex.miniRestSeconds || 20,
+          }
+        : ex.technique === 'stripping'
+        ? {
+            technique: 'stripping' as const,
+            targetStripDrops: ex.stripDrops || 3,
+            targetStripRepsPerDrop: ex.stripRepsPerDrop || '8',
+            targetStripMaxDropPct: ex.stripMaxDropPct || 50,
           }
         : {}),
     }));
@@ -308,6 +320,71 @@ export const LiveWorkoutScreen: React.FC = () => {
           setCurrentExerciseIndex(currentExerciseIndex + 1);
           setInputWeight('');
           setCurrentMiniSets([]);
+        }, 500);
+      }
+    }
+  };
+
+  // --- Stripping (drop sets) ---
+  const handleLogDrop = () => {
+    const weight = parseFloat(dropWeightInput) || 0;
+    const reps = parseInt(dropRepsInput, 10);
+    if (!reps || reps <= 0) {
+      crossAlert('Attenzione', 'Inserisci le ripetizioni del drop.');
+      return;
+    }
+    setCurrentDropSets((prev) => [...prev, { weight, reps }]);
+    setDropWeightInput('');
+    setDropRepsInput('');
+  };
+
+  const handleRemoveDrop = (index: number) => {
+    setCurrentDropSets((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCompleteStrippingSet = async () => {
+    if (!activeWorkout) return;
+    if (currentDropSets.length === 0) {
+      crossAlert('Attenzione', 'Registra almeno un drop.');
+      return;
+    }
+    const totalReps = currentDropSets.reduce((sum, d) => sum + d.reps, 0);
+    const topWeight = currentDropSets.length > 0 ? currentDropSets[0].weight : 0;
+
+    const newLogs = [...exerciseLogs];
+    const currentLog = newLogs[currentExerciseIndex];
+    const newSet: SetLog = {
+      setNumber: currentLog.sets.length + 1,
+      reps: totalReps,
+      weight: topWeight,
+      completed: true,
+      completedAt: new Date(),
+      dropSetsCompleted: currentDropSets.length,
+      dropSetDetails: currentDropSets,
+    };
+    currentLog.sets.push(newSet);
+
+    setExerciseLogs(newLogs);
+    setCurrentDropSets([]);
+    setDropWeightInput('');
+    setDropRepsInput('');
+
+    try {
+      await updateExerciseLogs(activeWorkout.id, newLogs);
+    } catch (err) {
+      console.error('Errore salvataggio serie:', err);
+    }
+
+    const workoutDay = activeWorkout?.dayOfWeek ?? selectedDayIndex;
+    const dayExs = activePlan?.weeklySchedule[workoutDay]?.exercises || [];
+    const restSeconds = dayExs[currentExerciseIndex]?.restSeconds || 120;
+    startRestTimer(restSeconds);
+
+    if (currentLog.sets.length >= currentLog.targetSets) {
+      if (currentExerciseIndex < exerciseLogs.length - 1) {
+        setTimeout(() => {
+          setCurrentExerciseIndex(currentExerciseIndex + 1);
+          setCurrentDropSets([]);
         }, 500);
       }
     }
@@ -648,7 +725,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                 i === currentExerciseIndex && styles.exerciseNavActive,
                 done && styles.exerciseNavDone,
               ]}
-              onPress={() => { setCurrentExerciseIndex(i); setCurrentMiniSets([]); }}
+              onPress={() => { setCurrentExerciseIndex(i); setCurrentMiniSets([]); setCurrentDropSets([]); }}
             >
               <Text style={[
                 styles.exerciseNavText,
@@ -678,6 +755,11 @@ export const LiveWorkoutScreen: React.FC = () => {
             {currentExercise.technique === 'rest_pause' && (
               <Text style={styles.restPauseTag}>
                 SERIE INTERROTTE · {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} · rec {currentExercise.targetMiniRestSeconds || 20}s
+              </Text>
+            )}
+            {currentExercise.technique === 'stripping' && (
+              <Text style={styles.restPauseTag}>
+                STRIPPING · {currentExercise.targetStripDrops || 3} scarichi da {currentExercise.targetStripRepsPerDrop || '8'} reps · max -{currentExercise.targetStripMaxDropPct || 50}%
               </Text>
             )}
 
@@ -772,6 +854,11 @@ export const LiveWorkoutScreen: React.FC = () => {
                             {' '}(rec {s.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'})
                           </Text>
                         )}
+                        {s.dropSetDetails && s.dropSetDetails.length > 0 && (
+                          <Text style={styles.miniSetSummary}>
+                            {s.dropSetsCompleted} drop: {s.dropSetDetails.map((d) => `${d.weight}kg x${d.reps}`).join(' → ')}
+                          </Text>
+                        )}
                       </View>
                       {s.rpe && <Text style={styles.rpeText}>RPE {s.rpe}</Text>}
                       <Ionicons name="pencil" size={14} color={colors.textLight} style={{ marginLeft: 'auto' }} />
@@ -794,7 +881,74 @@ export const LiveWorkoutScreen: React.FC = () => {
 
             {/* Input serie (se non ho completato tutte le serie di questo esercizio) */}
             {currentExercise.sets.length < currentExercise.targetSets && (
-              currentExercise.technique === 'rest_pause' ? (
+              currentExercise.technique === 'stripping' ? (
+                <View style={styles.inputSection}>
+                  <Text style={styles.inputTitle}>
+                    Serie Stripping {currentExercise.sets.length + 1} di {currentExercise.targetSets}
+                  </Text>
+                  <Text style={styles.restPauseHint}>
+                    Obiettivo: {currentExercise.targetStripDrops || 3} scarichi da {currentExercise.targetStripRepsPerDrop || '8'} reps
+                    {' '}· max -{currentExercise.targetStripMaxDropPct || 50}%
+                  </Text>
+
+                  {currentDropSets.length > 0 && (
+                    <View style={styles.miniSetList}>
+                      {currentDropSets.map((d, i) => (
+                        <View key={i} style={styles.miniSetRow}>
+                          <Text style={styles.miniSetRowText}>
+                            Drop {i + 1}: {d.weight} kg x {d.reps} reps
+                          </Text>
+                          <TouchableOpacity onPress={() => handleRemoveDrop(i)}>
+                            <Ionicons name="close-circle" size={18} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <Text style={styles.inputLabel}>
+                    Drop {currentDropSets.length + 1} di {currentExercise.targetStripDrops || 3}
+                  </Text>
+                  <View style={styles.inputRow}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Peso (kg)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="decimal-pad"
+                        value={dropWeightInput}
+                        onChangeText={setDropWeightInput}
+                        placeholder="0"
+                        placeholderTextColor={colors.textLight}
+                      />
+                    </View>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Reps fatte</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="number-pad"
+                        value={dropRepsInput}
+                        onChangeText={setDropRepsInput}
+                        placeholder={currentExercise.targetStripRepsPerDrop || '8'}
+                        placeholderTextColor={colors.textLight}
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.miniSetButton} onPress={handleLogDrop}>
+                    <Ionicons name="add-circle" size={20} color={colors.accent} />
+                    <Text style={styles.miniSetButtonText}>REGISTRA DROP</Text>
+                  </TouchableOpacity>
+
+                  {currentDropSets.length > 0 && (
+                    <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteStrippingSet}>
+                      <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                      <Text style={styles.logSetButtonText}>
+                        COMPLETA SERIE ({currentDropSets.length} drop)
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : currentExercise.technique === 'rest_pause' ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>
                     Serie Interrotta {currentExercise.sets.length + 1} di {currentExercise.targetSets}

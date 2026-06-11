@@ -321,6 +321,11 @@ export const WorkoutHistoryScreen: React.FC = () => {
                               {' '}· rec: {set.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
                             </Text>
                           )}
+                          {set.dropSetDetails && set.dropSetDetails.length > 0 && (
+                            <Text style={{ fontSize: fontSize.xs, color: colors.accent, paddingLeft: 40, paddingBottom: 4 }}>
+                              Stripping · {set.dropSetsCompleted} drop: {set.dropSetDetails.map((d) => `${d.weight}kg x${d.reps}`).join(' → ')}
+                            </Text>
+                          )}
                         </View>
                       ))}
                     </View>

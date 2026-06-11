@@ -98,6 +98,11 @@ export const MyProgramScreen: React.FC = () => {
               SERIE INTERROTTE: {exercise.miniSets || 4} mini serie da {exercise.miniReps || '6'} reps, rec {exercise.miniRestSeconds || 20}s tra mini serie
             </Text>
           )}
+          {exercise.technique === 'stripping' && (
+            <Text style={styles.restPauseTag}>
+              STRIPPING: {exercise.stripDrops || 3} scarichi da {exercise.stripRepsPerDrop || '8'} reps, max -{exercise.stripMaxDropPct || 50}%
+            </Text>
+          )}
         </View>
       </View>
 

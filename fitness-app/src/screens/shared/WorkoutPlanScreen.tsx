@@ -78,11 +78,14 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
-  // Tecnica: Serie Interrotte (rest-pause)
-  const [exTechnique, setExTechnique] = useState<'standard' | 'rest_pause'>('standard');
+  // Tecnica: Serie Interrotte (rest-pause) / Stripping (drop sets)
+  const [exTechnique, setExTechnique] = useState<'standard' | 'rest_pause' | 'stripping'>('standard');
   const [exMiniSets, setExMiniSets] = useState('4');
   const [exMiniReps, setExMiniReps] = useState('6');
   const [exMiniRest, setExMiniRest] = useState('20');
+  const [exStripDrops, setExStripDrops] = useState('3');
+  const [exStripRepsPerDrop, setExStripRepsPerDrop] = useState('8');
+  const [exStripMaxDropPct, setExStripMaxDropPct] = useState('50');
 
   // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -480,6 +483,13 @@ export const WorkoutPlanScreen: React.FC = () => {
             miniReps: exMiniReps || '6',
             miniRestSeconds: parseInt(exMiniRest, 10) || 20,
           }
+        : exTechnique === 'stripping'
+        ? {
+            technique: 'stripping' as const,
+            stripDrops: parseInt(exStripDrops, 10) || 3,
+            stripRepsPerDrop: exStripRepsPerDrop || '8',
+            stripMaxDropPct: parseInt(exStripMaxDropPct, 10) || 50,
+          }
         : { technique: 'standard' as const }),
     };
 
@@ -526,6 +536,9 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExMiniSets('4');
     setExMiniReps('6');
     setExMiniRest('20');
+    setExStripDrops('3');
+    setExStripRepsPerDrop('8');
+    setExStripMaxDropPct('50');
     setSaveToLibrary(false);
     setEditingExerciseIndex(null);
     setShowExerciseModal(false);
@@ -542,10 +555,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExCategory(ex.category || 'forza');
     setExVideoUrl(ex.videoUrl || '');
     setExNotes(ex.notes || '');
-    setExTechnique(ex.technique === 'rest_pause' ? 'rest_pause' : 'standard');
+    setExTechnique(ex.technique === 'rest_pause' ? 'rest_pause' : ex.technique === 'stripping' ? 'stripping' : 'standard');
     setExMiniSets(String(ex.miniSets || 4));
     setExMiniReps(ex.miniReps || '6');
     setExMiniRest(String(ex.miniRestSeconds || 20));
+    setExStripDrops(String(ex.stripDrops || 3));
+    setExStripRepsPerDrop(ex.stripRepsPerDrop || '8');
+    setExStripMaxDropPct(String(ex.stripMaxDropPct || 50));
     setEditingExerciseIndex(exerciseIndex);
     setShowExerciseModal(true);
   };
@@ -842,6 +858,10 @@ export const WorkoutPlanScreen: React.FC = () => {
                         <Text style={styles.restPauseBadge}>
                           Serie Interrotte: {ex.miniSets || 4} mini serie da {ex.miniReps || '6'} (rec {ex.miniRestSeconds || 20}s)
                         </Text>
+                      ) : ex.technique === 'stripping' ? (
+                        <Text style={styles.restPauseBadge}>
+                          Stripping: {ex.stripDrops || 3} scarichi da {ex.stripRepsPerDrop || '8'} reps (max -{ex.stripMaxDropPct || 50}%)
+                        </Text>
                       ) : null}
                       {ex.description ? (
                         <Text style={styles.exerciseDesc}>{ex.description}</Text>
@@ -977,6 +997,14 @@ export const WorkoutPlanScreen: React.FC = () => {
                   Serie Interrotte
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.categoryChip, exTechnique === 'stripping' && styles.categoryChipActive]}
+                onPress={() => setExTechnique('stripping')}
+              >
+                <Text style={[styles.categoryChipText, exTechnique === 'stripping' && styles.categoryChipTextActive]}>
+                  Stripping
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {exTechnique === 'rest_pause' && (
@@ -1010,6 +1038,41 @@ export const WorkoutPlanScreen: React.FC = () => {
                   onChangeText={setExMiniRest}
                   keyboardType="number-pad"
                   placeholder="20"
+                />
+              </View>
+            )}
+
+            {exTechnique === 'stripping' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Esegui le ripetizioni, poi senza pausa scala il peso e ripeti.
+                  Decidi quante volte scalare, le reps per ogni livello e la % massima di scarico.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="N. scarichi"
+                      value={exStripDrops}
+                      onChangeText={setExStripDrops}
+                      keyboardType="number-pad"
+                      placeholder="3"
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Reps per livello"
+                      value={exStripRepsPerDrop}
+                      onChangeText={setExStripRepsPerDrop}
+                      placeholder="8"
+                    />
+                  </View>
+                </View>
+                <InputField
+                  label="Scarico massimo (%)"
+                  value={exStripMaxDropPct}
+                  onChangeText={setExStripMaxDropPct}
+                  keyboardType="number-pad"
+                  placeholder="50"
                 />
               </View>
             )}
