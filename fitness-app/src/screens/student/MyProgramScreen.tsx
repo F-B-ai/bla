@@ -93,14 +93,18 @@ export const MyProgramScreen: React.FC = () => {
             {exercise.sets} serie x {exercise.reps} reps
             {exercise.restSeconds > 0 && ` | Recupero: ${exercise.restSeconds}s`}
           </Text>
-          {exercise.technique === 'rest_pause' && (
+          {exercise.technique && exercise.technique !== 'standard' && (
             <Text style={styles.restPauseTag}>
-              SERIE INTERROTTE: {exercise.miniSets || 4} mini serie da {exercise.miniReps || '6'} reps, rec {exercise.miniRestSeconds || 20}s tra mini serie
-            </Text>
-          )}
-          {exercise.technique === 'stripping' && (
-            <Text style={styles.restPauseTag}>
-              STRIPPING: {exercise.stripDrops || 3} scarichi da {exercise.stripRepsPerDrop || '8'} reps, max -{exercise.stripMaxDropPct || 50}%
+              {exercise.technique === 'rest_pause' && `SERIE INTERROTTE: ${exercise.miniSets || 4} mini serie da ${exercise.miniReps || '6'} reps, rec ${exercise.miniRestSeconds || 20}s`}
+              {exercise.technique === 'stripping' && `STRIPPING: ${exercise.stripDrops || 3} scarichi da ${exercise.stripRepsPerDrop || '8'} reps, max -${exercise.stripMaxDropPct || 50}%`}
+              {exercise.technique === 'pyramid' && `PIRAMIDALI: ${exercise.pyramidType === 'ascending' ? 'ascendente ↑' : exercise.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+              {exercise.technique === 'tempo' && `TEMPO: ${exercise.tempoNotation || '4-1-2-0'}`}
+              {exercise.technique === 'myo_reps' && `MYO-REPS: attivazione ${exercise.myoActivationReps || '12'} + ${exercise.myoMiniSets || 4}x${exercise.myoMiniReps || '3'} reps, rec ${exercise.myoRestSeconds || 5}s`}
+              {exercise.technique === 'isometric' && `ISOMETRIA: tenuta ${exercise.isometricHoldSeconds || 30}s`}
+              {exercise.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
+              {exercise.technique === 'cluster' && `CLUSTER: ${exercise.clusterSets || 5}x${exercise.clusterReps || 2} reps, pausa ${exercise.clusterRestSeconds || 15}s`}
+              {exercise.technique === 'negative' && `NEGATIVA: ${exercise.negativeSeconds || 5}s eccentrica`}
+              {exercise.technique === 'emom' && `EMOM: ${exercise.emomRepsPerMinute || '5'} reps ogni minuto x ${exercise.emomMinutes || 10} min`}
             </Text>
           )}
         </View>

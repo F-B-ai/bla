@@ -78,14 +78,34 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
-  // Tecnica: Serie Interrotte (rest-pause) / Stripping (drop sets)
-  const [exTechnique, setExTechnique] = useState<'standard' | 'rest_pause' | 'stripping'>('standard');
+  // Tecnica
+  const [exTechnique, setExTechnique] = useState<Exercise['technique']>('standard');
   const [exMiniSets, setExMiniSets] = useState('4');
   const [exMiniReps, setExMiniReps] = useState('6');
   const [exMiniRest, setExMiniRest] = useState('20');
   const [exStripDrops, setExStripDrops] = useState('3');
   const [exStripRepsPerDrop, setExStripRepsPerDrop] = useState('8');
   const [exStripMaxDropPct, setExStripMaxDropPct] = useState('50');
+  // Piramidali
+  const [exPyramidType, setExPyramidType] = useState<'ascending' | 'descending' | 'triangular'>('ascending');
+  // Tempo controllato
+  const [exTempo, setExTempo] = useState('4-1-2-0');
+  // Myo-reps
+  const [exMyoActivationReps, setExMyoActivationReps] = useState('12');
+  const [exMyoMiniReps, setExMyoMiniReps] = useState('3');
+  const [exMyoMiniSets, setExMyoMiniSets] = useState('4');
+  const [exMyoRest, setExMyoRest] = useState('5');
+  // Isometria
+  const [exIsometricHold, setExIsometricHold] = useState('30');
+  // Cluster
+  const [exClusterReps, setExClusterReps] = useState('2');
+  const [exClusterSets, setExClusterSets] = useState('5');
+  const [exClusterRest, setExClusterRest] = useState('15');
+  // Negativa enfatizzata
+  const [exNegativeSeconds, setExNegativeSeconds] = useState('5');
+  // EMOM
+  const [exEmomMinutes, setExEmomMinutes] = useState('10');
+  const [exEmomReps, setExEmomReps] = useState('5');
 
   // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -476,21 +496,44 @@ export const WorkoutPlanScreen: React.FC = () => {
       notes: exNotes,
       category: exCategory,
       ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
-      ...(exTechnique === 'rest_pause'
-        ? {
-            technique: 'rest_pause' as const,
-            miniSets: parseInt(exMiniSets, 10) || 4,
-            miniReps: exMiniReps || '6',
-            miniRestSeconds: parseInt(exMiniRest, 10) || 20,
-          }
-        : exTechnique === 'stripping'
-        ? {
-            technique: 'stripping' as const,
-            stripDrops: parseInt(exStripDrops, 10) || 3,
-            stripRepsPerDrop: exStripRepsPerDrop || '8',
-            stripMaxDropPct: parseInt(exStripMaxDropPct, 10) || 50,
-          }
-        : { technique: 'standard' as const }),
+      technique: exTechnique || 'standard',
+      ...(exTechnique === 'rest_pause' ? {
+        miniSets: parseInt(exMiniSets, 10) || 4,
+        miniReps: exMiniReps || '6',
+        miniRestSeconds: parseInt(exMiniRest, 10) || 20,
+      } : {}),
+      ...(exTechnique === 'stripping' ? {
+        stripDrops: parseInt(exStripDrops, 10) || 3,
+        stripRepsPerDrop: exStripRepsPerDrop || '8',
+        stripMaxDropPct: parseInt(exStripMaxDropPct, 10) || 50,
+      } : {}),
+      ...(exTechnique === 'pyramid' ? {
+        pyramidType: exPyramidType,
+      } : {}),
+      ...(exTechnique === 'tempo' ? {
+        tempoNotation: exTempo || '4-1-2-0',
+      } : {}),
+      ...(exTechnique === 'myo_reps' ? {
+        myoActivationReps: exMyoActivationReps || '12',
+        myoMiniReps: exMyoMiniReps || '3',
+        myoMiniSets: parseInt(exMyoMiniSets, 10) || 4,
+        myoRestSeconds: parseInt(exMyoRest, 10) || 5,
+      } : {}),
+      ...(exTechnique === 'isometric' ? {
+        isometricHoldSeconds: parseInt(exIsometricHold, 10) || 30,
+      } : {}),
+      ...(exTechnique === 'cluster' ? {
+        clusterReps: parseInt(exClusterReps, 10) || 2,
+        clusterSets: parseInt(exClusterSets, 10) || 5,
+        clusterRestSeconds: parseInt(exClusterRest, 10) || 15,
+      } : {}),
+      ...(exTechnique === 'negative' ? {
+        negativeSeconds: parseInt(exNegativeSeconds, 10) || 5,
+      } : {}),
+      ...(exTechnique === 'emom' ? {
+        emomMinutes: parseInt(exEmomMinutes, 10) || 10,
+        emomRepsPerMinute: exEmomReps || '5',
+      } : {}),
     };
 
     if (editingExerciseIndex !== null) {
@@ -539,6 +582,19 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExStripDrops('3');
     setExStripRepsPerDrop('8');
     setExStripMaxDropPct('50');
+    setExPyramidType('ascending');
+    setExTempo('4-1-2-0');
+    setExMyoActivationReps('12');
+    setExMyoMiniReps('3');
+    setExMyoMiniSets('4');
+    setExMyoRest('5');
+    setExIsometricHold('30');
+    setExClusterReps('2');
+    setExClusterSets('5');
+    setExClusterRest('15');
+    setExNegativeSeconds('5');
+    setExEmomMinutes('10');
+    setExEmomReps('5');
     setSaveToLibrary(false);
     setEditingExerciseIndex(null);
     setShowExerciseModal(false);
@@ -555,13 +611,26 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExCategory(ex.category || 'forza');
     setExVideoUrl(ex.videoUrl || '');
     setExNotes(ex.notes || '');
-    setExTechnique(ex.technique === 'rest_pause' ? 'rest_pause' : ex.technique === 'stripping' ? 'stripping' : 'standard');
+    setExTechnique(ex.technique || 'standard');
     setExMiniSets(String(ex.miniSets || 4));
     setExMiniReps(ex.miniReps || '6');
     setExMiniRest(String(ex.miniRestSeconds || 20));
     setExStripDrops(String(ex.stripDrops || 3));
     setExStripRepsPerDrop(ex.stripRepsPerDrop || '8');
     setExStripMaxDropPct(String(ex.stripMaxDropPct || 50));
+    setExPyramidType(ex.pyramidType || 'ascending');
+    setExTempo(ex.tempoNotation || '4-1-2-0');
+    setExMyoActivationReps(ex.myoActivationReps || '12');
+    setExMyoMiniReps(ex.myoMiniReps || '3');
+    setExMyoMiniSets(String(ex.myoMiniSets || 4));
+    setExMyoRest(String(ex.myoRestSeconds || 5));
+    setExIsometricHold(String(ex.isometricHoldSeconds || 30));
+    setExClusterReps(String(ex.clusterReps || 2));
+    setExClusterSets(String(ex.clusterSets || 5));
+    setExClusterRest(String(ex.clusterRestSeconds || 15));
+    setExNegativeSeconds(String(ex.negativeSeconds || 5));
+    setExEmomMinutes(String(ex.emomMinutes || 10));
+    setExEmomReps(ex.emomRepsPerMinute || '5');
     setEditingExerciseIndex(exerciseIndex);
     setShowExerciseModal(true);
   };
@@ -854,15 +923,20 @@ export const WorkoutPlanScreen: React.FC = () => {
                       <Text style={styles.exerciseDetails}>
                         {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
                       </Text>
-                      {ex.technique === 'rest_pause' ? (
+                      {ex.technique && ex.technique !== 'standard' && (
                         <Text style={styles.restPauseBadge}>
-                          Serie Interrotte: {ex.miniSets || 4} mini serie da {ex.miniReps || '6'} (rec {ex.miniRestSeconds || 20}s)
+                          {ex.technique === 'rest_pause' && `Serie Interrotte: ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
+                          {ex.technique === 'stripping' && `Stripping: ${ex.stripDrops || 3} scarichi da ${ex.stripRepsPerDrop || '8'} reps (max -${ex.stripMaxDropPct || 50}%)`}
+                          {ex.technique === 'pyramid' && `Piramidali: ${ex.pyramidType === 'ascending' ? 'ascendente ↑' : ex.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+                          {ex.technique === 'tempo' && `Tempo: ${ex.tempoNotation || '4-1-2-0'}`}
+                          {ex.technique === 'myo_reps' && `Myo-reps: attivazione ${ex.myoActivationReps || '12'} + ${ex.myoMiniSets || 4}x${ex.myoMiniReps || '3'} (rec ${ex.myoRestSeconds || 5}s)`}
+                          {ex.technique === 'isometric' && `Isometria: tenuta ${ex.isometricHoldSeconds || 30}s`}
+                          {ex.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
+                          {ex.technique === 'cluster' && `Cluster: ${ex.clusterSets || 5}x${ex.clusterReps || 2} (pausa ${ex.clusterRestSeconds || 15}s)`}
+                          {ex.technique === 'negative' && `Negativa: ${ex.negativeSeconds || 5}s eccentrica`}
+                          {ex.technique === 'emom' && `EMOM: ${ex.emomRepsPerMinute || '5'} reps ogni minuto x ${ex.emomMinutes || 10} min`}
                         </Text>
-                      ) : ex.technique === 'stripping' ? (
-                        <Text style={styles.restPauseBadge}>
-                          Stripping: {ex.stripDrops || 3} scarichi da {ex.stripRepsPerDrop || '8'} reps (max -{ex.stripMaxDropPct || 50}%)
-                        </Text>
-                      ) : null}
+                      )}
                       {ex.description ? (
                         <Text style={styles.exerciseDesc}>{ex.description}</Text>
                       ) : null}
@@ -981,30 +1055,29 @@ export const WorkoutPlanScreen: React.FC = () => {
             {/* Tecnica */}
             <Text style={styles.fieldLabel}>Tecnica</Text>
             <View style={styles.categoryRow}>
-              <TouchableOpacity
-                style={[styles.categoryChip, exTechnique === 'standard' && styles.categoryChipActive]}
-                onPress={() => setExTechnique('standard')}
-              >
-                <Text style={[styles.categoryChipText, exTechnique === 'standard' && styles.categoryChipTextActive]}>
-                  Normale
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.categoryChip, exTechnique === 'rest_pause' && styles.categoryChipActive]}
-                onPress={() => setExTechnique('rest_pause')}
-              >
-                <Text style={[styles.categoryChipText, exTechnique === 'rest_pause' && styles.categoryChipTextActive]}>
-                  Serie Interrotte
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.categoryChip, exTechnique === 'stripping' && styles.categoryChipActive]}
-                onPress={() => setExTechnique('stripping')}
-              >
-                <Text style={[styles.categoryChipText, exTechnique === 'stripping' && styles.categoryChipTextActive]}>
-                  Stripping
-                </Text>
-              </TouchableOpacity>
+              {([
+                { key: 'standard', label: 'Normale' },
+                { key: 'rest_pause', label: 'Serie Interrotte' },
+                { key: 'stripping', label: 'Stripping' },
+                { key: 'pyramid', label: 'Piramidali' },
+                { key: 'tempo', label: 'Tempo' },
+                { key: 'myo_reps', label: 'Myo-reps' },
+                { key: 'isometric', label: 'Isometria' },
+                { key: 'twentyone', label: '21s' },
+                { key: 'cluster', label: 'Cluster' },
+                { key: 'negative', label: 'Negativa' },
+                { key: 'emom', label: 'EMOM' },
+              ] as const).map((t) => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[styles.categoryChip, exTechnique === t.key && styles.categoryChipActive]}
+                  onPress={() => setExTechnique(t.key)}
+                >
+                  <Text style={[styles.categoryChipText, exTechnique === t.key && styles.categoryChipTextActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
 
             {exTechnique === 'rest_pause' && (
@@ -1046,34 +1119,131 @@ export const WorkoutPlanScreen: React.FC = () => {
               <View style={styles.restPauseBox}>
                 <Text style={styles.restPauseInfo}>
                   Esegui le ripetizioni, poi senza pausa scala il peso e ripeti.
-                  Decidi quante volte scalare, le reps per ogni livello e la % massima di scarico.
                 </Text>
                 <View style={styles.row}>
                   <View style={styles.halfField}>
-                    <InputField
-                      label="N. scarichi"
-                      value={exStripDrops}
-                      onChangeText={setExStripDrops}
-                      keyboardType="number-pad"
-                      placeholder="3"
-                    />
+                    <InputField label="N. scarichi" value={exStripDrops} onChangeText={setExStripDrops} keyboardType="number-pad" placeholder="3" />
                   </View>
                   <View style={styles.halfField}>
-                    <InputField
-                      label="Reps per livello"
-                      value={exStripRepsPerDrop}
-                      onChangeText={setExStripRepsPerDrop}
-                      placeholder="8"
-                    />
+                    <InputField label="Reps per livello" value={exStripRepsPerDrop} onChangeText={setExStripRepsPerDrop} placeholder="8" />
                   </View>
                 </View>
-                <InputField
-                  label="Scarico massimo (%)"
-                  value={exStripMaxDropPct}
-                  onChangeText={setExStripMaxDropPct}
-                  keyboardType="number-pad"
-                  placeholder="50"
-                />
+                <InputField label="Scarico massimo (%)" value={exStripMaxDropPct} onChangeText={setExStripMaxDropPct} keyboardType="number-pad" placeholder="50" />
+              </View>
+            )}
+
+            {exTechnique === 'pyramid' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Aumenta o diminuisci il carico ad ogni serie. Ascendente: peso sale, reps scendono. Discendente: peso scende, reps salgono. Triangolare: sale e poi scende.
+                </Text>
+                <View style={styles.categoryRow}>
+                  {([
+                    { key: 'ascending', label: 'Ascendente ↑' },
+                    { key: 'descending', label: 'Discendente ↓' },
+                    { key: 'triangular', label: 'Triangolare ↑↓' },
+                  ] as const).map((p) => (
+                    <TouchableOpacity
+                      key={p.key}
+                      style={[styles.categoryChip, exPyramidType === p.key && styles.categoryChipActive]}
+                      onPress={() => setExPyramidType(p.key)}
+                    >
+                      <Text style={[styles.categoryChipText, exPyramidType === p.key && styles.categoryChipTextActive]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {exTechnique === 'tempo' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Formato: Eccentrica-Pausa bassa-Concentrica-Pausa alta (es. 4-1-2-0 = 4s giù, 1s pausa, 2s su, 0s pausa).
+                </Text>
+                <InputField label="Tempo (es. 4-1-2-0)" value={exTempo} onChangeText={setExTempo} placeholder="4-1-2-0" />
+              </View>
+            )}
+
+            {exTechnique === 'myo_reps' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie attivante ad alto numero di reps, poi mini serie brevi con recupero minimo (3-5 respiri).
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps attivazione" value={exMyoActivationReps} onChangeText={setExMyoActivationReps} placeholder="12" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps mini serie" value={exMyoMiniReps} onChangeText={setExMyoMiniReps} placeholder="3" />
+                  </View>
+                </View>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="N. mini serie" value={exMyoMiniSets} onChangeText={setExMyoMiniSets} keyboardType="number-pad" placeholder="4" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Pausa (secondi)" value={exMyoRest} onChangeText={setExMyoRest} keyboardType="number-pad" placeholder="5" />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {exTechnique === 'isometric' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Tenuta statica nella posizione target. L'allievo vedrà un timer per la tenuta.
+                </Text>
+                <InputField label="Durata tenuta (secondi)" value={exIsometricHold} onChangeText={setExIsometricHold} keyboardType="number-pad" placeholder="30" />
+              </View>
+            )}
+
+            {exTechnique === 'twentyone' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  7 ripetizioni parziali basse + 7 parziali alte + 7 complete = 21 totali. Non serve configurazione, lo schema è fisso.
+                </Text>
+              </View>
+            )}
+
+            {exTechnique === 'cluster' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie spezzata in mini-gruppi (cluster) con micro-pause. Es: 5 cluster da 2 reps con 15s di pausa.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps per cluster" value={exClusterReps} onChangeText={setExClusterReps} keyboardType="number-pad" placeholder="2" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="N. cluster" value={exClusterSets} onChangeText={setExClusterSets} keyboardType="number-pad" placeholder="5" />
+                  </View>
+                </View>
+                <InputField label="Pausa tra cluster (sec)" value={exClusterRest} onChangeText={setExClusterRest} keyboardType="number-pad" placeholder="15" />
+              </View>
+            )}
+
+            {exTechnique === 'negative' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Fase eccentrica (discesa) lenta e controllata con carico più pesante del normale. L'allievo vedrà il timer per la negativa.
+                </Text>
+                <InputField label="Durata eccentrica (secondi)" value={exNegativeSeconds} onChangeText={setExNegativeSeconds} keyboardType="number-pad" placeholder="5" />
+              </View>
+            )}
+
+            {exTechnique === 'emom' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Every Minute On the Minute: esegui le reps ogni minuto per la durata totale. Il resto del minuto è recupero.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Durata (minuti)" value={exEmomMinutes} onChangeText={setExEmomMinutes} keyboardType="number-pad" placeholder="10" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps per minuto" value={exEmomReps} onChangeText={setExEmomReps} placeholder="5" />
+                  </View>
+                </View>
               </View>
             )}
 

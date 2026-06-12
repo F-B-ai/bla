@@ -338,14 +338,18 @@ export const WorkoutMonitorScreen: React.FC = () => {
                           <Text style={styles.exTarget}>
                             {ex.sets.length}/{ex.targetSets} serie x {ex.targetReps}
                           </Text>
-                          {ex.technique === 'rest_pause' && (
+                          {ex.technique && ex.technique !== 'standard' && (
                             <Text style={styles.restPauseTag}>
-                              SERIE INTERROTTE · {ex.targetMiniSets || 4} mini da {ex.targetMiniReps || '6'} · rec {ex.targetMiniRestSeconds || 20}s
-                            </Text>
-                          )}
-                          {ex.technique === 'stripping' && (
-                            <Text style={styles.restPauseTag}>
-                              STRIPPING · {ex.targetStripDrops || 3} scarichi da {ex.targetStripRepsPerDrop || '8'} · max -{ex.targetStripMaxDropPct || 50}%
+                              {ex.technique === 'rest_pause' && `SERIE INTERROTTE · ${ex.targetMiniSets || 4} mini da ${ex.targetMiniReps || '6'} · rec ${ex.targetMiniRestSeconds || 20}s`}
+                              {ex.technique === 'stripping' && `STRIPPING · ${ex.targetStripDrops || 3} scarichi da ${ex.targetStripRepsPerDrop || '8'} · max -${ex.targetStripMaxDropPct || 50}%`}
+                              {ex.technique === 'pyramid' && `PIRAMIDALI · ${ex.targetPyramidType === 'ascending' ? 'ascendente ↑' : ex.targetPyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+                              {ex.technique === 'tempo' && `TEMPO · ${ex.targetTempoNotation || '4-1-2-0'}`}
+                              {ex.technique === 'myo_reps' && `MYO-REPS · ${ex.targetMyoActivationReps || '12'} + ${ex.targetMyoMiniSets || 4}x${ex.targetMyoMiniReps || '3'}`}
+                              {ex.technique === 'isometric' && `ISOMETRIA · ${ex.targetIsometricHoldSeconds || 30}s`}
+                              {ex.technique === 'twentyone' && '21s · 7+7+7'}
+                              {ex.technique === 'cluster' && `CLUSTER · ${ex.targetClusterSets || 5}x${ex.targetClusterReps || 2} · pausa ${ex.targetClusterRestSeconds || 15}s`}
+                              {ex.technique === 'negative' && `NEGATIVA · ${ex.targetNegativeSeconds || 5}s ecc`}
+                              {ex.technique === 'emom' && `EMOM · ${ex.targetEmomRepsPerMinute || '5'} reps x ${ex.targetEmomMinutes || 10} min`}
                             </Text>
                           )}
                         </View>

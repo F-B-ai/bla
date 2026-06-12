@@ -289,6 +289,18 @@ export const WorkoutHistoryScreen: React.FC = () => {
                         <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
                         <Text style={styles.exerciseTarget}>
                           Target: {ex.targetSets} x {ex.targetReps}
+                          {ex.technique && ex.technique !== 'standard' && ` · ${
+                            ex.technique === 'rest_pause' ? 'Serie Interrotte' :
+                            ex.technique === 'stripping' ? 'Stripping' :
+                            ex.technique === 'pyramid' ? 'Piramidali' :
+                            ex.technique === 'tempo' ? `Tempo ${ex.targetTempoNotation || ''}` :
+                            ex.technique === 'myo_reps' ? 'Myo-reps' :
+                            ex.technique === 'isometric' ? 'Isometria' :
+                            ex.technique === 'twentyone' ? '21s' :
+                            ex.technique === 'cluster' ? 'Cluster' :
+                            ex.technique === 'negative' ? 'Negativa' :
+                            ex.technique === 'emom' ? 'EMOM' : ''
+                          }`}
                         </Text>
                       </View>
                       <Text style={styles.volumeText}>{totalVol > 0 ? `${totalVol} kg vol` : ''}</Text>
@@ -317,7 +329,7 @@ export const WorkoutHistoryScreen: React.FC = () => {
                           </View>
                           {set.miniSetDetails && set.miniSetDetails.length > 0 && (
                             <Text style={{ fontSize: fontSize.xs, color: colors.accent, paddingLeft: 40, paddingBottom: 4 }}>
-                              Serie Interrotta · {set.miniSetsCompleted} mini: {set.miniSetDetails.map((m) => m.reps).join('/')}
+                              {set.miniSetsCompleted} {ex.technique === 'cluster' ? 'cluster' : ex.technique === 'myo_reps' ? 'myo' : 'mini'}: {set.miniSetDetails.map((m) => m.reps).join('/')}
                               {' '}· rec: {set.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
                             </Text>
                           )}

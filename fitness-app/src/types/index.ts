@@ -109,7 +109,18 @@ export interface TrainingProgram {
 }
 
 // --- Esercizio ---
-export type ExerciseTechnique = 'standard' | 'rest_pause' | 'stripping';
+export type ExerciseTechnique =
+  | 'standard'
+  | 'rest_pause'
+  | 'stripping'
+  | 'pyramid'
+  | 'tempo'
+  | 'myo_reps'
+  | 'isometric'
+  | 'twentyone'
+  | 'cluster'
+  | 'negative'
+  | 'emom';
 
 export interface Exercise {
   id: string;
@@ -122,15 +133,37 @@ export interface Exercise {
   imageUrl?: string;
   notes: string;
   category: ExerciseCategory;
-  // Serie Interrotte (rest-pause): ogni serie e' composta da mini serie
   technique?: ExerciseTechnique;
-  miniSets?: number; // numero di mini serie per serie (es. 4)
-  miniReps?: string; // ripetizioni per mini serie (es. "6")
-  miniRestSeconds?: number; // recupero tra mini serie (es. 15-25s)
-  // Stripping (drop sets): scalare peso senza pausa
-  stripDrops?: number; // quante volte scalare il carico (es. 3)
-  stripRepsPerDrop?: string; // ripetizioni per ogni livello (es. "8")
-  stripMaxDropPct?: number; // percentuale massima di scarico (es. 50 = 50%)
+  // Serie Interrotte (rest-pause)
+  miniSets?: number;
+  miniReps?: string;
+  miniRestSeconds?: number;
+  // Stripping (drop sets)
+  stripDrops?: number;
+  stripRepsPerDrop?: string;
+  stripMaxDropPct?: number;
+  // Piramidali
+  pyramidType?: 'ascending' | 'descending' | 'triangular';
+  // Tempo controllato (es. "4-1-2-0" = 4s ecc, 1s pausa bassa, 2s conc, 0s pausa alta)
+  tempoNotation?: string;
+  // Myo-reps
+  myoActivationReps?: string;
+  myoMiniReps?: string;
+  myoMiniSets?: number;
+  myoRestSeconds?: number;
+  // Isometria
+  isometricHoldSeconds?: number;
+  // Cluster set
+  clusterReps?: number;
+  clusterSets?: number;
+  clusterRestSeconds?: number;
+  // Negativa enfatizzata
+  negativeSeconds?: number;
+  // EMOM
+  emomMinutes?: number;
+  emomRepsPerMinute?: string;
+  // Superset/Giant set grouping
+  supersetGroupId?: string;
 }
 
 export type ExerciseCategory =
@@ -605,8 +638,8 @@ export interface ExerciseLog {
   targetSets: number;
   targetReps: string;
   sets: SetLog[];
-  // Serie Interrotte (rest-pause)
   technique?: ExerciseTechnique;
+  // Serie Interrotte (rest-pause)
   targetMiniSets?: number;
   targetMiniReps?: string;
   targetMiniRestSeconds?: number;
@@ -614,6 +647,28 @@ export interface ExerciseLog {
   targetStripDrops?: number;
   targetStripRepsPerDrop?: string;
   targetStripMaxDropPct?: number;
+  // Piramidali
+  targetPyramidType?: 'ascending' | 'descending' | 'triangular';
+  // Tempo controllato
+  targetTempoNotation?: string;
+  // Myo-reps
+  targetMyoActivationReps?: string;
+  targetMyoMiniReps?: string;
+  targetMyoMiniSets?: number;
+  targetMyoRestSeconds?: number;
+  // Isometria
+  targetIsometricHoldSeconds?: number;
+  // Cluster set
+  targetClusterReps?: number;
+  targetClusterSets?: number;
+  targetClusterRestSeconds?: number;
+  // Negativa enfatizzata
+  targetNegativeSeconds?: number;
+  // EMOM
+  targetEmomMinutes?: number;
+  targetEmomRepsPerMinute?: string;
+  // Superset
+  supersetGroupId?: string;
 }
 
 // Dettaglio singola mini serie (per Serie Interrotte)
@@ -642,6 +697,8 @@ export interface SetLog {
   // Stripping: dettaglio drop completati
   dropSetsCompleted?: number;
   dropSetDetails?: DropSetLog[];
+  // Isometria: tempo di tenuta effettivo
+  holdSeconds?: number;
 }
 
 // --- Navigation types ---

@@ -143,21 +143,37 @@ export const LiveWorkoutScreen: React.FC = () => {
       targetSets: ex.sets,
       targetReps: ex.reps,
       sets: [],
-      ...(ex.technique === 'rest_pause'
-        ? {
-            technique: 'rest_pause' as const,
-            targetMiniSets: ex.miniSets || 4,
-            targetMiniReps: ex.miniReps || '6',
-            targetMiniRestSeconds: ex.miniRestSeconds || 20,
-          }
-        : ex.technique === 'stripping'
-        ? {
-            technique: 'stripping' as const,
-            targetStripDrops: ex.stripDrops || 3,
-            targetStripRepsPerDrop: ex.stripRepsPerDrop || '8',
-            targetStripMaxDropPct: ex.stripMaxDropPct || 50,
-          }
-        : {}),
+      technique: ex.technique || 'standard',
+      ...(ex.technique === 'rest_pause' ? {
+        targetMiniSets: ex.miniSets || 4,
+        targetMiniReps: ex.miniReps || '6',
+        targetMiniRestSeconds: ex.miniRestSeconds || 20,
+      } : {}),
+      ...(ex.technique === 'stripping' ? {
+        targetStripDrops: ex.stripDrops || 3,
+        targetStripRepsPerDrop: ex.stripRepsPerDrop || '8',
+        targetStripMaxDropPct: ex.stripMaxDropPct || 50,
+      } : {}),
+      ...(ex.technique === 'pyramid' ? { targetPyramidType: ex.pyramidType || 'ascending' } : {}),
+      ...(ex.technique === 'tempo' ? { targetTempoNotation: ex.tempoNotation || '4-1-2-0' } : {}),
+      ...(ex.technique === 'myo_reps' ? {
+        targetMyoActivationReps: ex.myoActivationReps || '12',
+        targetMyoMiniReps: ex.myoMiniReps || '3',
+        targetMyoMiniSets: ex.myoMiniSets || 4,
+        targetMyoRestSeconds: ex.myoRestSeconds || 5,
+      } : {}),
+      ...(ex.technique === 'isometric' ? { targetIsometricHoldSeconds: ex.isometricHoldSeconds || 30 } : {}),
+      ...(ex.technique === 'cluster' ? {
+        targetClusterReps: ex.clusterReps || 2,
+        targetClusterSets: ex.clusterSets || 5,
+        targetClusterRestSeconds: ex.clusterRestSeconds || 15,
+      } : {}),
+      ...(ex.technique === 'negative' ? { targetNegativeSeconds: ex.negativeSeconds || 5 } : {}),
+      ...(ex.technique === 'emom' ? {
+        targetEmomMinutes: ex.emomMinutes || 10,
+        targetEmomRepsPerMinute: ex.emomRepsPerMinute || '5',
+      } : {}),
+      ...(ex.supersetGroupId ? { supersetGroupId: ex.supersetGroupId } : {}),
     }));
 
     try {
@@ -306,8 +322,13 @@ export const LiveWorkoutScreen: React.FC = () => {
     setMiniRepsInput('');
     setMiniRestElapsed(0);
 
-    // Start countdown for next mini-set rest
-    const targetRest = currentExercise?.targetMiniRestSeconds || 20;
+    // Start countdown for next mini-set rest (use technique-specific rest time)
+    const tech = currentExercise?.technique;
+    const targetRest = tech === 'myo_reps'
+      ? (currentExercise?.targetMyoRestSeconds || 5)
+      : tech === 'cluster'
+      ? (currentExercise?.targetClusterRestSeconds || 15)
+      : (currentExercise?.targetMiniRestSeconds || 20);
     startMiniRestTimer(targetRest);
   };
 
@@ -816,6 +837,46 @@ export const LiveWorkoutScreen: React.FC = () => {
                 STRIPPING · {currentExercise.targetStripDrops || 3} scarichi da {currentExercise.targetStripRepsPerDrop || '8'} reps · max -{currentExercise.targetStripMaxDropPct || 50}%
               </Text>
             )}
+            {currentExercise.technique === 'pyramid' && (
+              <Text style={styles.restPauseTag}>
+                PIRAMIDALI · {currentExercise.targetPyramidType === 'ascending' ? 'Ascendente ↑ (peso sale, reps scendono)' : currentExercise.targetPyramidType === 'descending' ? 'Discendente ↓ (peso scende, reps salgono)' : 'Triangolare ↑↓'}
+              </Text>
+            )}
+            {currentExercise.technique === 'tempo' && (
+              <Text style={styles.restPauseTag}>
+                TEMPO · {currentExercise.targetTempoNotation || '4-1-2-0'} (ecc-pausa-conc-pausa)
+              </Text>
+            )}
+            {currentExercise.technique === 'myo_reps' && (
+              <Text style={styles.restPauseTag}>
+                MYO-REPS · attivazione {currentExercise.targetMyoActivationReps || '12'} + {currentExercise.targetMyoMiniSets || 4}x{currentExercise.targetMyoMiniReps || '3'} · rec {currentExercise.targetMyoRestSeconds || 5}s
+              </Text>
+            )}
+            {currentExercise.technique === 'isometric' && (
+              <Text style={styles.restPauseTag}>
+                ISOMETRIA · tenuta {currentExercise.targetIsometricHoldSeconds || 30}s
+              </Text>
+            )}
+            {currentExercise.technique === 'twentyone' && (
+              <Text style={styles.restPauseTag}>
+                21s · 7 parziali basse + 7 parziali alte + 7 complete
+              </Text>
+            )}
+            {currentExercise.technique === 'cluster' && (
+              <Text style={styles.restPauseTag}>
+                CLUSTER · {currentExercise.targetClusterSets || 5} cluster da {currentExercise.targetClusterReps || 2} reps · pausa {currentExercise.targetClusterRestSeconds || 15}s
+              </Text>
+            )}
+            {currentExercise.technique === 'negative' && (
+              <Text style={styles.restPauseTag}>
+                NEGATIVA · {currentExercise.targetNegativeSeconds || 5}s eccentrica controllata
+              </Text>
+            )}
+            {currentExercise.technique === 'emom' && (
+              <Text style={styles.restPauseTag}>
+                EMOM · {currentExercise.targetEmomRepsPerMinute || '5'} reps ogni minuto x {currentExercise.targetEmomMinutes || 10} min
+              </Text>
+            )}
 
             {/* Serie completate */}
             {currentExercise.sets.length > 0 && (
@@ -1002,17 +1063,24 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              ) : currentExercise.technique === 'rest_pause' ? (
+              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster') ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>
-                    Serie Interrotta {currentExercise.sets.length + 1} di {currentExercise.targetSets}
+                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : 'Cluster'}{' '}
+                    {currentExercise.sets.length + 1} di {currentExercise.targetSets}
                   </Text>
                   <Text style={styles.restPauseHint}>
-                    Obiettivo: {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} reps
-                    {' '}· rec {currentExercise.targetMiniRestSeconds || 20}s tra mini serie
+                    {currentExercise.technique === 'rest_pause' && (
+                      `Obiettivo: ${currentExercise.targetMiniSets || 4} mini serie da ${currentExercise.targetMiniReps || '6'} reps · rec ${currentExercise.targetMiniRestSeconds || 20}s`
+                    )}
+                    {currentExercise.technique === 'myo_reps' && (
+                      `${currentMiniSets.length === 0 ? `Serie attivante: ${currentExercise.targetMyoActivationReps || '12'} reps` : `Mini serie: ${currentExercise.targetMyoMiniReps || '3'} reps · rec ${currentExercise.targetMyoRestSeconds || 5}s`} · tot ${(currentExercise.targetMyoMiniSets || 4) + 1} mini serie`
+                    )}
+                    {currentExercise.technique === 'cluster' && (
+                      `Obiettivo: ${currentExercise.targetClusterSets || 5} cluster da ${currentExercise.targetClusterReps || 2} reps · pausa ${currentExercise.targetClusterRestSeconds || 15}s`
+                    )}
                   </Text>
 
-                  {/* Peso per la serie */}
                   <View style={styles.inputRow}>
                     <View style={styles.inputGroup}>
                       <Text style={styles.inputLabel}>Peso (kg)</Text>
@@ -1027,13 +1095,12 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  {/* Mini serie registrate */}
                   {currentMiniSets.length > 0 && (
                     <View style={styles.miniSetList}>
                       {currentMiniSets.map((m, i) => (
                         <View key={i} style={styles.miniSetRow}>
                           <Text style={styles.miniSetRowText}>
-                            Mini {i + 1}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
+                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
                           </Text>
                           <TouchableOpacity onPress={() => handleRemoveMiniSet(i)}>
                             <Ionicons name="close-circle" size={18} color={colors.error} />
@@ -1043,14 +1110,15 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </View>
                   )}
 
-                  {/* Timer recupero tra mini serie */}
                   {isMiniResting && (
                     <View style={styles.miniRestContainer}>
                       <View style={styles.miniRestTimerCircle}>
                         <Text style={styles.miniRestTimerText}>{miniRestTimer}</Text>
                         <Text style={styles.miniRestTimerLabel}>sec</Text>
                       </View>
-                      <Text style={styles.miniRestTitle}>Recupero tra mini serie</Text>
+                      <Text style={styles.miniRestTitle}>
+                        {currentExercise.technique === 'cluster' ? 'Pausa tra cluster' : currentExercise.technique === 'myo_reps' ? 'Pausa myo-reps' : 'Recupero tra mini serie'}
+                      </Text>
                       <TouchableOpacity style={styles.skipMiniRestBtn} onPress={skipMiniRest}>
                         <Ionicons name="play-forward" size={18} color={colors.accent} />
                         <Text style={styles.skipMiniRestText}>Salta</Text>
@@ -1058,11 +1126,16 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </View>
                   )}
 
-                  {/* Input mini serie (nascosto durante il recupero) */}
                   {!isMiniResting && (
                     <>
                       <Text style={styles.inputLabel}>
-                        Mini serie {currentMiniSets.length + 1} di {currentExercise.targetMiniSets || 4}
+                        {currentExercise.technique === 'myo_reps' && currentMiniSets.length === 0
+                          ? 'Serie attivante'
+                          : currentExercise.technique === 'cluster'
+                          ? `Cluster ${currentMiniSets.length + 1} di ${currentExercise.targetClusterSets || 5}`
+                          : currentExercise.technique === 'myo_reps'
+                          ? `Mini serie ${currentMiniSets.length} di ${currentExercise.targetMyoMiniSets || 4}`
+                          : `Mini serie ${currentMiniSets.length + 1} di ${currentExercise.targetMiniSets || 4}`}
                       </Text>
                       <View style={styles.inputRow}>
                         <View style={styles.inputGroup}>
@@ -1072,7 +1145,13 @@ export const LiveWorkoutScreen: React.FC = () => {
                             keyboardType="number-pad"
                             value={miniRepsInput}
                             onChangeText={setMiniRepsInput}
-                            placeholder={currentExercise.targetMiniReps || '6'}
+                            placeholder={
+                              currentExercise.technique === 'myo_reps'
+                                ? (currentMiniSets.length === 0 ? (currentExercise.targetMyoActivationReps || '12') : (currentExercise.targetMyoMiniReps || '3'))
+                                : currentExercise.technique === 'cluster'
+                                ? String(currentExercise.targetClusterReps || 2)
+                                : (currentExercise.targetMiniReps || '6')
+                            }
                             placeholderTextColor={colors.textLight}
                           />
                         </View>
@@ -1080,7 +1159,9 @@ export const LiveWorkoutScreen: React.FC = () => {
 
                       <TouchableOpacity style={styles.miniSetButton} onPress={handleLogMiniSet}>
                         <Ionicons name="add-circle" size={20} color={colors.accent} />
-                        <Text style={styles.miniSetButtonText}>REGISTRA MINI SERIE</Text>
+                        <Text style={styles.miniSetButtonText}>
+                          {currentExercise.technique === 'myo_reps' && currentMiniSets.length === 0 ? 'REGISTRA ATTIVAZIONE' : currentExercise.technique === 'cluster' ? 'REGISTRA CLUSTER' : 'REGISTRA MINI SERIE'}
+                        </Text>
                       </TouchableOpacity>
                     </>
                   )}
@@ -1089,7 +1170,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
                       <Ionicons name="checkmark-circle" size={24} color="#FFF" />
                       <Text style={styles.logSetButtonText}>
-                        COMPLETA SERIE ({currentMiniSets.length} mini)
+                        COMPLETA SERIE ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : 'mini'})
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1099,6 +1180,43 @@ export const LiveWorkoutScreen: React.FC = () => {
                 <Text style={styles.inputTitle}>
                   Serie {currentExercise.sets.length + 1} di {currentExercise.targetSets}
                 </Text>
+
+                {currentExercise.technique === 'pyramid' && (
+                  <Text style={styles.restPauseHint}>
+                    {currentExercise.targetPyramidType === 'ascending'
+                      ? `Serie ${currentExercise.sets.length + 1}: aumenta il peso, riduci le reps`
+                      : currentExercise.targetPyramidType === 'descending'
+                      ? `Serie ${currentExercise.sets.length + 1}: riduci il peso, aumenta le reps`
+                      : currentExercise.sets.length + 1 <= Math.ceil(currentExercise.targetSets / 2)
+                      ? `Serie ${currentExercise.sets.length + 1}: fase ascendente (peso ↑ reps ↓)`
+                      : `Serie ${currentExercise.sets.length + 1}: fase discendente (peso ↓ reps ↑)`}
+                  </Text>
+                )}
+                {currentExercise.technique === 'tempo' && (
+                  <Text style={styles.restPauseHint}>
+                    Tempo: {currentExercise.targetTempoNotation || '4-1-2-0'} (eccentrica-pausa bassa-concentrica-pausa alta)
+                  </Text>
+                )}
+                {currentExercise.technique === 'isometric' && (
+                  <Text style={styles.restPauseHint}>
+                    Mantieni la posizione per {currentExercise.targetIsometricHoldSeconds || 30} secondi
+                  </Text>
+                )}
+                {currentExercise.technique === 'twentyone' && (
+                  <Text style={styles.restPauseHint}>
+                    7 reps parziali basse + 7 parziali alte + 7 complete = 21 totali
+                  </Text>
+                )}
+                {currentExercise.technique === 'negative' && (
+                  <Text style={styles.restPauseHint}>
+                    Fase eccentrica (discesa) di {currentExercise.targetNegativeSeconds || 5} secondi per ogni rep
+                  </Text>
+                )}
+                {currentExercise.technique === 'emom' && (
+                  <Text style={styles.restPauseHint}>
+                    EMOM: {currentExercise.targetEmomRepsPerMinute || '5'} reps ogni minuto per {currentExercise.targetEmomMinutes || 10} minuti
+                  </Text>
+                )}
 
                 <View style={styles.inputRow}>
                   <View style={styles.inputGroup}>
@@ -1119,7 +1237,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                       keyboardType="number-pad"
                       value={inputReps}
                       onChangeText={setInputReps}
-                      placeholder="0"
+                      placeholder={currentExercise.technique === 'twentyone' ? '21' : '0'}
                       placeholderTextColor={colors.textLight}
                     />
                   </View>
