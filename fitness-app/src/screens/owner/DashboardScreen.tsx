@@ -760,40 +760,42 @@ export const DashboardScreen: React.FC = () => {
       )}
 
       {/* Promemoria Pagamenti WhatsApp */}
-      {paymentReminders.length > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>Promemoria Pagamenti ({paymentReminders.length})</Text>
-          {paymentReminders.map((reminder, idx) => (
-            <Card key={idx} variant="elevated" style={styles.reminderCard}>
-              <View style={styles.reminderHeader}>
-                <View style={styles.reminderInfo}>
-                  <Text style={styles.reminderStudentName}>{reminder.studentFullName}</Text>
-                  <Text style={styles.reminderTitle}>{reminder.title}</Text>
-                </View>
-                {reminder.data?.amount && (
-                  <Text style={styles.reminderAmount}>€{reminder.data.amount}</Text>
-                )}
+      <Text style={styles.sectionTitle}>Promemoria Pagamenti {paymentReminders.length > 0 ? `(${paymentReminders.length})` : ''}</Text>
+      {paymentReminders.length === 0 ? (
+        <Card>
+          <Text style={styles.emptyText}>Nessuna rata in scadenza nei prossimi 15 giorni</Text>
+        </Card>
+      ) : (
+        paymentReminders.map((reminder, idx) => (
+          <Card key={idx} variant="elevated" style={styles.reminderCard}>
+            <View style={styles.reminderHeader}>
+              <View style={styles.reminderInfo}>
+                <Text style={styles.reminderStudentName}>{reminder.studentFullName}</Text>
+                <Text style={styles.reminderTitle}>{reminder.title}</Text>
               </View>
-              <Text style={styles.reminderBody} numberOfLines={2}>{reminder.body}</Text>
-              <View style={styles.reminderActions}>
-                {reminder.studentPhone ? (
-                  <TouchableOpacity
-                    style={styles.whatsappButton}
-                    onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
-                  >
-                    <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
-                    <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.noPhoneText}>Telefono non disponibile</Text>
-                )}
-                {reminder.data?.dueDate && (
-                  <Text style={styles.reminderDueDate}>Scadenza: {reminder.data.dueDate}</Text>
-                )}
-              </View>
-            </Card>
-          ))}
-        </>
+              {reminder.data?.amount && (
+                <Text style={styles.reminderAmount}>€{reminder.data.amount}</Text>
+              )}
+            </View>
+            <Text style={styles.reminderBody} numberOfLines={2}>{reminder.body}</Text>
+            <View style={styles.reminderActions}>
+              {reminder.studentPhone ? (
+                <TouchableOpacity
+                  style={styles.whatsappButton}
+                  onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
+                >
+                  <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+                  <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.noPhoneText}>Telefono non disponibile</Text>
+              )}
+              {reminder.data?.dueDate && (
+                <Text style={styles.reminderDueDate}>Scadenza: {reminder.data.dueDate}</Text>
+              )}
+            </View>
+          </Card>
+        ))
       )}
 
       {/* Rendimento Manager */}

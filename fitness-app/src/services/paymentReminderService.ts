@@ -62,9 +62,14 @@ export const generatePaymentReminders = async (
     for (const inst of plan.installments) {
       if (inst.status === 'paid') continue;
 
-      const dueDate = inst.dueDate instanceof Date
-        ? inst.dueDate
-        : new Date(inst.dueDate as unknown as string);
+      const rawDate = inst.dueDate as any;
+      const dueDate = rawDate instanceof Date
+        ? rawDate
+        : rawDate?.toDate ? rawDate.toDate()
+        : rawDate?.seconds ? new Date(rawDate.seconds * 1000)
+        : new Date(rawDate);
+
+      if (isNaN(dueDate.getTime())) continue;
 
       const dueDateStr = dueDate.toLocaleDateString('it-IT');
       const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
