@@ -23,7 +23,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { BarChart, BarData } from '../../components/charts/BarChart';
-import { Collaborator, Manager, TrainingSession, FinancialTransaction, PaymentPlan, Student } from '../../types';
+import { Collaborator, Manager, TrainingSession, FinancialTransaction, PaymentPlan, Student, AppNotification } from '../../types';
 import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
@@ -33,7 +33,7 @@ import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 import { generateWeeklySummary, ensureAIApiKey } from '../../services/aiService';
-import { generateAndSendRemindersForAllStudents } from '../../services/paymentReminderService';
+import { generateAndSendRemindersForAllStudents, generatePaymentReminders, sendWhatsAppReminder } from '../../services/paymentReminderService';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -64,6 +64,7 @@ export const DashboardScreen: React.FC = () => {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiSummaryText, setAiSummaryText] = useState('');
   const [showAiSummaryModal, setShowAiSummaryModal] = useState(false);
+  const [paymentReminders, setPaymentReminders] = useState<(AppNotification & { studentPhone: string; studentFullName: string })[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -90,6 +91,23 @@ export const DashboardScreen: React.FC = () => {
         payPlans,
         studs.map((s: any) => ({ id: s.id, name: s.name }))
       ).catch(() => {});
+
+      const sMap = new Map(studs.map((s: any) => [s.id, s]));
+      const plansByStudent: Record<string, PaymentPlan[]> = {};
+      payPlans.forEach((p: PaymentPlan) => {
+        if (!plansByStudent[p.studentId]) plansByStudent[p.studentId] = [];
+        plansByStudent[p.studentId].push(p);
+      });
+      const allReminders: (AppNotification & { studentPhone: string; studentFullName: string })[] = [];
+      for (const [studentId, studentPlans] of Object.entries(plansByStudent)) {
+        const student = sMap.get(studentId) as any;
+        if (!student) continue;
+        const reminders = await generatePaymentReminders(studentId, student.name, studentPlans);
+        for (const r of reminders) {
+          allReminders.push({ ...r, studentPhone: student.phone || '', studentFullName: `${student.name} ${student.surname || ''}`.trim() });
+        }
+      }
+      setPaymentReminders(allReminders);
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -741,6 +759,43 @@ export const DashboardScreen: React.FC = () => {
         ))
       )}
 
+      {/* Promemoria Pagamenti WhatsApp */}
+      {paymentReminders.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Promemoria Pagamenti ({paymentReminders.length})</Text>
+          {paymentReminders.map((reminder, idx) => (
+            <Card key={idx} variant="elevated" style={styles.reminderCard}>
+              <View style={styles.reminderHeader}>
+                <View style={styles.reminderInfo}>
+                  <Text style={styles.reminderStudentName}>{reminder.studentFullName}</Text>
+                  <Text style={styles.reminderTitle}>{reminder.title}</Text>
+                </View>
+                {reminder.data?.amount && (
+                  <Text style={styles.reminderAmount}>€{reminder.data.amount}</Text>
+                )}
+              </View>
+              <Text style={styles.reminderBody} numberOfLines={2}>{reminder.body}</Text>
+              <View style={styles.reminderActions}>
+                {reminder.studentPhone ? (
+                  <TouchableOpacity
+                    style={styles.whatsappButton}
+                    onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+                    <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.noPhoneText}>Telefono non disponibile</Text>
+                )}
+                {reminder.data?.dueDate && (
+                  <Text style={styles.reminderDueDate}>Scadenza: {reminder.data.dueDate}</Text>
+                )}
+              </View>
+            </Card>
+          ))}
+        </>
+      )}
+
       {/* Rendimento Manager */}
       <Text style={styles.sectionTitle}>Rendimento Manager</Text>
       {managers.length === 0 ? (
@@ -1008,6 +1063,71 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     padding: spacing.md,
+  },
+  reminderCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  reminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  reminderInfo: {
+    flex: 1,
+  },
+  reminderStudentName: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  reminderTitle: {
+    fontSize: fontSize.sm,
+    color: colors.warning,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  reminderAmount: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.error,
+  },
+  reminderBody: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  reminderActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  whatsappButton: {
+    backgroundColor: '#25D366',
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  whatsappButtonText: {
+    color: '#FFF',
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  noPhoneText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  reminderDueDate: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
   },
   resetSection: {
     margin: spacing.md,

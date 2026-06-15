@@ -6,6 +6,7 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
+import { Linking } from 'react-native';
 import { db } from '../config/firebase';
 import { PaymentPlan, AppNotification } from '../types';
 
@@ -26,6 +27,12 @@ const REMINDER_MESSAGES = {
     `raggiungono i risultati migliori, perché vivono il percorso con piena responsabilità. ` +
     `Mantieni il ritmo: la regolarità fuori dalla palestra riflette la regolarità dentro. ` +
     `Con la tua puntualità, possiamo pianificare al meglio ogni dettaglio del tuo programma.`,
+
+  threeDays: (name: string, amount: number, dueDate: string) =>
+    `${name}, mancano 3 giorni alla scadenza della rata di €${amount} (${dueDate}). ` +
+    `Il tuo impegno sta dando risultati concreti — non fermarti proprio adesso! ` +
+    `Regolarizzando il pagamento potrai continuare senza interruzioni il percorso che hai iniziato. ` +
+    `I tuoi progressi parlano chiaro: sei sulla strada giusta. Mantieni la continuità!`,
 
   oneDay: (name: string, amount: number, dueDate: string) =>
     `${name}, domani scade la tua rata di €${amount} (${dueDate}). ` +
@@ -63,7 +70,7 @@ export const generatePaymentReminders = async (
       const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
       let message = '';
-      let type: 'payment_reminder_15days' | 'payment_reminder_week' | 'payment_reminder_1day' | 'payment_due' | null = null;
+      let type: 'payment_reminder_15days' | 'payment_reminder_week' | 'payment_reminder_3days' | 'payment_reminder_1day' | 'payment_due' | null = null;
 
       if (diffDays <= 0) {
         message = REMINDER_MESSAGES.overdue(studentName, inst.amount, dueDateStr);
@@ -71,6 +78,9 @@ export const generatePaymentReminders = async (
       } else if (diffDays <= 1) {
         message = REMINDER_MESSAGES.oneDay(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_1day';
+      } else if (diffDays <= 3) {
+        message = REMINDER_MESSAGES.threeDays(studentName, inst.amount, dueDateStr);
+        type = 'payment_reminder_3days';
       } else if (diffDays <= 7) {
         message = REMINDER_MESSAGES.week(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_week';
@@ -152,6 +162,27 @@ export const generateAndSendRemindersForAllStudents = async (
   }
 
   return sentCount;
+};
+
+export const sendWhatsAppReminder = async (
+  phone: string,
+  message: string
+): Promise<boolean> => {
+  if (!phone) return false;
+  const cleanPhone = phone.replace(/[^0-9+]/g, '');
+  const intlPhone = cleanPhone.startsWith('+') ? cleanPhone : `+39${cleanPhone}`;
+  const encoded = encodeURIComponent(message);
+  const url = `https://wa.me/${intlPhone.replace('+', '')}?text=${encoded}`;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 };
 
 export const getStudentNotifications = async (
