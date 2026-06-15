@@ -12,8 +12,11 @@ import { PaymentPlan, AppNotification } from '../types';
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
+const MSG_PREFIX = `*APP ESSĒRE*\n\n`;
+
 const REMINDER_MESSAGES = {
   fifteenDays: (name: string, amount: number, dueDate: string) =>
+    MSG_PREFIX +
     `Ciao ${name}, tra 15 giorni è previsto il rinnovo della tua rata di €${amount} (${dueDate}). ` +
     `Pensa a quanto sei cambiato da quando hai iniziato questo percorso: ogni allenamento ha costruito ` +
     `una versione più forte di te. Chi investe con costanza nel proprio corpo ottiene risultati che ` +
@@ -21,6 +24,7 @@ const REMINDER_MESSAGES = {
     `Noi siamo pronti a darti il meglio — e quando tutto è in ordine, possiamo concentrarci solo sui tuoi risultati.`,
 
   week: (name: string, amount: number, dueDate: string) =>
+    MSG_PREFIX +
     `${name}, manca una settimana alla scadenza della tua rata di €${amount} (${dueDate}). ` +
     `Hai già costruito un ritmo, un'abitudine, una disciplina — e sai quanto è difficile ` +
     `ricostruirla se si interrompe. Gli allievi più costanti nei pagamenti sono anche quelli che ` +
@@ -29,12 +33,14 @@ const REMINDER_MESSAGES = {
     `Con la tua puntualità, possiamo pianificare al meglio ogni dettaglio del tuo programma.`,
 
   threeDays: (name: string, amount: number, dueDate: string) =>
+    MSG_PREFIX +
     `${name}, mancano 3 giorni alla scadenza della rata di €${amount} (${dueDate}). ` +
     `Il tuo impegno sta dando risultati concreti — non fermarti proprio adesso! ` +
     `Regolarizzando il pagamento potrai continuare senza interruzioni il percorso che hai iniziato. ` +
     `I tuoi progressi parlano chiaro: sei sulla strada giusta. Mantieni la continuità!`,
 
   oneDay: (name: string, amount: number, dueDate: string) =>
+    MSG_PREFIX +
     `${name}, domani scade la tua rata di €${amount} (${dueDate}). ` +
     `Ogni giorno che hai investito in te stesso ti ha portato fin qui — non lasciare che un ` +
     `dettaglio amministrativo rallenti il tuo slancio. Provvedi oggi al pagamento e domani ` +
@@ -43,6 +49,7 @@ const REMINDER_MESSAGES = {
     `senza distrazioni. Il tuo percorso merita continuità.`,
 
   overdue: (name: string, amount: number, dueDate: string) =>
+    MSG_PREFIX +
     `${name}, la rata di €${amount} prevista per il ${dueDate} risulta scaduta. ` +
     `Sappiamo che la vita è piena di impegni, ma ogni giorno che passa senza regolarizzare ` +
     `la posizione è un giorno in cui il tuo percorso perde slancio. I tuoi progressi sono reali ` +
