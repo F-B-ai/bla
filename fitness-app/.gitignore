@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .expo/
+.firebase/
 *.tsbuildinfo
 firebase-sa-key.json
 sa-key.json
