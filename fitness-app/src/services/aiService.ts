@@ -823,3 +823,274 @@ RISPONDI in JSON array con questa struttura:
     return [];
   }
 };
+
+// ============================================================
+// 6. STIMA COMPOSIZIONE CORPOREA CON AI VISION
+// ============================================================
+
+export interface AIBodyCompositionResult {
+  estimatedBodyFat: number;
+  muscleMassQuality: string;
+  muscleDistribution: string;
+  strengths: string[];
+  areasToImprove: string[];
+  summary: string;
+  recommendations: string[];
+}
+
+export const estimateBodyComposition = async (
+  images: {
+    front: string;
+    sideLeft: string;
+    sideRight: string;
+    back: string;
+  },
+  studentInfo?: { name?: string; goals?: string; weight?: number; height?: number }
+): Promise<AIBodyCompositionResult> => {
+  const systemPrompt = `Sei un esperto nutrizionista sportivo e analista della composizione corporea italiana. Analizza le 4 fotografie fornite (frontale, laterale sinistro, laterale destro, posteriore) per stimare la composizione corporea del soggetto.
+
+RISPONDI SEMPRE in formato JSON valido con questa struttura:
+{
+  "estimatedBodyFat": <numero percentuale stimata di grasso corporeo, es. 18.5>,
+  "muscleMassQuality": "<valutazione qualitativa della massa muscolare: scarsa, sufficiente, buona, ottima, eccellente>",
+  "muscleDistribution": "<descrizione della distribuzione muscolare, simmetria, proporzioni tra i gruppi muscolari>",
+  "strengths": ["punto di forza 1", "punto di forza 2", ...],
+  "areasToImprove": ["area da migliorare 1", "area da migliorare 2", ...],
+  "summary": "<riassunto complessivo della valutazione della composizione corporea in italiano>",
+  "recommendations": ["raccomandazione 1", "raccomandazione 2", ...]
+}
+
+Analizza attentamente:
+- Percentuale stimata di grasso corporeo visibile (pliche cutanee visibili, definizione muscolare, accumuli adiposi)
+- Qualità della massa muscolare (tono, volume, definizione)
+- Distribuzione muscolare (simmetria destra/sinistra, proporzioni arti superiori/inferiori/tronco)
+- Aree di sviluppo muscolare più evidenti (punti di forza)
+- Aree che necessitano maggiore lavoro (punti deboli)
+- Valutazione complessiva del fisico
+
+Sii specifico, professionale e costruttivo. Fornisci raccomandazioni pratiche per l'allenamento e la nutrizione.`;
+
+  const content: any[] = [];
+
+  const viewLabels: Record<string, string> = {
+    front: 'Vista frontale',
+    sideLeft: 'Vista laterale sinistra',
+    sideRight: 'Vista laterale destra',
+    back: 'Vista posteriore',
+  };
+
+  for (const [view, uri] of Object.entries(images)) {
+    if (!uri) continue;
+    try {
+      const base64 = await imageUriToBase64(uri);
+      content.push({
+        type: 'text',
+        text: `${viewLabels[view]}:`,
+      });
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: base64,
+        },
+      });
+    } catch {
+      // Salta immagine se la conversione fallisce
+    }
+  }
+
+  let contextText = 'Analizza la composizione corporea di questo soggetto basandoti sulle 4 immagini fornite.';
+
+  if (studentInfo) {
+    contextText += '\n\nInformazioni soggetto:';
+    if (studentInfo.name) contextText += `\n- Nome: ${studentInfo.name}`;
+    if (studentInfo.goals) contextText += `\n- Obiettivi: ${studentInfo.goals}`;
+    if (studentInfo.weight) contextText += `\n- Peso: ${studentInfo.weight} kg`;
+    if (studentInfo.height) contextText += `\n- Altezza: ${studentInfo.height} cm`;
+  }
+
+  content.push({ type: 'text', text: contextText });
+
+  if (content.length === 0) {
+    throw new Error('Fornisci almeno un\'immagine per la stima della composizione corporea');
+  }
+
+  const responseText = await callClaude(
+    [{ role: 'user', content }],
+    systemPrompt,
+    3000
+  );
+
+  const parsed = extractJSON<AIBodyCompositionResult>(responseText);
+  if (parsed) return parsed;
+
+  // Fallback: restituisci risultato generico se il parsing fallisce
+  return {
+    estimatedBodyFat: 0,
+    muscleMassQuality: 'Non determinabile',
+    muscleDistribution: 'Non determinabile',
+    strengths: [],
+    areasToImprove: [],
+    summary: responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '').replace(/[{}\[\]"]/g, '').trim() || 'Analisi completata',
+    recommendations: [],
+  };
+};
+
+// ============================================================
+// 7. AI COACH PERSONALE - Analisi completa studente
+// ============================================================
+
+export interface AICoachInsights {
+  overallScore: number;
+  status: 'eccellente' | 'buono' | 'attenzione' | 'critico';
+  insights: Array<{
+    category: 'allenamento' | 'recupero' | 'umore' | 'progressi' | 'nutrizione' | 'costanza';
+    title: string;
+    description: string;
+    priority: 'alta' | 'media' | 'bassa';
+  }>;
+  weeklyTip: string;
+  warnings: string[];
+  encouragement: string;
+}
+
+export const generateAICoachInsights = async (params: {
+  studentName: string;
+  goals: string;
+  medicalNotes?: string;
+  workoutLogs: Array<{
+    date: string;
+    duration: number;
+    exerciseCount: number;
+    totalVolume: number;
+    avgRpe: number;
+    completed: boolean;
+  }>;
+  diaryEntries: Array<{
+    date: string;
+    mood: string;
+    painLevel: number;
+    content: string;
+  }>;
+  measurements: Array<{
+    date: string;
+    weight?: number;
+    bodyFat?: number;
+    muscleMass?: number;
+  }>;
+  sessionsAttendance: {
+    completed: number;
+    total: number;
+    cancelledLate: number;
+    noShow: number;
+  };
+  currentStreak: number;
+  totalWorkouts: number;
+}): Promise<AICoachInsights> => {
+  const systemPrompt = `Sei un esperto AI fitness coach che analizza dati completi degli studenti. Genera insight personalizzati, rileva pattern, segnala criticità e fornisci raccomandazioni pratiche.
+
+Concentrati su:
+- Costanza nell'allenamento e presenza alle sessioni
+- Necessità di recupero e segni di sovrallenamento
+- Pattern di umore ed energia
+- Tasso di progressione (peso, composizione corporea, volume)
+- Rischio infortuni (livello di dolore, carico eccessivo)
+- Nutrizione e composizione corporea
+
+Rispondi SEMPRE in italiano con un JSON valido con questa struttura:
+{
+  "overallScore": <numero 1-100>,
+  "status": "eccellente|buono|attenzione|critico",
+  "insights": [
+    {
+      "category": "allenamento|recupero|umore|progressi|nutrizione|costanza",
+      "title": "titolo breve",
+      "description": "descrizione dettagliata dell'insight",
+      "priority": "alta|media|bassa"
+    }
+  ],
+  "weeklyTip": "consiglio pratico per la prossima settimana",
+  "warnings": ["avviso critico 1", "avviso 2"],
+  "encouragement": "messaggio motivazionale personalizzato"
+}
+
+Regole:
+- overallScore: 80-100 = eccellente, 60-79 = buono, 40-59 = attenzione, 1-39 = critico
+- Genera 3-6 insights significativi ordinati per priorità
+- warnings: solo se ci sono situazioni che richiedono attenzione immediata (dolore alto, assenze frequenti, calo drastico). Array vuoto se tutto ok.
+- Sii specifico e basati sui dati forniti, non generico
+- Il messaggio di incoraggiamento deve essere personalizzato e motivante`;
+
+  let prompt = `Analizza i dati di questo allievo e genera insight personalizzati.
+
+PROFILO ALLIEVO:
+- Nome: ${params.studentName}
+- Obiettivi: ${params.goals}`;
+
+  if (params.medicalNotes) {
+    prompt += `\n- Note mediche: ${params.medicalNotes}`;
+  }
+
+  prompt += `\n\nSTATISTICHE GENERALI:
+- Allenamenti totali: ${params.totalWorkouts}
+- Streak attuale: ${params.currentStreak} giorni
+- Sessioni completate: ${params.sessionsAttendance.completed}/${params.sessionsAttendance.total}
+- Cancellazioni tardive: ${params.sessionsAttendance.cancelledLate}
+- No-show: ${params.sessionsAttendance.noShow}`;
+
+  if (params.workoutLogs.length > 0) {
+    prompt += `\n\nULTIMI ALLENAMENTI (${params.workoutLogs.length} sessioni):`;
+    for (const log of params.workoutLogs.slice(0, 20)) {
+      prompt += `\n- ${log.date}: ${log.duration}min, ${log.exerciseCount} esercizi, volume ${log.totalVolume}kg, RPE ${log.avgRpe}, ${log.completed ? 'completato' : 'incompleto'}`;
+    }
+  } else {
+    prompt += `\n\nNessun log di allenamento disponibile.`;
+  }
+
+  if (params.diaryEntries.length > 0) {
+    prompt += `\n\nDIARIO RECENTE (${params.diaryEntries.length} voci):`;
+    for (const entry of params.diaryEntries.slice(0, 15)) {
+      prompt += `\n- ${entry.date}: Umore ${entry.mood}, Dolore ${entry.painLevel}/10`;
+      if (entry.content) prompt += ` | "${entry.content.substring(0, 100)}"`;
+    }
+  } else {
+    prompt += `\n\nNessuna voce di diario disponibile.`;
+  }
+
+  if (params.measurements.length > 0) {
+    prompt += `\n\nMISURAZIONI CORPOREE (${params.measurements.length} rilevazioni):`;
+    for (const m of params.measurements.slice(0, 10)) {
+      prompt += `\n- ${m.date}:`;
+      if (m.weight != null) prompt += ` Peso ${m.weight}kg`;
+      if (m.bodyFat != null) prompt += ` BF ${m.bodyFat}%`;
+      if (m.muscleMass != null) prompt += ` MM ${m.muscleMass}kg`;
+    }
+  } else {
+    prompt += `\n\nNessuna misurazione corporea disponibile.`;
+  }
+
+  prompt += `\n\nGenera un'analisi completa con insight, avvisi e incoraggiamento personalizzato.`;
+
+  const responseText = await callClaude(
+    [{ role: 'user', content: prompt }],
+    systemPrompt,
+    3000,
+    '{'
+  );
+
+  const parsed = extractJSON<AICoachInsights>(responseText);
+  if (parsed && typeof parsed.overallScore === 'number' && parsed.status) {
+    return parsed;
+  }
+
+  // Fallback se il parsing fallisce
+  return {
+    overallScore: 50,
+    status: 'attenzione',
+    insights: [],
+    weeklyTip: 'Continua ad allenarti con costanza e registra i tuoi progressi.',
+    warnings: ['Impossibile generare un\'analisi dettagliata. Riprova.'],
+    encouragement: responseText.replace(/^\{/, '').substring(0, 200) || 'Continua così!',
+  };
+};

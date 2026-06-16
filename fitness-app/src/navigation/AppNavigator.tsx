@@ -88,6 +88,9 @@ import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
+import { GamificationScreen } from '../screens/student/GamificationScreen';
+import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
+import { AICoachScreen } from '../screens/shared/AICoachScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
 
@@ -357,6 +360,22 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Nutrizionista"
       component={NutritionistScreen}
       options={{
@@ -506,6 +525,22 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Earnings"
       component={EarningsScreen}
       options={{
@@ -644,6 +679,22 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
@@ -801,6 +852,22 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Traguardi"
+      component={GamificationScreen}
+      options={{
+        tabBarLabel: 'Traguardi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'trophy' : 'trophy-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen

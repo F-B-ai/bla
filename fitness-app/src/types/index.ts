@@ -701,6 +701,56 @@ export interface SetLog {
   holdSeconds?: number;
 }
 
+// --- Gamification ---
+export type BadgeId =
+  | 'first_workout' | 'ten_workouts' | 'fifty_workouts' | 'hundred_workouts'
+  | 'streak_7' | 'streak_30' | 'streak_90' | 'streak_365'
+  | 'early_bird' | 'night_owl'
+  | 'first_program' | 'five_programs'
+  | 'diary_writer' | 'diary_faithful'
+  | 'payment_punctual' | 'heavy_lifter'
+  | 'consistency_king';
+
+export interface Badge {
+  id: BadgeId;
+  name: string;
+  description: string;
+  icon: string; // emoji
+  unlockedAt?: Date;
+}
+
+export interface StudentGamification {
+  id: string;
+  studentId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastWorkoutDate?: Date;
+  totalWorkouts: number;
+  totalDiaryEntries: number;
+  badges: Badge[];
+  level: number;
+  xp: number;
+  updatedAt: Date;
+}
+
+// --- Stima composizione corporea ---
+export interface BodyCompositionEstimate {
+  id: string;
+  studentId: string;
+  assessorId: string;
+  date: Date;
+  frontImageUrl: string;
+  sideLeftImageUrl: string;
+  sideRightImageUrl: string;
+  backImageUrl: string;
+  estimatedBodyFat?: number;
+  estimatedMuscleMass?: string;
+  muscleDistribution?: string;
+  aiAnalysis: string;
+  recommendations: string[];
+  createdAt: Date;
+}
+
 // --- Navigation types ---
 export type RootStackParamList = {
   Login: undefined;
