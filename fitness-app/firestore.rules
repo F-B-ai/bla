@@ -317,6 +317,22 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    // Body composition estimates
+    match /bodyCompositionEstimates/{estimateId} {
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Gamification
+    match /gamification/{gamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
+
     // Nutrition team notes
     match /nutritionTeamNotes/{noteId} {
       allow read: if isStaff();
