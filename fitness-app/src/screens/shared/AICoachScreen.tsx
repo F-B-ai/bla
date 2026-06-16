@@ -324,46 +324,48 @@ export const AICoachScreen: React.FC = () => {
                 ) : students.length === 0 ? (
                   <Text style={styles.emptyText}>Nessun allievo trovato</Text>
                 ) : (
-                  students
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((s) => (
-                      <TouchableOpacity
-                        key={s.id}
-                        style={[
-                          styles.pickerItem,
-                          selectedStudentId === s.id && styles.pickerItemSelected,
-                        ]}
-                        onPress={() => {
-                          setSelectedStudentId(s.id);
-                          setShowStudentPicker(false);
-                          setInsights(null);
-                        }}
-                      >
-                        <View style={styles.pickerAvatar}>
-                          <Text style={styles.pickerAvatarText}>
-                            {s.name[0]}
-                            {s.surname[0]}
-                          </Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.pickerName}>
-                            {s.name} {s.surname}
-                          </Text>
-                          {s.goals ? (
-                            <Text style={styles.pickerGoals} numberOfLines={1}>
-                              {s.goals}
+                  <ScrollView nestedScrollEnabled>
+                    {students
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((s) => (
+                        <TouchableOpacity
+                          key={s.id}
+                          style={[
+                            styles.pickerItem,
+                            selectedStudentId === s.id && styles.pickerItemSelected,
+                          ]}
+                          onPress={() => {
+                            setSelectedStudentId(s.id);
+                            setShowStudentPicker(false);
+                            setInsights(null);
+                          }}
+                        >
+                          <View style={styles.pickerAvatar}>
+                            <Text style={styles.pickerAvatarText}>
+                              {s.name[0]}
+                              {s.surname[0]}
                             </Text>
-                          ) : null}
-                        </View>
-                        {selectedStudentId === s.id && (
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={20}
-                            color={colors.accent}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    ))
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.pickerName}>
+                              {s.name} {s.surname}
+                            </Text>
+                            {s.goals ? (
+                              <Text style={styles.pickerGoals} numberOfLines={1}>
+                                {s.goals}
+                              </Text>
+                            ) : null}
+                          </View>
+                          {selectedStudentId === s.id && (
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={20}
+                              color={colors.accent}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
                 )}
               </View>
             )}
@@ -673,8 +675,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginTop: spacing.sm,
-    maxHeight: 260,
-    overflow: 'hidden',
+    maxHeight: 400,
   },
   pickerItem: {
     flexDirection: 'row',
