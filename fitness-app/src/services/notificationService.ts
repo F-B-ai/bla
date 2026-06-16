@@ -20,6 +20,10 @@ let _currentUserId: string | null = null;
 export const setCurrentUserId = (uid: string | null) => { _currentUserId = uid; };
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
+const NOTIFICATION_PREFIX = 'APP ESSĒRE\n\n';
+
+const prefixBody = (body: string): string =>
+  body.startsWith('APP ESS') ? body : NOTIFICATION_PREFIX + body;
 
 export const createNotification = async (
   userId: string,
@@ -33,7 +37,7 @@ export const createNotification = async (
     userId,
     type,
     title,
-    body,
+    body: prefixBody(body),
     data: data || {},
     read: false,
     createdAt: Timestamp.now(),
@@ -56,7 +60,7 @@ export const createBulkNotifications = async (
       userId,
       type,
       title,
-      body,
+      body: prefixBody(body),
       data: data || {},
       read: false,
       createdAt: Timestamp.now(),
