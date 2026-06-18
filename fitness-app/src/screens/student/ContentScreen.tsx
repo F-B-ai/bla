@@ -16,6 +16,8 @@ import { getContentForStudent } from '../../services/contentService';
 const CONTENT_ICONS: Record<ContentType, string> = {
   podcast: 'Podcast',
   video: 'Video',
+  audio: 'Audio',
+  pdf: 'PDF',
   article: 'Articolo',
   resource: 'Risorsa',
 };
@@ -23,8 +25,10 @@ const CONTENT_ICONS: Record<ContentType, string> = {
 const CONTENT_COLORS: Record<ContentType, string> = {
   podcast: '#9C27B0',
   video: '#F44336',
+  audio: '#FF9800',
+  pdf: '#4CAF50',
   article: '#2196F3',
-  resource: '#4CAF50',
+  resource: '#607D8B',
 };
 
 export const ContentScreen: React.FC = () => {

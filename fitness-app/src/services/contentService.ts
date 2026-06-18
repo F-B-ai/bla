@@ -9,7 +9,8 @@ import {
   doc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../config/firebase';
 import { SpecialContent, DiaryEntry, NutritionalConsultation } from '../types';
 
 // --- Contenuti speciali (podcast, risorse, ecc.) ---
@@ -51,6 +52,22 @@ export const getAllContent = async (): Promise<SpecialContent[]> => {
 
 export const deleteContent = async (contentId: string): Promise<void> => {
   await deleteDoc(doc(db, CONTENT_COLLECTION, contentId));
+};
+
+export const uploadContentFile = async (
+  fileUri: string,
+  fileName: string,
+  contentType: string
+): Promise<string> => {
+  const timestamp = Date.now();
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const fileRef = ref(storage, `content/${timestamp}_${safeName}`);
+
+  const response = await fetch(fileUri);
+  const blob = await response.blob();
+  await uploadBytes(fileRef, blob, { contentType });
+
+  return getDownloadURL(fileRef);
 };
 
 // --- Diario allievo ---

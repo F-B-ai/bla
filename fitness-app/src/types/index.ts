@@ -290,7 +290,7 @@ export interface ChatMessage {
 }
 
 // --- Contenuti speciali ---
-export type ContentType = 'podcast' | 'video' | 'article' | 'resource';
+export type ContentType = 'podcast' | 'video' | 'article' | 'resource' | 'pdf' | 'audio';
 
 export interface SpecialContent {
   id: string;
