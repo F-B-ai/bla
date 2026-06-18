@@ -178,8 +178,8 @@ export const ManageUsersScreen: React.FC = () => {
     setGeneratingReport(student.id);
     try {
       await openStudentReport(student, coachNames);
-    } catch {
-      crossAlert('Errore', 'Impossibile generare il report');
+    } catch (err: any) {
+      crossAlert('Errore', `Impossibile generare il report: ${err?.message || String(err)}`);
     } finally {
       setGeneratingReport(null);
     }

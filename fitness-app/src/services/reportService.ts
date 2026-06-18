@@ -21,19 +21,28 @@ const toDate = (raw: any): Date => {
   return new Date(raw);
 };
 
-const fmt = (d: Date): string =>
-  d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fmt = (d: Date): string => {
+  try {
+    if (!d || isNaN(d.getTime())) return 'N/D';
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch { return 'N/D'; }
+};
 
 export const generateStudentReport = async (
   student: Student,
   coachName: string
 ): Promise<ReportData> => {
-  const [sessions, measurements, plans, logs] = await Promise.all([
+  const [sessionsRes, measurementsRes, plansRes, logsRes] = await Promise.allSettled([
     getStudentSessions(student.id),
     getStudentMeasurements(student.id),
     getStudentPaymentPlans(student.id),
     getStudentWorkoutLogs(student.id),
   ]);
+
+  const sessions = sessionsRes.status === 'fulfilled' ? sessionsRes.value : [];
+  const measurements = measurementsRes.status === 'fulfilled' ? measurementsRes.value : [];
+  const plans = plansRes.status === 'fulfilled' ? plansRes.value : [];
+  const logs = logsRes.status === 'fulfilled' ? logsRes.value : [];
 
   return {
     student,
@@ -68,14 +77,16 @@ const buildHTML = (data: ReportData): string => {
     measurements.length > 1 ? measurements[measurements.length - 1] : null;
 
   const activePlan = plans.find((p) => {
-    const end = toDate(p.endDate);
-    return end >= new Date();
+    try {
+      const end = toDate(p.endDate);
+      return !isNaN(end.getTime()) && end >= new Date();
+    } catch { return false; }
   });
 
-  const paidInstallments = activePlan
+  const paidInstallments = activePlan?.installments
     ? activePlan.installments.filter((i) => i.status === 'paid').length
     : 0;
-  const totalInstallments = activePlan ? activePlan.installments.length : 0;
+  const totalInstallments = activePlan?.installments ? activePlan.installments.length : 0;
 
   const measurementRows = measurements
     .slice(0, 8)
@@ -405,15 +416,24 @@ export const openStudentReport = async (
   coachName: string
 ): Promise<void> => {
   const data = await generateStudentReport(student, coachName);
-  const html = buildHTML(data);
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
+  let html: string;
+  try {
+    html = buildHTML(data);
+  } catch (err: any) {
+    throw new Error('Errore generazione HTML: ' + (err?.message || String(err)));
+  }
 
-  const opened = window.open(url, '_blank');
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
 
-  if (!opened) {
-    // Fallback: navigate current page (will leave app)
-    window.location.href = url;
+    const opened = window.open(url, '_blank');
+
+    if (!opened) {
+      window.location.href = url;
+    }
+  } catch (err: any) {
+    throw new Error('Errore apertura report: ' + (err?.message || String(err)));
   }
 };
