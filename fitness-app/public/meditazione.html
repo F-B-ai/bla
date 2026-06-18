@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Meditazione — ESSĒRE</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0A0A0A;
+    color: #F2F2F7;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Ambient particles */
+  .particles {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0;
+    animation: float linear infinite;
+  }
+
+  @keyframes float {
+    0% { opacity: 0; transform: translateY(100vh) scale(0); }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-20vh) scale(1); }
+  }
+
+  /* Main content */
+  .container {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 32px; padding: 24px; text-align: center;
+    max-width: 420px; width: 100%;
+  }
+
+  /* Brand */
+  .brand {
+    font-size: 14px; font-weight: 800; letter-spacing: 4px;
+    color: rgba(212, 0, 0, 0.6); text-transform: uppercase;
+  }
+
+  /* Breathing circle */
+  .breath-wrapper {
+    position: relative; width: 220px; height: 220px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .breath-ring {
+    position: absolute; width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 2px solid rgba(212, 0, 0, 0.15);
+  }
+
+  .breath-ring-pulse {
+    position: absolute; width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 1px solid rgba(212, 0, 0, 0.08);
+    animation: ringPulse 8s ease-in-out infinite;
+  }
+
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.3); opacity: 0; }
+  }
+
+  .breath-circle {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #D40000, #6B0000);
+    box-shadow: 0 0 60px rgba(212, 0, 0, 0.3), 0 0 120px rgba(212, 0, 0, 0.1);
+    transition: transform 4s ease-in-out, box-shadow 4s ease-in-out;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .breath-circle.inhale {
+    transform: scale(1.5);
+    box-shadow: 0 0 80px rgba(212, 0, 0, 0.5), 0 0 160px rgba(212, 0, 0, 0.2);
+  }
+  .breath-circle.hold {
+    transform: scale(1.5);
+    box-shadow: 0 0 80px rgba(212, 0, 0, 0.5), 0 0 160px rgba(212, 0, 0, 0.2);
+    transition-duration: 4s;
+  }
+  .breath-circle.exhale {
+    transform: scale(1);
+    box-shadow: 0 0 40px rgba(212, 0, 0, 0.2), 0 0 80px rgba(212, 0, 0, 0.05);
+    transition-duration: 6s;
+  }
+
+  .breath-text {
+    font-size: 13px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(255,255,255,0.9);
+    transition: opacity 0.5s;
+  }
+
+  /* Timer */
+  .timer {
+    font-size: 42px; font-weight: 200; color: rgba(242, 242, 247, 0.4);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+    min-height: 52px;
+  }
+
+  /* Quote */
+  .quote-container {
+    min-height: 100px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 12px;
+  }
+  .quote {
+    font-size: 18px; font-weight: 300; line-height: 1.6;
+    color: rgba(242, 242, 247, 0.85);
+    font-style: italic;
+    transition: opacity 1.5s ease-in-out;
+    max-width: 340px;
+  }
+  .quote-author {
+    font-size: 11px; font-weight: 600; letter-spacing: 2px;
+    color: rgba(212, 0, 0, 0.5); text-transform: uppercase;
+    transition: opacity 1.5s ease-in-out;
+  }
+
+  /* Controls */
+  .controls { display: flex; gap: 16px; margin-top: 8px; }
+
+  .btn {
+    padding: 14px 28px; border-radius: 50px; border: none;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.3s;
+  }
+  .btn-primary {
+    background: #D40000; color: #fff;
+    box-shadow: 0 4px 20px rgba(212, 0, 0, 0.4);
+  }
+  .btn-primary:active { transform: scale(0.95); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-secondary:active { transform: scale(0.95); }
+
+  /* Cycle counter */
+  .cycles {
+    font-size: 11px; color: rgba(255,255,255,0.25);
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  /* Gradient overlay */
+  .gradient-top, .gradient-bottom {
+    position: fixed; left: 0; width: 100%; height: 120px;
+    pointer-events: none; z-index: 0;
+  }
+  .gradient-top {
+    top: 0;
+    background: linear-gradient(180deg, rgba(10,10,10,1) 0%, transparent 100%);
+  }
+  .gradient-bottom {
+    bottom: 0;
+    background: linear-gradient(0deg, rgba(10,10,10,1) 0%, transparent 100%);
+  }
+
+  /* Intro screen */
+  .intro {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: #0A0A0A; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; padding: 32px; text-align: center;
+    transition: opacity 1s ease-out;
+  }
+  .intro.hidden { opacity: 0; pointer-events: none; }
+  .intro-title {
+    font-size: 32px; font-weight: 200; letter-spacing: 6px;
+    color: #F2F2F7;
+  }
+  .intro-line {
+    width: 60px; height: 2px; background: #D40000;
+    margin: 4px auto;
+  }
+  .intro-subtitle {
+    font-size: 15px; font-weight: 300; color: rgba(242,242,247,0.5);
+    line-height: 1.7; max-width: 300px;
+  }
+  .intro-duration {
+    display: flex; gap: 12px; margin-top: 8px;
+  }
+  .dur-btn {
+    padding: 10px 20px; border-radius: 50px; border: 1px solid rgba(212,0,0,0.3);
+    background: transparent; color: rgba(242,242,247,0.7);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all 0.3s;
+  }
+  .dur-btn.active, .dur-btn:active {
+    background: #D40000; color: #fff; border-color: #D40000;
+  }
+</style>
+</head>
+<body>
+
+<!-- Particles -->
+<div class="particles" id="particles"></div>
+<div class="gradient-top"></div>
+<div class="gradient-bottom"></div>
+
+<!-- Intro -->
+<div class="intro" id="intro">
+  <div class="brand">ESSĒRE</div>
+  <div class="intro-title">Meditazione</div>
+  <div class="intro-line"></div>
+  <div class="intro-subtitle">
+    Trova il tuo centro.<br>
+    Respira con intenzione.<br>
+    Sii presente a te stesso.
+  </div>
+  <div class="intro-duration">
+    <button class="dur-btn active" onclick="setDuration(3)">3 min</button>
+    <button class="dur-btn" onclick="setDuration(5)">5 min</button>
+    <button class="dur-btn" onclick="setDuration(10)">10 min</button>
+  </div>
+  <button class="btn btn-primary" onclick="startMeditation()" style="margin-top:12px">
+    Inizia
+  </button>
+</div>
+
+<!-- Main -->
+<div class="container" id="main" style="display:none">
+  <div class="brand">ESSĒRE</div>
+
+  <div class="breath-wrapper">
+    <div class="breath-ring"></div>
+    <div class="breath-ring-pulse"></div>
+    <div class="breath-circle" id="circle">
+      <span class="breath-text" id="breathText">Pronto</span>
+    </div>
+  </div>
+
+  <div class="timer" id="timer">0:00</div>
+
+  <div class="quote-container">
+    <div class="quote" id="quote"></div>
+    <div class="quote-author" id="quoteAuthor"></div>
+  </div>
+
+  <div class="cycles" id="cycles"></div>
+
+  <div class="controls">
+    <button class="btn btn-secondary" onclick="togglePause()" id="pauseBtn">Pausa</button>
+    <button class="btn btn-secondary" onclick="stopMeditation()">Fine</button>
+  </div>
+</div>
+
+<script>
+const quotes = [
+  { text: "Non sei i tuoi pensieri. Sei lo spazio in cui accadono.", author: "Eckhart Tolle" },
+  { text: "Il momento presente è l'unico momento in cui la vita è disponibile.", author: "Thich Nhat Hanh" },
+  { text: "Essere è più importante di fare. La qualità della tua presenza è il tuo dono più grande.", author: "ESSĒRE" },
+  { text: "Il corpo è il tuo primo strumento. Ascoltalo, rispettalo, nutrilo.", author: "ESSĒRE" },
+  { text: "Ogni respiro è un nuovo inizio. Ogni espirazione, un lasciar andare.", author: "" },
+  { text: "La vera forza nasce dalla calma interiore.", author: "Lao Tzu" },
+  { text: "Non cercare fuori ciò che puoi trovare solo dentro.", author: "ESSĒRE" },
+  { text: "Il silenzio è il linguaggio di Dio. Tutto il resto è una cattiva traduzione.", author: "Rumi" },
+  { text: "Dove va l'attenzione, scorre l'energia.", author: "" },
+  { text: "Il tuo corpo sente quello che la mente non dice. Fermati. Ascolta.", author: "ESSĒRE" },
+  { text: "La disciplina è il ponte tra i tuoi obiettivi e i tuoi risultati.", author: "Jim Rohn" },
+  { text: "Ogni giorno è un'occasione per diventare la versione migliore di te stesso.", author: "ESSĒRE" },
+];
+
+let duration = 3;
+let elapsed = 0;
+let cycleCount = 0;
+let running = false;
+let paused = false;
+let breathInterval = null;
+let timerInterval = null;
+let quoteInterval = null;
+let currentPhase = '';
+
+function setDuration(min) {
+  duration = min;
+  document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+function createParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 25; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 3 + 1;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = Math.random() > 0.5
+      ? 'rgba(212, 0, 0, ' + (Math.random() * 0.4 + 0.1) + ')'
+      : 'rgba(242, 242, 247, ' + (Math.random() * 0.15 + 0.05) + ')';
+    p.style.animationDuration = (Math.random() * 15 + 10) + 's';
+    p.style.animationDelay = (Math.random() * 10) + 's';
+    container.appendChild(p);
+  }
+}
+
+function showQuote() {
+  const q = quotes[Math.floor(Math.random() * quotes.length)];
+  const quoteEl = document.getElementById('quote');
+  const authorEl = document.getElementById('quoteAuthor');
+  quoteEl.style.opacity = '0';
+  authorEl.style.opacity = '0';
+  setTimeout(() => {
+    quoteEl.textContent = '« ' + q.text + ' »';
+    authorEl.textContent = q.author ? '— ' + q.author : '';
+    quoteEl.style.opacity = '1';
+    authorEl.style.opacity = '1';
+  }, 800);
+}
+
+function updateTimer() {
+  if (paused) return;
+  elapsed++;
+  const remaining = duration * 60 - elapsed;
+  if (remaining <= 0) {
+    endMeditation();
+    return;
+  }
+  const min = Math.floor(remaining / 60);
+  const sec = remaining % 60;
+  document.getElementById('timer').textContent = min + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function breathCycle() {
+  if (paused) return;
+  const circle = document.getElementById('circle');
+  const text = document.getElementById('breathText');
+
+  // Inhale 4s
+  currentPhase = 'inhale';
+  circle.className = 'breath-circle inhale';
+  text.textContent = 'Inspira';
+
+  setTimeout(() => {
+    if (paused || !running) return;
+    // Hold 4s
+    currentPhase = 'hold';
+    circle.className = 'breath-circle hold';
+    text.textContent = 'Trattieni';
+
+    setTimeout(() => {
+      if (paused || !running) return;
+      // Exhale 6s
+      currentPhase = 'exhale';
+      circle.className = 'breath-circle exhale';
+      text.textContent = 'Espira';
+      cycleCount++;
+      document.getElementById('cycles').textContent = cycleCount + (cycleCount === 1 ? ' ciclo' : ' cicli');
+
+      setTimeout(() => {
+        if (paused || !running) return;
+        breathCycle();
+      }, 6000);
+    }, 4000);
+  }, 4000);
+}
+
+function startMeditation() {
+  document.getElementById('intro').classList.add('hidden');
+  setTimeout(() => {
+    document.getElementById('main').style.display = 'flex';
+  }, 500);
+
+  elapsed = 0;
+  cycleCount = 0;
+  running = true;
+  paused = false;
+  document.getElementById('timer').textContent = duration + ':00';
+  document.getElementById('cycles').textContent = '';
+
+  showQuote();
+  quoteInterval = setInterval(showQuote, 18000);
+
+  setTimeout(() => {
+    breathCycle();
+    timerInterval = setInterval(updateTimer, 1000);
+  }, 1500);
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Riprendi' : 'Pausa';
+  if (!paused) breathCycle();
+}
+
+function stopMeditation() {
+  running = false;
+  clearInterval(timerInterval);
+  clearInterval(quoteInterval);
+  document.getElementById('main').style.display = 'none';
+  document.getElementById('intro').classList.remove('hidden');
+}
+
+function endMeditation() {
+  running = false;
+  clearInterval(timerInterval);
+  clearInterval(quoteInterval);
+
+  const circle = document.getElementById('circle');
+  const text = document.getElementById('breathText');
+  circle.className = 'breath-circle';
+  text.textContent = '';
+
+  document.getElementById('timer').textContent = '';
+
+  const quoteEl = document.getElementById('quote');
+  const authorEl = document.getElementById('quoteAuthor');
+  quoteEl.style.opacity = '0';
+  authorEl.style.opacity = '0';
+
+  setTimeout(() => {
+    quoteEl.textContent = '« Hai dedicato tempo a te stesso. Questo è il primo passo per essere straordinario. »';
+    authorEl.textContent = '— ESSĒRE';
+    quoteEl.style.opacity = '1';
+    authorEl.style.opacity = '1';
+
+    document.getElementById('cycles').textContent = cycleCount + ' cicli completati';
+
+    const controls = document.querySelector('.controls');
+    controls.innerHTML = '<button class="btn btn-primary" onclick="stopMeditation()">Chiudi</button>';
+  }, 500);
+}
+
+createParticles();
+</script>
+</body>
+</html>

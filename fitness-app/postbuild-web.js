@@ -83,5 +83,18 @@ if (!html.includes("register('/sw.js')")) {
   html = html.replace('</body>', swScript + '\n  </body>');
 }
 
+// Copy public/ files to dist/ (meditazione.html, etc.)
+const publicDir = path.join(__dirname, 'public');
+if (fs.existsSync(publicDir)) {
+  fs.readdirSync(publicDir).forEach((file) => {
+    const src = path.join(publicDir, file);
+    const dst = path.join(__dirname, 'dist', file);
+    if (fs.statSync(src).isFile()) {
+      fs.copyFileSync(src, dst);
+      console.log(`✓ public/${file} copied to dist/`);
+    }
+  });
+}
+
 fs.writeFileSync(indexPath, html);
 console.log('✓ PWA meta tags and service worker injected into dist/index.html');
