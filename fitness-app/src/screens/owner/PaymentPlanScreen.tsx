@@ -17,7 +17,8 @@ import { Card } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { useAuth } from '../../hooks/useAuth';
-import { getStudents } from '../../services/authService';
+import { getStudents, getCollaborators } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   getAllPaymentPlans,
   createPaymentPlan,
@@ -114,14 +115,40 @@ export const PaymentPlanScreen: React.FC = () => {
         getAllPaymentPlans(),
         getStudents(),
       ]);
-      setPlans(plansData);
-      setStudents(studentsData);
+
+      if (isOwner) {
+        setPlans(plansData);
+        setStudents(studentsData);
+      } else if (isManager && user) {
+        const collabs = await getCollaborators();
+        const myCollabIds = collabs
+          .filter((c) => (c as any).assignedManagerId === user.id || (user as any).assignedCollaborators?.includes(c.id))
+          .map((c) => c.id);
+
+        const myStudentIds = new Set<string>();
+        for (const s of studentsData) {
+          if (s.assignedManagerId === user.id || isStudentAssignedTo(s, user.id)) {
+            myStudentIds.add(s.id);
+          }
+          for (const cid of myCollabIds) {
+            if (isStudentAssignedTo(s, cid)) {
+              myStudentIds.add(s.id);
+            }
+          }
+        }
+
+        setPlans(plansData.filter((p) => myStudentIds.has(p.studentId)));
+        setStudents(studentsData.filter((s) => myStudentIds.has(s.id)));
+      } else {
+        setPlans(plansData);
+        setStudents(studentsData);
+      }
     } catch (e) {
       crossAlert('Errore', 'Impossibile caricare i dati dei pagamenti.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOwner, isManager, user]);
 
   useEffect(() => {
     loadData();
