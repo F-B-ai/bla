@@ -31,6 +31,7 @@ import {
   denyRequest,
 } from '../../services/credentialService';
 import { createNotification } from '../../services/notificationService';
+import { openStudentReport } from '../../services/reportService';
 
 type ViewMode = 'list' | 'addManager' | 'addCollaborator' | 'addNutritionist' | 'addStudent' | 'inviteStudent' | 'editProfile';
 
@@ -62,6 +63,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [editSpecializations, setEditSpecializations] = useState('');
   const [editCollabType, setEditCollabType] = useState<'coach' | 'nutritionist'>('coach');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -160,6 +162,27 @@ export const ManageUsersScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  const handleGenerateReport = async (student: Student) => {
+    const coachIds = getStudentCoachIds(student);
+    const coachNames = coachIds.map((cid) => {
+      const c = collaborators.find((co) => co.id === cid);
+      if (c) return `${c.name} ${c.surname}`;
+      const m = managers.find((mg) => mg.id === cid);
+      if (m) return `${m.name} ${m.surname}`;
+      if (owner && owner.id === cid) return `${owner.name} ${owner.surname}`;
+      return null;
+    }).filter(Boolean).join(', ') || 'N/D';
+
+    setGeneratingReport(student.id);
+    try {
+      await openStudentReport(student, coachNames);
+    } catch {
+      crossAlert('Errore', 'Impossibile generare il report');
+    } finally {
+      setGeneratingReport(null);
+    }
   };
 
   const openCoachModal = (student: Student) => {
@@ -743,6 +766,20 @@ export const ManageUsersScreen: React.FC = () => {
                     <View style={[styles.statusDot, student.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
                   <View style={styles.userActions}>
+                    <TouchableOpacity
+                      style={styles.userActionBtn}
+                      onPress={() => handleGenerateReport(student)}
+                      disabled={generatingReport === student.id}
+                    >
+                      <View style={styles.userActionRow}>
+                        {generatingReport === student.id ? (
+                          <ActivityIndicator size="small" color={colors.success} />
+                        ) : (
+                          <Ionicons name="document-text-outline" size={14} color={colors.success} />
+                        )}
+                        <Text style={[styles.userActionText, { color: colors.success }]}>Report</Text>
+                      </View>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.userActionBtn}
                       onPress={() => openCoachModal(student)}
