@@ -397,33 +397,23 @@ const buildHTML = (data: ReportData): string => {
 
 declare const window: any;
 declare const document: any;
+declare const Blob: any;
+declare const URL: any;
 
 export const openStudentReport = async (
   student: Student,
   coachName: string
 ): Promise<void> => {
-  // Open window synchronously (before any await) to avoid popup blocker on iOS
-  const newWindow = window.open('', '_blank');
+  const data = await generateStudentReport(student, coachName);
+  const html = buildHTML(data);
 
-  try {
-    const data = await generateStudentReport(student, coachName);
-    const html = buildHTML(data);
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
 
-    if (newWindow) {
-      newWindow.document.write(html);
-      newWindow.document.close();
-    } else {
-      // Fallback: download as file if popup blocked
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Report_${student.name}_${student.surname}.html`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  } catch (err) {
-    if (newWindow) newWindow.close();
-    throw err;
+  const opened = window.open(url, '_blank');
+
+  if (!opened) {
+    // Fallback: navigate current page (will leave app)
+    window.location.href = url;
   }
 };
