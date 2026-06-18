@@ -535,17 +535,29 @@ export const PaymentPlanScreen: React.FC = () => {
   const handleConfirmTransfer = async (planId: string, installmentId: string, installments: Installment[], studentId?: string) => {
     try {
       setSaving(true);
-      // First clear transferPending on the installment
-      const clearedInstallments = installments.map((inst) =>
-        inst.id === installmentId
-          ? { ...inst, transferPending: false, transferMarkedAt: undefined }
-          : inst
-      );
+      const clearedInstallments = installments.map((inst) => {
+        const clean: Record<string, any> = { ...inst };
+        Object.keys(clean).forEach((k) => { if (clean[k] === undefined) delete clean[k]; });
+        if (inst.id === installmentId) {
+          clean.transferPending = false;
+          delete clean.transferMarkedAt;
+          clean.status = 'paid';
+          clean.paidDate = new Date();
+        }
+        if (clean.dueDate && typeof clean.dueDate === 'object' && 'toDate' in clean.dueDate) {
+          clean.dueDate = clean.dueDate.toDate();
+        }
+        if (clean.paidDate && typeof clean.paidDate === 'object' && 'toDate' in clean.paidDate) {
+          clean.paidDate = clean.paidDate.toDate();
+        }
+        if (clean.transferMarkedAt && typeof clean.transferMarkedAt === 'object' && 'toDate' in clean.transferMarkedAt) {
+          clean.transferMarkedAt = clean.transferMarkedAt.toDate();
+        }
+        return clean;
+      });
       await updateDoc(doc(db, 'paymentPlans', planId), {
         installments: clearedInstallments,
       });
-      // Then mark as paid
-      await markInstallmentPaid(planId, installmentId, clearedInstallments);
       const inst = installments.find((i) => i.id === installmentId);
       if (studentId) {
         createNotification(
