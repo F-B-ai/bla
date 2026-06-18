@@ -396,17 +396,34 @@ const buildHTML = (data: ReportData): string => {
 };
 
 declare const window: any;
+declare const document: any;
 
 export const openStudentReport = async (
   student: Student,
   coachName: string
 ): Promise<void> => {
-  const data = await generateStudentReport(student, coachName);
-  const html = buildHTML(data);
-
+  // Open window synchronously (before any await) to avoid popup blocker on iOS
   const newWindow = window.open('', '_blank');
-  if (newWindow) {
-    newWindow.document.write(html);
-    newWindow.document.close();
+
+  try {
+    const data = await generateStudentReport(student, coachName);
+    const html = buildHTML(data);
+
+    if (newWindow) {
+      newWindow.document.write(html);
+      newWindow.document.close();
+    } else {
+      // Fallback: download as file if popup blocked
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Report_${student.name}_${student.surname}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  } catch (err) {
+    if (newWindow) newWindow.close();
+    throw err;
   }
 };
