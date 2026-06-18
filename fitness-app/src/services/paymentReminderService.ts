@@ -15,46 +15,36 @@ const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 const MSG_PREFIX = `*APP ESSĒRE*\n\n`;
 
 const REMINDER_MESSAGES = {
-  fifteenDays: (name: string, amount: number, dueDate: string) =>
-    MSG_PREFIX +
-    `Ciao ${name}, tra 15 giorni è previsto il rinnovo della tua rata di €${amount} (${dueDate}). ` +
-    `Pensa a quanto sei cambiato da quando hai iniziato questo percorso: ogni allenamento ha costruito ` +
-    `una versione più forte di te. Chi investe con costanza nel proprio corpo ottiene risultati che ` +
-    `chi si ferma non vedrà mai. Il tuo futuro te stesso ti ringrazierà per aver scelto di continuare. ` +
-    `Noi siamo pronti a darti il meglio — e quando tutto è in ordine, possiamo concentrarci solo sui tuoi risultati.`,
-
   week: (name: string, amount: number, dueDate: string) =>
     MSG_PREFIX +
-    `${name}, manca una settimana alla scadenza della tua rata di €${amount} (${dueDate}). ` +
-    `Hai già costruito un ritmo, un'abitudine, una disciplina — e sai quanto è difficile ` +
-    `ricostruirla se si interrompe. Gli allievi più costanti nei pagamenti sono anche quelli che ` +
-    `raggiungono i risultati migliori, perché vivono il percorso con piena responsabilità. ` +
-    `Mantieni il ritmo: la regolarità fuori dalla palestra riflette la regolarità dentro. ` +
-    `Con la tua puntualità, possiamo pianificare al meglio ogni dettaglio del tuo programma.`,
-
-  threeDays: (name: string, amount: number, dueDate: string) =>
-    MSG_PREFIX +
-    `${name}, mancano 3 giorni alla scadenza della rata di €${amount} (${dueDate}). ` +
-    `Il tuo impegno sta dando risultati concreti — non fermarti proprio adesso! ` +
-    `Regolarizzando il pagamento potrai continuare senza interruzioni il percorso che hai iniziato. ` +
-    `I tuoi progressi parlano chiaro: sei sulla strada giusta. Mantieni la continuità!`,
+    `Ciao ${name} \u{1F60A}\n\n` +
+    `Ti scrivo per ricordarti che il ${dueDate} è in programma il rinnovo del tuo percorso (€${amount}).\n\n` +
+    `È solo un piccolo passaggio organizzativo — il vero lavoro lo stai già facendo tu, ` +
+    `ogni volta che ti alleni e scegli di investire su di te.\n\n` +
+    `Sistemando questo dettaglio per tempo, potremo continuare a dedicarci al 100% ai tuoi obiettivi ` +
+    `senza pensieri. I tuoi risultati parlano chiaro: stai andando alla grande \u{1F4AA}\n\n` +
+    `Per qualsiasi cosa, sono qui. A presto!`,
 
   oneDay: (name: string, amount: number, dueDate: string) =>
     MSG_PREFIX +
-    `${name}, domani scade la tua rata di €${amount} (${dueDate}). ` +
-    `Ogni giorno che hai investito in te stesso ti ha portato fin qui — non lasciare che un ` +
-    `dettaglio amministrativo rallenti il tuo slancio. Provvedi oggi al pagamento e domani ` +
-    `potrai allenarti con la mente libera, concentrato solo su ciò che conta: i tuoi progressi. ` +
-    `Quando sei in regola, possiamo dedicarti il 100% della nostra attenzione e del nostro tempo ` +
-    `senza distrazioni. Il tuo percorso merita continuità.`,
+    `Ciao ${name} \u{1F44B}\n\n` +
+    `Solo un veloce promemoria: domani (${dueDate}) è previsto il rinnovo del tuo percorso di €${amount}.\n\n` +
+    `Niente di complicato — è quel piccolo dettaglio che ti permette di continuare ` +
+    `a concentrarti solo su ciò che conta davvero: i tuoi progressi e il tuo benessere.\n\n` +
+    `Quando è tutto in ordine possiamo lavorare insieme senza interruzioni, ` +
+    `e tu meriti esattamente questo \u{2728}\n\n` +
+    `Se hai bisogno di qualsiasi cosa, scrivimi pure. Ci vediamo presto!`,
 
   overdue: (name: string, amount: number, dueDate: string) =>
     MSG_PREFIX +
-    `${name}, la rata di €${amount} prevista per il ${dueDate} risulta scaduta. ` +
-    `Sappiamo che la vita è piena di impegni, ma ogni giorno che passa senza regolarizzare ` +
-    `la posizione è un giorno in cui il tuo percorso perde slancio. I tuoi progressi sono reali ` +
-    `e meritano di essere protetti. Contattaci oggi stesso: insieme troviamo la soluzione migliore ` +
-    `per riprendere senza perdere ciò che hai costruito.`,
+    `Ciao ${name} \u{1F60A}\n\n` +
+    `Spero che vada tutto bene! Ti scrivo perché il rinnovo di €${amount} previsto per il ${dueDate} ` +
+    `risulta ancora in sospeso.\n\n` +
+    `So che tra mille impegni può sfuggire — capita a tutti! ` +
+    `È davvero solo una piccola formalità per poter continuare il tuo percorso senza intoppi.\n\n` +
+    `I progressi che hai fatto sono troppo importanti per fermarsi per un dettaglio amministrativo. ` +
+    `Fammi sapere se posso aiutarti in qualche modo \u{1F64F}\n\n` +
+    `A presto!`,
 };
 
 export const generatePaymentReminders = async (
@@ -90,15 +80,9 @@ export const generatePaymentReminders = async (
       } else if (diffDays <= 1) {
         message = REMINDER_MESSAGES.oneDay(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_1day';
-      } else if (diffDays <= 3) {
-        message = REMINDER_MESSAGES.threeDays(studentName, inst.amount, dueDateStr);
-        type = 'payment_reminder_3days';
       } else if (diffDays <= 7) {
         message = REMINDER_MESSAGES.week(studentName, inst.amount, dueDateStr);
         type = 'payment_reminder_week';
-      } else if (diffDays <= 15) {
-        message = REMINDER_MESSAGES.fifteenDays(studentName, inst.amount, dueDateStr);
-        type = 'payment_reminder_15days';
       }
 
       if (type && message) {

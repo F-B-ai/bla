@@ -760,42 +760,85 @@ export const DashboardScreen: React.FC = () => {
       )}
 
       {/* Promemoria Pagamenti WhatsApp */}
-      <Text style={styles.sectionTitle}>Promemoria Pagamenti {paymentReminders.length > 0 ? `(${paymentReminders.length})` : ''}</Text>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={[styles.sectionTitle, { margin: 0 }]}>Promemoria WhatsApp {paymentReminders.length > 0 ? `(${paymentReminders.length})` : ''}</Text>
+        {paymentReminders.filter((r) => r.studentPhone).length > 0 && (
+          <TouchableOpacity
+            style={styles.sendAllButton}
+            onPress={async () => {
+              const withPhone = paymentReminders.filter((r) => r.studentPhone);
+              crossAlert(
+                'Invia Promemoria',
+                `Stai per aprire WhatsApp per ${withPhone.length} promemoria.\nOgni messaggio si aprirà in sequenza.`,
+                [
+                  { text: 'Annulla', style: 'cancel' },
+                  {
+                    text: 'Invia Tutti',
+                    onPress: async () => {
+                      for (const r of withPhone) {
+                        await sendWhatsAppReminder(r.studentPhone, r.body);
+                        await new Promise((res) => setTimeout(res, 1500));
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+            <Text style={styles.sendAllButtonText}>Invia Tutti</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       {paymentReminders.length === 0 ? (
         <Card>
-          <Text style={styles.emptyText}>Nessuna rata in scadenza nei prossimi 15 giorni</Text>
+          <Text style={styles.emptyText}>Nessuna rata in scadenza nei prossimi 7 giorni</Text>
         </Card>
       ) : (
-        paymentReminders.map((reminder, idx) => (
-          <Card key={idx} variant="elevated" style={styles.reminderCard}>
-            <View style={styles.reminderHeader}>
-              <View style={styles.reminderInfo}>
-                <Text style={styles.reminderStudentName}>{reminder.studentFullName}</Text>
-                <Text style={styles.reminderTitle}>{reminder.title}</Text>
+        paymentReminders.map((reminder, idx) => {
+          const diffDays = reminder.data?.dueDate
+            ? Math.ceil(
+                (new Date(reminder.data.dueDate.split('/').reverse().join('-')).getTime() - Date.now()) /
+                  (1000 * 60 * 60 * 24)
+              )
+            : 99;
+          const urgencyColor = diffDays <= 0 ? colors.error : diffDays <= 1 ? colors.warning : colors.info;
+          const urgencyLabel = diffDays <= 0 ? 'Scaduta' : diffDays <= 1 ? 'Domani' : `Tra ${diffDays}g`;
+          return (
+            <Card key={idx} variant="elevated" style={styles.reminderCard}>
+              <View style={styles.reminderHeader}>
+                <View style={styles.reminderInfo}>
+                  <Text style={styles.reminderStudentName}>{reminder.studentFullName}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <View style={[styles.urgencyBadge, { backgroundColor: urgencyColor + '20' }]}>
+                      <Text style={[styles.urgencyText, { color: urgencyColor }]}>{urgencyLabel}</Text>
+                    </View>
+                    {reminder.data?.dueDate && (
+                      <Text style={styles.reminderDueDate}>{reminder.data.dueDate}</Text>
+                    )}
+                  </View>
+                </View>
+                {reminder.data?.amount && (
+                  <Text style={styles.reminderAmount}>€{reminder.data.amount}</Text>
+                )}
               </View>
-              {reminder.data?.amount && (
-                <Text style={styles.reminderAmount}>€{reminder.data.amount}</Text>
-              )}
-            </View>
-            <Text style={styles.reminderBody} numberOfLines={2}>{reminder.body}</Text>
-            <View style={styles.reminderActions}>
-              {reminder.studentPhone ? (
-                <TouchableOpacity
-                  style={styles.whatsappButton}
-                  onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
-                >
-                  <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
-                  <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={styles.noPhoneText}>Telefono non disponibile</Text>
-              )}
-              {reminder.data?.dueDate && (
-                <Text style={styles.reminderDueDate}>Scadenza: {reminder.data.dueDate}</Text>
-              )}
-            </View>
-          </Card>
-        ))
+              <Text style={styles.reminderBody} numberOfLines={3}>{reminder.body}</Text>
+              <View style={styles.reminderActions}>
+                {reminder.studentPhone ? (
+                  <TouchableOpacity
+                    style={styles.whatsappButton}
+                    onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
+                  >
+                    <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+                    <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.noPhoneText}>Telefono non disponibile</Text>
+                )}
+              </View>
+            </Card>
+          );
+        })
       )}
 
       {/* Rendimento Manager */}
@@ -1130,6 +1173,37 @@ const styles = StyleSheet.create({
   reminderDueDate: {
     fontSize: fontSize.xs,
     color: colors.textSecondary,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  sendAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#25D366',
+    borderRadius: borderRadius.round,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+  },
+  sendAllButtonText: {
+    color: '#FFF',
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  urgencyBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.round,
+  },
+  urgencyText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
   },
   resetSection: {
     margin: spacing.md,
