@@ -14,7 +14,7 @@ import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/t
 import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator, updateStudentCoaches } from '../../services/authService';
+import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggleUserActive, removeStudentFromCollaborator, updateStudentCoaches, updateUserProfile } from '../../services/authService';
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { Collaborator, Student, Manager, Owner, CredentialChangeRequest } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -53,6 +53,15 @@ export const ManageUsersScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [credentialRequests, setCredentialRequests] = useState<CredentialChangeRequest[]>([]);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<(Manager | Collaborator) | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSurname, setEditSurname] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editCommission, setEditCommission] = useState('');
+  const [editSpecializations, setEditSpecializations] = useState('');
+  const [editCollabType, setEditCollabType] = useState<'coach' | 'nutritionist'>('coach');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Gerarchia permessi:
   // Owner: crea manager, coach, allievi
@@ -251,6 +260,54 @@ export const ManageUsersScreen: React.FC = () => {
         },
       },
     ]);
+  };
+
+  const openEditModal = (userToEdit: Manager | Collaborator) => {
+    setEditTarget(userToEdit);
+    setEditName(userToEdit.name);
+    setEditSurname(userToEdit.surname);
+    setEditPhone(userToEdit.phone || '');
+    setEditCommission(String(userToEdit.commissionPercentage ?? 0));
+    setEditSpecializations((userToEdit.specializations || []).join(', '));
+    if (userToEdit.role === 'collaborator') {
+      setEditCollabType((userToEdit as Collaborator).collaboratorType || 'coach');
+    }
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim() || !editSurname.trim()) {
+      crossAlert('Errore', 'Nome e cognome sono obbligatori.');
+      return;
+    }
+    const commission = Number(editCommission);
+    if (isNaN(commission) || commission < 0 || commission > 100) {
+      crossAlert('Errore', 'La commissione deve essere un valore tra 0 e 100.');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const updateData: Parameters<typeof updateUserProfile>[1] = {
+        name: editName.trim(),
+        surname: editSurname.trim(),
+        phone: editPhone.trim(),
+        commissionPercentage: commission,
+        specializations: editSpecializations.split(',').map((s) => s.trim()).filter(Boolean),
+      };
+      if (editTarget.role === 'collaborator') {
+        updateData.collaboratorType = editCollabType;
+      }
+      await updateUserProfile(editTarget.id, updateData);
+      crossAlert('Fatto', 'Dati aggiornati con successo.');
+      setShowEditModal(false);
+      setEditTarget(null);
+      await loadData();
+    } catch (err: any) {
+      crossAlert('Errore', `Impossibile salvare: ${err?.message || String(err)}`);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   if (viewMode === 'addManager') {
@@ -510,6 +567,15 @@ export const ManageUsersScreen: React.FC = () => {
                     <View style={styles.userActions}>
                       <TouchableOpacity
                         style={styles.userActionBtn}
+                        onPress={() => openEditModal(mgr)}
+                      >
+                        <View style={styles.userActionRow}>
+                          <Ionicons name="create-outline" size={14} color={colors.info} />
+                          <Text style={[styles.userActionText, { color: colors.info }]}>Modifica</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
                         onPress={() => handleToggleActive(mgr.id, mgr.isActive, mgr.name)}
                       >
                         <Text style={[styles.userActionText, { color: mgr.isActive ? colors.warning : colors.success }]}>
@@ -589,6 +655,15 @@ export const ManageUsersScreen: React.FC = () => {
 
                   {canDeleteUsers && (
                     <View style={styles.userActions}>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => openEditModal(collab)}
+                      >
+                        <View style={styles.userActionRow}>
+                          <Ionicons name="create-outline" size={14} color={colors.info} />
+                          <Text style={[styles.userActionText, { color: colors.info }]}>Modifica</Text>
+                        </View>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.userActionBtn}
                         onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
@@ -807,6 +882,135 @@ export const ManageUsersScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.modalCancelBtn}
               onPress={() => setShowCoachModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Annulla</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Modifica Manager/Coach */}
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Modifica Dati</Text>
+            {editTarget && (
+              <Text style={styles.modalSubtitle}>
+                {editTarget.role === 'collaborator'
+                  ? (editTarget as Collaborator).collaboratorType === 'nutritionist'
+                    ? 'Nutrizionista'
+                    : 'Coach'
+                  : 'Manager'}
+              </Text>
+            )}
+
+            <ScrollView style={styles.editModalScroll} keyboardShouldPersistTaps="handled">
+              <Text style={styles.editLabel}>Nome</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Nome"
+                placeholderTextColor={colors.textLight}
+              />
+
+              <Text style={styles.editLabel}>Cognome</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editSurname}
+                onChangeText={setEditSurname}
+                placeholder="Cognome"
+                placeholderTextColor={colors.textLight}
+              />
+
+              <Text style={styles.editLabel}>Telefono</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editPhone}
+                onChangeText={setEditPhone}
+                placeholder="Telefono"
+                placeholderTextColor={colors.textLight}
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.editLabel}>Commissione %</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editCommission}
+                onChangeText={setEditCommission}
+                placeholder="0-100"
+                placeholderTextColor={colors.textLight}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.editLabel}>Specializzazioni (separate da virgola)</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editSpecializations}
+                onChangeText={setEditSpecializations}
+                placeholder="Es: Forza, CrossFit, Postura"
+                placeholderTextColor={colors.textLight}
+              />
+
+              {editTarget?.role === 'collaborator' && (
+                <>
+                  <Text style={styles.editLabel}>Tipo</Text>
+                  <View style={styles.editTypeRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.editTypeBtn,
+                        editCollabType === 'coach' && styles.editTypeBtnActive,
+                      ]}
+                      onPress={() => setEditCollabType('coach')}
+                    >
+                      <Text
+                        style={[
+                          styles.editTypeBtnText,
+                          editCollabType === 'coach' && styles.editTypeBtnTextActive,
+                        ]}
+                      >
+                        Coach
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.editTypeBtn,
+                        editCollabType === 'nutritionist' && styles.editTypeBtnActive,
+                      ]}
+                      onPress={() => setEditCollabType('nutritionist')}
+                    >
+                      <Text
+                        style={[
+                          styles.editTypeBtnText,
+                          editCollabType === 'nutritionist' && styles.editTypeBtnTextActive,
+                        ]}
+                      >
+                        Nutrizionista
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.modalSaveBtn, savingEdit && { opacity: 0.6 }]}
+              onPress={handleSaveEdit}
+              disabled={savingEdit}
+            >
+              <Text style={styles.modalSaveBtnText}>
+                {savingEdit ? 'Salvataggio...' : 'Salva Modifiche'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => { setShowEditModal(false); setEditTarget(null); }}
             >
               <Text style={styles.modalCancelText}>Annulla</Text>
             </TouchableOpacity>
@@ -1186,5 +1390,53 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
     color: '#fff',
+  },
+  // Edit modal
+  editModalScroll: {
+    maxHeight: 380,
+  },
+  editLabel: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    marginTop: spacing.md,
+  },
+  editInput: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    fontSize: fontSize.md,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editTypeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  editTypeBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+  },
+  editTypeBtnActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+  },
+  editTypeBtnText: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  editTypeBtnTextActive: {
+    color: colors.accent,
   },
 });

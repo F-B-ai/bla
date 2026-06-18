@@ -558,11 +558,24 @@ export const uploadAvatar = async (userId: string, imageUri: string): Promise<st
   return downloadUrl;
 };
 
-export const updateUserProfile = async (userId: string, data: { name?: string; surname?: string; phone?: string }): Promise<void> => {
-  const update: Record<string, string> = {};
+export const updateUserProfile = async (
+  userId: string,
+  data: {
+    name?: string;
+    surname?: string;
+    phone?: string;
+    commissionPercentage?: number;
+    specializations?: string[];
+    collaboratorType?: 'coach' | 'nutritionist';
+  }
+): Promise<void> => {
+  const update: Record<string, any> = {};
   if (data.name !== undefined) update.name = data.name.trim();
   if (data.surname !== undefined) update.surname = data.surname.trim();
   if (data.phone !== undefined) update.phone = data.phone.trim();
+  if (data.commissionPercentage !== undefined) update.commissionPercentage = data.commissionPercentage;
+  if (data.specializations !== undefined) update.specializations = data.specializations;
+  if (data.collaboratorType !== undefined) update.collaboratorType = data.collaboratorType;
   if (Object.keys(update).length > 0) {
     await updateDoc(doc(db, 'users', userId), update);
   }
