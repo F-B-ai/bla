@@ -26,7 +26,7 @@ import {
   subscribeToPresence,
   deleteChatRoom,
 } from '../../services/chatService';
-import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
+import { getUserProfile, getStudents, getCollaborators, getManagers } from '../../services/authService';
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
@@ -44,29 +44,40 @@ export const ChatListScreen: React.FC = () => {
   const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
-  const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
-    const userIds = new Set<string>();
-    chatRooms.forEach((room) => {
-      if (room.participants) {
-        room.participants.forEach((id) => { if (id) userIds.add(id); });
-      }
-      if (room.studentId) userIds.add(room.studentId);
-      if (room.collaboratorId) userIds.add(room.collaboratorId);
-    });
-
-    const profiles: Record<string, User> = {};
-    await Promise.allSettled(
-      Array.from(userIds).map(async (id) => {
-        try {
-          const profile = await getUserProfile(id);
-          if (profile) profiles[id] = profile;
-        } catch {
-          // skip failed profile loads
-        }
-      })
-    );
-    setParticipants((prev) => ({ ...prev, ...profiles }));
-  }, []);
+  const loadParticipantProfiles = useCallback(async (_chatRooms: ChatRoom[]) => {
+    try {
+      const [students, collaborators, managers] = await Promise.allSettled([
+        getStudents(),
+        getCollaborators(),
+        getManagers(),
+      ]);
+      const profiles: Record<string, User> = {};
+      const addAll = (list: User[]) => list.forEach((u) => { profiles[u.id] = u; });
+      if (students.status === 'fulfilled') addAll(students.value);
+      if (collaborators.status === 'fulfilled') addAll(collaborators.value);
+      if (managers.status === 'fulfilled') addAll(managers.value);
+      if (user) profiles[user.id] = user;
+      setParticipants(profiles);
+    } catch {
+      // fallback: load individually
+      const userIds = new Set<string>();
+      _chatRooms.forEach((room) => {
+        if (room.participants) room.participants.forEach((id) => { if (id) userIds.add(id); });
+        if (room.studentId) userIds.add(room.studentId);
+        if (room.collaboratorId) userIds.add(room.collaboratorId);
+      });
+      const profiles: Record<string, User> = {};
+      await Promise.allSettled(
+        Array.from(userIds).map(async (id) => {
+          try {
+            const profile = await getUserProfile(id);
+            if (profile) profiles[id] = profile;
+          } catch { /* skip */ }
+        })
+      );
+      setParticipants((prev) => ({ ...prev, ...profiles }));
+    }
+  }, [user]);
 
   const loadRooms = useCallback(async () => {
     if (!user) return;
