@@ -310,8 +310,6 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const filteredRooms = rooms.filter((room) => {
-    // Escludi chat di team (hanno il loro tab "Chat Team")
-    if (room.chatType === 'team') return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const name = getOtherParticipantName(room).toLowerCase();
