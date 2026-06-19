@@ -276,28 +276,29 @@ export const ChatListScreen: React.FC = () => {
     return 'Chat';
   };
 
-  const getCollabRoleLabel = (room: ChatRoom): string => {
-    if (!room.collaboratorId) return 'Collaboratore';
-    const collab = participants[room.collaboratorId];
-    if (!collab) return 'Collaboratore';
-    if (collab.role === 'manager') return 'Manager';
-    const c = collab as unknown as Collaborator;
-    if (c.collaboratorType === 'nutritionist') return 'Nutrizionista';
-    return 'Coach';
+  const getUserRoleLabel = (u: User): string => {
+    if (u.role === 'owner') return 'Owner';
+    if (u.role === 'manager') return 'Manager';
+    if (u.role === 'collaborator') {
+      const c = u as unknown as Collaborator;
+      return c.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    }
+    return 'Allievo';
   };
 
   const getParticipantRole = (room: ChatRoom): string => {
     if (room.chatType === 'team' || room.type === 'group') return 'Chat di Gruppo';
     if (isOwner) {
-      return `Allievo ↔ ${getCollabRoleLabel(room)}`;
+      const student = room.studentId ? participants[room.studentId] : null;
+      const collab = room.collaboratorId ? participants[room.collaboratorId] : null;
+      const sRole = student ? getUserRoleLabel(student) : 'Allievo';
+      const cRole = collab ? getUserRoleLabel(collab) : 'Collaboratore';
+      return `${sRole} ↔ ${cRole}`;
     }
     if (isManager || isCollaborator) return 'Allievo';
     const otherId = (room.participants || []).find((id) => id && id !== user?.id);
     if (otherId && participants[otherId]) {
-      const p = participants[otherId];
-      if (p.role === 'manager') return 'Manager';
-      if (p.role === 'collaborator') return 'Collaboratore';
-      return 'Allievo';
+      return getUserRoleLabel(participants[otherId]);
     }
     return '';
   };

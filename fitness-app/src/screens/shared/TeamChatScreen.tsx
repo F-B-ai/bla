@@ -24,7 +24,7 @@ import {
   subscribeToPresence,
   deleteChatRoom,
 } from '../../services/chatService';
-import { getUserProfile, getCollaborators, getManagers } from '../../services/authService';
+import { getUserProfile, getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
 
@@ -43,20 +43,34 @@ export const TeamChatScreen: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
-    const userIds = new Set<string>();
-    chatRooms.forEach((room) => {
-      room.participants.forEach((id) => userIds.add(id));
-    });
-    const profiles: Record<string, User> = {};
-    await Promise.all(
-      Array.from(userIds).map(async (id) => {
-        const profile = await getUserProfile(id);
-        if (profile) profiles[id] = profile;
-      })
-    );
-    setParticipants((prev) => ({ ...prev, ...profiles }));
-  }, []);
+  const loadParticipantProfiles = useCallback(async (_chatRooms: ChatRoom[]) => {
+    try {
+      const [students, collaborators, managers] = await Promise.allSettled([
+        getStudents(),
+        getCollaborators(),
+        getManagers(),
+      ]);
+      const profiles: Record<string, User> = {};
+      const addAll = (list: User[]) => list.forEach((u) => { profiles[u.id] = u; });
+      if (students.status === 'fulfilled') addAll(students.value);
+      if (collaborators.status === 'fulfilled') addAll(collaborators.value);
+      if (managers.status === 'fulfilled') addAll(managers.value);
+      if (user) profiles[user.id] = user;
+      setParticipants(profiles);
+    } catch {
+      const userIds = new Set<string>();
+      _chatRooms.forEach((room) => {
+        if (room.participants) room.participants.forEach((id) => { if (id) userIds.add(id); });
+      });
+      const profiles: Record<string, User> = {};
+      await Promise.allSettled(
+        Array.from(userIds).map(async (id) => {
+          try { const p = await getUserProfile(id); if (p) profiles[id] = p; } catch { /* skip */ }
+        })
+      );
+      setParticipants((prev) => ({ ...prev, ...profiles }));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -176,9 +190,20 @@ export const TeamChatScreen: React.FC = () => {
   };
 
   const getRoomSubtitle = (room: ChatRoom): string => {
-    const count = room.participants.length;
-    const online = room.participants.filter((id) => id !== user?.id && presence[id]?.isOnline).length;
-    return `${count} membri${online > 0 ? ` · ${online} online` : ''}`;
+    const names = (room.participants || [])
+      .filter((id) => id && id !== user?.id)
+      .map((id) => {
+        const p = participants[id];
+        if (!p) return '';
+        const role = p.role === 'manager' ? 'Mgr' :
+          p.role === 'collaborator' ? ((p as any).collaboratorType === 'nutritionist' ? 'Nutr' : 'Coach') :
+          p.role === 'owner' ? 'Owner' : 'All';
+        return `${p.name} (${role})`;
+      })
+      .filter(Boolean);
+    const online = (room.participants || []).filter((id) => id !== user?.id && presence[id]?.isOnline).length;
+    const nameStr = names.length > 0 ? names.join(', ') : `${(room.participants || []).length} membri`;
+    return online > 0 ? `${nameStr} · ${online} online` : nameStr;
   };
 
   const getRoleBadge = (u: User): string => {
