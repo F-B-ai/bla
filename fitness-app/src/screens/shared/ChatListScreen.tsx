@@ -235,20 +235,40 @@ export const ChatListScreen: React.FC = () => {
 
   const getOtherParticipantName = (room: ChatRoom): string => {
     if (!user) return '';
-    // Owner: mostra entrambi i nomi
-    if (isOwner) {
-      const student = participants[room.studentId];
-      const collab = participants[room.collaboratorId];
-      const studentName = student ? `${student.name} ${student.surname}` : 'Allievo';
-      const collabName = collab ? `${collab.name} ${collab.surname}` : 'Collaboratore';
-      return `${studentName} ↔ ${collabName}`;
+
+    // Chat di gruppo/team: usa il nome della room
+    if (room.chatType === 'team' || room.type === 'group') {
+      if (room.name) return room.name;
+      const names = (room.participants || [])
+        .filter((id) => id && id !== user.id && participants[id])
+        .map((id) => { const p = participants[id]; return `${p.name}`; });
+      return names.length > 0 ? names.join(', ') : 'Chat di Gruppo';
     }
+
+    // Owner: mostra entrambi i nomi (allievo ↔ collaboratore)
+    if (isOwner) {
+      const student = room.studentId ? participants[room.studentId] : null;
+      const collab = room.collaboratorId ? participants[room.collaboratorId] : null;
+      if (student || collab) {
+        const studentName = student ? `${student.name} ${student.surname}` : 'Allievo';
+        const collabName = collab ? `${collab.name} ${collab.surname}` : 'Collaboratore';
+        return `${studentName} ↔ ${collabName}`;
+      }
+      // Fallback: prova dall'array participants
+      const names = (room.participants || [])
+        .filter((id) => id && participants[id])
+        .map((id) => { const p = participants[id]; return `${p.name} ${p.surname}`; });
+      return names.length > 0 ? names.join(' ↔ ') : 'Chat';
+    }
+
     // Manager/Collaboratore: mostra il nome dell'allievo
     if ((isManager || isCollaborator) && room.studentId && participants[room.studentId]) {
       const s = participants[room.studentId];
       return `${s.name} ${s.surname}`;
     }
-    const otherId = room.participants.find((id) => id !== user.id);
+
+    // Fallback: mostra l'altro partecipante
+    const otherId = (room.participants || []).find((id) => id && id !== user.id);
     if (otherId && participants[otherId]) {
       const p = participants[otherId];
       return `${p.name} ${p.surname}`;
@@ -257,6 +277,7 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const getCollabRoleLabel = (room: ChatRoom): string => {
+    if (!room.collaboratorId) return 'Collaboratore';
     const collab = participants[room.collaboratorId];
     if (!collab) return 'Collaboratore';
     if (collab.role === 'manager') return 'Manager';
@@ -266,11 +287,12 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const getParticipantRole = (room: ChatRoom): string => {
+    if (room.chatType === 'team' || room.type === 'group') return 'Chat di Gruppo';
     if (isOwner) {
       return `Allievo ↔ ${getCollabRoleLabel(room)}`;
     }
     if (isManager || isCollaborator) return 'Allievo';
-    const otherId = room.participants.find((id) => id !== user?.id);
+    const otherId = (room.participants || []).find((id) => id && id !== user?.id);
     if (otherId && participants[otherId]) {
       const p = participants[otherId];
       if (p.role === 'manager') return 'Manager';
@@ -287,6 +309,8 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const filteredRooms = rooms.filter((room) => {
+    // Escludi chat di team (hanno il loro tab "Chat Team")
+    if (room.chatType === 'team') return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     const name = getOtherParticipantName(room).toLowerCase();
