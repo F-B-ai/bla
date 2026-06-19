@@ -47,14 +47,22 @@ export const ChatListScreen: React.FC = () => {
   const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
     const userIds = new Set<string>();
     chatRooms.forEach((room) => {
-      room.participants.forEach((id) => userIds.add(id));
+      if (room.participants) {
+        room.participants.forEach((id) => { if (id) userIds.add(id); });
+      }
+      if (room.studentId) userIds.add(room.studentId);
+      if (room.collaboratorId) userIds.add(room.collaboratorId);
     });
 
     const profiles: Record<string, User> = {};
-    await Promise.all(
+    await Promise.allSettled(
       Array.from(userIds).map(async (id) => {
-        const profile = await getUserProfile(id);
-        if (profile) profiles[id] = profile;
+        try {
+          const profile = await getUserProfile(id);
+          if (profile) profiles[id] = profile;
+        } catch {
+          // skip failed profile loads
+        }
       })
     );
     setParticipants((prev) => ({ ...prev, ...profiles }));
