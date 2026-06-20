@@ -469,14 +469,6 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
-      name="Team"
-      component={ManageUsersScreen}
-      options={{
-        tabBarLabel: 'Team',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
-      }}
-    />
-    <ManagerTab.Screen
       name="Programmi"
       component={WorkoutPlanScreen}
       options={{
@@ -570,14 +562,6 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Contenuti',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
-      }}
-    />
-    <ManagerTab.Screen
-      name="Pagamenti"
-      component={PaymentPlanScreen}
-      options={{
-        tabBarLabel: 'Pagamenti',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
@@ -727,6 +711,14 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'AI',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Content"
+      component={ContentManagementScreen}
+      options={{
+        tabBarLabel: 'Contenuti',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen

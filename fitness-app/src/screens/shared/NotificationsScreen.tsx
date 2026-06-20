@@ -206,7 +206,7 @@ export const NotificationsScreen: React.FC = () => {
         )}
       </View>
 
-      {(isOwner || isManager) && (
+      {isStaff && (
         <TouchableOpacity
           style={styles.sendAlertBtn}
           onPress={() => setShowSendModal(true)}

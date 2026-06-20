@@ -246,9 +246,11 @@ export const TeamChatScreen: React.FC = () => {
         </Text>
       </View>
 
-      <View style={styles.newChatContainer}>
-        <Button title="+ Nuovo Gruppo" onPress={handleNewGroup} />
-      </View>
+      {isOwner && (
+        <View style={styles.newChatContainer}>
+          <Button title="+ Nuovo Gruppo" onPress={handleNewGroup} />
+        </View>
+      )}
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={18} color={colors.textLight} />

@@ -436,7 +436,7 @@ export const ChatListScreen: React.FC = () => {
                       <Text style={styles.anonBadgeText}>Anon</Text>
                     </View>
                   )}
-                  {(isOwner || isManager) && (
+                  {isOwner && (
                     <TouchableOpacity
                       style={styles.deleteBtn}
                       onPress={() => handleDeleteChat(item)}

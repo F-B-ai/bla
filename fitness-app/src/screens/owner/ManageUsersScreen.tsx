@@ -70,7 +70,7 @@ export const ManageUsersScreen: React.FC = () => {
   // Manager: crea coach, allievi
   // Coach: crea allievi (solo i propri)
   const canCreateManager = isOwner;
-  const canCreateCoach = isOwner || isManager;
+  const canCreateCoach = isOwner;
   const canCreateStudent = isOwner || isManager || isCollaborator;
   const canDeleteUsers = isOwner || isManager;
 
