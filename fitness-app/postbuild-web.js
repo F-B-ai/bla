@@ -71,7 +71,7 @@ if (!html.includes("preload\" href=\"/Ionicons.ttf\"")) {
 html = html.replace('lang="en"', 'lang="it"');
 
 // Fix viewport for iOS
-html.replace(
+html = html.replace(
   'width=device-width, initial-scale=1, shrink-to-fit=no',
   'width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no'
 );
@@ -82,48 +82,27 @@ if (!html.includes("register('/sw.js')")) {
   html = html.replace('</body>', swScript + '\n  </body>');
 }
 
-// --- CODE PROTECTION: Anti-debugging, anti-inspection, anti-copy ---
+// --- CODE PROTECTION: Anti-inspection, anti-copy ---
 const protectionScript = `
     <script>
-    // Anti-devtools: block right-click, keyboard shortcuts, debugger
     (function(){
       // Block right-click context menu
       document.addEventListener('contextmenu',function(e){e.preventDefault();return false});
-      // Block common dev tools shortcuts
+      // Block dev tools keyboard shortcuts
       document.addEventListener('keydown',function(e){
-        // F12
         if(e.key==='F12'){e.preventDefault();return false}
-        // Ctrl+Shift+I / Cmd+Opt+I (Inspector)
-        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='I'||e.key==='i')){e.preventDefault();return false}
-        // Ctrl+Shift+J / Cmd+Opt+J (Console)
-        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='J'||e.key==='j')){e.preventDefault();return false}
-        // Ctrl+Shift+C / Cmd+Opt+C (Element picker)
-        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='C'||e.key==='c')){e.preventDefault();return false}
-        // Ctrl+U / Cmd+U (View source)
-        if((e.ctrlKey||e.metaKey)&&(e.key==='U'||e.key==='u')){e.preventDefault();return false}
-        // Ctrl+S / Cmd+S (Save page)
-        if((e.ctrlKey||e.metaKey)&&(e.key==='S'||e.key==='s')){e.preventDefault();return false}
-        // Ctrl+Shift+K (Firefox console)
-        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='K'||e.key==='k')){e.preventDefault();return false}
+        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&/^[IJCKijck]$/.test(e.key)){e.preventDefault();return false}
+        if((e.ctrlKey||e.metaKey)&&/^[USus]$/.test(e.key)){e.preventDefault();return false}
       });
-      // Block drag on all elements
+      // Block drag
       document.addEventListener('dragstart',function(e){e.preventDefault();return false});
-      // Block text selection via CSS
+      // Block text selection via CSS (except inputs)
       var s=document.createElement('style');
-      s.textContent='*{-webkit-user-select:none!important;-moz-user-select:none!important;-ms-user-select:none!important;user-select:none!important}input,textarea,[contenteditable=true]{-webkit-user-select:text!important;-moz-user-select:text!important;-ms-user-select:text!important;user-select:text!important}';
+      s.textContent='*{-webkit-user-select:none!important;user-select:none!important}input,textarea,[contenteditable]{-webkit-user-select:text!important;user-select:text!important}';
       document.head.appendChild(s);
-      // Debugger trap: continuous breakpoint to slow down devtools
-      (function _dt(){try{(function(){return false})['constructor']('debugger')()}catch(_){}setTimeout(_dt,100)})();
-      // Detect devtools via timing
-      var _c=0;
-      setInterval(function(){var t=performance.now();debugger;if(performance.now()-t>50){_c++;if(_c>2){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0D0D0D;color:#C5A55A;font-family:sans-serif;font-size:24px;text-align:center;padding:40px">Accesso non autorizzato</div>'}}else{_c=0}},2000);
       // Override console methods
-      var _noop=function(){};
-      ['log','debug','info','warn','error','table','trace','dir','group','groupEnd','clear','count','assert','profile','profileEnd','time','timeEnd','timeStamp'].forEach(function(m){try{console[m]=_noop}catch(_){}});
-      // Detect print and block it
-      window.addEventListener('beforeprint',function(e){e.preventDefault()});
-      var mp=window.matchMedia('print');
-      if(mp&&mp.addListener){mp.addListener(function(m){if(m.matches){document.body.style.display='none'}})}
+      var _n=function(){};
+      ['log','debug','info','warn','error','table','trace','dir','group','groupEnd','clear','count','assert'].forEach(function(m){try{console[m]=_n}catch(_){}});
     })();
     </script>`;
 
@@ -167,28 +146,26 @@ if (fs.existsSync(jsDir)) {
         compact: true,
         controlFlowFlattening: false,
         deadCodeInjection: false,
-        debugProtection: true,
-        debugProtectionInterval: 2000,
-        disableConsoleOutput: true,
+        debugProtection: false,
+        disableConsoleOutput: false,
         identifierNamesGenerator: 'hexadecimal',
         log: false,
-        numbersToExpressions: true,
+        numbersToExpressions: false,
         renameGlobals: false,
-        selfDefending: true,
+        selfDefending: false,
         simplify: true,
-        splitStrings: true,
-        splitStringsChunkLength: 5,
+        splitStrings: false,
         stringArray: true,
-        stringArrayCallsTransform: true,
-        stringArrayEncoding: ['base64'],
+        stringArrayCallsTransform: false,
+        stringArrayEncoding: [],
         stringArrayIndexShift: true,
         stringArrayRotate: true,
         stringArrayShuffle: true,
-        stringArrayWrappersCount: 2,
-        stringArrayWrappersChainedCalls: true,
-        stringArrayWrappersType: 'function',
+        stringArrayWrappersCount: 1,
+        stringArrayWrappersChainedCalls: false,
+        stringArrayWrappersType: 'variable',
         stringArrayThreshold: 0.5,
-        transformObjectKeys: true,
+        transformObjectKeys: false,
         unicodeEscapeSequence: false,
         sourceMap: false,
       });
