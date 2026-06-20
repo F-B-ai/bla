@@ -533,6 +533,14 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Analytics"
+      component={AnalyticsScreen}
+      options={{
+        tabBarLabel: 'KPI',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Earnings"
       component={EarningsScreen}
       options={{
@@ -679,6 +687,14 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'AI Coach',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Analytics"
+      component={AnalyticsScreen}
+      options={{
+        tabBarLabel: 'KPI',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
