@@ -152,12 +152,14 @@ export const ChatListScreen: React.FC = () => {
           setAvailableContacts([]);
         }
       } else if (isOwner) {
-        // Owner: mostra tutti collaboratori e allievi
-        const [allStudents, allCollaborators] = await Promise.all([
+        // Owner: mostra tutti collaboratori, manager e allievi
+        const [allStudents, allCollaborators, allManagers] = await Promise.all([
           getStudents(),
           getCollaborators(),
+          getManagers(),
         ]);
         setAvailableContacts([
+          ...allManagers.filter((m) => m.isActive && m.id !== user.id),
           ...allCollaborators.filter((c) => c.isActive),
           ...allStudents.filter((s) => s.isActive),
         ]);
@@ -182,16 +184,13 @@ export const ChatListScreen: React.FC = () => {
         studentId = contact.id;
         collaboratorId = user.id;
       } else {
-        // Owner: determina ruoli in base al contatto
+        // Owner: chat diretta con il contatto selezionato
         if (contact.role === 'student') {
-          const student = contact as unknown as Student;
           studentId = contact.id;
-          const coachIds = getStudentCoachIds(student);
-          collaboratorId = coachIds[0] || user.id;
+          collaboratorId = user.id;
         } else {
-          crossAlert('Info', 'Seleziona un allievo per avviare la chat con il suo collaboratore');
-          setCreatingChat(false);
-          return;
+          studentId = user.id;
+          collaboratorId = contact.id;
         }
       }
 
@@ -304,7 +303,11 @@ export const ChatListScreen: React.FC = () => {
   };
 
   const getRoleBadge = (contact: User): string => {
-    if (contact.role === 'collaborator') return 'Coach';
+    if (contact.role === 'manager') return 'Manager';
+    if (contact.role === 'collaborator') {
+      const c = contact as unknown as Collaborator;
+      return c.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    }
     if (contact.role === 'student') return 'Allievo';
     return contact.role;
   };
@@ -344,14 +347,12 @@ export const ChatListScreen: React.FC = () => {
       </View>
 
       {/* Pulsante Nuova Chat */}
-      {!isOwner && (
-        <View style={styles.newChatContainer}>
-          <Button
-            title="+ Nuova Conversazione"
-            onPress={handleNewChat}
-          />
-        </View>
-      )}
+      <View style={styles.newChatContainer}>
+        <Button
+          title="+ Nuova Conversazione"
+          onPress={handleNewChat}
+        />
+      </View>
 
       {isOwner && (
         <View style={styles.ownerActions}>
