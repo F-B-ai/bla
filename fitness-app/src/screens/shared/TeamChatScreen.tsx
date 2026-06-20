@@ -316,7 +316,7 @@ export const TeamChatScreen: React.FC = () => {
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              Nessuna chat di team ancora.{'\n'}Crea un gruppo per comunicare con lo staff.
+              Nessuna chat di team ancora.
             </Text>
           </Card>
         }
