@@ -43,7 +43,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'students'>(
+  const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'nutritionists' | 'students'>(
     isCollaborator ? 'students' : 'collaborators'
   );
   const [editingUser, setEditingUser] = useState<Student | null>(null);
@@ -375,7 +375,7 @@ export const ManageUsersScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Gestione Utenti</Text>
         <Text style={styles.subtitle}>
-          {managers.length} manager · {collaborators.length} coach · {students.length} allievi
+          {managers.length} manager · {collaborators.filter((c) => c.collaboratorType !== 'nutritionist').length} coach · {collaborators.filter((c) => c.collaboratorType === 'nutritionist').length} nutrizionisti · {students.length} allievi
         </Text>
       </View>
 
@@ -437,7 +437,17 @@ export const ManageUsersScreen: React.FC = () => {
             onPress={() => setActiveTab('collaborators')}
           >
             <Text style={[styles.tabText, activeTab === 'collaborators' && styles.tabTextActive]}>
-              Coach ({collaborators.length})
+              Coach ({collaborators.filter((c) => c.collaboratorType !== 'nutritionist').length})
+            </Text>
+          </TouchableOpacity>
+        )}
+        {(isOwner || isManager) && (
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'nutritionists' && styles.tabActive]}
+            onPress={() => setActiveTab('nutritionists')}
+          >
+            <Text style={[styles.tabText, activeTab === 'nutritionists' && styles.tabTextActive]}>
+              Nutrizionisti ({collaborators.filter((c) => c.collaboratorType === 'nutritionist').length})
             </Text>
           </TouchableOpacity>
         )}
@@ -458,7 +468,7 @@ export const ManageUsersScreen: React.FC = () => {
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder={`Cerca ${activeTab === 'managers' ? 'manager' : activeTab === 'collaborators' ? 'coach' : 'allievo'}...`}
+          placeholder={`Cerca ${activeTab === 'managers' ? 'manager' : activeTab === 'collaborators' ? 'coach' : activeTab === 'nutritionists' ? 'nutrizionista' : 'allievo'}...`}
           placeholderTextColor={colors.textLight}
         />
         {searchQuery.length > 0 && (
@@ -620,17 +630,17 @@ export const ManageUsersScreen: React.FC = () => {
         </>
       )}
 
-      {/* Lista collaboratori */}
+      {/* Lista coach */}
       {activeTab === 'collaborators' && (
         <>
-          {collaborators.length === 0 ? (
+          {collaborators.filter((c) => c.collaboratorType !== 'nutritionist').length === 0 ? (
             <Card>
               <Text style={styles.emptyText}>
-                Nessun collaboratore registrato. Premi "+ Collaboratore" per aggiungerne uno.
+                Nessun coach registrato. Premi "+ Coach" per aggiungerne uno.
               </Text>
             </Card>
           ) : (
-            collaborators.filter((c) => {
+            collaborators.filter((c) => c.collaboratorType !== 'nutritionist').filter((c) => {
               if (!searchQuery.trim()) return true;
               const q = searchQuery.toLowerCase();
               return `${c.name} ${c.surname}`.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
@@ -652,7 +662,7 @@ export const ManageUsersScreen: React.FC = () => {
                       </Text>
                       <Text style={styles.userEmail}>{collab.email}</Text>
                       <Text style={styles.userDetail}>
-                        {collab.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach'} · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
+                        Coach · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
                       </Text>
                       <Text style={styles.userStudents}>
                         {assignedStudents.length} allievi assegnati
@@ -661,7 +671,95 @@ export const ManageUsersScreen: React.FC = () => {
                     <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
                   </View>
 
-                  {/* Lista allievi assegnati */}
+                  {assignedStudents.length > 0 && (
+                    <View style={styles.assignedList}>
+                      {assignedStudents.map((s) => (
+                        <View key={s.id} style={styles.assignedItem}>
+                          <View style={styles.assignedDot} />
+                          <Text style={styles.assignedName}>{s.name} {s.surname}</Text>
+                          {!s.isActive && (
+                            <Text style={styles.assignedInactive}>(disattivato)</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {canDeleteUsers && (
+                    <View style={styles.userActions}>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => openEditModal(collab)}
+                      >
+                        <View style={styles.userActionRow}>
+                          <Ionicons name="create-outline" size={14} color={colors.info} />
+                          <Text style={[styles.userActionText, { color: colors.info }]}>Modifica</Text>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleToggleActive(collab.id, collab.isActive, collab.name)}
+                      >
+                        <Text style={[styles.userActionText, { color: collab.isActive ? colors.warning : colors.success }]}>
+                          {collab.isActive ? 'Disattiva' : 'Riattiva'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.userActionBtn}
+                        onPress={() => handleDeleteUser(collab.id, `${collab.name} ${collab.surname}`)}
+                      >
+                        <Text style={[styles.userActionText, { color: colors.error }]}>Elimina</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </Card>
+              );
+            })
+          )}
+        </>
+      )}
+
+      {/* Lista nutrizionisti */}
+      {activeTab === 'nutritionists' && (
+        <>
+          {collaborators.filter((c) => c.collaboratorType === 'nutritionist').length === 0 ? (
+            <Card>
+              <Text style={styles.emptyText}>
+                Nessun nutrizionista registrato. Premi "+ Nutrizionista" per aggiungerne uno.
+              </Text>
+            </Card>
+          ) : (
+            collaborators.filter((c) => c.collaboratorType === 'nutritionist').filter((c) => {
+              if (!searchQuery.trim()) return true;
+              const q = searchQuery.toLowerCase();
+              return `${c.name} ${c.surname}`.toLowerCase().includes(q) || c.email.toLowerCase().includes(q);
+            }).map((collab) => {
+              const assignedStudents = students.filter(
+                (s) => isStudentAssignedTo(s, collab.id)
+              );
+              return (
+                <Card key={collab.id} variant="elevated">
+                  <View style={styles.userRow}>
+                    <View style={[styles.avatar, styles.avatarNutritionist]}>
+                      <Text style={styles.avatarText}>
+                        {collab.name[0]}{collab.surname[0]}
+                      </Text>
+                    </View>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>
+                        {collab.name} {collab.surname}
+                      </Text>
+                      <Text style={styles.userEmail}>{collab.email}</Text>
+                      <Text style={styles.userDetail}>
+                        Nutrizionista · {collab.specializations.join(', ')} · {collab.commissionPercentage}% commissione
+                      </Text>
+                      <Text style={styles.userStudents}>
+                        {assignedStudents.length} allievi assegnati
+                      </Text>
+                    </View>
+                    <View style={[styles.statusDot, collab.isActive ? styles.statusActive : styles.statusInactive]} />
+                  </View>
+
                   {assignedStudents.length > 0 && (
                     <View style={styles.assignedList}>
                       {assignedStudents.map((s) => (
@@ -1148,6 +1246,9 @@ const styles = StyleSheet.create({
   },
   avatarManager: {
     backgroundColor: colors.managerBadge,
+  },
+  avatarNutritionist: {
+    backgroundColor: colors.warning,
   },
   avatarStudent: {
     backgroundColor: colors.studentBadge,
