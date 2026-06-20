@@ -15,6 +15,7 @@ import { getCollaborators, getManagers, getStudents } from '../../services/authS
 import { getTransactions, getFinancialSummary } from '../../services/financialService';
 import { getAllKPIIndicators, saveKPIIndicators, KPIIndicator } from '../../services/kpiTargetService';
 import { crossAlert } from '../../utils/alert';
+import { useAuth } from '../../hooks/useAuth';
 import { Collaborator, Manager, FinancialTransaction } from '../../types';
 
 type Period = 'month' | 'quarter' | 'year';
@@ -46,6 +47,7 @@ const getRoleAccent = (user: Collaborator | Manager): string => {
 };
 
 export const AnalyticsScreen: React.FC = () => {
+  const { isOwner } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -344,30 +346,32 @@ export const AnalyticsScreen: React.FC = () => {
         ))}
       </View>
 
-      {/* Riepilogo generale */}
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { borderLeftColor: colors.success }]}>
-          <Text style={styles.summaryLabel}>Ricavi Totali</Text>
-          <Text style={[styles.summaryValue, { color: colors.success }]}>
-            €{totalIncome.toLocaleString()}
-          </Text>
+      {/* Riepilogo generale — solo owner */}
+      {isOwner && (
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryCard, { borderLeftColor: colors.success }]}>
+            <Text style={styles.summaryLabel}>Ricavi Totali</Text>
+            <Text style={[styles.summaryValue, { color: colors.success }]}>
+              €{totalIncome.toLocaleString()}
+            </Text>
+          </View>
+          <View style={[styles.summaryCard, { borderLeftColor: colors.error }]}>
+            <Text style={styles.summaryLabel}>Spese Totali</Text>
+            <Text style={[styles.summaryValue, { color: colors.error }]}>
+              €{totalExpenses.toLocaleString()}
+            </Text>
+          </View>
         </View>
-        <View style={[styles.summaryCard, { borderLeftColor: colors.error }]}>
-          <Text style={styles.summaryLabel}>Spese Totali</Text>
-          <Text style={[styles.summaryValue, { color: colors.error }]}>
-            €{totalExpenses.toLocaleString()}
-          </Text>
-        </View>
-      </View>
+      )}
 
-      {/* Revenue Charts */}
-      {coachData.length > 0 && (
+      {/* Revenue Charts — solo owner */}
+      {isOwner && coachData.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ricavi per Coach</Text>
           <BarChart data={coachData} title="Produzione in €" height={220} />
         </View>
       )}
-      {managerData.length > 0 && (
+      {isOwner && managerData.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ricavi per Manager</Text>
           <BarChart data={managerData} title="Produzione Team in €" height={220} />
