@@ -23,9 +23,21 @@
     ],
     "headers": [
       {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "X-XSS-Protection", "value": "1; mode=block" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Permissions-Policy", "value": "interest-cohort=()" }
+        ]
+      },
+      {
         "source": "index.html",
         "headers": [
-          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" }
         ]
       },
       {
@@ -37,7 +49,8 @@
       {
         "source": "**/*.js",
         "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" }
         ]
       },
       {
@@ -54,6 +67,13 @@
           { "key": "Access-Control-Allow-Origin", "value": "*" },
           { "key": "Content-Type", "value": "font/woff2" },
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        ]
+      },
+      {
+        "source": "**/*.map",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-store" },
+          { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
         ]
       }
     ],
