@@ -642,6 +642,16 @@ export const WorkoutPlanScreen: React.FC = () => {
     }));
   };
 
+  const moveExercise = (dayIndex: number, fromIndex: number, toIndex: number) => {
+    setExercises((prev) => {
+      const list = [...(prev[dayIndex] || [])];
+      if (toIndex < 0 || toIndex >= list.length) return prev;
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
+      return { ...prev, [dayIndex]: list };
+    });
+  };
+
   const loadPlanForEditing = (plan: WorkoutPlan) => {
     setEditingPlan(plan);
     setSelectedStudentId(plan.studentId);
@@ -915,8 +925,26 @@ export const WorkoutPlanScreen: React.FC = () => {
               <TouchableOpacity key={ex.id} onPress={() => editExercise(selectedDay, index)} activeOpacity={0.7}>
                 <Card variant="outlined">
                   <View style={styles.exerciseRow}>
-                    <View style={styles.exerciseNumber}>
-                      <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+                    <View style={styles.exerciseOrderCol}>
+                      <TouchableOpacity
+                        onPress={() => moveExercise(selectedDay, index, index - 1)}
+                        disabled={index === 0}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={[styles.moveBtn, index === 0 && styles.moveBtnDisabled]}
+                      >
+                        <Ionicons name="chevron-up" size={18} color={index === 0 ? colors.border : colors.accent} />
+                      </TouchableOpacity>
+                      <View style={styles.exerciseNumber}>
+                        <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => moveExercise(selectedDay, index, index + 1)}
+                        disabled={index === exercises[selectedDay].length - 1}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={[styles.moveBtn, index === exercises[selectedDay].length - 1 && styles.moveBtnDisabled]}
+                      >
+                        <Ionicons name="chevron-down" size={18} color={index === exercises[selectedDay].length - 1 ? colors.border : colors.accent} />
+                      </TouchableOpacity>
                     </View>
                     <View style={styles.exerciseInfo}>
                       <Text style={styles.exerciseName}>{ex.name}</Text>
@@ -1890,6 +1918,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
+  },
+  exerciseOrderCol: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  moveBtn: {
+    padding: 2,
+  },
+  moveBtnDisabled: {
+    opacity: 0.3,
   },
   exerciseNumber: {
     width: 28,
