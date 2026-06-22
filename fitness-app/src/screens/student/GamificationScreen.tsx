@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -50,6 +51,79 @@ const PRIZE_MILESTONES = [
     color: '#F44336',
   },
 ];
+
+const SPARKLE_COLORS = ['#FFD700', '#FF6B6B', '#4CAF50', '#64D2FF', '#FF9F0A', '#D40000', '#9C27B0', '#00E676'];
+
+const SparkleIcon: React.FC<{ icon: string }> = ({ icon }) => {
+  const particles = useRef(
+    Array.from({ length: 8 }, (_, i) => ({
+      anim: new Animated.Value(0),
+      angle: (i * 360) / 8,
+      color: SPARKLE_COLORS[i % SPARKLE_COLORS.length],
+    }))
+  ).current;
+
+  useEffect(() => {
+    const animations = particles.map((p, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 120),
+          Animated.timing(p.anim, {
+            toValue: 1,
+            duration: 1800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(p.anim, {
+            toValue: 0,
+            duration: 1800,
+            useNativeDriver: false,
+          }),
+        ])
+      )
+    );
+    Animated.stagger(100, animations).start();
+  }, []);
+
+  return (
+    <View style={styles.sparkleContainer}>
+      {particles.map((p, i) => {
+        const rad = (p.angle * Math.PI) / 180;
+        const scale = p.anim.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.3, 1, 0.3],
+        });
+        const opacity = p.anim.interpolate({
+          inputRange: [0, 0.3, 0.7, 1],
+          outputRange: [0.2, 1, 1, 0.2],
+        });
+        const dist = p.anim.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [20, 26, 20],
+        });
+        return (
+          <Animated.View
+            key={i}
+            style={[
+              styles.sparkle,
+              {
+                backgroundColor: p.color,
+                opacity,
+                transform: [
+                  { scale },
+                  { translateX: Animated.multiply(dist, Math.cos(rad)) },
+                  { translateY: Animated.multiply(dist, Math.sin(rad)) },
+                ],
+              },
+            ]}
+          />
+        );
+      })}
+      <View style={styles.badgeIconUnlocked}>
+        <Text style={styles.badgeIcon}>{icon}</Text>
+      </View>
+    </View>
+  );
+};
 
 export const GamificationScreen: React.FC = () => {
   const { user } = useAuth();
@@ -337,18 +411,15 @@ export const GamificationScreen: React.FC = () => {
                   !isUnlocked && styles.badgeLocked,
                 ]}
               >
-                <View
-                  style={[
-                    styles.badgeIconContainer,
-                    isUnlocked
-                      ? styles.badgeIconUnlocked
-                      : styles.badgeIconLockedBg,
-                  ]}
-                >
-                  <Text style={styles.badgeIcon}>
-                    {isUnlocked ? def.icon : '🔒'}
-                  </Text>
-                </View>
+                {isUnlocked ? (
+                  <View style={styles.badgeIconContainer}>
+                    <SparkleIcon icon={def.icon} />
+                  </View>
+                ) : (
+                  <View style={[styles.badgeIconContainer, styles.badgeIconLockedBg]}>
+                    <Text style={styles.badgeIcon}>🔒</Text>
+                  </View>
+                )}
                 <Text
                   style={[
                     styles.badgeName,
@@ -699,8 +770,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
+  sparkleContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkle: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
   badgeIconUnlocked: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.accent + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   badgeIconLockedBg: {
     backgroundColor: colors.surfaceLight,

@@ -484,7 +484,8 @@ export type NotificationType =
   | 'session_cancelled'
   | 'new_content'
   | 'workout_renewal'
-  | 'custom_alert';
+  | 'custom_alert'
+  | 'badge_milestone';
 
 export interface AppNotification {
   id: string;

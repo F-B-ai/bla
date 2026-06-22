@@ -10,8 +10,44 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Badge, BadgeId, StudentGamification } from '../types';
+import { createNotification } from './notificationService';
+import { getOwner } from './authService';
 
 const GAMIFICATION_COLLECTION = 'gamification';
+
+const PRIZE_THRESHOLDS: Record<number, string> = {
+  15: 'Sessione di Mindfulness Personalizzata',
+  30: 'T-Shirt Esclusiva Mind Movement Lab',
+  40: 'Sessione di Myofascial Release & Mobility',
+  50: 'Sessione di Personal Training 1-on-1',
+};
+
+const notifyOwnerOfMilestone = async (
+  studentId: string,
+  totalBadges: number
+): Promise<void> => {
+  const prize = PRIZE_THRESHOLDS[totalBadges];
+  if (!prize) return;
+  try {
+    const owner = await getOwner();
+    if (!owner) return;
+    const usersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('__name__', '==', studentId))
+    );
+    const studentName = usersSnapshot.empty
+      ? 'Un allievo'
+      : (usersSnapshot.docs[0].data().displayName as string) || 'Un allievo';
+    await createNotification(
+      owner.id,
+      'badge_milestone',
+      `🏆 Traguardo ${totalBadges}/50 raggiunto!`,
+      `${studentName} ha sbloccato ${totalBadges} traguardi e ha vinto: ${prize}`,
+      { studentId, milestone: String(totalBadges) }
+    );
+  } catch {
+    // Non bloccare il flusso se la notifica fallisce
+  }
+};
 
 // --- Definizioni badge (50 traguardi) ---
 const BADGE_DEFINITIONS: Record<BadgeId, Omit<Badge, 'unlockedAt'>> = {
@@ -554,6 +590,7 @@ export const updateAfterWorkout = async (
   gamification.xp += xpGained;
   gamification.level = calculateLevel(gamification.xp);
 
+  const prevBadgeCount = gamification.badges.length;
   const newBadges = checkAndAwardBadges(gamification);
   gamification.badges = [...gamification.badges, ...newBadges];
 
@@ -573,6 +610,15 @@ export const updateAfterWorkout = async (
     updatedAt: Timestamp.now(),
   });
 
+  if (newBadges.length > 0) {
+    const totalNow = gamification.badges.length;
+    for (const t of Object.keys(PRIZE_THRESHOLDS).map(Number)) {
+      if (prevBadgeCount < t && totalNow >= t) {
+        notifyOwnerOfMilestone(studentId, t);
+      }
+    }
+  }
+
   return gamification;
 };
 
@@ -586,6 +632,7 @@ export const updateAfterDiaryEntry = async (
   gamification.xp += 10;
   gamification.level = calculateLevel(gamification.xp);
 
+  const prevBadgeCount = gamification.badges.length;
   const newBadges = checkAndAwardBadges(gamification);
   gamification.badges = [...gamification.badges, ...newBadges];
 
@@ -601,6 +648,15 @@ export const updateAfterDiaryEntry = async (
     })),
     updatedAt: Timestamp.now(),
   });
+
+  if (newBadges.length > 0) {
+    const totalNow = gamification.badges.length;
+    for (const t of Object.keys(PRIZE_THRESHOLDS).map(Number)) {
+      if (prevBadgeCount < t && totalNow >= t) {
+        notifyOwnerOfMilestone(studentId, t);
+      }
+    }
+  }
 
   return gamification;
 };

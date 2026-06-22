@@ -164,6 +164,8 @@ export const getNotificationIcon = (type: NotificationType): string => {
       return 'folder-open';
     case 'custom_alert':
       return 'megaphone';
+    case 'badge_milestone':
+      return 'trophy';
     default:
       return 'notifications';
   }
@@ -182,6 +184,8 @@ export const getNotificationColor = (type: NotificationType): string => {
       return '#FF453A';
     case 'custom_alert':
       return '#D40000';
+    case 'badge_milestone':
+      return '#FFD700';
     case 'new_content':
     case 'new_program':
     case 'workout_renewal':
