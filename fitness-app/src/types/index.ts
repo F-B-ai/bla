@@ -703,13 +703,26 @@ export interface SetLog {
 
 // --- Gamification ---
 export type BadgeId =
-  | 'first_workout' | 'ten_workouts' | 'fifty_workouts' | 'hundred_workouts'
-  | 'streak_7' | 'streak_30' | 'streak_90' | 'streak_365'
-  | 'early_bird' | 'night_owl'
-  | 'first_program' | 'five_programs'
-  | 'diary_writer' | 'diary_faithful'
-  | 'payment_punctual' | 'heavy_lifter'
-  | 'consistency_king';
+  // Allenamenti (10)
+  | 'first_workout' | 'five_workouts' | 'ten_workouts' | 'twenty_five_workouts'
+  | 'fifty_workouts' | 'seventy_five_workouts' | 'hundred_workouts'
+  | 'hundred_fifty_workouts' | 'two_hundred_workouts' | 'five_hundred_workouts'
+  // Costanza / Streak (10)
+  | 'streak_3' | 'streak_7' | 'streak_14' | 'streak_21' | 'streak_30'
+  | 'streak_60' | 'streak_90' | 'streak_180' | 'streak_270' | 'streak_365'
+  // Diario (8)
+  | 'diary_writer' | 'diary_seven' | 'diary_fifteen' | 'diary_faithful'
+  | 'diary_fifty' | 'diary_hundred' | 'diary_two_hundred' | 'diary_365'
+  // Orari (4)
+  | 'early_bird' | 'night_owl' | 'lunch_trainer' | 'dawn_warrior'
+  // Programmi (5)
+  | 'first_program' | 'three_programs' | 'five_programs' | 'ten_programs' | 'twenty_programs'
+  // Livelli (5)
+  | 'level_5' | 'level_10' | 'level_15' | 'level_20' | 'level_25'
+  // XP (5)
+  | 'xp_500' | 'xp_1000' | 'xp_2500' | 'xp_5000' | 'xp_10000'
+  // Speciali (3)
+  | 'payment_punctual' | 'heavy_lifter' | 'consistency_king';
 
 export interface Badge {
   id: BadgeId;

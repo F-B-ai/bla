@@ -20,6 +20,44 @@ import {
   xpForLevel,
 } from '../../services/gamificationService';
 
+const PRIZE_MILESTONES = [
+  {
+    threshold: 10,
+    icon: '🎁',
+    title: 'Sessione Stretching & Mobility',
+    description: 'Una sessione gratuita di stretching e mobility offerta da Mind Movement Lab',
+    color: '#4CAF50',
+  },
+  {
+    threshold: 20,
+    icon: '👕',
+    title: 'T-Shirt Esclusiva',
+    description: 'T-shirt esclusiva Mind Movement Lab in edizione limitata',
+    color: '#2196F3',
+  },
+  {
+    threshold: 30,
+    icon: '🏋️',
+    title: 'Personal Training 1-on-1',
+    description: 'Una sessione di personal training individuale gratuita con un coach',
+    color: '#9C27B0',
+  },
+  {
+    threshold: 40,
+    icon: '💆',
+    title: 'Pacchetto Benessere',
+    description: 'Massaggio sportivo + consulenza nutrizionale personalizzata',
+    color: '#FF9800',
+  },
+  {
+    threshold: 50,
+    icon: '👑',
+    title: 'Esperienza VIP',
+    description: 'Workshop esclusivo Mind Movement Lab + kit premium personalizzato',
+    color: '#F44336',
+  },
+];
+
 export const GamificationScreen: React.FC = () => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -67,27 +105,29 @@ export const GamificationScreen: React.FC = () => {
 
   const allBadges = getAllBadgeDefinitions();
   const unlockedIds = new Set(gamification.badges.map((b) => b.id));
+  const unlockedCount = gamification.badges.length;
 
-  // Calcola progresso XP verso prossimo livello
   const currentLevelXp = xpForLevel(gamification.level - 1);
   const nextLevelXp = xpForLevel(gamification.level);
   const xpInLevel = gamification.xp - currentLevelXp;
   const xpNeeded = nextLevelXp - currentLevelXp;
   const progressPercent = xpNeeded > 0 ? Math.min(xpInLevel / xpNeeded, 1) : 0;
 
-  // Tutti i badge ordinati: sbloccati prima, poi bloccati
   const badgeIds = Object.keys(allBadges) as BadgeId[];
   const sortedBadges = [
     ...badgeIds.filter((id) => unlockedIds.has(id)),
     ...badgeIds.filter((id) => !unlockedIds.has(id)),
   ];
 
+  const nextPrize = PRIZE_MILESTONES.find((p) => unlockedCount < p.threshold);
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.lg }]}>
         <Text style={styles.headerTitle}>I Miei Traguardi</Text>
-        <Text style={styles.headerSubtitle}>Conquista badge e sali di livello</Text>
+        <Text style={styles.headerSubtitle}>
+          {unlockedCount}/50 traguardi conquistati
+        </Text>
       </View>
 
       <ScrollView
@@ -105,14 +145,12 @@ export const GamificationScreen: React.FC = () => {
         {/* Level Card */}
         <Card variant="elevated" style={styles.levelCard}>
           <View style={styles.levelRow}>
-            {/* Progress Ring */}
             <View style={styles.progressRingContainer}>
               <View style={styles.progressRingBg}>
                 <View
                   style={[
                     styles.progressRingFill,
                     {
-                      // Simulate a progress ring with border trick
                       borderColor: colors.accent,
                       borderWidth: 4,
                       borderTopColor: progressPercent >= 0.25 ? colors.accent : colors.border,
@@ -132,7 +170,6 @@ export const GamificationScreen: React.FC = () => {
               <Text style={styles.xpText}>
                 {gamification.xp} XP totali
               </Text>
-              {/* XP progress bar */}
               <View style={styles.xpBarContainer}>
                 <View style={styles.xpBarBg}>
                   <View
@@ -184,10 +221,113 @@ export const GamificationScreen: React.FC = () => {
           />
         </View>
 
-        {/* Badges Section */}
-        <Text style={styles.sectionTitle}>Badge</Text>
+        {/* Next Prize Card */}
+        {nextPrize && (
+          <>
+            <Text style={styles.sectionTitle}>Prossimo Premio</Text>
+            <Card variant="elevated" style={styles.prizeCard}>
+              <View style={styles.prizeRow}>
+                <View style={[styles.prizeIconContainer, { backgroundColor: nextPrize.color + '20' }]}>
+                  <Text style={styles.prizeIcon}>{nextPrize.icon}</Text>
+                </View>
+                <View style={styles.prizeInfo}>
+                  <Text style={styles.prizeTitle}>{nextPrize.title}</Text>
+                  <Text style={styles.prizeDesc}>{nextPrize.description}</Text>
+                  <View style={styles.prizeProgressRow}>
+                    <View style={styles.prizeBarBg}>
+                      <View
+                        style={[
+                          styles.prizeBarFill,
+                          {
+                            width: `${Math.round((unlockedCount / nextPrize.threshold) * 100)}%`,
+                            backgroundColor: nextPrize.color,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.prizeProgressText, { color: nextPrize.color }]}>
+                      {unlockedCount}/{nextPrize.threshold}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </Card>
+          </>
+        )}
+
+        {/* Prize Milestones */}
+        <Text style={styles.sectionTitle}>Premi Mind Movement Lab</Text>
         <Text style={styles.sectionSubtitle}>
-          {gamification.badges.length}/{badgeIds.length} sbloccati
+          Sblocca un premio ogni 10 traguardi
+        </Text>
+
+        {PRIZE_MILESTONES.map((prize) => {
+          const isUnlocked = unlockedCount >= prize.threshold;
+          return (
+            <View
+              key={prize.threshold}
+              style={[
+                styles.milestoneCard,
+                isUnlocked ? { borderColor: prize.color, borderWidth: 1.5 } : {},
+              ]}
+            >
+              <View style={styles.milestoneRow}>
+                <View
+                  style={[
+                    styles.milestoneIconBox,
+                    {
+                      backgroundColor: isUnlocked ? prize.color + '20' : colors.surfaceLight,
+                    },
+                  ]}
+                >
+                  <Text style={styles.milestoneIcon}>
+                    {isUnlocked ? prize.icon : '🔒'}
+                  </Text>
+                </View>
+                <View style={styles.milestoneInfo}>
+                  <View style={styles.milestoneHeaderRow}>
+                    <Text
+                      style={[
+                        styles.milestoneName,
+                        !isUnlocked && { color: colors.textLight },
+                      ]}
+                    >
+                      {prize.title}
+                    </Text>
+                    <View
+                      style={[
+                        styles.milestoneBadge,
+                        { backgroundColor: isUnlocked ? prize.color : colors.border },
+                      ]}
+                    >
+                      <Text style={styles.milestoneBadgeText}>
+                        {prize.threshold}/50
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.milestoneDesc,
+                      !isUnlocked && { color: colors.textLight },
+                    ]}
+                  >
+                    {prize.description}
+                  </Text>
+                  {isUnlocked && (
+                    <Text style={[styles.milestoneStatus, { color: prize.color }]}>
+                      ✓ Premio sbloccato! Chiedi al tuo coach
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          );
+        })}
+
+        {/* Badges Section */}
+        <Text style={styles.sectionTitle}>Traguardi</Text>
+        <Text style={styles.sectionSubtitle}>
+          {unlockedCount}/{badgeIds.length} sbloccati
         </Text>
 
         <View style={styles.badgesGrid}>
@@ -247,7 +387,6 @@ export const GamificationScreen: React.FC = () => {
           })}
         </View>
 
-        {/* Bottom spacer */}
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
     </View>
@@ -270,7 +409,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
   },
 
-  // Header
   header: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
@@ -292,7 +430,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
 
-  // Level Card
   levelCard: {
     marginBottom: spacing.xs,
   },
@@ -360,7 +497,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Streak
   streakCard: {
     marginBottom: spacing.xs,
   },
@@ -404,7 +540,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // Stats
   statsRow: {
     flexDirection: 'row',
     marginVertical: spacing.xs,
@@ -413,7 +548,6 @@ const styles = StyleSheet.create({
     width: spacing.sm,
   },
 
-  // Section
   sectionTitle: {
     fontSize: fontSize.xxl,
     fontWeight: '700',
@@ -425,6 +559,123 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginBottom: spacing.md,
+  },
+
+  // Prize cards
+  prizeCard: {
+    marginBottom: spacing.xs,
+  },
+  prizeRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  prizeIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prizeIcon: {
+    fontSize: 28,
+  },
+  prizeInfo: {
+    flex: 1,
+  },
+  prizeTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  prizeDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  prizeProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  prizeBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  prizeBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  prizeProgressText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    minWidth: 36,
+    textAlign: 'right',
+  },
+
+  // Milestone cards
+  milestoneCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.divider,
+    ...shadows.small,
+  },
+  milestoneRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  milestoneIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  milestoneIcon: {
+    fontSize: 24,
+  },
+  milestoneInfo: {
+    flex: 1,
+  },
+  milestoneHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  milestoneName: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  milestoneBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.round,
+  },
+  milestoneBadgeText: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  milestoneDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  milestoneStatus: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    marginTop: 6,
   },
 
   // Badges grid (3 columns)
@@ -441,7 +692,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.divider,
     ...shadows.small,
-    // Fix width via flexBasis
     flexBasis: '31.5%',
     flexGrow: 0,
   },
