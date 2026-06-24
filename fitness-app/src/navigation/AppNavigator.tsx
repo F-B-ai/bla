@@ -182,7 +182,6 @@ const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.scrollableTabBarContent}
-      style={{ overflow: 'visible' } as any}
     >
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
@@ -1166,7 +1165,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingBottom: Platform.OS === 'web' ? 12 : 28,
     paddingTop: 6,
-    overflow: 'visible' as any,
   },
   academyTabBarContainer: {
     backgroundColor: '#0D0D0D',
@@ -1245,33 +1243,28 @@ const styles = StyleSheet.create({
 const notifBadgeStyles = StyleSheet.create({
   iconContainer: {
     width: TAB_ICON_SIZE + 14,
-    height: TAB_ICON_SIZE + 10,
+    height: TAB_ICON_SIZE + 6,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'visible' as any,
+    justifyContent: 'center',
   },
   icon: {
     marginTop: 0,
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: 0,
+    right: 0,
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    zIndex: 10,
-    elevation: 5,
+    paddingHorizontal: 3,
   },
   badgeText: {
     color: '#fff',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
 });
