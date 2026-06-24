@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -55,6 +56,7 @@ const CATEGORIES: { value: ExerciseCategory; label: string }[] = [
 
 export const WorkoutPlanScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator } = useAuth();
+  const route = useRoute<any>();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [planTitle, setPlanTitle] = useState('');
@@ -181,6 +183,24 @@ export const WorkoutPlanScreen: React.FC = () => {
     loadCustomTemplates();
     loadExerciseLibrary();
   }, [loadStudents, loadCustomTemplates, loadExerciseLibrary]);
+
+  useEffect(() => {
+    const tpl = route.params?.template;
+    if (!tpl?.weeklySchedule) return;
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of tpl.weeklySchedule) {
+      if (day.exercises?.length > 0) {
+        newExercises[day.dayOfWeek] = day.exercises.map((ex: any, i: number) => ({
+          ...ex,
+          id: ex.id || `${Date.now()}_${day.dayOfWeek}_${i}`,
+        }));
+      }
+    }
+    setExercises(newExercises);
+    setPlanTitle(tpl.name || '');
+    setSelectedDay(0);
+    crossAlert('Template Caricato', `"${tpl.name}" pronto. Seleziona un allievo e modifica gli esercizi.`);
+  }, [route.params?.template]);
 
   const formatDate = (date: any) => {
     if (!date) return '';

@@ -10,6 +10,7 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -52,6 +53,7 @@ type TabMode = 'custom' | 'builtin';
 
 export const ManageTemplatesScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [customTemplates, setCustomTemplates] = useState<CustomWorkoutTemplate[]>([]);
   const [tabMode, setTabMode] = useState<TabMode>('custom');
@@ -444,6 +446,15 @@ export const ManageTemplatesScreen: React.FC = () => {
           )}
 
           <View style={styles.detailActions}>
+            <Button
+              title="Usa per Allievo"
+              onPress={() => {
+                navigation.navigate('Programmi', { template: viewingTemplate });
+                setViewMode('list');
+                setViewingTemplate(null);
+              }}
+              style={{ flex: 1, minWidth: 100, backgroundColor: '#4CAF50' }}
+            />
             <Button
               title="Torna alla lista"
               onPress={() => { setViewMode('list'); setViewingTemplate(null); }}
