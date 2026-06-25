@@ -31,7 +31,7 @@ interface PricingTier {
   registrationFee: number;
   durationMonths: number;
   icon: string;
-  category: 'gym' | 'premium' | 'postural';
+  category: 'gym' | 'premium' | 'personal' | 'postural';
   features: string[];
   highlight?: string;
   highlightColor?: string;
@@ -112,6 +112,23 @@ const TIERS: PricingTier[] = [
       'Accesso Martedì e Giovedì',
       'Esame posturale incluso',
       'App ESSĒRE PREMIUM',
+    ],
+  },
+  {
+    id: 'personal_training',
+    title: 'Personal Training 1-to-1',
+    amount: 35,
+    registrationFee: 0,
+    durationMonths: 1,
+    icon: '🏋️',
+    category: 'personal',
+    priceLabel: '€35',
+    priceNote: 'a seduta',
+    courseType: 'Personal Training 1-to-1',
+    features: [
+      'Scheda d\'allenamento personalizzata',
+      'Sessione individuale con il coach',
+      'Programmazione su misura',
     ],
   },
   {
@@ -283,6 +300,7 @@ export const PricingScreen: React.FC = () => {
 
   const gymTiers = TIERS.filter(t => t.category === 'gym');
   const premiumTiers = TIERS.filter(t => t.category === 'premium');
+  const personalTiers = TIERS.filter(t => t.category === 'personal');
   const posturalTier = TIERS.find(t => t.category === 'postural')!;
 
   return (
@@ -319,6 +337,16 @@ export const PricingScreen: React.FC = () => {
         </View>
 
         {premiumTiers.map(t => (
+          <PlanCard key={t.id} tier={t} onCreatePlan={openCreateModal} />
+        ))}
+
+        {/* --- Personal Training --- */}
+        <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+          <Ionicons name="fitness" size={22} color={ACCENT} />
+          <Text style={styles.sectionTitle}>Personal Training</Text>
+        </View>
+
+        {personalTiers.map(t => (
           <PlanCard key={t.id} tier={t} onCreatePlan={openCreateModal} />
         ))}
 
