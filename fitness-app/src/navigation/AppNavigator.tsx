@@ -88,12 +88,15 @@ import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
+import { QRAccessScreen } from '../screens/owner/QRAccessScreen';
 import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
 import { GamificationScreen } from '../screens/student/GamificationScreen';
 import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
 import { AICoachScreen } from '../screens/shared/AICoachScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
+import { registerCheckin } from '../services/checkinService';
+import { crossAlert } from '../utils/alert';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -398,6 +401,14 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'AI',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="QRAccesso"
+      component={QRAccessScreen}
+      options={{
+        tabBarLabel: 'QR Accesso',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'qr-code' : 'qr-code-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
@@ -1052,6 +1063,28 @@ export const AppNavigator: React.FC = () => {
     } else {
       setCurrentUserId(null);
     }
+  }, [isAuthenticated, user]);
+
+  // Handle QR check-in from URL parameter
+  useEffect(() => {
+    if (!isAuthenticated || !user || Platform.OS !== 'web') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const checkinCode = params.get('checkin');
+      if (checkinCode === 'ESSERE_ACCESS') {
+        window.history.replaceState({}, '', window.location.pathname);
+        const displayName = user.name
+          ? `${user.name}${user.surname ? ' ' + user.surname : ''}`
+          : user.email || 'Utente';
+        registerCheckin(user.id, displayName).then((result) => {
+          if (result.success) {
+            crossAlert('Check-in registrato!', `Benvenuto ${user.name || ''}! Il tuo accesso è stato registrato.`);
+          } else if (result.alreadyCheckedIn) {
+            crossAlert('Già registrato', 'Hai già effettuato il check-in oggi.');
+          }
+        }).catch(() => {});
+      }
+    } catch {}
   }, [isAuthenticated, user]);
 
   // Clean up stale loginMode from storage when not authenticated
