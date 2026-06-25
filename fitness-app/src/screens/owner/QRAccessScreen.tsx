@@ -15,7 +15,7 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { getTodayCheckins, getRecentCheckins, CheckinRecord } from '../../services/checkinService';
 import QRCode from 'qrcode';
 
-const CHECKIN_URL = 'https://essere-3fe6f.web.app/?checkin=ESSERE_ACCESS';
+const CHECKIN_CODE = 'ESSERE_ACCESS_2024';
 
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
@@ -44,7 +44,7 @@ export const QRAccessScreen: React.FC = () => {
   const [showRecent, setShowRecent] = useState(false);
 
   useEffect(() => {
-    QRCode.toDataURL(CHECKIN_URL, {
+    QRCode.toDataURL(CHECKIN_CODE, {
       width: 400,
       margin: 2,
       color: { dark: '#000000', light: '#FFFFFF' },
@@ -165,11 +165,11 @@ export const QRAccessScreen: React.FC = () => {
           <h2>Registra il tuo accesso</h2>
           <div class="step">
             <div class="step-num">1</div>
-            <span>Apri la fotocamera del telefono</span>
+            <span>Apri l'app ESSĒRE</span>
           </div>
           <div class="step">
             <div class="step-num">2</div>
-            <span>Inquadra il QR code</span>
+            <span>Vai su Check-in e inquadra il QR</span>
           </div>
           <div class="step">
             <div class="step-num">3</div>
@@ -214,7 +214,7 @@ export const QRAccessScreen: React.FC = () => {
           </View>
           <Text style={styles.qrLabel}>Scansiona per registrare l'accesso</Text>
           <Text style={styles.qrSublabel}>
-            Gli allievi inquadrano il QR con la fotocamera del telefono
+            Gli allievi aprono l'app e scansionano il QR dalla tab Check-in
           </Text>
         </View>
 

@@ -95,8 +95,7 @@ import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
 import { AICoachScreen } from '../screens/shared/AICoachScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
-import { registerCheckin } from '../services/checkinService';
-import { crossAlert } from '../utils/alert';
+import { CheckinScreen } from '../screens/student/CheckinScreen';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -811,6 +810,14 @@ const StudentTabs = () => (
       }}
     />
     <StudentTab.Screen
+      name="Checkin"
+      component={CheckinScreen}
+      options={{
+        tabBarLabel: 'Check-in',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'qr-code' : 'qr-code-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
       name="Workout"
       component={LiveWorkoutScreen}
       options={{
@@ -1063,28 +1070,6 @@ export const AppNavigator: React.FC = () => {
     } else {
       setCurrentUserId(null);
     }
-  }, [isAuthenticated, user]);
-
-  // Handle QR check-in from URL parameter
-  useEffect(() => {
-    if (!isAuthenticated || !user || Platform.OS !== 'web') return;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const checkinCode = params.get('checkin');
-      if (checkinCode === 'ESSERE_ACCESS') {
-        window.history.replaceState({}, '', window.location.pathname);
-        const displayName = user.name
-          ? `${user.name}${user.surname ? ' ' + user.surname : ''}`
-          : user.email || 'Utente';
-        registerCheckin(user.id, displayName).then((result) => {
-          if (result.success) {
-            crossAlert('Check-in registrato!', `Benvenuto ${user.name || ''}! Il tuo accesso è stato registrato.`);
-          } else if (result.alreadyCheckedIn) {
-            crossAlert('Già registrato', 'Hai già effettuato il check-in oggi.');
-          }
-        }).catch(() => {});
-      }
-    } catch {}
   }, [isAuthenticated, user]);
 
   // Clean up stale loginMode from storage when not authenticated
