@@ -23,7 +23,7 @@ interface Props {
 }
 
 export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
@@ -57,9 +57,13 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
       setCollaborators(collabs);
       setManagers(mgrs);
       setOwner(ownerData);
-      setInvites(allInvites.filter((inv) => !inv.isUsed));
-      // Pre-seleziona il primo disponibile
-      if (ownerData) {
+      // Manager/coach vedono solo gli inviti che hanno creato loro
+      const visibleInvites = allInvites.filter((inv) => !inv.isUsed);
+      setInvites(isOwner ? visibleInvites : visibleInvites.filter((inv) => inv.createdBy === user?.id));
+      // Non-owner: assegna automaticamente a sé. Owner: pre-seleziona il primo disponibile
+      if (!isOwner && user) {
+        setSelectedCollaboratorId(user.id);
+      } else if (ownerData) {
         setSelectedCollaboratorId(ownerData.id);
       } else if (mgrs.length > 0) {
         setSelectedCollaboratorId(mgrs[0].id);
@@ -169,33 +173,43 @@ export const InviteStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="email dell'allievo"
           />
 
-          <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
-          {allAssignees.length === 0 ? (
-            <Text style={styles.noCollabText}>
-              Nessun coach o manager disponibile. Registrane uno prima.
-            </Text>
-          ) : (
-            <View style={styles.collabList}>
-              {allAssignees.map((assignee) => (
-                <TouchableOpacity
-                  key={assignee.id}
-                  style={[
-                    styles.collabOption,
-                    selectedCollaboratorId === assignee.id && styles.collabOptionSelected,
-                  ]}
-                  onPress={() => setSelectedCollaboratorId(assignee.id)}
-                >
-                  <Text
-                    style={[
-                      styles.collabOptionText,
-                      selectedCollaboratorId === assignee.id && styles.collabOptionTextSelected,
-                    ]}
-                  >
-                    {assignee.name} {assignee.surname} ({assignee.label})
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {!isOwner ? (
+            <View style={styles.autoAssignNote}>
+              <Text style={styles.autoAssignText}>
+                L'allievo verrà assegnato automaticamente a te.
+              </Text>
             </View>
+          ) : (
+            <>
+              <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
+              {allAssignees.length === 0 ? (
+                <Text style={styles.noCollabText}>
+                  Nessun coach o manager disponibile. Registrane uno prima.
+                </Text>
+              ) : (
+                <View style={styles.collabList}>
+                  {allAssignees.map((assignee) => (
+                    <TouchableOpacity
+                      key={assignee.id}
+                      style={[
+                        styles.collabOption,
+                        selectedCollaboratorId === assignee.id && styles.collabOptionSelected,
+                      ]}
+                      onPress={() => setSelectedCollaboratorId(assignee.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.collabOptionText,
+                          selectedCollaboratorId === assignee.id && styles.collabOptionTextSelected,
+                        ]}
+                      >
+                        {assignee.name} {assignee.surname} ({assignee.label})
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
           )}
 
           <Button
@@ -310,6 +324,22 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: spacing.lg,
+  },
+  autoAssignNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent + '15',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  autoAssignText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '500',
   },
   codeBox: {
     marginTop: spacing.lg,
