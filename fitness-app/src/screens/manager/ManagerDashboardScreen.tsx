@@ -469,7 +469,7 @@ export const ManagerDashboardScreen: React.FC = () => {
       <View style={styles.chartSection}>
         <BarChart
           data={sessionsData}
-          title="Riepilogo Sessioni Team"
+          title="Riepilogo Tue Sessioni"
           height={180}
           formatValue={(v) => String(v)}
         />
