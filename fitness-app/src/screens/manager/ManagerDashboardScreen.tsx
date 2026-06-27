@@ -423,16 +423,16 @@ export const ManagerDashboardScreen: React.FC = () => {
 
       {/* Guadagni manager */}
       <View style={styles.earningsCard}>
-        <Text style={styles.earningsLabel}>Ricavi Team</Text>
+        <Text style={styles.earningsLabel}>I tuoi Ricavi</Text>
         <Text style={[styles.earningsValue, { color: colors.success }]}>
-          €{totalTeamRevenue.toLocaleString()}
+          €{Math.round(managerEarnings).toLocaleString()}
         </Text>
         <View style={styles.earningsRow}>
           <Text style={styles.earningsDetail}>
-            Tua commissione ({manager?.commissionPercentage || 0}%)
+            Ricavi team ({manager?.commissionPercentage || 0}% commissione)
           </Text>
           <Text style={[styles.earningsDetailValue, { color: colors.managerBadge }]}>
-            €{Math.round(managerEarnings).toLocaleString()}
+            €{totalTeamRevenue.toLocaleString()}
           </Text>
         </View>
       </View>

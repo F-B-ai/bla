@@ -51,6 +51,15 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
       setCollaborators(collabs);
       setManagers(mgrs);
       setOwner(ownerData);
+      // Manager/collaboratore: pre-seleziona se stesso come coach assegnato
+      if (currentUser && !isOwner) {
+        setSelectedCoachIds((prev) => (prev.length === 0 ? [currentUser.id] : prev));
+        const me = mgrs.find((m) => m.id === currentUser.id);
+        if (me) {
+          setSelectedManagerId(me.id);
+          setManagerCommission(String(me.commissionPercentage ?? 10));
+        }
+      }
     } catch {
       crossAlert('Errore', 'Impossibile caricare i dati');
     }

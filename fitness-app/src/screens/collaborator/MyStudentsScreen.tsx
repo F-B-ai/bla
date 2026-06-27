@@ -30,11 +30,13 @@ import { isStudentAssignedTo } from '../../utils/helpers';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { generateAndSendRemindersForAllStudents } from '../../services/paymentReminderService';
+import { AddStudentScreen } from '../owner/AddStudentScreen';
 
 export const MyStudentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user, logout, isOwner, isManager } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+  const [showAddStudent, setShowAddStudent] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -291,6 +293,17 @@ export const MyStudentsScreen: React.FC = () => {
     </Card>
   );
 
+  if (showAddStudent) {
+    return (
+      <AddStudentScreen
+        onBack={() => {
+          setShowAddStudent(false);
+          loadStudents();
+        }}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
@@ -304,6 +317,10 @@ export const MyStudentsScreen: React.FC = () => {
             <Text style={styles.logoutText}>Esci</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity style={styles.addStudentButton} onPress={() => setShowAddStudent(true)}>
+          <Ionicons name="person-add" size={18} color={colors.textOnAccent} />
+          <Text style={styles.addStudentText}>Aggiungi Allievo</Text>
+        </TouchableOpacity>
       </View>
 
       <InstallPrompt />
@@ -597,6 +614,21 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  addStudentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
+  },
+  addStudentText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.md,
+    fontWeight: '700',
   },
   logoutText: {
     color: colors.accent,
