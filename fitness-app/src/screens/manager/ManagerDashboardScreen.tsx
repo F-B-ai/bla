@@ -429,10 +429,7 @@ export const ManagerDashboardScreen: React.FC = () => {
         </Text>
         <View style={styles.earningsRow}>
           <Text style={styles.earningsDetail}>
-            Ricavi team ({manager?.commissionPercentage || 0}% commissione)
-          </Text>
-          <Text style={[styles.earningsDetailValue, { color: colors.managerBadge }]}>
-            €{totalTeamRevenue.toLocaleString()}
+            Commissione {manager?.commissionPercentage || 0}%
           </Text>
         </View>
       </View>

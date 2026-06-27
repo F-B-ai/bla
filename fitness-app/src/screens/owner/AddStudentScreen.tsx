@@ -54,10 +54,14 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
       // Manager/collaboratore: pre-seleziona se stesso come coach assegnato
       if (currentUser && !isOwner) {
         setSelectedCoachIds((prev) => (prev.length === 0 ? [currentUser.id] : prev));
-        const me = mgrs.find((m) => m.id === currentUser.id);
-        if (me) {
-          setSelectedManagerId(me.id);
-          setManagerCommission(String(me.commissionPercentage ?? 10));
+        const meMgr = mgrs.find((m) => m.id === currentUser.id);
+        if (meMgr) {
+          setSelectedManagerId(meMgr.id);
+          setManagerCommission(String(meMgr.commissionPercentage ?? 10));
+        }
+        const meCollab = collabs.find((c) => c.id === currentUser.id);
+        if (meCollab) {
+          setCoachCommission(String(meCollab.commissionPercentage ?? 60));
         }
       }
     } catch {
@@ -163,8 +167,18 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="Numero di telefono"
           />
 
-          {/* Selezione manager (opzionale) */}
-          {managers.length > 0 && (
+          {/* Per manager/coach: l'allievo viene assegnato automaticamente a loro */}
+          {!isOwner && (
+            <View style={styles.autoAssignNote}>
+              <Ionicons name="information-circle" size={18} color={colors.accent} />
+              <Text style={styles.autoAssignText}>
+                L'allievo verrà assegnato automaticamente a te.
+              </Text>
+            </View>
+          )}
+
+          {/* Selezione manager (opzionale) — solo owner */}
+          {isOwner && managers.length > 0 && (
             <>
               <Text style={styles.fieldLabel}>Manager responsabile</Text>
               <View style={styles.collabList}>
@@ -203,7 +217,9 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             </>
           )}
 
-          {/* Selezione coach (multi-select) */}
+          {/* Selezione coach (multi-select) — solo owner */}
+          {isOwner && (
+          <>
           <Text style={styles.fieldLabel}>Coach assegnati * (puoi selezionarne più di uno)</Text>
           {selectedCoachIds.length > 0 && (
             <Text style={styles.selectedCount}>{selectedCoachIds.length} selezionati</Text>
@@ -332,6 +348,8 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             keyboardType="numeric"
             placeholder="Es: 60"
           />
+          </>
+          )}
 
           <InputField
             label="Obiettivi"
@@ -457,5 +475,21 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: spacing.lg,
+  },
+  autoAssignNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent + '15',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  autoAssignText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '500',
   },
 });
