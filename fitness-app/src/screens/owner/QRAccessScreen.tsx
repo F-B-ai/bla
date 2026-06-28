@@ -153,9 +153,47 @@ export const QRAccessScreen: React.FC = () => {
             color: #999;
             letter-spacing: 1px;
           }
+          .close-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #D40000;
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          }
+          .print-btn {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            background: #0A0A0A;
+            color: #fff;
+            border: none;
+            border-radius: 24px;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          }
+          @media print {
+            .no-print { display: none !important; }
+          }
         </style>
       </head>
       <body>
+        <button class="close-btn no-print" onclick="closePage()">✕ Chiudi</button>
+        <button class="print-btn no-print" onclick="window.print()">⎙ Stampa</button>
         <div class="brand">ESSĒRE</div>
         <div class="subtitle">MIND MOVEMENT LAB</div>
         <div class="qr-container">
@@ -177,7 +215,12 @@ export const QRAccessScreen: React.FC = () => {
           </div>
         </div>
         <div class="footer">ESSĒRE — MIND MOVEMENT LAB</div>
-        <script>window.onload = () => window.print();</script>
+        <script>
+          function closePage() {
+            try { window.close(); } catch (e) {}
+            setTimeout(function () { window.location.href = '/'; }, 150);
+          }
+        </script>
       </body>
       </html>
     `);
