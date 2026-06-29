@@ -89,6 +89,7 @@ import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
 import { QRAccessScreen } from '../screens/owner/QRAccessScreen';
+import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
 import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
 import { GamificationScreen } from '../screens/student/GamificationScreen';
 import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
@@ -448,6 +449,14 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Spazio"
+      component={StorageManagementScreen}
+      options={{
+        tabBarLabel: 'Spazio',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'server' : 'server-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
