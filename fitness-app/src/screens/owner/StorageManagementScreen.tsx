@@ -51,8 +51,9 @@ export const StorageManagementScreen: React.FC = () => {
     try {
       const all = await listAllFiles((c) => setScanCount(c));
       setFiles(all);
-    } catch {
-      crossAlert('Errore', 'Impossibile leggere lo spazio di archiviazione.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
+      crossAlert('Errore', `Impossibile leggere lo spazio di archiviazione.\n\nDettaglio: ${msg}`);
     } finally {
       setLoading(false);
     }
