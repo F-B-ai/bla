@@ -29,6 +29,7 @@ import { getAllSessions } from '../../services/sessionService';
 import { getFinancialSummary, getTransactions } from '../../services/financialService';
 import { getAllPaymentPlans } from '../../services/paymentService';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigation } from '@react-navigation/native';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
@@ -46,6 +47,7 @@ const toSafeDate = (d: unknown): Date => {
 
 export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { logout, user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -549,6 +551,42 @@ export const DashboardScreen: React.FC = () => {
             <Ionicons name="chevron-forward" size={20} color={colors.accent} />
           )}
         </View>
+      </TouchableOpacity>
+
+      {/* Scorciatoia gestione spazio */}
+      <TouchableOpacity
+        style={styles.shortcutCard}
+        onPress={() => navigation.navigate('Spazio')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.shortcutIconContainer}>
+          <Ionicons name="server" size={22} color={colors.accent} />
+        </View>
+        <View style={styles.shortcutInfo}>
+          <Text style={styles.shortcutTitle}>Gestione Spazio</Text>
+          <Text style={styles.shortcutDesc}>
+            Libera spazio eliminando foto e file vecchi
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.accent} />
+      </TouchableOpacity>
+
+      {/* Scorciatoia QR accesso */}
+      <TouchableOpacity
+        style={styles.shortcutCard}
+        onPress={() => navigation.navigate('QRAccesso')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.shortcutIconContainer}>
+          <Ionicons name="qr-code" size={22} color={colors.accent} />
+        </View>
+        <View style={styles.shortcutInfo}>
+          <Text style={styles.shortcutTitle}>QR Accesso</Text>
+          <Text style={styles.shortcutDesc}>
+            Mostra e stampa il QR per il check-in in palestra
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.accent} />
       </TouchableOpacity>
 
       {/* AI Summary Modal */}
@@ -1287,6 +1325,40 @@ const styles = StyleSheet.create({
   },
   aiSummaryCardInfo: {
     flex: 1,
+  },
+  shortcutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.small,
+  },
+  shortcutIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shortcutInfo: {
+    flex: 1,
+  },
+  shortcutTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  shortcutDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   aiSummaryCardTitle: {
     fontSize: fontSize.lg,
