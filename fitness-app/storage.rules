@@ -1,6 +1,16 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Solo il titolare può elencare ed eliminare i file ovunque
+    // (necessario per lo strumento di gestione spazio)
+    function isOwner() {
+      return request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'owner';
+    }
+    match /{allPaths=**} {
+      allow read, write: if isOwner();
+    }
+
     // Academy content
     match /academy/{courseId}/{folder}/{fileName} {
       allow read: if request.auth != null;

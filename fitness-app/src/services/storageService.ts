@@ -35,7 +35,7 @@ export const listAllFiles = async (
   const files: StorageFile[] = [];
 
   const walk = async (prefixPath: string): Promise<void> => {
-    const dirRef = ref(storage, prefixPath);
+    const dirRef = prefixPath === '' ? ref(storage) : ref(storage, prefixPath);
     const res = await listAll(dirRef);
 
     // File in questa cartella
