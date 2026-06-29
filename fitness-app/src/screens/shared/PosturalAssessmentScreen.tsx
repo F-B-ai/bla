@@ -165,7 +165,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.5,
         base64: true,
       });
       if (!result.canceled && result.assets[0]) {
@@ -186,7 +186,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
           const result = await ImagePicker.launchCameraAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            quality: 0.8,
+            quality: 0.5,
           });
           if (!result.canceled && result.assets[0]) {
             setImageForView(view, result.assets[0].uri);
@@ -199,7 +199,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
           const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
-            quality: 0.8,
+            quality: 0.5,
           });
           if (!result.canceled && result.assets[0]) {
             setImageForView(view, result.assets[0].uri);
@@ -310,14 +310,26 @@ export const PosturalAssessmentScreen: React.FC = () => {
       const isLocalUri = (uri: string) =>
         uri.startsWith('file://') || uri.startsWith('blob:') || uri.startsWith('data:');
 
+      // Upload non bloccante: se lo Storage è pieno/quota superata, la
+      // valutazione viene comunque salvata senza la foto che non è stata caricata.
+      let uploadFailed = false;
+      const tryUpload = async (uri: string, view: 'front' | 'side_left' | 'side_right' | 'back') => {
+        try {
+          return await uploadPosturalImage(selectedStudentId, uri, view);
+        } catch {
+          uploadFailed = true;
+          return '';
+        }
+      };
+
       if (frontImage && isLocalUri(frontImage))
-        frontUrl = await uploadPosturalImage(selectedStudentId, frontImage, 'front');
+        frontUrl = await tryUpload(frontImage, 'front');
       if (sideLeftImage && isLocalUri(sideLeftImage))
-        sideLeftUrl = await uploadPosturalImage(selectedStudentId, sideLeftImage, 'side_left');
+        sideLeftUrl = await tryUpload(sideLeftImage, 'side_left');
       if (sideRightImage && isLocalUri(sideRightImage))
-        sideRightUrl = await uploadPosturalImage(selectedStudentId, sideRightImage, 'side_right');
+        sideRightUrl = await tryUpload(sideRightImage, 'side_right');
       if (backImage && isLocalUri(backImage))
-        backUrl = await uploadPosturalImage(selectedStudentId, backImage, 'back');
+        backUrl = await tryUpload(backImage, 'back');
 
       // Merge AI findings into manual findings (add AI-found areas not already present)
       let mergedFindings = [...findings];
@@ -365,7 +377,12 @@ export const PosturalAssessmentScreen: React.FC = () => {
         aiExerciseProgram: aiResult?.exerciseProgram || [],
       });
 
-      crossAlert('Successo', 'Valutazione posturale salvata!');
+      crossAlert(
+        'Successo',
+        uploadFailed
+          ? 'Valutazione salvata! Le foto non sono state caricate perché lo spazio di archiviazione è esaurito. Tutti i dati e l\'analisi sono stati salvati.'
+          : 'Valutazione posturale salvata!'
+      );
       setSelectedStudentId('');
       setFrontImage(null);
       setSideLeftImage(null);
