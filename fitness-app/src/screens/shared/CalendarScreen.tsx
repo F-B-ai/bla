@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   FlatList,
   RefreshControl,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -195,6 +197,16 @@ export const CalendarScreen: React.FC = () => {
   // Student detail modal
   const [studentDetailId, setStudentDetailId] = useState<string | null>(null);
 
+  // Ricerca appuntamenti per nome allievo
+  const [searchName, setSearchName] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDetail, setSearchDetail] = useState<{
+    studentName: string;
+    upcoming: AppointmentItem[];
+    past: AppointmentItem[];
+    stats: { total: number; completed: number; cancelled: number; remaining: number };
+  } | null>(null);
+
   // View mode
   const [viewMode, setViewMode] = useState<'agenda' | 'calendar' | 'timeline'>('agenda');
 
@@ -335,6 +347,65 @@ export const CalendarScreen: React.FC = () => {
     const s = students.find((st) => st.id === id);
     return s ? `${s.name} ${s.surname}` : 'Allievo';
   };
+
+  // Allievi che corrispondono al testo di ricerca
+  const matchingStudents = useMemo(() => {
+    const q = searchName.trim().toLowerCase();
+    if (!q) return [];
+    return students
+      .filter((s) => `${s.name} ${s.surname}`.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [searchName, students]);
+
+  // Carica lo storico COMPLETO degli appuntamenti di un allievo e apre il dettaglio
+  const openStudentHistory = useCallback(async (studentId: string, studentName: string) => {
+    setSearchLoading(true);
+    setSearchName('');
+    try {
+      const [sess, appts] = await Promise.all([
+        getStudentSessions(studentId).catch(() => []),
+        getStudentAppointments(studentId).catch(() => []),
+      ]);
+      const items: AppointmentItem[] = [];
+      sess.forEach((s) => {
+        const d = toSafeDate(s.date);
+        items.push({
+          id: s.id, kind: 'training', studentId: s.studentId, staffId: s.collaboratorId,
+          date: d, dateStr: toDateStr(d), startTime: s.startTime, endTime: s.endTime,
+          status: s.status, notes: s.notes, sessionCost: s.sessionCost,
+          isCountedAsCompleted: s.isCountedAsCompleted,
+        });
+      });
+      appts.forEach((a) => {
+        const d = toSafeDate(a.date);
+        items.push({
+          id: a.id, kind: 'nutrition', studentId: a.studentId,
+          staffId: a.nutritionistId || a.nutritionManagerId || '',
+          date: d, dateStr: toDateStr(d), startTime: a.startTime, endTime: a.endTime,
+          status: a.status, notes: a.notes, sessionCost: a.sessionCost,
+          isCountedAsCompleted: a.isCountedAsCompleted,
+        });
+      });
+      const nowStr = toDateStr(new Date());
+      const upcoming = items
+        .filter((a) => a.dateStr >= nowStr && a.status === 'scheduled')
+        .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+      const past = items
+        .filter((a) => a.dateStr < nowStr || a.status !== 'scheduled')
+        .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+      const completed = items.filter((a) => a.isCountedAsCompleted || a.status === 'completed').length;
+      const cancelled = items.filter((a) => a.status.startsWith('cancelled')).length;
+      setSearchDetail({
+        studentName,
+        upcoming, past,
+        stats: { total: items.length, completed, cancelled, remaining: upcoming.length },
+      });
+    } catch {
+      crossAlert('Errore', 'Impossibile caricare gli appuntamenti dell\'allievo.');
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
   const getStudentPhone = (id: string) => {
     const s = students.find((st) => st.id === id);
     return s?.phone || '';
@@ -975,6 +1046,50 @@ export const CalendarScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Ricerca appuntamenti per allievo */}
+          {!isStudent && (
+            <View style={styles.searchSection}>
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color={colors.textLight} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={searchName}
+                  onChangeText={setSearchName}
+                  placeholder="Cerca appuntamenti di un allievo..."
+                  placeholderTextColor={colors.textLight}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+                {searchName.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchName('')}>
+                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {matchingStudents.length > 0 && (
+                <View style={styles.searchResults}>
+                  {matchingStudents.map((s) => (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={styles.searchResultRow}
+                      onPress={() => openStudentHistory(s.id, `${s.name} ${s.surname}`)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.searchAvatar}>
+                        <Text style={styles.searchAvatarText}>{s.name[0]}{s.surname[0]}</Text>
+                      </View>
+                      <Text style={styles.searchResultName}>{s.name} {s.surname}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {searchName.trim().length > 0 && matchingStudents.length === 0 && (
+                <Text style={styles.searchNoResult}>Nessun allievo trovato</Text>
+              )}
+            </View>
+          )}
+
           {/* Staff filter (owner only) */}
           {canSeeAll && staffList.length > 0 && (
             <View style={styles.staffFilterSection}>
@@ -1094,6 +1209,12 @@ export const CalendarScreen: React.FC = () => {
         {renderTaskModal()}
         {renderAppointmentModal()}
         {renderStudentDetailModal()}
+        {renderSearchHistoryModal()}
+        {searchLoading && (
+          <View style={styles.searchLoadingOverlay}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        )}
       </View>
     );
   }
@@ -1588,11 +1709,95 @@ export const CalendarScreen: React.FC = () => {
       />
     );
   }
+
+  function renderSearchHistoryModal() {
+    return (
+      <StudentDetailModal
+        visible={searchDetail !== null}
+        studentName={searchDetail?.studentName || ''}
+        isOwner={isOwner}
+        stats={searchDetail?.stats || { total: 0, completed: 0, cancelled: 0, remaining: 0 }}
+        upcoming={searchDetail?.upcoming || []}
+        past={searchDetail?.past || []}
+        onClose={() => setSearchDetail(null)}
+      />
+    );
+  }
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   listContent: { paddingBottom: spacing.xxl },
+  searchSection: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: spacing.xs,
+  },
+  searchResults: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  searchResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  searchAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchAvatarText: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  searchResultName: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  searchNoResult: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  searchLoadingOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     backgroundColor: colors.primary,
     padding: spacing.lg,
