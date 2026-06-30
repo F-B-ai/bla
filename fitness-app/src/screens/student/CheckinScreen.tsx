@@ -19,7 +19,7 @@ import { registerCheckin } from '../../services/checkinService';
 const isValidCheckinQR = (text: string): boolean =>
   text.trim().toUpperCase().includes('ESSERE_ACCESS');
 
-type CheckinState = 'idle' | 'scanning' | 'success' | 'already' | 'error' | 'camera_error';
+type CheckinState = 'idle' | 'scanning' | 'processing' | 'success' | 'already' | 'error' | 'camera_error';
 
 export const CheckinScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -84,7 +84,8 @@ export const CheckinScreen: React.FC = () => {
   useEffect(() => {
     if (state !== 'scanning') return;
     let cancelled = false;
-    const timer = setTimeout(async () => {
+    let started = false;
+    const startTimer = setTimeout(async () => {
       try {
         if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error('NO_CAMERA_API');
@@ -101,22 +102,32 @@ export const CheckinScreen: React.FC = () => {
           (decodedText) => handleScan(decodedText),
           () => {}
         );
+        started = true;
         if (!cancelled) setScannerReady(true);
       } catch (e: any) {
         const name = e?.name || e?.message || '';
-        let msg = 'Non è stato possibile aprire la fotocamera. Prova a scattare una foto del QR.';
+        let msg = 'Non è stato possibile aprire la fotocamera. Tocca "Scatta foto del QR".';
         if (name === 'NotAllowedError' || /denied|permission/i.test(String(name))) {
-          msg = 'Permesso fotocamera negato. Abilita la fotocamera per ESSĒRE nelle impostazioni del telefono, oppure scatta una foto del QR.';
+          msg = 'Permesso fotocamera negato. Abilitalo nelle impostazioni del telefono, oppure usa "Scatta foto del QR".';
         } else if (name === 'NotFoundError' || name === 'NO_CAMERA_API') {
-          msg = 'Fotocamera non disponibile su questo dispositivo/app. Scatta una foto del QR per registrare l\'accesso.';
+          msg = 'La fotocamera live non è disponibile in questa app. Usa "Scatta foto del QR" per registrare l\'accesso.';
         }
         if (!cancelled) { setCameraErrorMsg(msg); setState('camera_error'); }
       }
     }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [state, handleScan]);
+    // Watchdog: se entro 9s la fotocamera non parte, non restare bloccato
+    const watchdog = setTimeout(() => {
+      if (!cancelled && !started) {
+        stopScanner();
+        setCameraErrorMsg('La fotocamera live non si è avviata. Tocca "Scatta foto del QR".');
+        setState('camera_error');
+      }
+    }, 9000);
+    return () => { cancelled = true; clearTimeout(startTimer); clearTimeout(watchdog); };
+  }, [state, handleScan, stopScanner]);
 
-  // Fallback: scatta/scegli una foto del QR e decodificala (affidabile su iOS PWA)
+  // Metodo principale: scatta una foto del QR e decodificala.
+  // Affidabile su iOS PWA, dove la fotocamera "live" è spesso bloccata.
   const scanFromPhoto = useCallback(() => {
     if (typeof document === 'undefined') return;
     const input = document.createElement('input');
@@ -125,7 +136,8 @@ export const CheckinScreen: React.FC = () => {
     (input as any).capture = 'environment';
     input.onchange = async () => {
       const file = input.files && input.files[0];
-      if (!file) return;
+      if (!file) return; // utente ha annullato
+      setState('processing');
       const tmpId = 'qr-file-' + Math.random().toString(36).slice(2);
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
@@ -138,7 +150,7 @@ export const CheckinScreen: React.FC = () => {
         handleScan(result);
       } catch {
         try { const d = document.getElementById(tmpId); if (d) d.remove(); } catch {}
-        setCameraErrorMsg('Non sono riuscito a leggere il QR dalla foto. Riprova inquadrandolo bene e a fuoco.');
+        setCameraErrorMsg('Non sono riuscito a leggere il QR dalla foto. Avvicinati al QR, mettilo bene a fuoco e riprova.');
         setState('camera_error');
       }
     };
@@ -173,7 +185,7 @@ export const CheckinScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               style={styles.scanButton}
-              onPress={startScanner}
+              onPress={scanFromPhoto}
               activeOpacity={0.7}
             >
               <Ionicons name="camera" size={24} color="#fff" />
@@ -181,12 +193,19 @@ export const CheckinScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.photoLink}
-              onPress={scanFromPhoto}
+              onPress={startScanner}
               activeOpacity={0.7}
             >
-              <Ionicons name="image-outline" size={18} color={colors.accent} />
-              <Text style={styles.photoLinkText}>oppure scatta una foto del QR</Text>
+              <Ionicons name="scan-outline" size={18} color={colors.accent} />
+              <Text style={styles.photoLinkText}>scansione continua (fotocamera live)</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {state === 'processing' && (
+          <View style={styles.resultContainer}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.resultSubtitle}>Lettura del QR in corso...</Text>
           </View>
         )}
 
