@@ -13,7 +13,11 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { registerCheckin } from '../../services/checkinService';
 
-const VALID_CODE = 'ESSERE_ACCESS_2024';
+// Accetta qualsiasi QR di accesso ESSĒRE: il codice attuale
+// ('ESSERE_ACCESS_2024'), il vecchio codice ('ESSERE_ACCESS') o il
+// vecchio QR con URL ('https://...?checkin=ESSERE_ACCESS').
+const isValidCheckinQR = (text: string): boolean =>
+  text.trim().toUpperCase().includes('ESSERE_ACCESS');
 
 type CheckinState = 'idle' | 'scanning' | 'success' | 'already' | 'error';
 
@@ -41,7 +45,7 @@ export const CheckinScreen: React.FC = () => {
 
     await stopScanner();
 
-    if (decodedText.trim() !== VALID_CODE) {
+    if (!isValidCheckinQR(decodedText)) {
       setState('error');
       return;
     }
