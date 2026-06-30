@@ -19,13 +19,14 @@ import { registerCheckin } from '../../services/checkinService';
 const isValidCheckinQR = (text: string): boolean =>
   text.trim().toUpperCase().includes('ESSERE_ACCESS');
 
-type CheckinState = 'idle' | 'scanning' | 'success' | 'already' | 'error';
+type CheckinState = 'idle' | 'scanning' | 'success' | 'already' | 'error' | 'camera_error';
 
 export const CheckinScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [state, setState] = useState<CheckinState>('idle');
   const [scannerReady, setScannerReady] = useState(false);
+  const [cameraErrorMsg, setCameraErrorMsg] = useState('');
   const scannerRef = useRef<any>(null);
   const containerRef = useRef<string>('qr-reader-' + Math.random().toString(36).substring(7));
 
@@ -71,27 +72,77 @@ export const CheckinScreen: React.FC = () => {
     }
   }, [user, state, stopScanner]);
 
-  const startScanner = useCallback(async () => {
+  // Il bottone si limita a passare in stato "scanning": l'avvio reale
+  // avviene nell'useEffect sotto, quando il contenitore è già nel DOM.
+  const startScanner = useCallback(() => {
     if (Platform.OS !== 'web') return;
+    setScannerReady(false);
     setState('scanning');
+  }, []);
 
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const scanner = new Html5Qrcode(containerRef.current);
-      scannerRef.current = scanner;
+  // Avvia la fotocamera DOPO che l'elemento contenitore è montato.
+  useEffect(() => {
+    if (state !== 'scanning') return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('NO_CAMERA_API');
+        }
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (cancelled) return;
+        const el = typeof document !== 'undefined' ? document.getElementById(containerRef.current) : null;
+        if (!el) throw new Error('NO_CONTAINER');
+        const scanner = new Html5Qrcode(containerRef.current);
+        scannerRef.current = scanner;
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => handleScan(decodedText),
+          () => {}
+        );
+        if (!cancelled) setScannerReady(true);
+      } catch (e: any) {
+        const name = e?.name || e?.message || '';
+        let msg = 'Non è stato possibile aprire la fotocamera. Prova a scattare una foto del QR.';
+        if (name === 'NotAllowedError' || /denied|permission/i.test(String(name))) {
+          msg = 'Permesso fotocamera negato. Abilita la fotocamera per ESSĒRE nelle impostazioni del telefono, oppure scatta una foto del QR.';
+        } else if (name === 'NotFoundError' || name === 'NO_CAMERA_API') {
+          msg = 'Fotocamera non disponibile su questo dispositivo/app. Scatta una foto del QR per registrare l\'accesso.';
+        }
+        if (!cancelled) { setCameraErrorMsg(msg); setState('camera_error'); }
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [state, handleScan]);
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          handleScan(decodedText);
-        },
-        () => {}
-      );
-      setScannerReady(true);
-    } catch {
-      setState('error');
-    }
+  // Fallback: scatta/scegli una foto del QR e decodificala (affidabile su iOS PWA)
+  const scanFromPhoto = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    (input as any).capture = 'environment';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const tmpId = 'qr-file-' + Math.random().toString(36).slice(2);
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const div = document.createElement('div');
+        div.id = tmpId; div.style.display = 'none';
+        document.body.appendChild(div);
+        const qr = new Html5Qrcode(tmpId);
+        const result = await qr.scanFile(file, false);
+        try { document.body.removeChild(div); } catch {}
+        handleScan(result);
+      } catch {
+        try { const d = document.getElementById(tmpId); if (d) d.remove(); } catch {}
+        setCameraErrorMsg('Non sono riuscito a leggere il QR dalla foto. Riprova inquadrandolo bene e a fuoco.');
+        setState('camera_error');
+      }
+    };
+    input.click();
   }, [handleScan]);
 
   useEffect(() => {
@@ -127,6 +178,14 @@ export const CheckinScreen: React.FC = () => {
             >
               <Ionicons name="camera" size={24} color="#fff" />
               <Text style={styles.scanButtonText}>Scansiona QR</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.photoLink}
+              onPress={scanFromPhoto}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="image-outline" size={18} color={colors.accent} />
+              <Text style={styles.photoLinkText}>oppure scatta una foto del QR</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -198,6 +257,23 @@ export const CheckinScreen: React.FC = () => {
             <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
               <Ionicons name="refresh" size={20} color="#fff" />
               <Text style={styles.retryButtonText}>Riprova</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {state === 'camera_error' && (
+          <View style={styles.resultContainer}>
+            <View style={[styles.resultCircle, { backgroundColor: colors.warning + '20' }]}>
+              <Ionicons name="camera-outline" size={80} color={colors.warning} />
+            </View>
+            <Text style={styles.resultTitle}>Fotocamera non disponibile</Text>
+            <Text style={styles.resultSubtitle}>{cameraErrorMsg}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={scanFromPhoto}>
+              <Ionicons name="camera" size={20} color="#fff" />
+              <Text style={styles.retryButtonText}>Scatta foto del QR</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={() => setState('scanning')}>
+              <Text style={styles.secondaryButtonText}>Riprova con la fotocamera</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -367,5 +443,27 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: '700',
     color: '#fff',
+  },
+  photoLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  photoLinkText: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  secondaryButtonText: {
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
 });
