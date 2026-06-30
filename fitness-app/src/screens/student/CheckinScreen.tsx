@@ -34,16 +34,26 @@ export const CheckinScreen: React.FC = () => {
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraErrorMsg, setCameraErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
-  const scannerRef = useRef<any>(null);
   const containerRef = useRef<string>('qr-reader-' + Math.random().toString(36).substring(7));
+  const streamRef = useRef<any>(null);
+  const rafRef = useRef<any>(null);
+  const videoElRef = useRef<any>(null);
+  const jsQRRef = useRef<any>(null);
 
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch {}
-      scannerRef.current = null;
+  // Pre-carica il decoder jsQR così è pronto al momento del tocco
+  useEffect(() => {
+    import('jsqr').then((m) => { jsQRRef.current = m.default || m; }).catch(() => {});
+  }, []);
+
+  const stopScanner = useCallback(() => {
+    if (rafRef.current) { try { cancelAnimationFrame(rafRef.current); } catch {} rafRef.current = null; }
+    if (streamRef.current) {
+      try { streamRef.current.getTracks().forEach((t: any) => t.stop()); } catch {}
+      streamRef.current = null;
+    }
+    if (videoElRef.current) {
+      try { videoElRef.current.srcObject = null; videoElRef.current.remove(); } catch {}
+      videoElRef.current = null;
     }
     setScannerReady(false);
   }, []);
@@ -51,7 +61,7 @@ export const CheckinScreen: React.FC = () => {
   const handleScan = useCallback(async (decodedText: string) => {
     if (state === 'success' || state === 'already') return;
 
-    await stopScanner();
+    stopScanner();
 
     if (!isValidCheckinQR(decodedText)) {
       setState('error');
@@ -79,59 +89,88 @@ export const CheckinScreen: React.FC = () => {
     }
   }, [user, state, stopScanner]);
 
-  // Il bottone si limita a passare in stato "scanning": l'avvio reale
-  // avviene nell'useEffect sotto, quando il contenitore è già nel DOM.
-  const startScanner = useCallback(() => {
+  // Avvia la fotocamera DENTRO il tocco dell'utente: su iOS getUserMedia
+  // richiede l'attivazione utente, quindi va chiamato subito, senza await
+  // prima. Otteniamo lo stream e SOLO DOPO mostriamo la vista scanner.
+  const startScanner = useCallback(async () => {
     if (Platform.OS !== 'web') return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraErrorMsg('La fotocamera non è disponibile in questa app. Usa "Scatta foto del QR" o il codice.');
+      setState('camera_error');
+      return;
+    }
     setScannerReady(false);
-    setState('scanning');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setState('scanning');
+    } catch (e: any) {
+      const name = e?.name || '';
+      let msg = 'Non è stato possibile aprire la fotocamera. Usa "Scatta foto del QR" o il codice.';
+      if (name === 'NotAllowedError' || /denied|permission/i.test(String(name))) {
+        msg = 'Permesso fotocamera negato. Abilitalo nelle impostazioni del telefono, oppure usa "Scatta foto del QR".';
+      }
+      setCameraErrorMsg(msg);
+      setState('camera_error');
+    }
   }, []);
 
-  // Avvia la fotocamera DOPO che l'elemento contenitore è montato.
+  // Quando entriamo in "scanning" e abbiamo lo stream: monta il video e scansiona i frame.
   useEffect(() => {
-    if (state !== 'scanning') return;
-    let cancelled = false;
-    let started = false;
-    const startTimer = setTimeout(async () => {
-      try {
-        if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('NO_CAMERA_API');
+    if (state !== 'scanning' || !streamRef.current) return;
+    if (typeof document === 'undefined') return;
+    let stopped = false;
+    const timer = setTimeout(() => {
+      const container = document.getElementById(containerRef.current);
+      if (!container) { setCameraErrorMsg('Errore di avvio. Riprova.'); setState('camera_error'); return; }
+      const video = document.createElement('video');
+      video.setAttribute('playsinline', 'true');
+      (video as any).playsInline = true;
+      video.muted = true;
+      (video as any).autoplay = true;
+      video.style.width = '100%';
+      video.style.height = '100%';
+      video.style.objectFit = 'cover';
+      videoElRef.current = video;
+      try { container.innerHTML = ''; } catch {}
+      container.appendChild(video);
+      video.srcObject = streamRef.current;
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true } as any);
+
+      const tick = () => {
+        if (stopped) return;
+        const v = videoElRef.current;
+        if (v && v.readyState >= 2 && v.videoWidth > 0 && ctx) {
+          if (!stopped) setScannerReady(true);
+          canvas.width = v.videoWidth;
+          canvas.height = v.videoHeight;
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+          try {
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const decode = jsQRRef.current;
+            const code = decode ? decode(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' }) : null;
+            if (code && code.data) { handleScan(code.data); return; }
+          } catch {}
         }
-        const { Html5Qrcode } = await import('html5-qrcode');
-        if (cancelled) return;
-        const el = typeof document !== 'undefined' ? document.getElementById(containerRef.current) : null;
-        if (!el) throw new Error('NO_CONTAINER');
-        const scanner = new Html5Qrcode(containerRef.current);
-        scannerRef.current = scanner;
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText) => handleScan(decodedText),
-          () => {}
-        );
-        started = true;
-        if (!cancelled) setScannerReady(true);
-      } catch (e: any) {
-        const name = e?.name || e?.message || '';
-        let msg = 'Non è stato possibile aprire la fotocamera. Tocca "Scatta foto del QR".';
-        if (name === 'NotAllowedError' || /denied|permission/i.test(String(name))) {
-          msg = 'Permesso fotocamera negato. Abilitalo nelle impostazioni del telefono, oppure usa "Scatta foto del QR".';
-        } else if (name === 'NotFoundError' || name === 'NO_CAMERA_API') {
-          msg = 'La fotocamera live non è disponibile in questa app. Usa "Scatta foto del QR" per registrare l\'accesso.';
-        }
-        if (!cancelled) { setCameraErrorMsg(msg); setState('camera_error'); }
-      }
-    }, 250);
-    // Watchdog: se entro 9s la fotocamera non parte, non restare bloccato
-    const watchdog = setTimeout(() => {
-      if (!cancelled && !started) {
-        stopScanner();
-        setCameraErrorMsg('La fotocamera live non si è avviata. Tocca "Scatta foto del QR".');
-        setState('camera_error');
-      }
-    }, 9000);
-    return () => { cancelled = true; clearTimeout(startTimer); clearTimeout(watchdog); };
-  }, [state, handleScan, stopScanner]);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      const startLoop = () => { if (!stopped) rafRef.current = requestAnimationFrame(tick); };
+      video.play().then(startLoop).catch(startLoop);
+    }, 60);
+
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [state, handleScan]);
+
+  // Pulisce la fotocamera quando si lascia lo stato scanning
+  useEffect(() => {
+    if (state !== 'scanning') stopScanner();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   // Metodo principale: scatta una foto del QR e decodificala.
   // Affidabile su iOS PWA, dove la fotocamera "live" è spesso bloccata.
@@ -216,20 +255,20 @@ export const CheckinScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.scanButton}
-              onPress={scanFromPhoto}
+              onPress={startScanner}
               activeOpacity={0.85}
             >
-              <Ionicons name="camera" size={24} color="#fff" />
+              <Ionicons name="qr-code-outline" size={24} color="#fff" />
               <Text style={styles.scanButtonText}>Scansiona QR</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.liveLink}
-              onPress={startScanner}
+              onPress={scanFromPhoto}
               activeOpacity={0.7}
             >
-              <Ionicons name="scan-outline" size={16} color={colors.textSecondary} />
-              <Text style={styles.liveLinkText}>Scansione continua</Text>
+              <Ionicons name="camera-outline" size={16} color={colors.textSecondary} />
+              <Text style={styles.liveLinkText}>Scatta una foto del QR</Text>
             </TouchableOpacity>
 
             {/* Codice manuale */}
@@ -276,6 +315,14 @@ export const CheckinScreen: React.FC = () => {
                 nativeID={containerRef.current}
                 style={styles.scannerBox}
               />
+              {scannerReady && (
+                <View pointerEvents="none" style={styles.reticle}>
+                  <View style={[styles.corner, styles.cornerTL]} />
+                  <View style={[styles.corner, styles.cornerTR]} />
+                  <View style={[styles.corner, styles.cornerBL]} />
+                  <View style={[styles.corner, styles.cornerBR]} />
+                </View>
+              )}
               {!scannerReady && (
                 <View style={styles.scannerLoading}>
                   <ActivityIndicator size="large" color={colors.accent} />
@@ -350,8 +397,8 @@ export const CheckinScreen: React.FC = () => {
               <Ionicons name="camera" size={20} color="#fff" />
               <Text style={styles.retryButtonText}>Scatta foto del QR</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.secondaryButton} onPress={() => setState('scanning')}>
-              <Text style={styles.secondaryButtonText}>Riprova con la fotocamera</Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={startScanner}>
+              <Text style={styles.secondaryButtonText}>Riprova scansione live</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -450,6 +497,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  reticle: {
+    position: 'absolute',
+    top: '14%', left: '14%', right: '14%', bottom: '14%',
+  },
+  corner: {
+    position: 'absolute',
+    width: 34,
+    height: 34,
+    borderColor: '#fff',
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 12 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 12 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 12 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 12 },
   scannerLoading: {
     position: 'absolute',
     top: 0,
