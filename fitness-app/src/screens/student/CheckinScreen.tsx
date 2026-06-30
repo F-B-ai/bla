@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,11 +14,16 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { registerCheckin } from '../../services/checkinService';
 
-// Accetta qualsiasi QR di accesso ESSĒRE: il codice attuale
-// ('ESSERE_ACCESS_2024'), il vecchio codice ('ESSERE_ACCESS') o il
+// Codice da digitare alla reception (semplice e a prova di fotocamera)
+export const CHECKIN_MANUAL_CODE = 'MMLAB';
+
+// Accetta il codice manuale o qualsiasi QR di accesso ESSĒRE: il codice
+// attuale ('ESSERE_ACCESS_2024'), il vecchio ('ESSERE_ACCESS') o il
 // vecchio QR con URL ('https://...?checkin=ESSERE_ACCESS').
-const isValidCheckinQR = (text: string): boolean =>
-  text.trim().toUpperCase().includes('ESSERE_ACCESS');
+const isValidCheckinQR = (text: string): boolean => {
+  const t = text.trim().toUpperCase();
+  return t.includes('ESSERE_ACCESS') || t === CHECKIN_MANUAL_CODE;
+};
 
 type CheckinState = 'idle' | 'scanning' | 'processing' | 'success' | 'already' | 'error' | 'camera_error';
 
@@ -27,6 +33,7 @@ export const CheckinScreen: React.FC = () => {
   const [state, setState] = useState<CheckinState>('idle');
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraErrorMsg, setCameraErrorMsg] = useState('');
+  const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<any>(null);
   const containerRef = useRef<string>('qr-reader-' + Math.random().toString(36).substring(7));
 
@@ -164,8 +171,19 @@ export const CheckinScreen: React.FC = () => {
   }, [stopScanner]);
 
   const handleRetry = () => {
+    setManualCode('');
     setState('idle');
   };
+
+  const confirmManualCode = useCallback(() => {
+    if (!manualCode.trim()) return;
+    if (isValidCheckinQR(manualCode)) {
+      setState('processing');
+      handleScan(manualCode);
+    } else {
+      setState('error');
+    }
+  }, [manualCode, handleScan]);
 
   return (
     <View style={styles.container}>
@@ -177,19 +195,43 @@ export const CheckinScreen: React.FC = () => {
         {state === 'idle' && (
           <View style={styles.idleContainer}>
             <View style={styles.iconCircle}>
-              <Ionicons name="qr-code" size={64} color={colors.accent} />
+              <Ionicons name="keypad" size={56} color={colors.accent} />
             </View>
             <Text style={styles.mainText}>Registra il tuo accesso</Text>
             <Text style={styles.subText}>
-              Scansiona il QR code alla reception per registrare la tua presenza in palestra
+              Inserisci il codice mostrato alla reception per registrare la tua presenza
             </Text>
+
+            <TextInput
+              style={styles.codeInput}
+              value={manualCode}
+              onChangeText={setManualCode}
+              placeholder="Codice (es. MMLAB)"
+              placeholderTextColor={colors.textLight}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={confirmManualCode}
+            />
             <TouchableOpacity
-              style={styles.scanButton}
+              style={[styles.scanButton, !manualCode.trim() && { opacity: 0.5 }]}
+              onPress={confirmManualCode}
+              disabled={!manualCode.trim()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#fff" />
+              <Text style={styles.scanButtonText}>Conferma accesso</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.orDivider}>oppure</Text>
+
+            <TouchableOpacity
+              style={styles.photoLink}
               onPress={scanFromPhoto}
               activeOpacity={0.7}
             >
-              <Ionicons name="camera" size={24} color="#fff" />
-              <Text style={styles.scanButtonText}>Scansiona QR</Text>
+              <Ionicons name="camera-outline" size={18} color={colors.accent} />
+              <Text style={styles.photoLinkText}>scansiona il QR con la fotocamera</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.photoLink}
@@ -269,9 +311,9 @@ export const CheckinScreen: React.FC = () => {
             <View style={[styles.resultCircle, { backgroundColor: colors.error + '20' }]}>
               <Ionicons name="close-circle" size={80} color={colors.error} />
             </View>
-            <Text style={styles.resultTitle}>QR non valido</Text>
+            <Text style={styles.resultTitle}>Codice non valido</Text>
             <Text style={styles.resultSubtitle}>
-              Assicurati di inquadrare il QR code della palestra alla reception
+              Controlla il codice mostrato alla reception e riprova.
             </Text>
             <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
               <Ionicons name="refresh" size={20} color="#fff" />
@@ -462,6 +504,29 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: '700',
     color: '#fff',
+  },
+  codeInput: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  orDivider: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
   },
   photoLink: {
     flexDirection: 'row',

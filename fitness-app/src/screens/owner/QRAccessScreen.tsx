@@ -16,6 +16,8 @@ import { getTodayCheckins, getRecentCheckins, CheckinRecord } from '../../servic
 import QRCode from 'qrcode';
 
 const CHECKIN_CODE = 'ESSERE_ACCESS_2024';
+// Codice da digitare a mano (deve combaciare con CheckinScreen)
+const MANUAL_CODE = 'MMLAB';
 
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
@@ -147,8 +149,22 @@ export const QRAccessScreen: React.FC = () => {
             font-size: 14px;
             flex-shrink: 0;
           }
+          .manual-code {
+            margin-top: 28px;
+            text-align: center;
+            font-size: 16px;
+            color: #333;
+          }
+          .manual-code strong {
+            display: block;
+            margin-top: 6px;
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: 6px;
+            color: #D40000;
+          }
           .footer {
-            margin-top: 40px;
+            margin-top: 28px;
             font-size: 12px;
             color: #999;
             letter-spacing: 1px;
@@ -214,6 +230,10 @@ export const QRAccessScreen: React.FC = () => {
             <span>Accesso registrato!</span>
           </div>
         </div>
+        <div class="manual-code">
+          <span>Niente fotocamera? Inserisci il codice nell'app:</span>
+          <strong>${MANUAL_CODE}</strong>
+        </div>
         <div class="footer">ESSĒRE — MIND MOVEMENT LAB</div>
         <script>
           function closePage() {
@@ -257,8 +277,12 @@ export const QRAccessScreen: React.FC = () => {
           </View>
           <Text style={styles.qrLabel}>Scansiona per registrare l'accesso</Text>
           <Text style={styles.qrSublabel}>
-            Gli allievi aprono l'app e scansionano il QR dalla tab Check-in
+            Gli allievi aprono l'app, tab Check-in, e inquadrano il QR
           </Text>
+          <View style={styles.manualCodeBox}>
+            <Text style={styles.manualCodeLabel}>Oppure inserisci il codice:</Text>
+            <Text style={styles.manualCodeValue}>{MANUAL_CODE}</Text>
+          </View>
         </View>
 
         {/* Today's checkins */}
@@ -406,6 +430,28 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  manualCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+  },
+  manualCodeLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  manualCodeValue: {
+    fontSize: fontSize.xl,
+    fontWeight: '800',
+    color: colors.accent,
+    letterSpacing: 3,
   },
 
   sectionHeader: {
