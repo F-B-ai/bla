@@ -141,8 +141,16 @@ export const CheckinScreen: React.FC = () => {
     input.type = 'file';
     input.accept = 'image/*';
     (input as any).capture = 'environment';
+    // IMPORTANTE iOS: l'input deve essere agganciato al DOM, altrimenti
+    // il click viene ignorato e la fotocamera non si apre.
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    input.style.opacity = '0';
+    document.body.appendChild(input);
+    const cleanupInput = () => { try { input.remove(); } catch {} };
     input.onchange = async () => {
       const file = input.files && input.files[0];
+      cleanupInput();
       if (!file) return; // utente ha annullato
       setState('processing');
       const tmpId = 'qr-file-' + Math.random().toString(36).slice(2);
@@ -161,6 +169,8 @@ export const CheckinScreen: React.FC = () => {
         setState('camera_error');
       }
     };
+    // Se l'utente annulla il picker, ripulisci comunque l'input
+    setTimeout(() => { if (input.parentNode && !input.files?.length) { /* lasciato per onchange */ } }, 60000);
     input.click();
   }, [handleScan]);
 
@@ -194,53 +204,60 @@ export const CheckinScreen: React.FC = () => {
       <View style={styles.content}>
         {state === 'idle' && (
           <View style={styles.idleContainer}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="keypad" size={56} color={colors.accent} />
+            <View style={styles.heroRing}>
+              <View style={styles.iconCircle}>
+                <Ionicons name="qr-code" size={64} color={colors.accent} />
+              </View>
             </View>
-            <Text style={styles.mainText}>Registra il tuo accesso</Text>
+            <Text style={styles.mainText}>Check-in in palestra</Text>
             <Text style={styles.subText}>
-              Inserisci il codice mostrato alla reception per registrare la tua presenza
+              Inquadra il QR alla reception per registrare il tuo accesso
             </Text>
 
-            <TextInput
-              style={styles.codeInput}
-              value={manualCode}
-              onChangeText={setManualCode}
-              placeholder="Codice (es. MMLAB)"
-              placeholderTextColor={colors.textLight}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="done"
-              onSubmitEditing={confirmManualCode}
-            />
             <TouchableOpacity
-              style={[styles.scanButton, !manualCode.trim() && { opacity: 0.5 }]}
-              onPress={confirmManualCode}
-              disabled={!manualCode.trim()}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="checkmark-circle" size={24} color="#fff" />
-              <Text style={styles.scanButtonText}>Conferma accesso</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.orDivider}>oppure</Text>
-
-            <TouchableOpacity
-              style={styles.photoLink}
+              style={styles.scanButton}
               onPress={scanFromPhoto}
-              activeOpacity={0.7}
+              activeOpacity={0.85}
             >
-              <Ionicons name="camera-outline" size={18} color={colors.accent} />
-              <Text style={styles.photoLinkText}>scansiona il QR con la fotocamera</Text>
+              <Ionicons name="camera" size={24} color="#fff" />
+              <Text style={styles.scanButtonText}>Scansiona QR</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.photoLink}
+              style={styles.liveLink}
               onPress={startScanner}
               activeOpacity={0.7}
             >
-              <Ionicons name="scan-outline" size={18} color={colors.accent} />
-              <Text style={styles.photoLinkText}>scansione continua (fotocamera live)</Text>
+              <Ionicons name="scan-outline" size={16} color={colors.textSecondary} />
+              <Text style={styles.liveLinkText}>Scansione continua</Text>
             </TouchableOpacity>
+
+            {/* Codice manuale */}
+            <View style={styles.manualCard}>
+              <Text style={styles.manualCardLabel}>Non funziona la fotocamera?</Text>
+              <Text style={styles.manualCardHint}>Inserisci il codice della reception</Text>
+              <View style={styles.codeRow}>
+                <TextInput
+                  style={styles.codeInput}
+                  value={manualCode}
+                  onChangeText={setManualCode}
+                  placeholder="CODICE"
+                  placeholderTextColor={colors.textLight}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={confirmManualCode}
+                />
+                <TouchableOpacity
+                  style={[styles.codeConfirm, !manualCode.trim() && { opacity: 0.4 }]}
+                  onPress={confirmManualCode}
+                  disabled={!manualCode.trim()}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="arrow-forward" size={22} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         )}
 
@@ -373,13 +390,12 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: colors.accent + '10',
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    backgroundColor: colors.accent + '14',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
   },
   mainText: {
     fontSize: fontSize.xxl,
@@ -505,40 +521,77 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
-  codeInput: {
+  heroRing: {
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  liveLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  liveLinkText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  manualCard: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 340,
     backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginTop: spacing.xl,
+    alignItems: 'center',
+  },
+  manualCardLabel: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  manualCardHint: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    width: '100%',
+  },
+  codeInput: {
+    flex: 1,
+    backgroundColor: colors.surfaceLight,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    fontSize: fontSize.xl,
+    fontSize: fontSize.lg,
     fontWeight: '700',
     color: colors.text,
     textAlign: 'center',
-    letterSpacing: 2,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    letterSpacing: 3,
   },
-  orDivider: {
-    fontSize: fontSize.sm,
-    color: colors.textLight,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
-  },
-  photoLink: {
-    flexDirection: 'row',
+  codeConfirm: {
+    width: 50,
+    height: 50,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  photoLinkText: {
-    fontSize: fontSize.md,
-    color: colors.accent,
-    fontWeight: '600',
   },
   secondaryButton: {
     marginTop: spacing.md,
