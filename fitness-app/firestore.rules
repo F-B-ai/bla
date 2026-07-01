@@ -21,6 +21,13 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
+    // Config di istanza (licenza white-label): sola lettura dai client,
+    // scrittura solo dal fornitore via service account (Admin SDK).
+    match /config/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
     // Users collection
     match /users/{userId} {
       allow read: if isAuthenticated();

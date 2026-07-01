@@ -13,16 +13,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { registerCheckin } from '../../services/checkinService';
+import { brand } from '../../config/brand';
 
 // Codice da digitare alla reception (semplice e a prova di fotocamera)
-export const CHECKIN_MANUAL_CODE = 'MMLAB';
+export const CHECKIN_MANUAL_CODE = brand.checkinManualCode.toUpperCase();
 
 // Accetta il codice manuale o qualsiasi QR di accesso ESSĒRE: il codice
 // attuale ('ESSERE_ACCESS_2024'), il vecchio ('ESSERE_ACCESS') o il
 // vecchio QR con URL ('https://...?checkin=ESSERE_ACCESS').
 const isValidCheckinQR = (text: string): boolean => {
   const t = text.trim().toUpperCase();
-  return t.includes('ESSERE_ACCESS') || t === CHECKIN_MANUAL_CODE;
+  return t.includes('ESSERE_ACCESS') || t.includes(brand.checkinQRCode.toUpperCase()) || t === CHECKIN_MANUAL_CODE;
 };
 
 type CheckinState = 'idle' | 'scanning' | 'processing' | 'success' | 'already' | 'error' | 'camera_error';

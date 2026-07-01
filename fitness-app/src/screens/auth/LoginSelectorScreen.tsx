@@ -9,6 +9,7 @@ import {
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { EnsoLogo } from '../../components/common/EnsōLogo';
 import { AcademyLogo } from '../../components/common/AcademyLogo';
+import { brand } from '../../config/brand';
 
 const GOLD = '#C5A55A';
 const GOLD_DARK = '#8B7335';
@@ -36,7 +37,7 @@ export const LoginSelectorScreen: React.FC<LoginSelectorScreenProps> = ({
         >
           <View style={styles.cardContent}>
             <EnsoLogo size={70} />
-            <Text style={styles.cardTitle}>ESSĒRE</Text>
+            <Text style={styles.cardTitle}>{brand.appName}</Text>
             <Text style={styles.cardDescription}>
               Fitness, Coaching{'\n'}& Benessere
             </Text>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
+import { brand } from '../../config/brand';
 
 const DISMISSED_KEY = 'essere_install_prompt_dismissed';
 const MIN_VISITS_BEFORE_PROMPT = 2;
@@ -80,7 +81,7 @@ export const InstallPrompt: React.FC = () => {
           <Text style={styles.body}>
             {isiOS
               ? 'Tocca l\'icona Condividi in basso, poi "Aggiungi a Home" per un\'esperienza completa con notifiche push.'
-              : 'Aggiungi ESSĒRE alla schermata Home per accesso rapido e notifiche.'}
+              : `Aggiungi ${brand.appName} alla schermata Home per accesso rapido e notifiche.`}
           </Text>
         </View>
         <TouchableOpacity onPress={dismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>

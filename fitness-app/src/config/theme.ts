@@ -1,15 +1,16 @@
 // ============================================================
-// ESSĒRE - THEME CONFIGURATION
-// Palette: Nero, Rosso, Bianco/Crema
+// THEME CONFIGURATION (white-label)
+// I colori del brand arrivano da src/config/brand.ts
 // ============================================================
+import { brand } from './brand';
 
 export const colors = {
-  // --- Brand ---
-  primary: '#0A0A0A',
-  primaryLight: '#161616',
-  accent: '#D40000',
-  accentLight: '#E63333',
-  accentDark: '#990000',
+  // --- Brand (da brand.ts) ---
+  primary: brand.colors.primary,
+  primaryLight: brand.colors.primaryLight,
+  accent: brand.colors.accent,
+  accentLight: brand.colors.accentLight,
+  accentDark: brand.colors.accentDark,
 
   // --- Status ---
   success: '#34C759',

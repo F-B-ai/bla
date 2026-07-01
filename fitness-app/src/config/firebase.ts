@@ -9,16 +9,11 @@ import {
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { Platform } from 'react-native';
+import { brand } from './brand';
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyDAuKlToc-_GRILEcMzwoD4ysuBYRtPzxE',
-  authDomain: 'essere-3fe6f.firebaseapp.com',
-  projectId: 'essere-3fe6f',
-  storageBucket: 'essere-3fe6f.firebasestorage.app',
-  messagingSenderId: '9504654070',
-  appId: '1:9504654070:web:7b8c7d09645b113b0ea2d7',
-  measurementId: 'G-QLVE494VJR',
-};
+// La configurazione Firebase vive in src/config/brand.ts (white-label):
+// ogni palestra cliente ha il proprio progetto Firebase.
+const firebaseConfig = brand.firebase;
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 

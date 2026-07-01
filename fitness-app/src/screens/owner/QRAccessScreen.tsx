@@ -14,10 +14,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { getTodayCheckins, getRecentCheckins, CheckinRecord } from '../../services/checkinService';
 import QRCode from 'qrcode';
+import { brand } from '../../config/brand';
 
-const CHECKIN_CODE = 'ESSERE_ACCESS_2024';
+const CHECKIN_CODE = brand.checkinQRCode;
 // Codice da digitare a mano (deve combaciare con CheckinScreen)
-const MANUAL_CODE = 'MMLAB';
+const MANUAL_CODE = brand.checkinManualCode.toUpperCase();
 
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
@@ -80,7 +81,7 @@ export const QRAccessScreen: React.FC = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>QR Check-in ESSĒRE</title>
+        <title>QR Check-in ${brand.appName}</title>
         <style>
           @page { size: A4; margin: 0; }
           body {
@@ -210,8 +211,8 @@ export const QRAccessScreen: React.FC = () => {
       <body>
         <button class="close-btn no-print" onclick="closePage()">✕ Chiudi</button>
         <button class="print-btn no-print" onclick="window.print()">⎙ Stampa</button>
-        <div class="brand">ESSĒRE</div>
-        <div class="subtitle">MIND MOVEMENT LAB</div>
+        <div class="brand">${brand.appName}</div>
+        <div class="subtitle">${brand.tagline}</div>
         <div class="qr-container">
           <img src="${qrDataUrl}" alt="QR Check-in" />
         </div>
@@ -219,7 +220,7 @@ export const QRAccessScreen: React.FC = () => {
           <h2>Registra il tuo accesso</h2>
           <div class="step">
             <div class="step-num">1</div>
-            <span>Apri l'app ESSĒRE</span>
+            <span>Apri l'app ${brand.appName}</span>
           </div>
           <div class="step">
             <div class="step-num">2</div>
@@ -234,7 +235,7 @@ export const QRAccessScreen: React.FC = () => {
           <span>Niente fotocamera? Inserisci il codice nell'app:</span>
           <strong>${MANUAL_CODE}</strong>
         </div>
-        <div class="footer">ESSĒRE — MIND MOVEMENT LAB</div>
+        <div class="footer">${brand.appName} — ${brand.tagline}</div>
         <script>
           function closePage() {
             try { window.close(); } catch (e) {}

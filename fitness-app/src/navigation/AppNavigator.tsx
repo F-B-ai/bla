@@ -97,6 +97,9 @@ import { AICoachScreen } from '../screens/shared/AICoachScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
 import { CheckinScreen } from '../screens/student/CheckinScreen';
+import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
+import { checkLicense } from '../services/licenseService';
+import { brand } from '../config/brand';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -1036,6 +1039,7 @@ export const AppNavigator: React.FC = () => {
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [license, setLicense] = useState<{ active: boolean; message?: string }>({ active: true });
 
   useEffect(() => {
     if (isAuthenticated && user && (role === 'student' || role === 'collaborator')) {
@@ -1081,6 +1085,13 @@ export const AppNavigator: React.FC = () => {
     }
   }, [isAuthenticated, user]);
 
+  // Verifica licenza white-label (kill-switch) dopo l'autenticazione
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      checkLicense().then(setLicense).catch(() => {});
+    }
+  }, [isAuthenticated, user]);
+
   // Clean up stale loginMode from storage when not authenticated
   useEffect(() => {
     if (loginModeLoaded && !loading && !isAuthenticated && loginMode !== null && !loginModeSetByUser.current) {
@@ -1103,6 +1114,11 @@ export const AppNavigator: React.FC = () => {
     return <LoadingScreen />;
   }
 
+  // Licenza sospesa: blocca l'intera app (kill-switch white-label)
+  if (isAuthenticated && !license.active) {
+    return <LicenseLockedScreen message={license.message} />;
+  }
+
   // If not authenticated and loginMode came from storage (not user action), force selector
   const effectiveLoginMode = (!isAuthenticated && !loginModeSetByUser.current) ? null : loginMode;
 
@@ -1122,7 +1138,7 @@ export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer
       documentTitle={{
-        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+        formatter: () => effectiveLoginMode === 'academy' ? brand.academyName : brand.appName,
       }}
     >
       <View style={{ flex: 1 }}>

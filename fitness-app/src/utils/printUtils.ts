@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
+import { brand } from '../config/brand';
 
-const LOGO_CHAR = 'ESSĒRE';
+const LOGO_CHAR = brand.appName;
 
 const BASE_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -88,10 +89,10 @@ function showPrintOverlay(content: string, css: string) {
           const blob = new Blob([fullHtml], { type: 'text/html' });
           const file = new File([blob], 'ricevuta-essere.html', { type: 'text/html' });
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: 'Ricevuta ESSĒRE' });
+            await navigator.share({ files: [file], title: 'Ricevuta ' + brand.appName });
             return;
           }
-          await navigator.share({ title: 'Ricevuta ESSĒRE', text: body.innerText });
+          await navigator.share({ title: 'Ricevuta ' + brand.appName, text: body.innerText });
           return;
         }
         window.print();

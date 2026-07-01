@@ -1,3 +1,4 @@
+import { brand } from '../config/brand';
 import { Student, TrainingSession, BodyMeasurement, PaymentPlan } from '../types';
 import { getStudentSessions } from './sessionService';
 import { getStudentMeasurements } from './nutritionistService';
@@ -118,7 +119,7 @@ const buildHTML = (data: ReportData): string => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Report ${student.name} ${student.surname} — ESSĒRE</title>
+<title>Report ${student.name} ${student.surname} — ${brand.appName}</title>
 <style>
   @page { size: A4; margin: 15mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -224,7 +225,7 @@ const buildHTML = (data: ReportData): string => {
   <!-- Header -->
   <div class="header">
     <div>
-      <div class="brand">ESSĒRE</div>
+      <div class="brand">${brand.appName}</div>
       <div class="brand-sub">Report Progressi Allievo</div>
     </div>
     <div class="report-date">
@@ -388,7 +389,7 @@ const buildHTML = (data: ReportData): string => {
 
   <!-- Footer -->
   <div class="footer">
-    ESSĒRE — Report generato il ${fmt(new Date())} · Documento riservato
+    ${brand.appName} — Report generato il ${fmt(new Date())} · Documento riservato
   </div>
 
 </div>

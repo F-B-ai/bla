@@ -9,10 +9,11 @@ import {
 import { Linking } from 'react-native';
 import { db } from '../config/firebase';
 import { PaymentPlan, AppNotification } from '../types';
+import { brand } from '../config/brand';
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
 
-const MSG_PREFIX = `*APP ESSĒRE*\n\n`;
+const MSG_PREFIX = `*APP ${brand.appName}*\n\n`;
 
 const REMINDER_MESSAGES = {
   week: (name: string, amount: number, dueDate: string) =>

@@ -13,6 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { brand } from '../config/brand';
 import { AppNotification, NotificationType } from '../types';
 import { showLocalNotification, updateBadgeCount } from './pushNotificationService';
 
@@ -20,7 +21,7 @@ let _currentUserId: string | null = null;
 export const setCurrentUserId = (uid: string | null) => { _currentUserId = uid; };
 
 const NOTIFICATIONS_COLLECTION = 'diaryEntries';
-const NOTIFICATION_PREFIX = 'APP ESSĒRE\n\n';
+const NOTIFICATION_PREFIX = `APP ${brand.appName}\n\n`;
 
 const prefixBody = (body: string): string =>
   body.startsWith('APP ESS') ? body : NOTIFICATION_PREFIX + body;
