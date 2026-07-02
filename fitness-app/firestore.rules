@@ -21,6 +21,13 @@ service cloud.firestore {
       return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
+    // Stato ESSĒRE (check-in mente-corpo quotidiano)
+    match /wellnessChecks/{checkId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isStaff();
+    }
+
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
     match /config/{docId} {

@@ -1,0 +1,160 @@
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  Timestamp,
+} from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+const WELLNESS_COLLECTION = 'wellnessChecks';
+
+// ============================================================
+// STATO ESSĒRE — check-in quotidiano mente-corpo
+// 4 dimensioni (1-5): sonno, energia, umore, dolori muscolari.
+// Il punteggio 0-100 guida il consiglio di allenamento del giorno
+// ed è visibile al coach.
+// ============================================================
+
+export interface WellnessCheck {
+  id: string;
+  studentId: string;
+  studentName: string;
+  sleep: number; // 1-5
+  energy: number; // 1-5
+  mood: number; // 1-5
+  soreness: number; // 1-5 (5 = molto dolorante)
+  score: number; // 0-100
+  timestamp: Date;
+}
+
+export const computeScore = (
+  sleep: number,
+  energy: number,
+  mood: number,
+  soreness: number
+): number => {
+  // dolori invertiti: 1 dolorante-zero → contributo pieno
+  const raw = sleep + energy + mood + (6 - soreness); // 4..20
+  return Math.round(((raw - 4) / 16) * 100);
+};
+
+export interface ScoreAdvice {
+  title: string;
+  detail: string;
+  color: 'success' | 'warning' | 'error';
+}
+
+export const adviceForScore = (score: number): ScoreAdvice => {
+  if (score >= 75) {
+    return {
+      title: 'Giornata per spingere',
+      detail: 'Mente e corpo sono pronti: è il giorno giusto per intensità e carichi importanti.',
+      color: 'success',
+    };
+  }
+  if (score >= 50) {
+    return {
+      title: 'Allenamento moderato',
+      detail: 'Allenati con buona tecnica ma senza cercare massimali: ascolta il corpo.',
+      color: 'warning',
+    };
+  }
+  return {
+    title: 'Recupero attivo',
+    detail: 'Oggi privilegia mobilità, respirazione e lavoro leggero: il recupero è allenamento.',
+    color: 'error',
+  };
+};
+
+const startOfToday = (): Date => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const fromDoc = (id: string, data: Record<string, any>): WellnessCheck => ({
+  id,
+  studentId: data.studentId,
+  studentName: data.studentName || '',
+  sleep: data.sleep || 3,
+  energy: data.energy || 3,
+  mood: data.mood || 3,
+  soreness: data.soreness || 3,
+  score: data.score || 0,
+  timestamp: data.timestamp ? (data.timestamp as Timestamp).toDate() : new Date(),
+});
+
+// Ritorna il check-in di oggi dello studente, se esiste.
+// NB: filtro solo per data lato server (nessun indice composito
+// richiesto) e per studente lato client.
+export const getTodayCheck = async (studentId: string): Promise<WellnessCheck | null> => {
+  const snap = await getDocs(
+    query(
+      collection(db, WELLNESS_COLLECTION),
+      where('timestamp', '>=', Timestamp.fromDate(startOfToday()))
+    )
+  );
+  const d = snap.docs.find((x) => x.data().studentId === studentId);
+  return d ? fromDoc(d.id, d.data()) : null;
+};
+
+export const saveDailyCheck = async (
+  studentId: string,
+  studentName: string,
+  values: { sleep: number; energy: number; mood: number; soreness: number }
+): Promise<WellnessCheck> => {
+  const score = computeScore(values.sleep, values.energy, values.mood, values.soreness);
+  const ref = await addDoc(collection(db, WELLNESS_COLLECTION), {
+    studentId,
+    studentName,
+    ...values,
+    score,
+    timestamp: Timestamp.now(),
+  });
+  return {
+    id: ref.id,
+    studentId,
+    studentName,
+    ...values,
+    score,
+    timestamp: new Date(),
+  };
+};
+
+// Storico recente dello studente (per trend personale)
+export const getRecentChecks = async (
+  studentId: string,
+  days: number = 14
+): Promise<WellnessCheck[]> => {
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  start.setHours(0, 0, 0, 0);
+  const snap = await getDocs(
+    query(
+      collection(db, WELLNESS_COLLECTION),
+      where('timestamp', '>=', Timestamp.fromDate(start)),
+      orderBy('timestamp', 'desc'),
+      limit(500)
+    )
+  );
+  return snap.docs
+    .filter((d) => d.data().studentId === studentId)
+    .slice(0, days)
+    .map((d) => fromDoc(d.id, d.data()));
+};
+
+// Tutti i check-in di oggi (vista coach/owner)
+export const getAllTodayChecks = async (): Promise<WellnessCheck[]> => {
+  const snap = await getDocs(
+    query(
+      collection(db, WELLNESS_COLLECTION),
+      where('timestamp', '>=', Timestamp.fromDate(startOfToday())),
+      orderBy('timestamp', 'desc')
+    )
+  );
+  return snap.docs.map((d) => fromDoc(d.id, d.data()));
+};

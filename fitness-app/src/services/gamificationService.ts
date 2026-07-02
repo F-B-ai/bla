@@ -622,6 +622,27 @@ export const updateAfterWorkout = async (
   return gamification;
 };
 
+// --- Assegna XP generici (es. check-in Stato ESSĒRE) ---
+export const awardXp = async (
+  studentId: string,
+  amount: number
+): Promise<void> => {
+  const gamification = await getStudentGamification(studentId);
+  gamification.xp += amount;
+  gamification.level = calculateLevel(gamification.xp);
+  const newBadges = checkAndAwardBadges(gamification);
+  gamification.badges = [...gamification.badges, ...newBadges];
+  await updateDoc(doc(db, GAMIFICATION_COLLECTION, gamification.id), {
+    xp: gamification.xp,
+    level: gamification.level,
+    badges: gamification.badges.map((b) => ({
+      ...b,
+      unlockedAt: b.unlockedAt ? Timestamp.fromDate(b.unlockedAt) : null,
+    })),
+    updatedAt: Timestamp.now(),
+  });
+};
+
 // --- Aggiorna dopo una nuova nota nel diario ---
 export const updateAfterDiaryEntry = async (
   studentId: string

@@ -35,15 +35,16 @@ export const registerCheckin = async (
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  // Filtro solo per data lato server (nessun indice composito richiesto),
+  // per studente lato client: i check-in di oggi sono pochi.
   const existing = await getDocs(
     query(
       collection(db, CHECKIN_COLLECTION),
-      where('studentId', '==', studentId),
       where('timestamp', '>=', Timestamp.fromDate(todayStart))
     )
   );
 
-  if (!existing.empty) {
+  if (existing.docs.some((d) => d.data().studentId === studentId)) {
     return { success: false, alreadyCheckedIn: true };
   }
 

@@ -35,6 +35,7 @@ import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 import { generateWeeklySummary, ensureAIApiKey } from '../../services/aiService';
 import { generateAndSendRemindersForAllStudents, generatePaymentReminders, sendWhatsAppReminder } from '../../services/paymentReminderService';
+import { getAllTodayChecks, WellnessCheck } from '../../services/wellnessService';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -49,6 +50,11 @@ export const DashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { logout, user } = useAuth();
+  const [wellnessToday, setWellnessToday] = useState<WellnessCheck[]>([]);
+
+  useEffect(() => {
+    getAllTodayChecks().then(setWellnessToday).catch(() => {});
+  }, []);
   const [refreshing, setRefreshing] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
@@ -588,6 +594,34 @@ export const DashboardScreen: React.FC = () => {
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.accent} />
       </TouchableOpacity>
+
+      {/* Stato ESSĒRE del team — check-in mente-corpo di oggi */}
+      {wellnessToday.length > 0 && (
+        <View style={styles.wellnessCard}>
+          <View style={styles.wellnessHeader}>
+            <Ionicons name="pulse" size={20} color={colors.accent} />
+            <Text style={styles.wellnessTitle}>Stato Allievi oggi</Text>
+            <Text style={styles.wellnessAvg}>
+              media {Math.round(wellnessToday.reduce((s, c) => s + c.score, 0) / wellnessToday.length)}
+            </Text>
+          </View>
+          {wellnessToday.slice(0, 8).map((c) => (
+            <View key={c.id} style={styles.wellnessRow}>
+              <View
+                style={[
+                  styles.wellnessDot,
+                  { backgroundColor: c.score >= 75 ? colors.success : c.score >= 50 ? colors.warning : colors.error },
+                ]}
+              />
+              <Text style={styles.wellnessName} numberOfLines={1}>{c.studentName}</Text>
+              <Text style={styles.wellnessScore}>{c.score}</Text>
+              {c.score < 50 && (
+                <Text style={styles.wellnessFlag}>da attenzionare</Text>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* AI Summary Modal */}
       <Modal visible={showAiSummaryModal} animationType="slide" transparent>
@@ -1359,6 +1393,61 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  wellnessCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.small,
+  },
+  wellnessHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  wellnessTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+    flex: 1,
+  },
+  wellnessAvg: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  wellnessRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  wellnessDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  wellnessName: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  wellnessScore: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  wellnessFlag: {
+    fontSize: fontSize.xs,
+    color: colors.error,
+    fontWeight: '700',
   },
   aiSummaryCardTitle: {
     fontSize: fontSize.lg,

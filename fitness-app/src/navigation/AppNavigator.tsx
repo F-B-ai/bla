@@ -97,6 +97,7 @@ import { AICoachScreen } from '../screens/shared/AICoachScreen';
 import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
 import { registerPushToken } from '../services/pushNotificationService';
 import { CheckinScreen } from '../screens/student/CheckinScreen';
+import { EssereScreen } from '../screens/student/EssereScreen';
 import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
 import { checkLicense } from '../services/licenseService';
 import { brand } from '../config/brand';
@@ -813,6 +814,14 @@ const StudentTabs = () => (
       headerShown: false,
     }}
   >
+    <StudentTab.Screen
+      name="Essere"
+      component={EssereScreen}
+      options={{
+        tabBarLabel: brand.appName,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'pulse' : 'pulse-outline'} focused={focused} />,
+      }}
+    />
     <StudentTab.Screen
       name="MyProgram"
       component={MyProgramScreen}
