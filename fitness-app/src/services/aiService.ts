@@ -27,7 +27,9 @@ export const ensureAIApiKey = async (): Promise<string> => {
   return API_KEY;
 };
 
-// Carica la chiave API da AsyncStorage all'avvio
+// Carica la chiave API da AsyncStorage all'avvio; se assente, fallback
+// al documento Firestore config/aiKey (impostato dall'owner) così tutti
+// i dispositivi degli allievi la ricevono senza configurazione manuale.
 export const loadAIApiKey = async (): Promise<string> => {
   if (_keyLoaded) return API_KEY;
   try {
@@ -38,6 +40,22 @@ export const loadAIApiKey = async (): Promise<string> => {
   } catch {
     // ignore
   }
+  if (!API_KEY) {
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../config/firebase');
+      const snap = await getDoc(doc(db, 'config', 'aiKey'));
+      const remote = snap.exists() ? (snap.data().key as string) : '';
+      if (remote) {
+        API_KEY = remote;
+        AsyncStorage.setItem(AI_KEY_STORAGE, remote).catch(() => {});
+      }
+    } catch {
+      // offline o regole: si riproverà alla prossima chiamata
+      _keyLoaded = false;
+      return API_KEY;
+    }
+  }
   _keyLoaded = true;
   return API_KEY;
 };
@@ -46,11 +64,12 @@ export const loadAIApiKey = async (): Promise<string> => {
 loadAIApiKey();
 
 // --- Helper per chiamata Claude ---
-const callClaude = async (
+export const callClaude = async (
   messages: Array<{ role: string; content: any }>,
   systemPrompt: string,
   maxTokens: number = 2000,
-  prefill?: string
+  prefill?: string,
+  model: string = 'claude-sonnet-4-5'
 ): Promise<string> => {
   if (!API_KEY) {
     await loadAIApiKey();
@@ -80,7 +99,7 @@ const callClaude = async (
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model,
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: allMessages,

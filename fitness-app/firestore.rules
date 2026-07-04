@@ -42,6 +42,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Eccezioni scrivibili dall'owner: info per l'Assistente e chiave AI
+    match /config/assistantInfo {
+      allow read: if isAuthenticated();
+      allow write: if isOwner();
+    }
+    match /config/aiKey {
+      allow read: if isAuthenticated();
+      allow write: if isOwner();
+    }
+
     // Users collection
     match /users/{userId} {
       allow read: if isAuthenticated();

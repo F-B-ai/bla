@@ -98,6 +98,7 @@ import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificati
 import { registerPushToken } from '../services/pushNotificationService';
 import { CheckinScreen } from '../screens/student/CheckinScreen';
 import { EssereScreen } from '../screens/student/EssereScreen';
+import { AssistantScreen } from '../screens/shared/AssistantScreen';
 import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
 import { checkLicense } from '../services/licenseService';
 import { brand } from '../config/brand';
@@ -405,6 +406,14 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'AI',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Assistente"
+      component={AssistantScreen}
+      options={{
+        tabBarLabel: 'Assistente',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
@@ -836,6 +845,14 @@ const StudentTabs = () => (
       options={{
         tabBarLabel: 'Check-in',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'qr-code' : 'qr-code-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Assistente"
+      component={AssistantScreen}
+      options={{
+        tabBarLabel: 'Assistente',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
