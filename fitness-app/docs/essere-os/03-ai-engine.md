@@ -290,7 +290,7 @@ La pratica di default 2026 — embeddings + vector DB su tutto — risolve il pr
 | 3. Snapshot Twin | proiezione compatta per-allievo (sotto) | cambia a ogni chiamata | ❌ dopo il breakpoint |
 | 4. Conversazione | ultimi N turni (finestra per modulo) | volatile | ❌ |
 
-Regole pratiche di caching: mai timestamp/ID volatili negli strati 1–2 (un byte diverso invalida tutto il prefisso); serializzazione deterministica (chiavi ordinate); il prefisso cacheable deve superare la soglia minima del modello (ordine di 1–4k token a seconda del modello: i system prompt dei moduli chat ci arrivano naturalmente con i few-shot; per Haiku/Recovery, prompt corto, il caching non si applica e va bene così). Verifica in CI: `cache_read_input_tokens > 0` sul secondo hit di ogni eval (§5).
+Regole pratiche di caching: mai timestamp/ID volatili negli strati 1–2 (un byte diverso invalida tutto il prefisso); serializzazione deterministica (chiavi ordinate); il prefisso cacheable deve superare la soglia minima del modello (a luglio 2026: ~4096 token per `claude-opus-4-8` e `claude-haiku-4-5`, ~2048 per `claude-sonnet-4-6` — sotto soglia il breakpoint viene ignorato in silenzio, senza errore: i system prompt dei moduli chat superano la soglia naturalmente con i few-shot; per Haiku/Recovery, prompt corto, il caching non si applica e va bene così). Verifica in CI: `cache_read_input_tokens > 0` sul secondo hit di ogni eval (§5).
 
 ### 3.3 Snapshot Twin: budget token per modulo
 
@@ -354,7 +354,7 @@ Dashboard settimanale per il founder (una pagina, non Grafana):
 
 ### 4.4 Aggiornamento modelli
 
-ID pinnati per modulo nel registro (§0.2). Quando Anthropic rilascia un modello nuovo: si esegue l'eval set completo sul candidato, si confrontano assertion + judge + costi, si migra un modulo alla volta partendo dal meno critico (Recovery), con il vecchio ID come rollback a 1 riga. Mai "upgrade automatico all'ultimo modello": un cambio di modello è un deploy, con le stesse cautele.
+ID pinnati per modulo nel registro (§0.2). Quando Anthropic rilascia un modello nuovo: si esegue l'eval set completo sul candidato, si confrontano assertion + judge + costi, si migra un modulo alla volta partendo dal meno critico (Recovery), con il vecchio ID come rollback a 1 riga. Mai "upgrade automatico all'ultimo modello": un cambio di modello è un deploy, con le stesse cautele. Primo candidato concreto da valutare in H1: `claude-sonnet-5` (stessa fascia di listino di Sonnet 4.6, con prezzo introduttivo fino ad agosto 2026) — attenzione al tokenizer diverso (~+30% token a parità di testo: i budget di §3.3 vanno ri-misurati, non riusati) e al thinking adattivo attivo di default (va disabilitato o messo a budget nei moduli a bassa latenza come Recovery).
 
 ---
 
@@ -398,7 +398,7 @@ Centralizzati nel gateway (guardrail chain, §0.2), non affidati alla memoria de
 
 ## Cosa NON faremo (e perché)
 
-- **Fine-tuning o modello proprietario in H0/H1.** Il vantaggio non è il modello: è il contesto (Twin) e le label (coach). Si compra l'intelligenza a consumo; il fine-tuning si rivaluta in H2 quando `ai.feedback` avrà decine di migliaia di label — con un caso d'uso che il prompt engineering non copre.
+- **Fine-tuning o modello proprietario in H0/H1.** Il vantaggio non Ã¨ il modello: Ã¨ il contesto (Twin) e le label (coach). Si compra l'intelligenza a consumo; il fine-tuning si rivaluta in H2 quando `ai.feedback` avrÃ  decine di migliaia di label â con un caso d'uso che il prompt engineering non copre. **Condizione giuridica non negoziabile**: il fine-tuning avverrÃ  solo sul dataset pseudonimizzato coperto dal consenso per finalitÃ  secondarie e dalla clausola di sopravvivenza del DPA (assetto “titolare autonomo delimitato”, [06 Â§3.1](./06-sicurezza-compliance.md)) â consenso da raccogliere dal giorno 1, o questo punto resta carta.
 - **Framework di orchestrazione AI (LangChain, agent framework, ecc.).** Il gateway è ~400 righe di codice che si leggono in un'ora. Un framework aggiunge astrazioni, lock-in e superficie di bug sopra un'API che è già semplice; a questa scala è puro costo.
 - **Vector DB / embeddings in H0/H1.** Vedi decisione 5. Rivalutazione in H2 per libreria esercizi, Academy e marketplace — corpus veri, non il Twin.
 - **AI autonoma sui programmi di allenamento.** Nemmeno in H2 senza numeri (accettazione > 90% per 3+ mesi). Il coach nel loop è il prodotto e il moat, non un collo di bottiglia da ottimizzare via.

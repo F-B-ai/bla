@@ -86,14 +86,14 @@ La tesi (da dimostrare coi numeri, non da recitare): **coach-in-the-loop + readi
 
 3. **White-label B2B: si vende alla palestra, non all'utente.** Un contratto = 30–300 utenti in un colpo, con onboarding fatto dal coach (che ha interesse a farlo, perché l'app lavora per lui). Il churn dell'allievo è assorbito dalla palestra; il nostro churn rilevante è quello della palestra, che ha switching cost crescenti (§5).
 
-4. **Valutazione posturale AI = il momento "wow" di vendita.** Nessun competitor della tabella la offre come onboarding. In demo dal vivo (founder + tablet + 3 minuti) è l'argomento che chiude: la palestra vede un servizio da vendere ai propri clienti, non un costo.
+4. **Valutazione posturale AI = il momento "wow" di vendita.** Nessun competitor della tabella la offre come onboarding. In demo dal vivo (founder + tablet, pochi minuti) è l'argomento su cui puntiamo per chiudere — **ipotesi da verificare**: la conversione demo→firma si strumenta dalla prima trattativa (pipeline di 07 M6.5), e questo claim si sostituisce col numero reale appena esiste. La palestra vede un servizio da vendere ai propri clienti, non un costo.
 
 ### 3.2 Perché B2B2C batte B2C, per noi, con i numeri
 
 | Dimensione | B2C diretto | B2B2C white-label (scelto) |
 |---|---|---|
 | CAC | 20–80 € per install a pagamento su Meta/Google; con budget ~0 = irrilevante | ~0 nella rete locale del founder (referral tra titolari); 300–500 € stimati con outbound in H1 → **un contratto porta 30–300 utenti** |
-| Distribuzione | Serve ranking negli store contro Apple/Whoop con milioni di budget ads | Il coach installa l'app all'allievo in palestra, di persona. Attivazione ~100%, non ~25% |
+| Distribuzione | Serve ranking negli store contro Apple/Whoop con milioni di budget ads | Il coach installa l'app all'allievo in palestra, di persona. Ipotesi: attivazione quasi totale contro il ~25% tipico del B2C — **da strumentare sul pilota** (M3.5: % iscritti attivati a 30gg è un criterio di accettazione, non uno slogan) |
 | Retention | Le app fitness consumer perdono ~90% degli utenti in 90 giorni (media di settore) | L'allievo resta finché resta in palestra; il coach lo richiama fisicamente. La retention è **strutturale**, non da growth hack |
 | Dati | Utenti anonimi, self-reported, senza ground truth | Ogni dato ha contesto (palestra, programma, coach) e **label umane** (feedback coach) → §5 |
 | Pricing power | 4,99–9,99 €/mese contestati da alternative gratuite | 149–399 €/mese a chi ci fa girare il business sopra |
@@ -134,8 +134,9 @@ Modello: **setup una tantum + canone mensile a scaglioni di allievi attivi**. Un
 | Supporto ricorrente | ~2–3h/mese | ~1–2h/mese | Da abbattere con Assistente ESSĒRE lato titolare |
 | **Margine lordo cash** | **~84%** | **~70%** | Prima del costo-tempo founder |
 | CAC | 0–500 € | — | Referral rete locale → outbound |
-| LTV (churn palestre 20%/anno, prudente) | — | **~13.000 €** | vita media 5 anni × margine |
-| **LTV/CAC** | — | **> 20** | anche nello scenario outbound |
+| **Payback CAC** | **immediato** | — | Il setup fee (1.490 €) copre il CAC anche nello scenario outbound peggiore |
+
+> **Niente LTV per ora.** Un LTV calcolato con zero clienti e churn inventato è la vanity math da pitch deck che questo documento rifiuta. Le metriche oneste oggi sono due: payback (il setup copre il CAC) e margine lordo. L'LTV si calcola quando esisteranno 12 mesi di churn reale.
 
 **Soglie di sopravvivenza** (per il founder, senza stipendio esterno): 5 palestre PRO ≈ 1.245 €/mese ricorrenti coprono tutta l'infrastruttura e comprano tempo; **12–15 palestre ≈ 3.000–3.700 €/mese** = sostenibilità personale; 30 palestre = primo hire (vedi [07-roadmap-milestones](./07-roadmap-milestones.md)).
 
@@ -169,8 +170,8 @@ Il dettaglio tecnico è in [02-dati-digital-twin](./02-dati-digital-twin.md); qu
 
 - **Il dataset è longitudinale ed etichettato.** Apple ha più dati grezzi di chiunque, ma non ha un esperto umano che scrive "ridotto il carico perché il ginocchio destro segnala dolore da 3 giorni" accanto al dato. Quella frase, moltiplicata per migliaia di allievi e anni, è ciò che permette in H2 un AI Coach che nessun modello foundation può replicare da solo — perché il dato di training non esiste altrove.
 - **Lo switching cost cresce da solo.** Una palestra al mese 18 ha nel twin dei suoi allievi un valore che nessun competitor può migrare: cambiare piattaforma significa ricominciare la storia clinica-sportiva da zero. Il churn scende col tempo senza che spendiamo in retention.
-- **Il moat parte piccolo e va detto.** Con 30 allievi non c'è nessun moat: c'è un seme. Il moat è credibile a ~5.000 allievi attivi (≈ 40–60 palestre, fine H1/inizio H2). Fingerlo prima sarebbe una bugia da pitch deck; il piano è costruire lo schema dati **oggi** in modo che ogni giorno da qui in avanti accumuli capitale ([02-dati-digital-twin](./02-dati-digital-twin.md) definisce eventi e ontologia proprio per questo).
-- **Condizione abilitante**: consensi e base giuridica raccolti correttamente fin da H0 ([06-sicurezza-compliance](./06-sicurezza-compliance.md)) — un dataset raccolto male è un passivo, non un moat.
+- **Il moat parte piccolo e va detto.** Con 30 allievi non c'è nessun moat: c'è un seme. Il moat è credibile a **~5.000 AAT** (≈ 40–60 palestre), attesi realisticamente verso il **mese ~24 (metà H2)** — non prima. Fingerlo prima sarebbe una bugia da pitch deck; il piano è costruire lo schema dati **oggi** in modo che ogni giorno da qui in avanti accumuli capitale ([02-dati-digital-twin](./02-dati-digital-twin.md) definisce eventi e ontologia proprio per questo).
+- **Condizione abilitante (decisione legale da prendere ORA, non in H2)**: con il solo assetto "ESSĒRE responsabile ex art. 28" il moat è giuridicamente inesercitabile — a fine contratto i dati vanno cancellati o restituiti, e il no-training pledge vieterebbe il fine-tuning H2. La scelta di questo pacchetto è: **ESSĒRE titolare autonomo per due finalità secondarie delimitate** (benchmark aggregati pseudonimizzati; miglioramento dei modelli), con **consenso dedicato e revocabile raccolto dall'allievo dal giorno 1** e **clausola di sopravvivenza nel DPA** con le palestre clienti. [06-sicurezza-compliance](./06-sicurezza-compliance.md) §7 definisce testi e meccanica; [02](./02-dati-digital-twin.md) §7.2 e [03](./03-ai-engine.md) sono allineati a questo assetto. Un dataset raccolto male è un passivo, non un moat.
 
 ---
 
@@ -227,7 +228,7 @@ Perché questa e non altre:
 
 | Metrica | Target 36 mesi | Note |
 |---|---|---|
-| AAT totali | ≥ 10.000 | ≈ 80–120 palestre: soglia moat (§5.2) |
+| AAT totali | ≥ 10.000 | ≈ 80–120 palestre: 2× la soglia moat di §5.2 (5.000 AAT, attesa ~mese 24) |
 | ARR | ≥ 400.000 € | Mix: canoni + Academy + marketplace |
 | GMV marketplace | primo 100.000 €/anno | take-rate 15% |
 | Twin ≥ 12 mesi di storico | ≥ 40% degli AAT | La metrica del moat |
@@ -246,7 +247,7 @@ Perché questa e non altre:
 | **Readiness software-first: Stato ESSĒRE come core, wearable solo come arricchimento, mai requisito** | Copertura 100% allievi a costo hardware 0; scientificamente difendibile; i wearable diventano input via HealthKit/Health Connect | Readiness hardware-dipendente stile Whoop: taglierebbe fuori il 95% degli allievi di una palestra italiana media |
 | **Gate di vendita: bonifica sicurezza (managedPassword + proxy AI) prima del primo contratto white-label** | Un incidente su dati salute al primo cliente è fatale e irreversibile per la reputazione; il proxy risolve insieme sicurezza e controllo costi AI | "Vendere subito e sistemare dopo": il rischio R6 è a impatto critico e la bonifica costa ~4 settimane, non mesi |
 | **Restare su Firebase (Spark→Blaze) per H0/H1; nessuna riscrittura** | Il prodotto funziona, i volumi sono minuscoli, Blaze costa ~0 a questi numeri e sblocca Cloud Functions (proxy AI); riscrivere = 6+ mesi senza valore per il cliente | Migrazione a stack "serio" (Postgres/self-hosted) il giorno 1: nessun numero la giustifica sotto le 50 palestre |
-| **Un'istanza Firebase per palestra in H1; multi-tenant rimandato a H2 con soglia esplicita (>30 istanze)** | Isolamento dati perfetto (argomento di vendita GDPR), zero refactoring oggi, playbook WHITE-LABEL.md già pronto | Multi-tenant subito: mesi di refactoring rules/query per un problema (gestire decine di istanze) che non abbiamo ancora |
+| **Un'istanza Firebase per palestra in H1; corsia multi-tenant self-serve al primo tra >10 istanze attive o >4 h/settimana di ops (trigger unico, vedi 01 §3.1)** | Isolamento dati perfetto (argomento di vendita GDPR), zero refactoring oggi, playbook WHITE-LABEL.md già pronto | Multi-tenant subito: mesi di refactoring rules/query per un problema (gestire decine di istanze) che non abbiamo ancora |
 | **Marketplace al 15% di take-rate, e solo in H2** | Coi creator early il take-rate alto uccide l'offerta; serve massa critica (>50 palestre) prima che un marketplace abbia liquidità | 30% Apple-style; oppure marketplace in H1 (nessuna liquidità = città fantasma) |
 
 ---

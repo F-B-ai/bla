@@ -22,7 +22,7 @@
 | 5 | `fontSize.xs: 10` e `sm: 11` | Sotto i 12pt su mobile è illeggibile per una fetta reale dei ~30 allievi (età media palestra, non età media di chi sviluppa) | MEDIA |
 | 6 | Accent `#D40000` usato anche come colore testo | Contrasto ~3.6:1 su `#0A0A0A`: fallisce WCAG AA per testo normale (serve 4.5:1). Passa solo per testo grande e componenti UI | MEDIA |
 | 7 | Ombre (`shadows`) su tema dark | Ombre nere su sfondo nero = invisibili. L'elevazione su dark si fa con superfici più chiare + bordo, non con `shadowRadius` | MEDIA |
-| 8 | Bundle unico ~4MB offuscato | Su Android di fascia media in 4G il time-to-interactive supera i 5s: la migliore UX del mondo non salva un'app che non parte. (Fix: code-splitting, doc 01 §7) | ALTA |
+| 8 | Bundle unico ~4MB offuscato | Su Android di fascia media in 4G il time-to-interactive supera i 5s: la migliore UX del mondo non salva un'app che non parte. (Fix assegnato: deliverable 6 di M2 in [07-roadmap](./07-roadmap-milestones.md) — lazy-load per rotta + rimozione obfuscator dal web; criterio: bundle iniziale < 1,5 MB, TTI < 3 s su 4G reale) | ALTA |
 | 9 | Stati vuoto/caricamento/errore incoerenti o assenti | Spinner generici e schermate bianche: l'utente non sa mai se sta aspettando o se è rotto | MEDIA |
 | 10 | Nessuna misura di usabilità | Zero eventi analytics sui flussi: le decisioni UX si fanno "a sensazione". Con 30 allievi veri è uno spreco: sono un laboratorio gratuito | MEDIA |
 
@@ -129,7 +129,7 @@ Scala (sostituisce `fontSize` attuale; minimo 12):
 
 ### 4.3 Spaziatura, raggi, elevazione
 
-- **Griglia 4pt rigorosa:** `space-1..10` = 4, 8, 12, 16, 24, 32, 40. Sostituisce `xs:3, sm:6`. Migrazione: alias deprecati (`xs→4, sm→8`) + lint che vieta numeri magici negli stili.
+- **Griglia 4pt rigorosa:** `space-1..8` = 4, 8, 12, 16, 24, 32, 40, 48. Sostituisce `xs:3, sm:6`. Migrazione: alias deprecati (`xs→4, sm→8`) + lint che vieta numeri magici negli stili.
 - **Raggi:** 4 (chip), 8 (bottoni, input), 12 (card), 16 (sheet), 999 (pill/avatar). La scala attuale va già bene: si conserva.
 - **Elevazione dark:** livello 0 = `bg`; 1 = `surface1`; 2 = `surface2` + border; 3 (sheet/modal) = `surface3` + border + scrim 60%. Le `shadows` di `theme.ts` restano solo per il futuro light theme.
 
@@ -435,7 +435,7 @@ Gerarchia: stato attuale → programma → note. È l'hub: da qui si raggiunge t
 
 | Metrica | Definizione | Come si misura |
 |---|---|---|
-| **Tap-to-value** | n° tap dall'apertura app al completamento del job | evento `flow_start`/`flow_complete` con contatore tap |
+| **Tap-to-value** | n° tap dall'apertura app al completamento del job | evento `flow_start`/`flow_complete` con contatore tap — eventi di *product analytics*: vanno nella collezione `analytics/` (retention 12 mesi), MAI in `human_events` (decisione del registro unico, [02 §3.3](./02-dati-digital-twin.md)) |
 | **Time-to-task** | tempo p50/p90 dello stesso percorso | timestamp negli stessi eventi |
 
 **Budget per flusso (violarlo = bug UX, si tratta come un crash):**
@@ -481,7 +481,7 @@ Revisione mensile con i ~30 allievi reali (H0): sono il laboratorio di usabilit�
 ## Dipendenze verso gli altri documenti
 
 - **01-architettura:** code-splitting del bundle (prerequisito dei budget time-to-task), offline-first per F3/F4, piano store per haptics e review Apple.
-- **02-dati-digital-twin:** gli stati derivati alimentano "Oggi" e "Da attenzionare"; gli eventi UX (`flow_*`, `coach.attention_handled`) entrano nella tassonomia.
+- **02-dati-digital-twin:** gli stati derivati alimentano "Oggi" e "Da attenzionare"; `coach.attention_handled` e `coach.weekly_review_done` sono nel registro unico di 02 §3.3; gli eventi UX `flow_*` restano fuori da `human_events` (collezione `analytics/` separata, per decisione dello stesso registro).
 - **03-ai-engine:** copy e comportamento di consiglio del giorno, seduta ridotta (F11), riepilogo settimanale (F9), guardrail Assistente (F12).
 - **05-api-sdk:** Stripe per F5; il design system diventa parte dell'SDK white-label in H2.
 - **06-sicurezza-compliance:** flusso credenziali onboarding (F1) legato alla bonifica `managedPassword`.

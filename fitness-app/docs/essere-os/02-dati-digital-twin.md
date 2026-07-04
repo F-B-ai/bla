@@ -159,7 +159,8 @@ Censimento completo (fonte: `firestore.rules`, `src/types/index.ts`, `src/servic
   "type": "workout.completed",    // tassonomia chiusa (§3.3): valori fuori lista = scrittura rifiutata
   "ts": Timestamp,                 // quando è ACCADUTO
   "recorded_at": Timestamp,        // quando è stato SCRITTO (wearable: può differire di ore)
-  "source": "app",                // app | coach | wearable | ai | system
+  "source": "app",                // ENUM chiuso: app | coach | wearable | ai | system
+  "source_detail": null,           // string libera: "healthkit", "health_connect", "backfill_v1", ...
   "actor_id": "uid_...",          // chi ha generato (allievo, coach, batch)
   "payload": { /* per-tipo, validato con zod condiviso client/functions (rif. 05) */ },
   "confidence": 1.0,               // fedeltà della MISURA, non verità assoluta (tabella sotto)
@@ -180,13 +181,20 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 | Stima AI composizione corporea | 0.55 | La più incerta: sempre mostrata come range, mai come verità |
 | Backfill da collezioni legacy | eredita la riga sopra −0.05 | Dati storici senza validazione all'origine |
 
+> **Onestà sui numeri**: questi valori sono *prior* dichiarati, non misure calibrate — trattarli come tali. Piano di calibrazione: in H1, quando esisteranno label coach sufficienti (03 §4.2), si confrontano le stime AI con le misure coach sugli stessi allievi e si aggiornano i valori con una PR su questo documento; fino ad allora l'AI engine li usa solo come ordinamento relativo tra sorgenti (coach > self-report > wearable > AI), mai come probabilità.
+
 ### 3.2 Regole di integrità
 
-- **Append-only**: le security rules permettono solo `create` (con validazione di `type`, `person_id` coerente col ruolo, `ts` non futuro oltre 5 min); `update` e `delete` negati a tutti i client. Le correzioni si fanno con un nuovo evento `event.corrected` + campo `supersedes` (dettaglio rules in [06](./06-sicurezza-compliance.md)).
+- **Percorso di scrittura in DUE FASI dichiarate** (allineato con [01](./01-architettura.md) Decisione 4 — questa è la versione canonica):
+  - **Fase 1 (M3, transitoria)**: i client possono fare **solo `create`** su un sottoinsieme limitato di tipi, con validazione dura nelle security rules (`type` nella tassonomia, `person_id` coerente col ruolo, `ts` non futuro oltre 5 min); `update` e `delete` negati a tutti i client.
+  - **Fase 2 (da 01 tappa 4)**: **write deny totale lato client**; ogni evento passa da `POST /v1/events` con header `Idempotency-Key`. Vincolo di sicurezza non negoziabile: **la gamification server-side (XP/badge con premi reali) non parte finché i tipi che generano XP non sono API-only** — eventi fabbricabili dal client = frode sui premi.
+  - Le correzioni si fanno in entrambe le fasi con un nuovo evento `event.corrected` + campo `supersedes` (dettaglio rules in [06](./06-sicurezza-compliance.md)).
 - **Idempotenza**: gli eventi derivati da fatti "per giorno" (wearable, check-in) usano ID deterministico `hash(type|person_id|giorno|sorgente)` → il retry non duplica. Gli altri usano ULID.
 - **Il payload è un riassunto, non un dump**: l'evento porta ciò che serve al calcolo degli stati derivati; il dettaglio resta nel doc legacy puntato da `source_ref`. Esempio: `workout.completed` porta per-esercizio `{pattern, top_set: {kg, reps}, volume_kg, sets}` — non i 40 set grezzi.
 
-### 3.3 Tassonomia v1 (34 tipi, chiusa: si estende con PR sul pacchetto documenti, non ad hoc)
+### 3.3 Tassonomia v1 (42 tipi, chiusa: si estende con PR sul pacchetto documenti, non ad hoc)
+
+> **Questo registro è la fonte unica dei nomi evento.** Ogni altro documento (03, 04, 05) usa questi nomi; dove un documento ne citasse di diversi, vale questo. Gli eventi di *product analytics* (`flow_*`, tempi-per-schermata di 04) **NON entrano in `human_events`**: non descrivono la persona ma l'interfaccia, e vanno in una collezione `analytics/` separata con retention 12 mesi.
 
 | Dominio | Tipi | Payload minimo | Orizzonte |
 |---|---|---|---|
@@ -195,12 +203,13 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 | **Mente/soggettivo** (3) | `wellness.checkin_submitted` · `breathing.session_completed` · `diary.entry_added` | sleep/energy/mood/soreness + score + formula_version; tecnica+durata; **solo metadato, mai testo** | H0 |
 | **Allenamento** (5) | `workout.plan_assigned` · `workout.started` · `workout.completed` · `workout.abandoned` · `workout.external_recorded` | plan_id; per-esercizio {pattern, top_set, volume_kg}, durata, sRPE (nuovo campo) | H0 (external: H1) |
 | **Presenza** (1) | `gym.checkin` | metodo (qr/manuale) | H0 |
-| **Coach-loop** (4) | `coach.note_added` · `coach.flag_raised` · `coach.flag_resolved` · `coach.program_adjusted` | motivo strutturato + testo libero; **è la label umana del dataset** (00-strategia §5) | H0 |
+| **Coach-loop** (6) | `coach.note_added` · `coach.flag_raised` · `coach.flag_resolved` · `coach.program_adjusted` · `coach.attention_handled` · `coach.weekly_review_done` | motivo strutturato + testo libero; **è la label umana del dataset** (00-strategia §5); gli ultimi due alimentano i flussi coach di 04 | H0 (ultimi due: H1) |
 | **Nutrizione** (2) | `nutrition.consultation_recorded` · `nutrition.appointment_attended` | metadato + eventuali target macro | H1 |
 | **Gamification** (3) | `badge.earned` · `level.reached` · `reward.redeemed` | badge_id; level; reward_id | H0 |
 | **Business** (4) | `membership.started` · `membership.expired` · `payment.recorded` · `payment.overdue` | plan_id, importo, rata n/N | H0 |
 | **Academy** (3) | `academy.lesson_completed` · `academy.quiz_attempted` · `academy.certificate_earned` | course_id, score | H1 |
 | **Wearable** (4) | `sleep.recorded` · `hr.resting_recorded` · `hrv.recorded` · `steps.recorded` | §5.2 | H1 |
+| **AI** (1) | `ai.feedback` | modulo, rating/correzione del coach o dell'allievo su un output AI (03 §4.2) | H1 |
 | **Meta** (1) | `event.corrected` | supersedes + motivo | H0 |
 
 **Perché non un evento per set** (la domanda 10x al contrario): i puristi dell'event sourcing loggherebbero `set.completed` → 30–50 eventi/workout → ~40× i costi di scrittura e lettura per zero valore analitico aggiuntivo rispetto al payload aggregato (il set-by-set resta in `workoutLogs` via `source_ref`). La granularità dell'evento è "decisione del coach": il coach ragiona per sedute e pattern, non per singolo set.
@@ -222,8 +231,8 @@ Alternativa scartata: migrare le collezioni a un "nuovo schema pulito" in un col
 
 | Stato | Formula (v1) | Frequenza | Orizzonte |
 |---|---|---|---|
-| **Readiness (Stato ESSĒRE v2)** | v1 attuale: media pesata sleep/energy/mood/soreness → 0–100. v2: stesso core + modulazione wearable se presente (§4.2) | **Realtime** al submit del check-in (client, come oggi) + ricalcolo canonico in batch notturno | H0 (v1 nel log) / H1 (v2) |
-| **Carico acuto/cronico (ACWR)** | acuto = Σ carico 7gg; cronico = media mobile 28gg; carico seduta = volume_kg totale, oppure `durata × sRPE` quando sRPE presente (più robusto tra tipi di seduta) | Batch notturno | H0 (volume) / H1 (sRPE) |
+| **Readiness (Stato ESSĒRE v2)** | **Formula canonica: [03 §2.1](./03-ai-engine.md)** (soggettivo comanda, blend wearable con α ≤ 0.4 su z-score a baseline 60gg, penalità ACWR). Qui non si duplica: una formula scritta in due posti diverge | **Realtime** al submit del check-in (client, come oggi) + ricalcolo canonico in batch notturno | H0 (v1 nel log) / H1 (v2) |
+| **Carico acuto/cronico (ACWR)** | **Formula canonica: [03 §2.2](./03-ai-engine.md)** (EWMA 7/28gg; carico seduta = sRPE `RPE × durata`, fallback tonnellaggio) | Batch notturno | H0 (tonnellaggio) / H1 (sRPE) |
 | **Trend forza per pattern** | e1RM Epley `kg × (1 + reps/30)` sul top set per pattern; trend = regressione lineare 8 settimane; segnale se pendenza < 0 per 2 pattern per 4 settimane | Batch settimanale (domenica notte) | H0 |
 | **Aderenza** | workout completati / programmati (28gg) + presenze QR / attese | Batch notturno | H0 |
 | **Rischio churn (0–100)** | H0: euristica a punti — presenze 2 settimane < 50% della baseline personale (+30), streak check-in interrotto > 7gg (+20), rata `payment.overdue` (+25), nessun `workout.completed` 10gg (+25). H1: regressione logistica addestrata sugli churn reali multi-tenant | Batch notturno | H0 euristica / H1 modello |
@@ -231,7 +240,7 @@ Alternativa scartata: migrare le collezioni a un "nuovo schema pulito" in un col
 
 ### 4.2 Readiness v2: fusione soggettivo + wearable (H1)
 
-Principio: **il soggettivo comanda, l'oggettivo modula**. `readiness = base_soggettiva ± Δ_wearable`, con Δ limitato a ±15 punti: HRV del giorno sotto la baseline personale a 28gg di > 1 deviazione standard → −10; sonno < 6h → −5; RHR > baseline +8 bpm → −5 (cap complessivo −15/+15). Perché non un modello "scientifico" complesso: con i nostri volumi non è validabile, e un numero inspiegabile distrugge la fiducia del coach. Ogni punteggio v2 mostra la scomposizione ("72 = 78 soggettivo − 6 sonno") — cosa che Whoop non fa e che il coach ci chiede.
+Principio: **il soggettivo comanda, l'oggettivo modula** — con wearable assente la formula coincide con la v1 attuale, per costruzione. La definizione matematica completa (pesi, blend α ≤ 0.4, z-score su baseline individuale 60gg, penalità ACWR, soglie d'azione) vive **solo** in [03 §2.1](./03-ai-engine.md), versionata in `src/domain` e testata in CI: chi implementa parte da lì. Qui resta il vincolo di prodotto: ogni punteggio v2 mostra la scomposizione ("72 = 78 soggettivo − 6 sonno") — cosa che Whoop non fa e che il coach ci chiede; un numero inspiegabile distrugge la fiducia del coach.
 
 ### 4.3 Architettura di calcolo: batch prima, realtime solo dove l'utente lo vede
 
@@ -277,7 +286,7 @@ Lo `uid` di Firebase Auth è **locale all'istanza** (un progetto Firebase per pa
 
 ### 6.2 `tenant_id` anche in istanze single-tenant — **H0**
 
-Ogni evento porta `tenant_id` (slug da `brand.ts`) anche se oggi ogni istanza ne ha uno solo. Perché: (a) l'export BigQuery H2 (§7.4) aggrega più istanze e senza tenant_id gli eventi sarebbero indistinguibili; (b) la portabilità (§6.3) richiede di sapere *dove* è successo cosa; (c) costa un campo. Il multi-tenant vero (più palestre in un progetto) resta rimandato a H2 con soglia > 30 istanze ([00-strategia](./00-strategia.md), Decisioni).
+Ogni evento porta `tenant_id` (slug da `brand.ts`) anche se oggi ogni istanza ne ha uno solo. Perché: (a) l'export BigQuery H2 (§7.4) aggrega più istanze e senza tenant_id gli eventi sarebbero indistinguibili; (b) la portabilità (§6.3) richiede di sapere *dove* è successo cosa; (c) costa un campo. Il multi-tenant vero (più palestre in un progetto) parte al primo tra **>10 istanze attive o >4 h/settimana di ops** — trigger unico del pacchetto, definito in [01 §3.1](./01-architettura.md) e ripreso da [00](./00-strategia.md) e [07](./07-roadmap-milestones.md).
 
 ### 6.3 Il twin appartiene alla persona (scelta strategica) — dichiarata H0, esercitabile H1/H2
 
@@ -319,7 +328,7 @@ L'append-only non confligge con l'art. 17: "append-only" vincola i *client*; la 
 
 | Dato | Retention | Meccanismo |
 |---|---|---|
-| `human_events` (quasi tutti) | **Illimitata** — è il capitale dell'azienda (00-strategia §5.2) | — |
+| `human_events` (quasi tutti) | **Illimitata** — è il capitale dell'azienda (00-strategia §5.2). **Condizione giuridica**: la retention oltre la fine del contratto con la palestra vale solo per il dataset pseudonimizzato coperto dal consenso per finalità secondarie e dalla clausola di sopravvivenza del DPA (assetto "titolare autonomo delimitato", [00 §5.2](./00-strategia.md) e [06 §7](./06-sicurezza-compliance.md)); i dati identificabili del tenant seguono il DPA (restituzione/cancellazione) | — |
 | `steps.recorded` | 24 mesi (il valore decisionale è nel trend recente; il twin conserva gli aggregati mensili) | Firestore TTL policy su `expires_at` |
 | `notifications`, `chatTyping`, `userPresence` | 6 mesi / 48h / 48h | TTL |
 | Foto posturali e progress | Illimitata (serie longitudinale = valore) ma **compresse client-side a ≤ 300KB** prima dell'upload | Fix immediato quota Storage, H0 settimana 1 |

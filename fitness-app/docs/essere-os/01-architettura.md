@@ -86,7 +86,7 @@ Obiettivo: mettere un API layer tra client e dati **solo dove serve** (segreti, 
                              │   · rate limit per utente e per ruolo  │
 ┌──────────────┐             │   · log costi per chiamata/tenant      │
 │  Firestore   │◄──scrittura─│   · prompt caching + scelta modello    │
-│  (+ indici   │  validata   │  /payments/*  denaro: solo server      │
+│  (+ indici   │  validata   │  /v1/payments/* denaro: solo server      │
 │  compositi)  │             │  /events      EVENT LOG per il Twin    │
 │              │             │   · append-only, validato, immutabile  │
 │  events/     │◄────────────│   (schema in doc 02)                   │
@@ -110,22 +110,24 @@ promemoria WhatsApp/SMS                 └────────────�
 | **Cloud Functions v2 come API layer** | Zero server da gestire, scale-to-zero, deploy con `firebase deploy`, gratuite fino a 2M invocazioni/mese: a questa scala costano ~0€. v2 gira su Cloud Run, quindi la migrazione futura a Cloud Run "puro" (container proprio, più controllo) è un cambio di deploy, non di codice | Server Node su VPS (€5/mese ma va patchato, monitorato, e il bus factor resta 1); Cloud Run day-1 (aggiunge Docker/registry senza benefici a questa scala) |
 | **Ibrido: SDK diretto per letture, API per scritture sensibili** | Le regole Firestore in sola lettura per ruolo sono sicure e gratuite; il realtime della chat via SDK è gratis e già funziona. Mettere TUTTO dietro API triplicherebbe il lavoro e ucciderebbe l'offline di Firestore senza guadagno | "Tutto dietro API" (dogma da manuale enterprise: a 30–500 utenti è puro costo); "tutto su SDK" (status quo: insicuro per denaro/AI/segreti) |
 | **AI Proxy obbligatorio, prima mossa H0→H1** | Chiave in Secret Manager, mai sul client. Il proxy aggiunge: rate limit per utente (es. studente: 30 msg/giorno all'Assistente; coach: 100), scelta del modello per funzione, prompt caching (il system prompt dell'Assistente = listino + info palestra è stabile → `cache_control` ephemeral, letture a ~10% del costo input), log di costo per chiamata in `aiUsage/` per fatturare i tenant white-label | Restare client-side "tanto il bundle è offuscato" (la chiave viaggia in chiaro negli header HTTP: l'offuscazione non protegge nulla); API Gateway di terzi (Kong ecc.: sovradimensionato) |
-| **Event log in Firestore (`events/`), non un database nuovo** | Il Twin (doc 02) ha bisogno di una cronologia append-only di fatti: check-in, workout completati, valutazioni, pagamenti, accessi QR. Una collection Firestore con scritture SOLO via API (regole: client read-own, write deny) basta per anni. Export giornaliero su Cloud Storage (JSONL) come backup e futura sorgente analytics | BigQuery day-1 (c'è l'estensione ufficiale Firestore→BigQuery: la attiveremo in H1 avanzato quando servirà analytics, non prima); Postgres/Timescale (un secondo database = un secondo sistema da amministrare) |
+| **Event log in Firestore (`events/`), non un database nuovo** | Il Twin (doc 02) ha bisogno di una cronologia append-only di fatti: check-in, workout completati, valutazioni, pagamenti, accessi QR. Percorso di scrittura in **due fasi dichiarate** (versione canonica: 02 §3.2): fase transitoria M3 = `create` client su tipi limitati con validazione dura nelle rules; da tappa 4 = write deny totale + `POST /v1/events` con Idempotency-Key. Vincolo: la gamification server-side non parte finché i tipi che generano XP non sono API-only (i premi sono reali). Export giornaliero su Cloud Storage (JSONL) come backup e futura sorgente analytics | BigQuery day-1 (c'è l'estensione ufficiale Firestore→BigQuery: la attiveremo in H1 avanzato quando servirà analytics, non prima); Postgres/Timescale (un secondo database = un secondo sistema da amministrare) |
 | **Blaze subito, con budget alert a 25€/50€** | Sblocca Functions e Storage. Il terrore del "pay-as-you-go" si gestisce con alert e con il rate limit del proxy: il rischio di costo oggi è la chiave AI esposta, non Blaze | Restare su Spark (già in quota, e blocca tutto il piano) |
 | **Modello AI per funzione, non un modello unico** | Assistente allievi: `claude-sonnet-4-5` con caching (volume alto, costo basso); analisi posturale/composizione + riepilogo owner: `claude-opus-4-8` (bassa frequenza, alta qualità); classificazioni/triage (es. "allievo da attenzionare"): `claude-haiku-4-5` (1$/5$ per MTok). Il proxy centralizza la scelta: cambiare modello = 1 riga server, zero release client | Modello unico premium ovunque (costo 5x senza valore percepito sulle funzioni di volume) |
 
 ### 2.2 Contratto minimo dell'AI Proxy (H0, ~200 righe di codice)
 
 ```
-POST /ai/chat        { feature: "assistant"|"coach"|... , messages: [...] }
+POST /v1/ai/messages   { feature: "assistant"|"coach"|... , messages: [...] }
   → verifica ID token → carica limiti per ruolo → controlla contatore
     giornaliero (aiUsage/{uid}/daily/{date}) → chiama Anthropic con chiave
     da Secret Manager, system prompt server-side, cache_control →
     scrive {uid, tenant, feature, model, input_tokens, output_tokens,
     cache_read, costo_stimato} → risponde in streaming (SSE)
-POST /ai/vision      { feature: "postural"|"bodycomp", imageRef }
+POST /v1/ai/vision     { feature: "postural"|"bodycomp", imageRef }
   → come sopra, immagine letta da Storage server-side (mai base64 dal client)
 ```
+
+**Questo è il contratto unico del gateway, scritto subito in `openapi.yaml`**: HTTP function (non callable — le callable non fanno SSE e non sono rotte REST versionabili), naming `/v1` dal giorno 1 come da tesi di 05 §1.2 ("API interna = API pubblica"), campo `feature` coerente col registro moduli di [03 §0.2](./03-ai-engine.md). 07 M1 implementa questo contratto alla lettera.
 
 Nota: il system prompt si sposta sul server. Effetto collaterale voluto: i prompt (know-how del prodotto) smettono di essere leggibili nel bundle client.
 
@@ -211,11 +213,11 @@ Regola operativa: **ogni tappa è rilasciabile da sola, in giorni non mesi, e re
 | Tappa | Orizzonte | Cosa si sposta | Come (strangler) | Cosa NON si tocca |
 |---|---|---|---|---|
 | 0 | H0, subito | `managedPassword` eliminata | Reset credenziali gestite via Admin SDK (script una tantum), campo cancellato, regola che nega la lettura. Dettaglio: doc 06 | Tutto il resto |
-| 1 | H0, sett. 1–2 | Progetto su Blaze + Secret Manager + prima Function `/ai/chat` | `aiService.ts` e `assistantService.ts`: la fetch verso Anthropic diventa fetch verso la Function con ID token. Flag `USE_AI_PROXY` per rollback. La chiave client si revoca DOPO 1 settimana di proxy stabile | Schermate AI, prompt lato UX |
+| 1 | H0, sett. 1–2 | Progetto su Blaze + Secret Manager + prima Function `/v1/ai/messages` | `aiService.ts` e `assistantService.ts`: la fetch verso Anthropic diventa fetch verso la Function con ID token. Flag `USE_AI_PROXY` per rollback. La chiave client si revoca DOPO 1 settimana di proxy stabile | Schermate AI, prompt lato UX |
 | 2 | H0, sett. 2–4 | Vision AI (posturale, composizione) sul proxy | `posturalService`/`bodyCompositionService`: upload foto su Storage (già così), al proxy passa solo il riferimento; il server legge l'immagine e chiama Anthropic | Flusso foto dell'utente |
 | 3 | H0–H1 | Rate limit + log costi + prompt caching nel proxy | Middleware nella stessa Function; collection `aiUsage/` | Nulla lato client |
-| 4 | H1, mese 3–5 | Event log `events/` | I service che registrano fatti (checkin, workoutLog, session, payment, gamification) scrivono ANCHE su `POST /events` (dual-write). Dopo 1 mese di verifica, `events/` diventa la fonte per i trend e il vecchio percorso di lettura si spegne a moduli | Schemi Firestore esistenti (restano come proiezioni di lettura) |
-| 5 | H1, mese 4–6 | Denaro dietro API | `paymentService`/`financialService`: creazione piani, rate, ricevute passano a `/payments/*` con validazione server. Regole Firestore: write deny sui documenti finanziari per i client | Dashboard finanziaria (legge come prima) |
+| 4 | H1, mese 3–5 | Event log `events/` | I service che registrano fatti (checkin, workoutLog, session, payment, gamification) scrivono ANCHE su `POST /v1/events` (dual-write). Dopo 1 mese di verifica, `events/` diventa la fonte per i trend e il vecchio percorso di lettura si spegne a moduli | Schemi Firestore esistenti (restano come proiezioni di lettura) |
+| 5 | H1, mese 4–6 | Denaro dietro API | `paymentService`/`financialService`: creazione piani, rate, ricevute passano a `/v1/payments/*` con validazione server. Regole Firestore: write deny sui documenti finanziari per i client | Dashboard finanziaria (legge come prima) |
 | 6 | H1, mese 5–7 | Gamification server-side | XP/badge calcolati da un consumer dell'event log (niente più XP scrivibili dal client) | UI badge/livelli |
 | 7 | H1, mese 6–9 | Indici compositi + query server per liste pesanti | Aggiunta indici in `firestore.indexes.json` (file già presente, va popolato); le 3–4 query oggi filtrate client-side migrano una alla volta | Query leggere |
 | 8 | H1→H2 | `tenant_id` ovunque negli eventi; provisioning istanze scriptato | Script `create-tenant.ts` (progetto, regole, indici, brand, licenza) al posto del playbook manuale WHITE-LABEL.md | Istanze esistenti |
