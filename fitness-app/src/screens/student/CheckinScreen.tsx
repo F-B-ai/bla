@@ -14,6 +14,16 @@ import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { registerCheckin } from '../../services/checkinService';
 import { brand } from '../../config/brand';
+import jsQRStatic from 'jsqr';
+
+// Risolve la funzione di decodifica in modo robusto rispetto all'interop
+// dei moduli (CJS/ESM): scarta i wrapper .default finché trova la funzione.
+const resolveDecoder = (mod: any): any => {
+  let m = mod;
+  for (let i = 0; i < 3 && m && typeof m !== 'function'; i++) m = m.default;
+  return typeof m === 'function' ? m : null;
+};
+const jsQR = resolveDecoder(jsQRStatic);
 
 // Codice da digitare alla reception (semplice e a prova di fotocamera)
 export const CHECKIN_MANUAL_CODE = brand.checkinManualCode.toUpperCase();
@@ -35,16 +45,11 @@ export const CheckinScreen: React.FC = () => {
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraErrorMsg, setCameraErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
+  const [showScanHint, setShowScanHint] = useState(false);
   const containerRef = useRef<string>('qr-reader-' + Math.random().toString(36).substring(7));
   const streamRef = useRef<any>(null);
   const rafRef = useRef<any>(null);
   const videoElRef = useRef<any>(null);
-  const jsQRRef = useRef<any>(null);
-
-  // Pre-carica il decoder jsQR così è pronto al momento del tocco
-  useEffect(() => {
-    import('jsqr').then((m) => { jsQRRef.current = m.default || m; }).catch(() => {});
-  }, []);
 
   const stopScanner = useCallback(() => {
     if (rafRef.current) { try { cancelAnimationFrame(rafRef.current); } catch {} rafRef.current = null; }
@@ -142,19 +147,25 @@ export const CheckinScreen: React.FC = () => {
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true } as any);
+      let lastDecode = 0;
 
       const tick = () => {
         if (stopped) return;
+        const now = Date.now();
         const v = videoElRef.current;
-        if (v && v.readyState >= 2 && v.videoWidth > 0 && ctx) {
+        // decodifica ~8 volte al secondo: più leggero e più affidabile del
+        // full-frame a 60fps, specialmente su iPhone
+        if (v && v.readyState >= 2 && v.videoWidth > 0 && ctx && now - lastDecode > 120) {
+          lastDecode = now;
           if (!stopped) setScannerReady(true);
-          canvas.width = v.videoWidth;
-          canvas.height = v.videoHeight;
+          // downscale a max 640px: jsQR lavora meglio e pesa meno
+          const scale = Math.min(1, 640 / v.videoWidth);
+          canvas.width = Math.round(v.videoWidth * scale);
+          canvas.height = Math.round(v.videoHeight * scale);
           ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
           try {
             const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const decode = jsQRRef.current;
-            const code = decode ? decode(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' }) : null;
+            const code = jsQR ? jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' }) : null;
             if (code && code.data) { handleScan(code.data); return; }
           } catch {}
         }
@@ -164,7 +175,16 @@ export const CheckinScreen: React.FC = () => {
       video.play().then(startLoop).catch(startLoop);
     }, 60);
 
-    return () => { stopped = true; clearTimeout(timer); };
+    // Se il decoder non è disponibile, meglio dirlo subito che girare a vuoto
+    if (!jsQR) {
+      setCameraErrorMsg('Il lettore QR non è disponibile su questa versione. Usa "Scatta una foto del QR" o il codice.');
+      setState('camera_error');
+      return () => { stopped = true; clearTimeout(timer); };
+    }
+
+    // Dopo 6 secondi senza lettura, mostra un aiuto (senza fermare la scansione)
+    const hintTimer = setTimeout(() => { if (!stopped) setShowScanHint(true); }, 6000);
+    return () => { stopped = true; clearTimeout(timer); clearTimeout(hintTimer); setShowScanHint(false); };
   }, [state, handleScan]);
 
   // Pulisce la fotocamera quando si lascia lo stato scanning
@@ -193,19 +213,33 @@ export const CheckinScreen: React.FC = () => {
       cleanupInput();
       if (!file) return; // utente ha annullato
       setState('processing');
-      const tmpId = 'qr-file-' + Math.random().toString(36).slice(2);
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const div = document.createElement('div');
-        div.id = tmpId; div.style.display = 'none';
-        document.body.appendChild(div);
-        const qr = new Html5Qrcode(tmpId);
-        const result = await qr.scanFile(file, false);
-        try { document.body.removeChild(div); } catch {}
-        handleScan(result);
+        if (!jsQR) throw new Error('decoder');
+        const url = URL.createObjectURL(file);
+        const img: any = await new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = rej;
+          im.src = url;
+        });
+        // prova a più risoluzioni: aiuta con foto grandi o sfocate
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true } as any);
+        let decoded: string | null = null;
+        for (const maxW of [800, 1200, 500]) {
+          const scale = Math.min(1, maxW / img.width);
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          ctx!.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const data = ctx!.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(data.data, data.width, data.height, { inversionAttempts: 'attemptBoth' });
+          if (code && code.data) { decoded = code.data; break; }
+        }
+        URL.revokeObjectURL(url);
+        if (decoded) { handleScan(decoded); return; }
+        throw new Error('no-qr');
       } catch {
-        try { const d = document.getElementById(tmpId); if (d) d.remove(); } catch {}
-        setCameraErrorMsg('Non sono riuscito a leggere il QR dalla foto. Avvicinati al QR, mettilo bene a fuoco e riprova.');
+        setCameraErrorMsg('Non sono riuscito a leggere il QR dalla foto. Avvicinati al QR, mettilo bene a fuoco e riprova — oppure usa il codice.');
         setState('camera_error');
       }
     };
@@ -331,6 +365,14 @@ export const CheckinScreen: React.FC = () => {
                 </View>
               )}
             </View>
+            {showScanHint && (
+              <View style={styles.scanHint}>
+                <Ionicons name="bulb-outline" size={16} color={colors.warning} />
+                <Text style={styles.scanHintText}>
+                  Difficoltà a leggere? Avvicinati al QR, evita riflessi, oppure usa il codice {CHECKIN_MANUAL_CODE}
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={() => { stopScanner(); setState('idle'); }}
@@ -526,6 +568,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: fontSize.md,
     marginTop: spacing.md,
+  },
+  scanHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.warning + '15',
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    maxWidth: 350,
+  },
+  scanHintText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 18,
   },
   cancelButton: {
     marginTop: spacing.lg,
