@@ -101,6 +101,8 @@ import { EssereScreen } from '../screens/student/EssereScreen';
 import { AssistantScreen } from '../screens/shared/AssistantScreen';
 import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
 import { checkLicense } from '../services/licenseService';
+import { ConsentScreen } from '../screens/shared/ConsentScreen';
+import { needsConsentDecision, clearConsentCache } from '../services/consentService';
 import { brand } from '../config/brand';
 
 const RootStack = createStackNavigator();
@@ -1066,6 +1068,7 @@ export const AppNavigator: React.FC = () => {
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [license, setLicense] = useState<{ active: boolean; message?: string }>({ active: true });
+  const [consentNeeded, setConsentNeeded] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user && (role === 'student' || role === 'collaborator')) {
@@ -1118,6 +1121,17 @@ export const AppNavigator: React.FC = () => {
     }
   }, [isAuthenticated, user]);
 
+  // Consensi privacy (GDPR art. 9): al primo accesso, o quando cambia
+  // la versione del testo, l'utente decide voce per voce
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      clearConsentCache();
+      needsConsentDecision(user.id).then(setConsentNeeded).catch(() => {});
+    } else {
+      setConsentNeeded(false);
+    }
+  }, [isAuthenticated, user]);
+
   // Clean up stale loginMode from storage when not authenticated
   useEffect(() => {
     if (loginModeLoaded && !loading && !isAuthenticated && loginMode !== null && !loginModeSetByUser.current) {
@@ -1143,6 +1157,16 @@ export const AppNavigator: React.FC = () => {
   // Licenza sospesa: blocca l'intera app (kill-switch white-label)
   if (isAuthenticated && !license.active) {
     return <LicenseLockedScreen message={license.message} />;
+  }
+
+  // Consensi privacy da raccogliere prima di usare l'app
+  if (isAuthenticated && user && consentNeeded) {
+    return (
+      <ConsentScreen
+        userId={user.id}
+        onDone={() => setConsentNeeded(false)}
+      />
+    );
   }
 
   // If not authenticated and loginMode came from storage (not user action), force selector

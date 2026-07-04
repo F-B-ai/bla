@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,6 +35,7 @@ import {
   getUserRequests,
 } from '../../services/credentialService';
 import { adminSetUserEmail, adminSetUserPassword } from '../../services/adminAuthService';
+import { ConsentScreen } from './ConsentScreen';
 import { resetPassword } from '../../services/authService';
 import { createNotification } from '../../services/notificationService';
 
@@ -54,6 +56,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
 
   // Invio link reimpostazione password (staff)
   const [sendingResetLink, setSendingResetLink] = useState(false);
+  const [showConsents, setShowConsents] = useState(false);
 
   // Edit email
   const [editingEmail, setEditingEmail] = useState(false);
@@ -675,6 +678,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           />
         )}
       </Card>
+
+      {/* Consensi privacy (GDPR art. 9) — solo sul proprio profilo */}
+      {!isEditingOther && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Consensi privacy</Text>
+          <Text style={styles.requestHint}>
+            Rivedi o modifica i consensi al trattamento dei tuoi dati
+            (benessere, foto posturali, AI). Le modifiche hanno effetto immediato.
+          </Text>
+          <Button
+            title="Gestisci consensi"
+            variant="outline"
+            onPress={() => setShowConsents(true)}
+          />
+        </Card>
+      )}
+
+      {!isEditingOther && user && (
+        <Modal visible={showConsents} animationType="slide" onRequestClose={() => setShowConsents(false)}>
+          <ConsentScreen
+            userId={user.id}
+            reviewMode
+            onDone={() => setShowConsents(false)}
+          />
+        </Modal>
+      )}
 
       {/* Non-owner: request form */}
       {needsApproval && requestType && (

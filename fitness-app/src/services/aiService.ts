@@ -71,6 +71,11 @@ export const callClaude = async (
   prefill?: string,
   model: string = 'claude-sonnet-4-5'
 ): Promise<string> => {
+  // GDPR art. 9: ogni chiamata AI richiede il consenso "AI esterna"
+  // dell'utente corrente (choke point unico: tutte le funzioni AI passano di qui)
+  const { ensureOwnConsent } = await import('./consentService');
+  await ensureOwnConsent('externalAI');
+
   if (!API_KEY) {
     await loadAIApiKey();
   }

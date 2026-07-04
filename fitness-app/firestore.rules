@@ -35,6 +35,17 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
 
+    // Consensi privacy (GDPR art. 9): ognuno scrive SOLO i propri;
+    // lo staff puo' leggerli (per sapere cosa puo' fare sui dati
+    // dell'allievo); mai modificare i consensi di un altro.
+    match /consents/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || isStaff()
+      );
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
     match /config/{docId} {
