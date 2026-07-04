@@ -55,25 +55,7 @@ export const markInstallmentPaid = async (
 
 // --- Calcolo commissioni collaboratore e manager ---
 
-export const calculateCollaboratorEarnings = (
-  totalPaid: number,
-  commissionPercentage: number
-): { collaboratorShare: number; ownerShare: number } => {
-  const collaboratorShare = (totalPaid * commissionPercentage) / 100;
-  const ownerShare = totalPaid - collaboratorShare;
-  return { collaboratorShare, ownerShare };
-};
-
-export const calculateFullEarnings = (
-  totalPaid: number,
-  coachCommissionPercentage: number,
-  managerCommissionPercentage: number
-): { coachShare: number; managerShare: number; ownerShare: number } => {
-  const coachShare = (totalPaid * coachCommissionPercentage) / 100;
-  const managerShare = (totalPaid * managerCommissionPercentage) / 100;
-  const ownerShare = totalPaid - coachShare - managerShare;
-  return { coachShare, managerShare, ownerShare };
-};
+export { calculateCollaboratorEarnings, calculateFullEarnings } from '../domain/formulas';
 
 export const getCollaboratorEarnings = async (
   collaboratorId: string,

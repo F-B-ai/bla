@@ -31,44 +31,9 @@ export interface WellnessCheck {
   timestamp: Date;
 }
 
-export const computeScore = (
-  sleep: number,
-  energy: number,
-  mood: number,
-  soreness: number
-): number => {
-  // dolori invertiti: 1 dolorante-zero → contributo pieno
-  const raw = sleep + energy + mood + (6 - soreness); // 4..20
-  return Math.round(((raw - 4) / 16) * 100);
-};
-
-export interface ScoreAdvice {
-  title: string;
-  detail: string;
-  color: 'success' | 'warning' | 'error';
-}
-
-export const adviceForScore = (score: number): ScoreAdvice => {
-  if (score >= 75) {
-    return {
-      title: 'Giornata per spingere',
-      detail: 'Mente e corpo sono pronti: è il giorno giusto per intensità e carichi importanti.',
-      color: 'success',
-    };
-  }
-  if (score >= 50) {
-    return {
-      title: 'Allenamento moderato',
-      detail: 'Allenati con buona tecnica ma senza cercare massimali: ascolta il corpo.',
-      color: 'warning',
-    };
-  }
-  return {
-    title: 'Recupero attivo',
-    detail: 'Oggi privilegia mobilità, respirazione e lavoro leggero: il recupero è allenamento.',
-    color: 'error',
-  };
-};
+export { computeScore, adviceForScore } from '../domain/formulas';
+export type { ScoreAdvice } from '../domain/formulas';
+import { computeScore } from '../domain/formulas';
 
 const startOfToday = (): Date => {
   const d = new Date();

@@ -373,24 +373,8 @@ export const getAllBadgeDefinitions = (): Record<BadgeId, Omit<Badge, 'unlockedA
 };
 
 // --- Calcola livello da XP ---
-export const calculateLevel = (xp: number): number => {
-  let level = 0;
-  let xpRequired = 0;
-  while (xpRequired <= xp) {
-    level++;
-    xpRequired += level * 100;
-  }
-  return level;
-};
-
-// XP totali necessari per raggiungere un livello
-export const xpForLevel = (level: number): number => {
-  let total = 0;
-  for (let i = 1; i <= level; i++) {
-    total += i * 100;
-  }
-  return total;
-};
+export { calculateLevel, xpForLevel } from '../domain/formulas';
+import { calculateLevel, xpForLevel } from '../domain/formulas';
 
 // --- Helper: converte Firestore data a StudentGamification ---
 const fromFirestore = (id: string, data: Record<string, unknown>): StudentGamification => {

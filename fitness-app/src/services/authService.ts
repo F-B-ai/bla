@@ -105,7 +105,6 @@ export const registerOwner = async (
 
   await setDoc(doc(db, 'users', credential.user.uid), {
     ...userData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -122,6 +121,7 @@ export const registerManager = async (
   specializations: string[] = []
 ): Promise<Manager> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const managerData: Omit<Manager, 'id'> = {
     email,
@@ -140,7 +140,6 @@ export const registerManager = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...managerData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -153,6 +152,18 @@ export const signOut = async (): Promise<void> => {
 
 export const resetPassword = async (email: string): Promise<void> => {
   await sendPasswordResetEmail(auth, email);
+};
+
+// Account creati dallo staff: si invia subito il link "imposta la tua
+// password" all'email reale dell'allievo/collaboratore. La password
+// temporanea scelta alla creazione NON viene mai salvata (bonifica V1):
+// il canale credenziali è il link, che arriva alla persona e non allo staff.
+const sendPasswordSetupEmail = async (email: string): Promise<void> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch {
+    // Email non raggiungibile: lo staff può reinviare il link dal profilo
+  }
 };
 
 export const getCurrentUser = (): Promise<FirebaseUser | null> => {
@@ -185,6 +196,7 @@ export const registerCollaborator = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -202,7 +214,6 @@ export const registerCollaborator = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...collaboratorData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -219,6 +230,7 @@ export const registerNutritionist = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -236,7 +248,6 @@ export const registerNutritionist = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...collaboratorData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
   });
 
@@ -257,6 +268,7 @@ export const registerStudent = async (
   coachCommissionPercentage?: number
 ): Promise<Student> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
   const coachIds = Array.isArray(assignedCollaboratorIds) ? assignedCollaboratorIds : [assignedCollaboratorIds];
 
   const studentData: Omit<Student, 'id'> = {
@@ -280,7 +292,6 @@ export const registerStudent = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...studentData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
     startDate: Timestamp.now(),
   });
@@ -406,7 +417,6 @@ export const registerStudentWithInvite = async (
 
   await setDoc(doc(db, 'users', uid), {
     ...studentData,
-    managedPassword: password,
     createdAt: Timestamp.now(),
     startDate: Timestamp.now(),
   });
@@ -465,39 +475,15 @@ export const toggleUserActive = async (userId: string, isActive: boolean): Promi
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
-  const userSnap = await getDoc(doc(db, 'users', userId));
-  if (userSnap.exists()) {
-    const data = userSnap.data();
-    const email = data?.email;
-    const password = data?.managedPassword;
-    if (email && password) {
-      try {
-        const apiKey = auth.app.options.apiKey;
-        if (apiKey) {
-          const signInRes = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, password, returnSecureToken: true }),
-            }
-          );
-          const signInData = await signInRes.json();
-          if (signInRes.ok && signInData.idToken) {
-            await fetch(
-              `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idToken: signInData.idToken }),
-              }
-            );
-          }
-        }
-      } catch {
-        // Auth deletion failed — continue with Firestore cleanup
-      }
-    }
+  // Eliminazione account Auth server-side (Cloud Function adminDeleteUser).
+  // Se le Functions non sono ancora deployate (piano Spark), si elimina
+  // comunque il profilo Firestore: l'account Auth orfano resta inutilizzabile
+  // (il login richiede il profilo) e si rimuove con lo script di bonifica.
+  try {
+    const { adminDeleteAuthUser } = await import('./adminAuthService');
+    await adminDeleteAuthUser(userId);
+  } catch {
+    // Auth deletion non disponibile — si procede con la pulizia Firestore
   }
   await deleteDoc(doc(db, 'users', userId));
 };

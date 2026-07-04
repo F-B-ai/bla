@@ -52,12 +52,31 @@ service cloud.firestore {
       allow write: if isOwner();
     }
 
-    // Users collection
+    // Users collection — M0 hardening:
+    // - lettura: il proprio documento, lo staff (che gestisce gli allievi),
+    //   oppure i profili dello staff (gli allievi devono vedere nome/contatti
+    //   di coach e titolare per chat e pagamenti — MAI i documenti di altri
+    //   allievi, che contengono note mediche e obiettivi).
+    // - update: il proprietario NON puo' toccare ruolo, commissioni o
+    //   assegnazioni (anti scalata di privilegi); owner/manager si'.
+    //   L'eccezione hasOnly(['assignedStudents']) serve al flusso inviti
+    //   (l'allievo appena registrato si aggiunge alla lista del coach).
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isStaff() ||
+        resource.data.role in ['owner', 'manager', 'collaborator']
+      );
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
-        request.auth.uid == userId || isOwnerOrManager()
+        isOwnerOrManager() ||
+        (request.auth.uid == userId &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+            ['role', 'commissionPercentage', 'managerCommissionPercentage',
+             'coachCommissionPercentage', 'managedPassword']
+          )) ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['assignedStudents'])
       );
       allow delete: if isStaff();
     }

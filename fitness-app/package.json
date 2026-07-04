@@ -66,5 +66,14 @@
     "puppeteer-core": "^24.39.0",
     "react-test-renderer": "18.3.1",
     "typescript": "^5.3.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/src/domain/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "babel-jest"
+    }
   }
 }

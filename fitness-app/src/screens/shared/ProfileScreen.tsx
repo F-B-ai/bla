@@ -30,12 +30,11 @@ import {
 import {
   changeOwnEmail,
   changeOwnPasswordAndStore,
-  adminChangeUserEmail,
-  adminChangeUserPassword,
-  getManagedPassword,
   createCredentialRequest,
   getUserRequests,
 } from '../../services/credentialService';
+import { adminSetUserEmail, adminSetUserPassword } from '../../services/adminAuthService';
+import { resetPassword } from '../../services/authService';
 import { createNotification } from '../../services/notificationService';
 
 interface ProfileScreenProps {
@@ -53,10 +52,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   const [uploading, setUploading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Password visibility (owner only)
-  const [managedPassword, setManagedPassword] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [loadingPassword, setLoadingPassword] = useState(false);
+  // Invio link reimpostazione password (staff)
+  const [sendingResetLink, setSendingResetLink] = useState(false);
 
   // Edit email
   const [editingEmail, setEditingEmail] = useState(false);
@@ -118,17 +115,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       setAvatarUrl(user.avatarUrl);
     }
   }, [user, isEditingOther]);
-
-  // Load managed password for owner
-  useEffect(() => {
-    if (isOwner && userId) {
-      setLoadingPassword(true);
-      getManagedPassword(userId).then((pw) => {
-        setManagedPassword(pw);
-        setLoadingPassword(false);
-      }).catch(() => setLoadingPassword(false));
-    }
-  }, [isOwner, userId]);
 
   // Load user's own requests (students + staff)
   useEffect(() => {
@@ -225,12 +211,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     setSavingEmail(true);
     try {
       if (isEditingOther && profileUser) {
-        if (!managedPassword) {
-          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
-          setSavingEmail(false);
-          return;
-        }
-        await adminChangeUserEmail(profileUser.id, profileUser.email, managedPassword, newEmail.trim());
+        await adminSetUserEmail(profileUser.id, newEmail.trim());
         setProfileUser({ ...profileUser, email: newEmail.trim() });
       } else {
         if (!currentPasswordForEmail) {
@@ -279,13 +260,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
     setSavingPassword(true);
     try {
       if (isEditingOther && profileUser) {
-        if (!managedPassword) {
-          crossAlert('Errore', 'Password gestita non disponibile per questo utente.');
-          setSavingPassword(false);
-          return;
-        }
-        await adminChangeUserPassword(profileUser.id, profileUser.email, managedPassword, newPassword);
-        setManagedPassword(newPassword);
+        await adminSetUserPassword(profileUser.id, newPassword);
       } else {
         if (!currentPasswordForPw) {
           crossAlert('Errore', 'Inserisci la password attuale.');
@@ -293,7 +268,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           return;
         }
         await changeOwnPasswordAndStore(currentPasswordForPw, newPassword);
-        setManagedPassword(newPassword);
       }
       crossAlert('Fatto', 'Password aggiornata con successo.');
       setEditingPassword(false);
@@ -615,29 +589,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
       <Card variant="elevated">
         <Text style={styles.sectionTitle}>Password</Text>
 
-        {/* Owner: show stored password */}
-        {isOwner && (
-          <View style={styles.passwordDisplay}>
-            <Text style={styles.passwordLabel}>Password attuale:</Text>
-            {loadingPassword ? (
-              <ActivityIndicator size="small" color={colors.accent} />
-            ) : managedPassword ? (
-              <View style={styles.passwordValueRow}>
-                <Text style={styles.passwordValue}>
-                  {showPassword ? managedPassword : '••••••••'}
-                </Text>
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <Text style={styles.passwordNotAvailable}>Non disponibile</Text>
-            )}
-          </View>
+        {/* Per sicurezza le password non vengono mai salvate né mostrate.
+            Lo staff può inviare all'utente un link di reimpostazione. */}
+        {isOwner && isEditingOther && profileUser?.email && (
+          <Button
+            title={sendingResetLink ? 'Invio in corso...' : 'Invia link reimpostazione password'}
+            variant="outline"
+            loading={sendingResetLink}
+            onPress={async () => {
+              setSendingResetLink(true);
+              try {
+                await resetPassword(profileUser.email);
+                crossAlert('Inviato', `Link di reimpostazione inviato a ${profileUser.email}. L'utente sceglie la nuova password dal link.`);
+              } catch {
+                crossAlert('Errore', 'Impossibile inviare il link. Verifica che l\'email sia corretta.');
+              } finally {
+                setSendingResetLink(false);
+              }
+            }}
+          />
         )}
 
         {/* Owner: change password form */}

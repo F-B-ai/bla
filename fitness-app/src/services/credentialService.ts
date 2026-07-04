@@ -19,119 +19,6 @@ import { CredentialChangeRequest, CredentialRequestType } from '../types';
 
 const REQUESTS_COLLECTION = 'credentialRequests';
 
-const getApiKey = (): string => {
-  const apiKey = auth.app.options.apiKey;
-  if (!apiKey) throw new Error('Firebase API key non trovata');
-  return apiKey;
-};
-
-const restSignIn = async (
-  email: string,
-  password: string
-): Promise<{ idToken: string; localId: string }> => {
-  const apiKey = getApiKey();
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error?.message || 'Errore di autenticazione');
-  return { idToken: data.idToken, localId: data.localId };
-};
-
-const restSendVerifyAndChangeEmail = async (
-  idToken: string,
-  newEmail: string
-): Promise<void> => {
-  const apiKey = getApiKey();
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requestType: 'VERIFY_AND_CHANGE_EMAIL',
-        idToken,
-        newEmail,
-      }),
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) {
-    const errMsg = data?.error?.message || '';
-    if (errMsg === 'EMAIL_EXISTS') throw new Error('Questa email è già in uso');
-    if (errMsg === 'INVALID_EMAIL') throw new Error('Email non valida');
-    throw new Error(errMsg || 'Errore invio email di verifica');
-  }
-};
-
-const restUpdateAccount = async (
-  idToken: string,
-  updates: { email?: string; password?: string }
-): Promise<void> => {
-  const apiKey = getApiKey();
-  const body: Record<string, unknown> = { idToken, returnSecureToken: false };
-  if (updates.email) body.email = updates.email;
-  if (updates.password) body.password = updates.password;
-
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) {
-    const errMsg = data?.error?.message || '';
-    if (errMsg === 'EMAIL_EXISTS') throw new Error('Questa email è già in uso');
-    if (errMsg === 'WEAK_PASSWORD') throw new Error('Password troppo debole (min 6 caratteri)');
-    if (errMsg === 'INVALID_EMAIL') throw new Error('Email non valida');
-    throw new Error(errMsg || 'Errore aggiornamento credenziali');
-  }
-};
-
-// Owner changes another user's email
-export const adminChangeUserEmail = async (
-  userId: string,
-  currentEmail: string,
-  currentPassword: string,
-  newEmail: string
-): Promise<void> => {
-  const { idToken } = await restSignIn(currentEmail, currentPassword);
-  try {
-    await restUpdateAccount(idToken, { email: newEmail });
-  } catch (err: any) {
-    if (err?.message?.includes('OPERATION_NOT_ALLOWED') || err?.message?.includes('verify')) {
-      await restSendVerifyAndChangeEmail(idToken, newEmail);
-      await updateDoc(doc(db, 'users', userId), { email: newEmail });
-      throw new Error(
-        'VERIFY_SENT: Email di verifica inviata a ' + newEmail +
-        '. Il cambio sarà effettivo dopo che l\'utente confermerà cliccando il link nell\'email.'
-      );
-    }
-    throw err;
-  }
-  await updateDoc(doc(db, 'users', userId), { email: newEmail });
-};
-
-// Owner changes another user's password
-export const adminChangeUserPassword = async (
-  userId: string,
-  currentEmail: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<void> => {
-  const { idToken } = await restSignIn(currentEmail, currentPassword);
-  await restUpdateAccount(idToken, { password: newPassword });
-  await updateDoc(doc(db, 'users', userId), { managedPassword: newPassword });
-};
-
 // Owner changes own email
 export const changeOwnEmail = async (
   currentPassword: string,
@@ -155,16 +42,6 @@ export const changeOwnPasswordAndStore = async (
   const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
   await reauthenticateWithCredential(fbUser, credential);
   await updatePassword(fbUser, newPassword);
-};
-
-// Get managed password
-export const getManagedPassword = async (
-  userId: string
-): Promise<string | null> => {
-  const { getDoc } = await import('firebase/firestore');
-  const snap = await getDoc(doc(db, 'users', userId));
-  if (!snap.exists()) return null;
-  return snap.data()?.managedPassword || null;
 };
 
 // ==========================================
@@ -228,25 +105,16 @@ export const approveRequest = async (
   request: CredentialChangeRequest,
   reviewerId: string
 ): Promise<void> => {
-  const managedPassword = await getManagedPassword(request.userId);
-  if (!managedPassword) {
-    throw new Error('Password gestita non trovata. Impossibile applicare la modifica.');
-  }
-
+  // Le modifiche credenziali passano dalle Cloud Functions (Admin SDK,
+  // verifica ruolo server-side): mai più login "come l'utente" con
+  // password salvate in chiaro (vulnerabilità V1, bonificata in M0).
   if (request.requestType === 'email' && request.newEmail) {
-    await adminChangeUserEmail(
-      request.userId,
-      request.currentEmail,
-      managedPassword,
-      request.newEmail
-    );
+    const { adminSetUserEmail } = await import('./adminAuthService');
+    await adminSetUserEmail(request.userId, request.newEmail);
+    await updateDoc(doc(db, 'users', request.userId), { email: request.newEmail });
   } else if (request.requestType === 'password' && request.newPassword) {
-    await adminChangeUserPassword(
-      request.userId,
-      request.currentEmail,
-      managedPassword,
-      request.newPassword
-    );
+    const { adminSetUserPassword } = await import('./adminAuthService');
+    await adminSetUserPassword(request.userId, request.newPassword);
   } else if (request.requestType === 'info' && request.newInfo) {
     try {
       const info = JSON.parse(request.newInfo);
