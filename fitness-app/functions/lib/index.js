@@ -33,9 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cleanManagedPasswords = exports.migrateUserClaims = exports.setUserClaims = exports.adminDeleteUser = exports.adminChangePassword = exports.adminChangeEmail = void 0;
+exports.cleanManagedPasswords = exports.migrateUserClaims = exports.setUserClaims = exports.adminDeleteUser = exports.adminChangePassword = exports.adminChangeEmail = exports.aiMessages = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
+var ai_1 = require("./ai");
+Object.defineProperty(exports, "aiMessages", { enumerable: true, get: function () { return ai_1.aiMessages; } });
 admin.initializeApp();
 const db = admin.firestore();
 const authAdmin = admin.auth();

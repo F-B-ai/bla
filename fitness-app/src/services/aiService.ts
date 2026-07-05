@@ -5,10 +5,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PosturalFinding, Exercise, WorkoutPlan } from '../types';
+import { auth } from '../config/firebase';
 
 // La chiave API va impostata in config. In produzione usare un backend proxy.
 // MAI esporre la chiave in un'app client in produzione.
 const API_URL = 'https://api.anthropic.com/v1/messages';
+// M1 — AI Gateway server-side: la chiave Anthropic vive in Secret Manager,
+// il modello viene scelto dal server in base alla feature (03 §0.3).
+const AI_GATEWAY_URL = 'https://europe-west1-essere-3fe6f.cloudfunctions.net/aiMessages';
 const AI_KEY_STORAGE = '@essère_ai_key';
 
 let API_KEY = '';
@@ -69,13 +73,51 @@ export const callClaude = async (
   systemPrompt: string,
   maxTokens: number = 2000,
   prefill?: string,
-  model: string = 'claude-sonnet-4-5'
+  model: string = 'claude-sonnet-4-5',
+  feature: string = 'generic'
 ): Promise<string> => {
   // GDPR art. 9: ogni chiamata AI richiede il consenso "AI esterna"
   // dell'utente corrente (choke point unico: tutte le funzioni AI passano di qui)
   const { ensureOwnConsent } = await import('./consentService');
   await ensureOwnConsent('externalAI');
 
+  // --- M1: prima scelta = gateway server-side ---
+  // Se il gateway risponde, la chiave non serve sul client. Il fallback
+  // diretto resta SOLO per la settimana di transizione (poi si revoca
+  // la chiave client e si rimuove il ramo legacy).
+  try {
+    const idToken = await auth.currentUser?.getIdToken();
+    if (idToken) {
+      const gwRes = await fetch(AI_GATEWAY_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ feature, messages, system: systemPrompt, maxTokens, prefill }),
+      });
+      if (gwRes.ok) {
+        const gwData = await gwRes.json();
+        const gwText = gwData?.text;
+        if (!gwText) throw new Error('AI_FATAL: Il servizio AI ha restituito una risposta vuota. Riprova.');
+        return prefill ? prefill + gwText : gwText;
+      }
+      if (gwRes.status === 403 || gwRes.status === 429) {
+        // Consenso mancante o quota esaurita: errori definitivi, niente fallback
+        const err = await gwRes.json().catch(() => ({}));
+        throw new Error(`AI_FATAL: ${err?.message || 'Richiesta non consentita.'}`);
+      }
+      // 404 (gateway non ancora deployato) o 5xx → si tenta il ramo legacy
+    }
+  } catch (e) {
+    const msg = (e as Error)?.message || '';
+    if (msg.startsWith('AI_FATAL: ')) {
+      throw new Error(msg.slice('AI_FATAL: '.length));
+    }
+    // errore di rete verso il gateway → fallback legacy
+  }
+
+  // --- Ramo legacy (transizione M1): chiamata diretta con chiave client ---
   if (!API_KEY) {
     await loadAIApiKey();
   }
@@ -367,6 +409,10 @@ Sii specifico e professionale. Suggerisci esercizi correttivi concreti con serie
     [{ role: 'user', content }],
     systemPrompt,
     4096
+  ,
+    undefined,
+    'claude-sonnet-4-5',
+    'postural'
   );
 
   // Parse JSON dalla risposta
@@ -566,7 +612,9 @@ Sii specifico, professionale e motivante.`;
     [{ role: 'user', content: hasImages ? content : contextText }],
     systemPrompt,
     3000,
-    '{'
+    '{',
+    'claude-sonnet-4-5',
+    'postural'
   );
 
   const parsed = extractJSON<AIPosturalComparison>(responseText);
@@ -686,6 +734,10 @@ Informazioni allievo:
     [{ role: 'user', content: prompt }],
     systemPrompt,
     4000
+  ,
+    undefined,
+    'claude-sonnet-4-5',
+    'progression'
   );
 
   try {
@@ -759,7 +811,9 @@ Attrezzatura: ${params.equipment}`;
     [{ role: 'user', content: prompt }],
     systemPrompt,
     8192,
-    '{'
+    '{',
+    'claude-sonnet-4-5',
+    'workoutplan'
   );
 
   const parsed = extractJSON<AIGeneratedWorkoutPlan>(responseText);
@@ -810,6 +864,10 @@ Allievi:`;
     [{ role: 'user', content: prompt }],
     systemPrompt,
     1500
+  ,
+    undefined,
+    'claude-sonnet-4-5',
+    'weekly_summary'
   );
 };
 
@@ -837,6 +895,10 @@ RISPONDI in JSON array con questa struttura:
     [{ role: 'user', content: `Suggerisci 5 esercizi per ${muscle} con obiettivo ${goal}. Attrezzatura: ${equipment}.` }],
     systemPrompt,
     1500
+  ,
+    undefined,
+    'claude-sonnet-4-5',
+    'progression'
   );
 
   try {
@@ -944,6 +1006,10 @@ Sii specifico, professionale e costruttivo. Fornisci raccomandazioni pratiche pe
     [{ role: 'user', content }],
     systemPrompt,
     3000
+  ,
+    undefined,
+    'claude-sonnet-4-5',
+    'bodycomp'
   );
 
   const parsed = extractJSON<AIBodyCompositionResult>(responseText);
@@ -1100,7 +1166,9 @@ PROFILO ALLIEVO:
     [{ role: 'user', content: prompt }],
     systemPrompt,
     3000,
-    '{'
+    '{',
+    'claude-sonnet-4-5',
+    'coach'
   );
 
   const parsed = extractJSON<AICoachInsights>(responseText);

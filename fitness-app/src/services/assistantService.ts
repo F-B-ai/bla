@@ -89,5 +89,7 @@ export const askAssistant = async (
   const system = buildSystemPrompt(gymInfo, userName);
   // Limita la storia alle ultime 12 battute per contenere i costi
   const recent = history.slice(-12).map((m) => ({ role: m.role, content: m.content }));
-  return callClaude(recent, system, 1000, undefined, 'claude-opus-4-8');
+  // Modello: lo sceglie il gateway per feature (assistant → Sonnet con
+  // prompt caching: superficie ad alto volume, 03 §0.3 / 07 M1)
+  return callClaude(recent, system, 1000, undefined, 'claude-sonnet-4-5', 'assistant');
 };

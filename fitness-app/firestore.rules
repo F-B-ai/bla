@@ -46,6 +46,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Log costi/uso AI: scrive SOLO il gateway (Admin SDK).
+    // L'owner/manager li legge per il cruscotto costi.
+    match /aiUsage/{docId} {
+      allow read: if isOwnerOrManager();
+      allow write: if false;
+    }
+
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
     match /config/{docId} {
