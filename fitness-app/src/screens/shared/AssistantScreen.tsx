@@ -80,9 +80,24 @@ export const AssistantScreen: React.FC = () => {
   }, [messages, sending, user]);
 
   const handleSaveInfo = async () => {
+    // Protezione anti-cancellazione: se il campo è vuoto ma su Firestore
+    // esistono informazioni, chiedi conferma esplicita prima di sovrascrivere.
+    if (!infoText.trim()) {
+      try {
+        const saved = await getAssistantInfo();
+        if (saved && saved.trim()) {
+          crossAlert(
+            'Attenzione',
+            'Il campo è vuoto ma ci sono informazioni salvate. Per cancellarle davvero, scrivi "CANCELLA TUTTO" nel campo e salva di nuovo.'
+          );
+          return;
+        }
+      } catch { /* in dubbio, non bloccare */ }
+    }
+    const toSave = infoText.trim() === 'CANCELLA TUTTO' ? '' : infoText;
     setSavingInfo(true);
     try {
-      await saveAssistantInfo(infoText);
+      await saveAssistantInfo(toSave);
       setShowInfoModal(false);
       crossAlert('Salvato', 'Le informazioni della palestra sono state aggiornate. L\'assistente le userà da subito.');
     } catch {
@@ -111,7 +126,18 @@ export const AssistantScreen: React.FC = () => {
         {isOwner && (
           <TouchableOpacity
             style={styles.editInfoBtn}
-            onPress={() => setShowInfoModal(true)}
+            onPress={async () => {
+              setShowInfoModal(true);
+              // Ricarica SEMPRE il testo salvato all'apertura: il caricamento
+              // al mount può fallire (auth/rete non pronte) e lasciare il campo
+              // vuoto — salvare in quello stato cancellerebbe le informazioni.
+              try {
+                const saved = await getAssistantInfo();
+                if (saved) {
+                  setInfoText((current) => (current.trim() ? current : saved));
+                }
+              } catch { /* si mantiene il testo attuale */ }
+            }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Ionicons name="create-outline" size={20} color={colors.accent} />
