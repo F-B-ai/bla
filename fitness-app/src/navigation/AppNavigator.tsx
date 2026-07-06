@@ -103,6 +103,11 @@ import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
 import { checkLicense } from '../services/licenseService';
 import { ConsentScreen } from '../screens/shared/ConsentScreen';
 import { StudentTabsV2 } from './StudentTabsV2';
+import { makeStaffTabs } from './StaffTabsV2';
+
+const OwnerTabsV2 = makeStaffTabs('owner');
+const ManagerTabsV2 = makeStaffTabs('manager');
+const CollaboratorTabsV2 = makeStaffTabs('collaborator');
 import { needsConsentDecision, clearConsentCache } from '../services/consentService';
 import { brand } from '../config/brand';
 
@@ -1223,14 +1228,11 @@ export const AppNavigator: React.FC = () => {
           ) : effectiveLoginMode === 'academy' ? (
             <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
           ) : role === 'owner' ? (
-            <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
+            <RootStack.Screen name="OwnerTabs" component={OwnerTabsV2} />
           ) : role === 'manager' ? (
-            <RootStack.Screen name="ManagerTabs" component={ManagerTabs} />
+            <RootStack.Screen name="ManagerTabs" component={ManagerTabsV2} />
           ) : role === 'collaborator' ? (
-            <RootStack.Screen
-              name="CollaboratorTabs"
-              component={CollaboratorTabs}
-            />
+            <RootStack.Screen name="CollaboratorTabs" component={CollaboratorTabsV2} />
           ) : (
             <RootStack.Screen name="StudentTabs" component={StudentTabsV2} />
           )}
