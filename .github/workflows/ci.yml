@@ -33,6 +33,9 @@ jobs:
       - name: Test (logica pura src/domain)
         run: npx jest --ci
 
+      - name: Guardiano palette (M2 — niente nuovi colori fuori tema)
+        run: node scripts/check-colors.js
+
       - name: Grep anti-regressione — managedPassword (V1)
         run: |
           # Cattura USI del campo (scrittura "managedPassword:" o lettura
