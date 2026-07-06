@@ -102,6 +102,7 @@ import { AssistantScreen } from '../screens/shared/AssistantScreen';
 import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
 import { checkLicense } from '../services/licenseService';
 import { ConsentScreen } from '../screens/shared/ConsentScreen';
+import { StudentTabsV2 } from './StudentTabsV2';
 import { needsConsentDecision, clearConsentCache } from '../services/consentService';
 import { brand } from '../config/brand';
 
@@ -1231,7 +1232,7 @@ export const AppNavigator: React.FC = () => {
               component={CollaboratorTabs}
             />
           ) : (
-            <RootStack.Screen name="StudentTabs" component={StudentTabs} />
+            <RootStack.Screen name="StudentTabs" component={StudentTabsV2} />
           )}
         </RootStack.Navigator>
         {showOnboarding && user && role && (
