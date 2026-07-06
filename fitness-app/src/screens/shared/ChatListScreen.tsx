@@ -11,6 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -33,6 +34,7 @@ import { crossAlert } from '../../utils/alert';
 
 export const ChatListScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
+  const navigation = useNavigation<any>();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [participants, setParticipants] = useState<Record<string, User>>({});
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -346,6 +348,28 @@ export const ChatListScreen: React.FC = () => {
         </Text>
       </View>
 
+      {/* Scorciatoie fisse: canali sempre disponibili (M2) */}
+      <View style={styles.pinnedRow}>
+        {(isOwner || isManager || isCollaborator) && (
+          <TouchableOpacity
+            style={styles.pinnedChip}
+            onPress={() => { try { navigation.navigate('TeamChat'); } catch { /* rotta assente */ } }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="people" size={16} color={colors.accent} />
+            <Text style={styles.pinnedChipText}>Chat del team</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.pinnedChip}
+          onPress={() => { try { navigation.navigate('Assistente'); } catch { /* rotta assente */ } }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="sparkles" size={16} color={colors.accent} />
+          <Text style={styles.pinnedChipText}>Assistente</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Pulsante Nuova Chat */}
       <View style={styles.newChatContainer}>
         <Button
@@ -512,6 +536,28 @@ export const ChatListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  pinnedRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  pinnedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pinnedChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.text,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
