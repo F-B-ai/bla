@@ -1617,7 +1617,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                       style={[styles.saveAsTemplateBtn, { backgroundColor: colors.info }]}
                       onPress={() => printWorkoutPlan({ studentName: getStudentName(viewingPlan.studentId), plan: viewingPlan })}
                     >
-                      <Ionicons name="print-outline" size={16} color="#fff" />
+                      <Ionicons name="print-outline" size={16} color={colors.white} />
                       <Text style={styles.saveAsTemplateText}>Stampa</Text>
                     </TouchableOpacity>
                   )}
@@ -1834,7 +1834,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                     <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
                     {libEx.videoUrl && (
                       <View style={styles.libraryVideoBadge}>
-                        <Ionicons name="videocam" size={12} color="#FFF" />
+                        <Ionicons name="videocam" size={12} color={colors.white} />
                         <Text style={styles.libraryVideoBadgeText}>Video</Text>
                       </View>
                     )}
@@ -1921,7 +1921,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   dayBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '700',
   },
@@ -1958,7 +1958,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exerciseNumberText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
     fontSize: fontSize.sm,
   },
@@ -2035,7 +2035,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -2177,7 +2177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateGenderText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
     fontSize: fontSize.md,
   },
@@ -2253,7 +2253,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   activeBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '800',
   },
@@ -2456,7 +2456,7 @@ const styles = StyleSheet.create({
   },
   libraryVideoBadgeText: {
     fontSize: fontSize.xs,
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
   },
   libraryItemSeparator: {

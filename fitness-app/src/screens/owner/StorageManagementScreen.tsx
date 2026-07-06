@@ -420,10 +420,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     alignItems: 'center',
     gap: spacing.md,
   },
-  overlayText: { color: '#fff', fontSize: fontSize.md, fontWeight: '600' },
+  overlayText: { color: colors.white, fontSize: fontSize.md, fontWeight: '600' },
 });

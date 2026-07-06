@@ -389,9 +389,9 @@ export const WorkoutHistoryScreen: React.FC = () => {
                           <Ionicons
                             name={volDiff > 0 ? 'trending-up' : 'trending-down'}
                             size={14}
-                            color={volDiff > 0 ? '#34C759' : '#FF453A'}
+                            color={volDiff > 0 ? colors.success : colors.error}
                           />
-                          <Text style={{ fontSize: fontSize.xs, color: volDiff > 0 ? '#34C759' : '#FF453A', fontWeight: '600' }}>
+                          <Text style={{ fontSize: fontSize.xs, color: volDiff > 0 ? colors.success : colors.error, fontWeight: '600' }}>
                             {volDiff > 0 ? '+' : ''}{volDiff} kg vol
                           </Text>
                         </View>
@@ -402,7 +402,7 @@ export const WorkoutHistoryScreen: React.FC = () => {
                       <Text style={styles.progStatText}>
                         Max: <Text style={{ fontWeight: '700', color: colors.text }}>{sess.bestWeight} kg</Text>
                         {weightDiff !== 0 && (
-                          <Text style={{ color: weightDiff > 0 ? '#34C759' : '#FF453A' }}>
+                          <Text style={{ color: weightDiff > 0 ? colors.success : colors.error }}>
                             {' '}({weightDiff > 0 ? '+' : ''}{weightDiff})
                           </Text>
                         )}
@@ -604,7 +604,7 @@ export const WorkoutHistoryScreen: React.FC = () => {
                           <Ionicons
                             name={trend === 'up' ? 'arrow-up-circle' : trend === 'down' ? 'arrow-down-circle' : 'remove-circle'}
                             size={18}
-                            color={trend === 'up' ? '#34C759' : trend === 'down' ? '#FF453A' : colors.textLight}
+                            color={trend === 'up' ? colors.success : trend === 'down' ? colors.error : colors.textLight}
                           />
                         )}
                       </View>
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.textSecondary, textAlign: 'center', padding: spacing.xl },
 
   // Detail modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,

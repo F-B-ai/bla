@@ -892,7 +892,7 @@ export const ManageTemplatesScreen: React.FC = () => {
                     <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
                     {libEx.videoUrl && (
                       <View style={styles.libraryVideoBadge}>
-                        <Ionicons name="videocam" size={12} color="#FFF" />
+                        <Ionicons name="videocam" size={12} color={colors.white} />
                         <Text style={styles.libraryVideoBadgeText}>Video</Text>
                       </View>
                     )}
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
   // Template list
   templateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   templateGenderBadge: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  templateGenderText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.md },
+  templateGenderText: { color: colors.white, fontWeight: '700', fontSize: fontSize.md },
   templateInfo: { flex: 1 },
   templateName: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   templateCategory: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '600', marginTop: 2 },
@@ -961,7 +961,7 @@ const styles = StyleSheet.create({
   // Detail view
   detailMeta: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, alignItems: 'center' },
   genderBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round },
-  genderBadgeText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  genderBadgeText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   detailCategory: { fontSize: fontSize.md, color: colors.accent, fontWeight: '600' },
   detailDays: { fontSize: fontSize.sm, color: colors.textSecondary },
   detailActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap' },
@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success, borderRadius: 10, width: 20, height: 20,
     justifyContent: 'center', alignItems: 'center', marginTop: 4,
   },
-  dayBadgeText: { color: '#FFF', fontSize: fontSize.xs, fontWeight: '700' },
+  dayBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
 
   // Exercise list
   sectionTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
@@ -993,7 +993,7 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accent,
     justifyContent: 'center', alignItems: 'center',
   },
-  exerciseNumberText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  exerciseNumberText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   exerciseInfo: { flex: 1 },
   exerciseName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
   exerciseDetails: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   genderBtnMaleActive: { backgroundColor: '#4A90D9', borderColor: '#4A90D9' },
   genderBtnFemaleActive: { backgroundColor: '#D94A8C', borderColor: '#D94A8C' },
   genderBtnText: { fontSize: fontSize.md, color: colors.textSecondary, fontWeight: '600' },
-  genderBtnTextActive: { color: '#FFF' },
+  genderBtnTextActive: { color: colors.white },
   categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.md },
   categoryChip: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round,
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
   halfField: { flex: 1 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '90%',
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success,
     paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm,
   },
-  libraryVideoBadgeText: { fontSize: fontSize.xs, color: '#FFF', fontWeight: '700' },
+  libraryVideoBadgeText: { fontSize: fontSize.xs, color: colors.white, fontWeight: '700' },
   libraryItemSeparator: { height: 1, backgroundColor: colors.divider, marginHorizontal: spacing.md },
   libraryEmptyContainer: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
   libraryEmptyText: { color: colors.textSecondary, textAlign: 'center', fontSize: fontSize.md },

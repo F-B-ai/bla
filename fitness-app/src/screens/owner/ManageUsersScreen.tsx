@@ -521,10 +521,10 @@ export const ManageUsersScreen: React.FC = () => {
                     disabled={isProcessing}
                   >
                     {isProcessing ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={colors.white} />
                     ) : (
                       <>
-                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Ionicons name="checkmark" size={16} color={colors.white} />
                         <Text style={styles.requestActionText}>Approva</Text>
                       </>
                     )}
@@ -1254,7 +1254,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.studentBadge,
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -1359,7 +1359,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
@@ -1435,7 +1435,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   modalSaveBtnText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -1527,7 +1527,7 @@ const styles = StyleSheet.create({
   requestActionText: {
     fontSize: fontSize.sm,
     fontWeight: '600',
-    color: '#fff',
+    color: colors.white,
   },
   // Edit modal
   editModalScroll: {

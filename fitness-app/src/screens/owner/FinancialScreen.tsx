@@ -244,7 +244,7 @@ export const FinancialScreen: React.FC = () => {
                 type="date"
                 value={printStartDate}
                 onChange={(e: any) => setPrintStartDate(e.target.value)}
-                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
               />
             </View>
             <View style={styles.printDateField}>
@@ -253,14 +253,14 @@ export const FinancialScreen: React.FC = () => {
                 type="date"
                 value={printEndDate}
                 onChange={(e: any) => setPrintEndDate(e.target.value)}
-                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
               />
             </View>
           </View>
           <Button
             title="Stampa Report"
             onPress={handlePrintFinancial}
-            icon={<Ionicons name="print" size={18} color="#fff" />}
+            icon={<Ionicons name="print" size={18} color={colors.white} />}
           />
         </Card>
       )}
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

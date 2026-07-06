@@ -412,7 +412,7 @@ export const AcademyStudentsScreen: React.FC = () => {
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color="#FFF" />
+                    <ActivityIndicator size="small" color={colors.white} />
                   ) : (
                     <Text style={styles.saveBtnText}>Crea Studente</Text>
                   )}
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   // Detail modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     padding: spacing.lg,
   },

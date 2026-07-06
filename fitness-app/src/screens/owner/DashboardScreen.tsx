@@ -482,7 +482,7 @@ export const DashboardScreen: React.FC = () => {
                   type="date"
                   value={printStartDate}
                   onChange={(e: any) => setPrintStartDate(e.target.value)}
-                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
                 />
               </View>
               <View style={styles.printDateField}>
@@ -491,7 +491,7 @@ export const DashboardScreen: React.FC = () => {
                   type="date"
                   value={printEndDate}
                   onChange={(e: any) => setPrintEndDate(e.target.value)}
-                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: '#fff', width: '100%' } as any}
+                  style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
                 />
               </View>
             </View>
@@ -499,7 +499,7 @@ export const DashboardScreen: React.FC = () => {
               <Button
                 title="Le mie lezioni + Staff completo"
                 onPress={handlePrintOwner}
-                icon={<Ionicons name="person" size={16} color="#fff" />}
+                icon={<Ionicons name="person" size={16} color={colors.white} />}
               />
               <Button
                 title="Solo Staff (Manager, Coach, Nutrizionisti)"
@@ -857,7 +857,7 @@ export const DashboardScreen: React.FC = () => {
               );
             }}
           >
-            <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+            <Ionicons name="logo-whatsapp" size={16} color={colors.white} />
             <Text style={styles.sendAllButtonText}>Invia Tutti</Text>
           </TouchableOpacity>
         )}
@@ -901,7 +901,7 @@ export const DashboardScreen: React.FC = () => {
                     style={styles.whatsappButton}
                     onPress={() => sendWhatsAppReminder(reminder.studentPhone, reminder.body)}
                   >
-                    <Ionicons name="logo-whatsapp" size={16} color="#FFF" />
+                    <Ionicons name="logo-whatsapp" size={16} color={colors.white} />
                     <Text style={styles.whatsappButtonText}>Invia WhatsApp</Text>
                   </TouchableOpacity>
                 ) : (
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   whatsappButtonText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
   },
@@ -1264,7 +1264,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   sendAllButtonText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
   },
@@ -1461,7 +1461,7 @@ const styles = StyleSheet.create({
   },
   aiSummaryModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   aiSummaryModalContent: {

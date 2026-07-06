@@ -190,7 +190,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 style={{
                   flex: 1,
                   backgroundColor: '#1A1A1A',
-                  color: '#FFFFFF',
+                  color: colors.white,
                   border: `1px solid ${colors.border}`,
                   borderRadius: 8,
                   padding: '10px 14px',
@@ -335,7 +335,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   todayBtnText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
   },

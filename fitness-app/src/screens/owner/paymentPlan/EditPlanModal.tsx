@@ -381,13 +381,13 @@ export const EditPlanModal: React.FC<EditPlanModalProps> = ({
                       title="Salva Modifiche"
                       onPress={handleSaveEdit}
                       loading={saving}
-                      icon={<Ionicons name="save" size={18} color="#fff" />}
+                      icon={<Ionicons name="save" size={18} color={colors.white} />}
                     />
                     <Button
                       title="Elimina Piano"
                       variant="danger"
                       onPress={() => handleDelete(editingPlan.id)}
-                      icon={<Ionicons name="trash" size={18} color="#fff" />}
+                      icon={<Ionicons name="trash" size={18} color={colors.white} />}
                     />
                   </>
                 )}
@@ -408,7 +408,7 @@ export const EditPlanModal: React.FC<EditPlanModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {

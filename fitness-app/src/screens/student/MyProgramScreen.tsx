@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   activeBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '800',
   },

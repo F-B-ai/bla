@@ -448,11 +448,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
             )}
             {uploading ? (
               <View style={styles.avatarOverlay}>
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.white} />
               </View>
             ) : (
               <View style={styles.cameraIcon}>
-                <Ionicons name="camera" size={18} color="#fff" />
+                <Ionicons name="camera" size={18} color={colors.white} />
               </View>
             )}
           </TouchableOpacity>
@@ -960,7 +960,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderRadius: 55,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },

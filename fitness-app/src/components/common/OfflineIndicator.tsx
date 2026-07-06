@@ -47,7 +47,7 @@ export const OfflineIndicator: React.FC = () => {
       <Ionicons
         name={isOffline ? 'cloud-offline-outline' : 'checkmark-circle-outline'}
         size={16}
-        color="#FFF"
+        color={colors.white}
       />
       <Text style={styles.text}>
         {isOffline ? 'Sei offline — i dati saranno sincronizzati al ritorno' : 'Connessione ripristinata'}
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
   text: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '600',
   },

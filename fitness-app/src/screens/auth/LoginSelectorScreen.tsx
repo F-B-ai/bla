@@ -160,13 +160,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   cardFooterText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   cardArrow: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -174,13 +174,13 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD_DARK,
   },
   academyFooterText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   academyArrow: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },

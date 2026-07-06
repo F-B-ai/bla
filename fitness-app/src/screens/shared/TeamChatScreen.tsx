@@ -285,7 +285,7 @@ export const TeamChatScreen: React.FC = () => {
                 <View style={styles.roomRow}>
                   <View style={styles.roomAvatarWrapper}>
                     <View style={styles.roomAvatar}>
-                      <Ionicons name="people" size={22} color="#FFFFFF" />
+                      <Ionicons name="people" size={22} color={colors.white} />
                     </View>
                     {onlineCount > 0 && <View style={styles.presenceDot} />}
                   </View>
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg, lineHeight: 22,
   },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   contactAvatarSelected: { backgroundColor: colors.accent },
-  contactAvatarText: { color: '#FFFFFF', fontSize: fontSize.md, fontWeight: '700' },
+  contactAvatarText: { color: colors.white, fontSize: fontSize.md, fontWeight: '700' },
   contactInfo: { flex: 1 },
   contactName: { fontSize: fontSize.lg, fontWeight: '600', color: colors.text },
   contactRole: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },

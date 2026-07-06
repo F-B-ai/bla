@@ -288,7 +288,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
                       onClose();
                       onEditPlan(plan);
                     }}
-                    icon={<Ionicons name="create-outline" size={18} color="#fff" />}
+                    icon={<Ionicons name="create-outline" size={18} color={colors.white} />}
                   />
                 )}
                 <Button
@@ -308,7 +308,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {

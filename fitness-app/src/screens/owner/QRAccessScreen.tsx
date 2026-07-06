@@ -50,7 +50,7 @@ export const QRAccessScreen: React.FC = () => {
     QRCode.toDataURL(CHECKIN_CODE, {
       width: 400,
       margin: 2,
-      color: { dark: '#000000', light: '#FFFFFF' },
+      color: { dark: colors.black, light: colors.white },
     }).then(setQrDataUrl).catch(() => {});
   }, []);
 
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   qrCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     padding: spacing.lg,
     borderRadius: borderRadius.xl,
     marginBottom: spacing.md,
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: fontSize.sm,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
   refreshBtn: {
     padding: spacing.xs,

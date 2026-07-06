@@ -293,7 +293,7 @@ export const CheckinScreen: React.FC = () => {
               onPress={startScanner}
               activeOpacity={0.85}
             >
-              <Ionicons name="qr-code-outline" size={24} color="#fff" />
+              <Ionicons name="qr-code-outline" size={24} color={colors.white} />
               <Text style={styles.scanButtonText}>Scansiona QR</Text>
             </TouchableOpacity>
 
@@ -328,7 +328,7 @@ export const CheckinScreen: React.FC = () => {
                   disabled={!manualCode.trim()}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="arrow-forward" size={22} color="#fff" />
+                  <Ionicons name="arrow-forward" size={22} color={colors.white} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -423,7 +423,7 @@ export const CheckinScreen: React.FC = () => {
               Controlla il codice mostrato alla reception e riprova.
             </Text>
             <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Ionicons name="refresh" size={20} color="#fff" />
+              <Ionicons name="refresh" size={20} color={colors.white} />
               <Text style={styles.retryButtonText}>Riprova</Text>
             </TouchableOpacity>
           </View>
@@ -437,7 +437,7 @@ export const CheckinScreen: React.FC = () => {
             <Text style={styles.resultTitle}>Fotocamera non disponibile</Text>
             <Text style={styles.resultSubtitle}>{cameraErrorMsg}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={scanFromPhoto}>
-              <Ionicons name="camera" size={20} color="#fff" />
+              <Ionicons name="camera" size={20} color={colors.white} />
               <Text style={styles.retryButtonText}>Scatta foto del QR</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={startScanner}>
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   scanButtonText: {
     fontSize: fontSize.xl,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
 
   scanningContainer: {
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     maxWidth: 350,
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
-    backgroundColor: '#000',
+    backgroundColor: colors.black,
     position: 'relative',
   },
   scannerBox: {
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 34,
     height: 34,
-    borderColor: '#fff',
+    borderColor: colors.white,
   },
   cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 12 },
   cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 12 },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: fontSize.lg,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
   heroRing: {
     width: 156,

@@ -276,7 +276,7 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
                 title="Salva Piano"
                 onPress={onSave}
                 loading={saving}
-                icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />}
+                icon={<Ionicons name="checkmark-circle" size={18} color={colors.white} />}
               />
               <Button
                 title="Annulla"
@@ -294,7 +294,7 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {

@@ -69,7 +69,7 @@ export const NotificationPrompt: React.FC = () => {
       </View>
       {(!isiOS || standalone) && (
         <TouchableOpacity style={styles.button} onPress={handleEnable}>
-          <Ionicons name="notifications-outline" size={16} color="#FFF" />
+          <Ionicons name="notifications-outline" size={16} color={colors.white} />
           <Text style={styles.buttonText}>Attiva Notifiche</Text>
         </TouchableOpacity>
       )}
@@ -105,5 +105,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginTop: spacing.sm,
   },
-  buttonText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  buttonText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
 });

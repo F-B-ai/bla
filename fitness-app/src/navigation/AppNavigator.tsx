@@ -1368,7 +1368,7 @@ const notifBadgeStyles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 9,
     fontWeight: '700',
   },

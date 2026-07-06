@@ -32,6 +32,13 @@ export const colors = {
   textOnPrimary: '#F2F2F7',
   textOnAccent: '#FFFFFF',
 
+  // --- Neutri e overlay (M2: centralizzati per il white-label) ---
+  white: '#FFFFFF',
+  black: '#000000',
+  overlay: 'rgba(0,0,0,0.5)',
+  overlayDark: 'rgba(0,0,0,0.7)',
+  glass: 'rgba(255,255,255,0.12)',
+
   // --- Badge ruoli ---
   ownerBadge: '#D40000',
   managerBadge: '#AF52DE',

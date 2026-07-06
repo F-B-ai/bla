@@ -147,7 +147,7 @@ export const OnboardingOverlay: React.FC<Props> = ({ role, userName, userId, onC
             </Text>
             <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(0)}>
               <Text style={styles.primaryButtonText}>Inizia il tour</Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFF" />
+              <Ionicons name="arrow-forward" size={18} color={colors.white} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
               <Text style={styles.skipText}>Salta, conosco già l'app</Text>
@@ -177,7 +177,7 @@ export const OnboardingOverlay: React.FC<Props> = ({ role, userName, userId, onC
                 <Text style={styles.primaryButtonText}>
                   {isLastStep ? 'Inizia!' : 'Avanti'}
                 </Text>
-                <Ionicons name={isLastStep ? 'checkmark' : 'arrow-forward'} size={18} color="#FFF" />
+                <Ionicons name={isLastStep ? 'checkmark' : 'arrow-forward'} size={18} color={colors.white} />
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     minWidth: 140,
   },
   primaryButtonText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
     fontSize: fontSize.lg,
   },

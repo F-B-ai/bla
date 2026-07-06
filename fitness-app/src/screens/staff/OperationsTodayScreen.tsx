@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
   headerBtn: {
     width: 42, height: 42, borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.glass,
     alignItems: 'center', justifyContent: 'center',
   },
   body: { flex: 1 },

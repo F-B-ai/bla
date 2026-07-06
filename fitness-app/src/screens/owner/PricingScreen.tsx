@@ -56,7 +56,7 @@ const PlanCard = ({
       onPress={() => onCreatePlan(tier)}
       activeOpacity={0.7}
     >
-      <Ionicons name="add-circle" size={18} color="#fff" />
+      <Ionicons name="add-circle" size={18} color={colors.white} />
       <Text style={styles.createBtnText}>Crea Piano</Text>
     </TouchableOpacity>
   </View>
@@ -284,7 +284,7 @@ export const PricingScreen: React.FC = () => {
             onPress={() => openCreateModal(posturalTier)}
             activeOpacity={0.7}
           >
-            <Ionicons name="add-circle" size={18} color="#fff" />
+            <Ionicons name="add-circle" size={18} color={colors.white} />
             <Text style={styles.createBtnText}>Crea Piano Posturale</Text>
           </TouchableOpacity>
         </View>
@@ -443,10 +443,10 @@ export const PricingScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colors.white} size="small" />
                   ) : (
                     <>
-                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Ionicons name="checkmark-circle" size={20} color={colors.white} />
                       <Text style={styles.confirmBtnText}>Conferma Piano</Text>
                     </>
                   )}
@@ -541,7 +541,7 @@ const styles = StyleSheet.create({
   highlightText: {
     fontSize: fontSize.xs,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
   createBtnText: {
     fontSize: fontSize.lg,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
 
   bonusCard: {
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -899,6 +899,6 @@ const styles = StyleSheet.create({
   confirmBtnText: {
     fontSize: fontSize.xl,
     fontWeight: '700',
-    color: '#fff',
+    color: colors.white,
   },
 });

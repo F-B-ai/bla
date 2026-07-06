@@ -1338,7 +1338,7 @@ export const CalendarScreen: React.FC = () => {
                       height,
                       backgroundColor: isTraining ? colors.accent + '20' : '#34C75920',
                       borderLeftWidth: 3,
-                      borderLeftColor: isTraining ? colors.accent : '#34C759',
+                      borderLeftColor: isTraining ? colors.accent : colors.success,
                       borderRadius: borderRadius.md,
                       padding: spacing.sm,
                       justifyContent: 'center',
@@ -2197,7 +2197,7 @@ const styles = StyleSheet.create({
   footerSpacer: { padding: spacing.md, paddingBottom: spacing.xxl },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
@@ -2265,7 +2265,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   todayBtnText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '700',
   },

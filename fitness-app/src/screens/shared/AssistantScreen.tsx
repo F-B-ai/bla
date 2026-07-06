@@ -116,7 +116,7 @@ export const AssistantScreen: React.FC = () => {
       <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <Ionicons name="sparkles" size={20} color="#fff" />
+            <Ionicons name="sparkles" size={20} color={colors.white} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Assistente {brand.appName}</Text>
@@ -216,7 +216,7 @@ export const AssistantScreen: React.FC = () => {
           disabled={!input.trim() || sending}
           activeOpacity={0.8}
         >
-          <Ionicons name="arrow-up" size={22} color="#fff" />
+          <Ionicons name="arrow-up" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -250,7 +250,7 @@ export const AssistantScreen: React.FC = () => {
               activeOpacity={0.8}
             >
               {savingInfo ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={colors.white} size="small" />
               ) : (
                 <Text style={styles.saveInfoBtnText}>Salva</Text>
               )}
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderBottomLeftRadius: 4,
   },
-  bubbleUserText: { color: '#fff', fontSize: fontSize.md, lineHeight: 20 },
+  bubbleUserText: { color: colors.white, fontSize: fontSize.md, lineHeight: 20 },
   bubbleAssistantText: { color: colors.text, fontSize: fontSize.md, lineHeight: 20 },
   typingBubble: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   typingText: { color: colors.textSecondary, fontSize: fontSize.sm },
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlayDark, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.primary,
     borderTopLeftRadius: borderRadius.xl,
@@ -423,5 +423,5 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  saveInfoBtnText: { color: '#fff', fontSize: fontSize.lg, fontWeight: '700' },
+  saveInfoBtnText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '700' },
 });

@@ -674,7 +674,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </View>
 
                     <TouchableOpacity style={styles.startButton} onPress={handleStartWorkout}>
-                      <Ionicons name="play" size={24} color="#FFF" />
+                      <Ionicons name="play" size={24} color={colors.white} />
                       <Text style={styles.startButtonText}>INIZIA ALLENAMENTO</Text>
                     </TouchableOpacity>
                   </View>
@@ -947,7 +947,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                             style={{ flex: 2, backgroundColor: colors.accent, borderRadius: borderRadius.md, paddingVertical: 8, alignItems: 'center' }}
                             onPress={handleSaveEdit}
                           >
-                            <Text style={{ color: '#FFF', fontWeight: '700' }}>Salva</Text>
+                            <Text style={{ color: colors.white, fontWeight: '700' }}>Salva</Text>
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -1056,7 +1056,7 @@ export const LiveWorkoutScreen: React.FC = () => {
 
                   {currentDropSets.length > 0 && (
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteStrippingSet}>
-                      <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                      <Ionicons name="checkmark-circle" size={24} color={colors.white} />
                       <Text style={styles.logSetButtonText}>
                         COMPLETA SERIE ({currentDropSets.length} drop)
                       </Text>
@@ -1168,7 +1168,7 @@ export const LiveWorkoutScreen: React.FC = () => {
 
                   {currentMiniSets.length > 0 && (
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
-                      <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                      <Ionicons name="checkmark-circle" size={24} color={colors.white} />
                       <Text style={styles.logSetButtonText}>
                         COMPLETA SERIE ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : 'mini'})
                       </Text>
@@ -1255,7 +1255,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                 </View>
 
                 <TouchableOpacity style={styles.logSetButton} onPress={handleLogSet}>
-                  <Ionicons name="checkmark-circle" size={24} color="#FFF" />
+                  <Ionicons name="checkmark-circle" size={24} color={colors.white} />
                   <Text style={styles.logSetButtonText}>REGISTRA SERIE</Text>
                 </TouchableOpacity>
               </View>
@@ -1293,7 +1293,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                 onChangeText={setSessionNotes}
               />
               <TouchableOpacity style={styles.completeButton} onPress={handleCompleteWorkout}>
-                <Ionicons name="trophy" size={24} color="#FFF" />
+                <Ionicons name="trophy" size={24} color={colors.white} />
                 <Text style={styles.completeButtonText}>COMPLETA ALLENAMENTO</Text>
               </TouchableOpacity>
             </View>
@@ -1389,7 +1389,7 @@ const styles = StyleSheet.create({
   exerciseNavActive: { backgroundColor: colors.accent },
   exerciseNavDone: { backgroundColor: colors.success + '30' },
   exerciseNavText: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
-  exerciseNavTextActive: { color: '#FFF' },
+  exerciseNavTextActive: { color: colors.white },
   exerciseNavName: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, maxWidth: 60 },
   exerciseName: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text },
   exerciseTarget: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: 4 },
@@ -1461,11 +1461,11 @@ const styles = StyleSheet.create({
   miniRestTimerText: {
     fontSize: 36,
     fontWeight: '800',
-    color: '#FFF',
+    color: colors.white,
   },
   miniRestTimerLabel: {
     fontSize: fontSize.xs,
-    color: '#FFF',
+    color: colors.white,
     marginTop: -4,
     fontWeight: '600',
   },
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  setNumberText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  setNumberText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   setText: { fontSize: fontSize.md, color: colors.text, flex: 1 },
   rpeText: { fontSize: fontSize.sm, color: colors.warning, fontWeight: '600' },
   restContainer: {
@@ -1549,7 +1549,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
-  logSetButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  logSetButtonText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
   exerciseDone: { marginTop: spacing.lg, alignItems: 'center' },
   exerciseDoneText: { fontSize: fontSize.lg, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
   extraSetBtn: { marginTop: spacing.sm },
@@ -1576,7 +1576,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
   },
-  completeButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  completeButtonText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
   startCard: { alignItems: 'center', padding: spacing.lg },
   startTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, marginTop: spacing.md },
   startSubtitle: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: spacing.xs },
@@ -1594,7 +1594,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xl,
   },
-  startButtonText: { color: '#FFF', fontSize: fontSize.lg, fontWeight: '800' },
+  startButtonText: { color: colors.white, fontSize: fontSize.lg, fontWeight: '800' },
   historyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1610,7 +1610,7 @@ const styles = StyleSheet.create({
   historyButtonText: { color: colors.accent, fontSize: fontSize.md, fontWeight: '600' },
   emptyContainer: { alignItems: 'center', padding: spacing.xl },
   emptyText: { color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md, lineHeight: 22 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
@@ -1623,7 +1623,7 @@ const styles = StyleSheet.create({
   historyDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   historyStats: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
   statusBadge: { borderRadius: borderRadius.md, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  statusText: { color: '#FFF', fontSize: fontSize.xs, fontWeight: '700' },
+  statusText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
   historyExercise: { marginTop: spacing.sm, paddingLeft: spacing.md },
   historyExName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text },
   historySets: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: 2 },

@@ -52,7 +52,7 @@ const PRIZE_MILESTONES = [
   },
 ];
 
-const SPARKLE_COLORS = ['#FFD700', '#FF6B6B', '#4CAF50', '#64D2FF', '#FF9F0A', '#D40000', '#9C27B0', '#00E676'];
+const SPARKLE_COLORS = ['#FFD700', '#FF6B6B', '#4CAF50', colors.info, colors.warning, colors.accent, '#9C27B0', '#00E676'];
 
 const SparkleIcon: React.FC<{ icon: string }> = ({ icon }) => {
   const particles = useRef(
@@ -729,7 +729,7 @@ const styles = StyleSheet.create({
   milestoneBadgeText: {
     fontSize: fontSize.xs,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   milestoneDesc: {
     fontSize: fontSize.sm,

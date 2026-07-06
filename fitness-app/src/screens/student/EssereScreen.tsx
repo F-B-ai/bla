@@ -277,10 +277,10 @@ export const EssereScreen: React.FC = () => {
                   activeOpacity={0.85}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={colors.white} size="small" />
                   ) : (
                     <>
-                      <Ionicons name="pulse" size={20} color="#fff" />
+                      <Ionicons name="pulse" size={20} color={colors.white} />
                       <Text style={styles.saveBtnText}>
                         {previewScore != null ? `Registra il mio stato · ${previewScore}` : 'Registra il mio stato'}
                       </Text>
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   },
   dotActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   dotText: { fontSize: fontSize.md, fontWeight: '700', color: colors.textSecondary },
-  dotTextActive: { color: '#fff' },
+  dotTextActive: { color: colors.white },
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     marginTop: spacing.sm,
   },
-  saveBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: '#fff' },
+  saveBtnText: { fontSize: fontSize.lg, fontWeight: '700', color: colors.white },
 
   // --- Risultato ---
   resultCard: {

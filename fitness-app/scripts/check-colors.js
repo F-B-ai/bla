@@ -27,6 +27,7 @@ const WHITELIST = new Set([
   'src/config/brand.ts',   // config white-label per cliente
   'src/utils/printUtils.ts',     // template HTML stampa
   'src/services/reportService.ts', // template HTML report
+  'src/components/common/EnsōLogo.tsx', // asset di brand (SVG): i colori sono il disegno
 ]);
 
 const walk = (dir) => {

@@ -267,7 +267,7 @@ export const AICoachScreen: React.FC = () => {
   const getScoreColor = (score: number): string => {
     if (score >= 80) return colors.success;
     if (score >= 60) return colors.warning;
-    if (score >= 40) return '#FF9F0A';
+    if (score >= 40) return colors.warning;
     return colors.error;
   };
 

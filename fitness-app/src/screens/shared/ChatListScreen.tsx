@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modeTextActive: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   list: {
     padding: spacing.md,
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   roomAvatarText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.lg,
     fontWeight: '700',
   },
@@ -708,7 +708,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   contactAvatarText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },

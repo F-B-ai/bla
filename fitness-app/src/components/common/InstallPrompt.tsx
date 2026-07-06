@@ -103,7 +103,7 @@ export const InstallPrompt: React.FC = () => {
         </View>
       ) : deferredPrompt ? (
         <TouchableOpacity style={styles.button} onPress={handleInstall}>
-          <Ionicons name="download-outline" size={16} color="#FFF" />
+          <Ionicons name="download-outline" size={16} color={colors.white} />
           <Text style={styles.buttonText}>Installa</Text>
         </TouchableOpacity>
       ) : null}
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepNumText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  stepNumText: { color: colors.white, fontSize: 11, fontWeight: '700' },
   stepText: { fontSize: fontSize.sm, color: colors.textSecondary },
   button: {
     flexDirection: 'row',
@@ -167,5 +167,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginTop: spacing.sm,
   },
-  buttonText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  buttonText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
 });

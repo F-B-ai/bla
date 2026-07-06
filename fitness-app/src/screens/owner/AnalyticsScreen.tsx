@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   roleBadgeText: {
     fontSize: fontSize.xs,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.white,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
   roleBadgeSmallText: {
     fontSize: fontSize.xs,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.white,
     textTransform: 'uppercase',
   },
   modalScroll: {

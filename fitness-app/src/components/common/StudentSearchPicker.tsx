@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   avatarTextActive: {
-    color: '#FFF',
+    color: colors.white,
   },
   resultInfo: {
     flex: 1,
