@@ -30,17 +30,16 @@ export const ptraining: Brand = {
   checkinManualCode: 'PTRAIN',
 
   // --- Progetto Firebase del cliente ---
-  // DEMO: punta all'istanza attuale solo per il "vestito". Alla
-  // firma del cliente reale va creato un progetto Firebase dedicato
-  // e incollato qui (isolamento totale dei dati — vedi WHITE-LABEL.md).
+  // DEMO: progetto Firebase DEDICATO (ptraining-demo) — dati isolati
+  // dai membri reali di ESSĒRE. Config esatta letta dalla management
+  // API (projects/ptraining-demo/webApps/-/config).
   firebase: {
-    apiKey: 'AIzaSyDAuKlToc-_GRILEcMzwoD4ysuBYRtPzxE',
-    authDomain: 'essere-3fe6f.firebaseapp.com',
-    projectId: 'essere-3fe6f',
-    storageBucket: 'essere-3fe6f.firebasestorage.app',
-    messagingSenderId: '9504654070',
-    appId: '1:9504654070:web:7b8c7d09645b113b0ea2d7',
-    measurementId: 'G-QLVE494VJR',
+    apiKey: 'AIzaSyBmx4tMMtUv89_Spl1YJreyOOKaaDgSQUk',
+    authDomain: 'ptraining-demo.firebaseapp.com',
+    projectId: 'ptraining-demo',
+    storageBucket: 'ptraining-demo.firebasestorage.app',
+    messagingSenderId: '173206159256',
+    appId: '1:173206159256:web:c462d38fce2480c75235ed',
   },
 
   appUrl: 'https://ptraining-demo.web.app',
