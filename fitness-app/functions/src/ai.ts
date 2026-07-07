@@ -20,6 +20,24 @@ const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 const db = () => admin.firestore();
 
+// Istanze DEMO white-label servite dallo STESSO gateway ESSĒRE, così la
+// demo mostra il prodotto completo (Assistente incluso) senza deployare
+// Functions su ogni progetto cliente. I loro ID token hanno `aud`
+// diverso: li verifichiamo con app admin secondarie dedicate (per
+// verifyIdToken basta il projectId — la firma è validata sui certificati
+// pubblici Google). NB: percorso pensato per i progetti demo con dati
+// FINTI; i clienti reali paganti avranno il proprio gateway isolato.
+const DEMO_PROJECT_IDS = ["ptraining-demo"];
+let _demoApps: admin.app.App[] | null = null;
+const demoApps = (): admin.app.App[] => {
+  if (!_demoApps) {
+    _demoApps = DEMO_PROJECT_IDS.map((pid) =>
+      admin.apps.find((a) => a?.name === pid) ||
+      admin.initializeApp({projectId: pid}, pid));
+  }
+  return _demoApps;
+};
+
 // Modello per feature (03 §1.7 / 07 M1): Sonnet per il volume,
 // Opus SOLO vision e riepilogo owner, Haiku per i triage.
 const MODEL_BY_FEATURE: Record<string, string> = {
@@ -88,27 +106,47 @@ export const aiMessages = onRequest(
       res.status(401).json({error: "Autenticazione richiesta"});
       return;
     }
-    let uid: string;
+    let uid = "";
+    let isDemo = false;
     try {
       uid = (await admin.auth().verifyIdToken(idToken)).uid;
     } catch {
-      res.status(401).json({error: "Token non valido o scaduto"});
-      return;
+      // Non è un token ESSĒRE: provalo contro le istanze demo white-label.
+      let verified = false;
+      for (const app of demoApps()) {
+        try {
+          uid = (await admin.auth(app).verifyIdToken(idToken)).uid;
+          isDemo = true;
+          verified = true;
+          break;
+        } catch {
+          // prova il prossimo progetto demo
+        }
+      }
+      if (!verified) {
+        res.status(401).json({error: "Token non valido o scaduto"});
+        return;
+      }
     }
 
     // --- 2. Consenso GDPR "AI esterna" ---
-    try {
-      const consent = await db().collection("consents").doc(uid).get();
-      if (consent.data()?.choices?.externalAI !== true) {
-        res.status(403).json({
-          error: "CONSENT_REQUIRED",
-          message: "Serve il consenso 'AI esterna' (Profilo → Consensi privacy).",
-        });
+    // Solo per gli utenti reali ESSĒRE: il consenso è nella loro istanza.
+    // Le istanze demo lo gestiscono in casa propria (schermata consensi
+    // dell'app che gira sul progetto demo) — qui non lo rileggiamo.
+    if (!isDemo) {
+      try {
+        const consent = await db().collection("consents").doc(uid).get();
+        if (consent.data()?.choices?.externalAI !== true) {
+          res.status(403).json({
+            error: "CONSENT_REQUIRED",
+            message: "Serve il consenso 'AI esterna' (Profilo → Consensi privacy).",
+          });
+          return;
+        }
+      } catch {
+        res.status(500).json({error: "Verifica consenso non riuscita"});
         return;
       }
-    } catch {
-      res.status(500).json({error: "Verifica consenso non riuscita"});
-      return;
     }
 
     // --- 3. Rate limit giornaliero per ruolo ---
