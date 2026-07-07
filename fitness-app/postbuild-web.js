@@ -2,15 +2,40 @@
 const fs = require('fs');
 const path = require('path');
 
+// --- WHITE-LABEL: risolve il brand attivo (nome + colore) dal file di
+// config, così titolo scheda, meta PWA e manifest seguono il cliente.
+// Legge src/config/brand.ts; se è un ri-export (set-brand.js) segue il
+// file brands/<cliente>.ts. Fallback a ESSĒRE se qualcosa non torna.
+function readActiveBrand() {
+  const cfgDir = path.join(__dirname, 'src', 'config');
+  let src = '';
+  try {
+    src = fs.readFileSync(path.join(cfgDir, 'brand.ts'), 'utf8');
+    const reexport = src.match(/from '\.\/brands\/([A-Za-z0-9_-]+)'/);
+    if (reexport) {
+      src = fs.readFileSync(path.join(cfgDir, 'brands', `${reexport[1]}.ts`), 'utf8');
+    }
+  } catch (_) { /* fallback sotto */ }
+  const appName = (src.match(/appName:\s*['"]([^'"]+)['"]/) || [])[1] || 'ESSĒRE';
+  const tagline = (src.match(/tagline:\s*['"]([^'"]+)['"]/) || [])[1] || '';
+  const primary = (src.match(/primary:\s*['"](#[0-9a-fA-F]{3,8})['"]/) || [])[1] || '#0D0D0D';
+  return { appName, tagline, primary };
+}
+const BRAND = readActiveBrand();
+console.log(`✓ Brand attivo per il web: ${BRAND.appName} (${BRAND.primary})`);
+
 const indexPath = path.join(__dirname, 'dist', 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 
+// Titolo scheda browser = nome del brand attivo
+html = html.replace(/<title>[^<]*<\/title>/, `<title>${BRAND.appName}</title>`);
+
 const pwaMeta = `
     <!-- PWA Meta -->
-    <meta name="theme-color" content="#0D0D0D" />
+    <meta name="theme-color" content="${BRAND.primary}" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="ESSĒRE" />
+    <meta name="apple-mobile-web-app-title" content="${BRAND.appName}" />
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
@@ -53,6 +78,23 @@ webAssets.forEach((file) => {
     }
   }
 });
+
+// --- WHITE-LABEL: allinea il manifest PWA al brand attivo (nome app
+// installata + colori splash/tema). Le icone restano quelle in web/.
+const manifestDst = path.join(__dirname, 'dist', 'manifest.json');
+if (fs.existsSync(manifestDst)) {
+  try {
+    const m = JSON.parse(fs.readFileSync(manifestDst, 'utf8'));
+    m.name = BRAND.appName;
+    m.short_name = BRAND.appName;
+    m.background_color = BRAND.primary;
+    m.theme_color = BRAND.primary;
+    fs.writeFileSync(manifestDst, JSON.stringify(m, null, 2));
+    console.log(`✓ manifest.json allineato al brand: ${BRAND.appName}`);
+  } catch (e) {
+    console.warn('manifest.json non aggiornato:', e.message);
+  }
+}
 
 // Inject safe area CSS for PWA standalone on notched iPhones
 if (!html.includes('tab-bar-bottom')) {
