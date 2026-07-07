@@ -103,6 +103,8 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exClusterReps, setExClusterReps] = useState('2');
   const [exClusterSets, setExClusterSets] = useState('5');
   const [exClusterRest, setExClusterRest] = useState('15');
+  const [exCumulativeTarget, setExCumulativeTarget] = useState('10');
+  const [exCumulativeRest, setExCumulativeRest] = useState('15');
   // Negativa enfatizzata
   const [exNegativeSeconds, setExNegativeSeconds] = useState('5');
   // EMOM
@@ -550,6 +552,10 @@ export const WorkoutPlanScreen: React.FC = () => {
       ...(exTechnique === 'negative' ? {
         negativeSeconds: parseInt(exNegativeSeconds, 10) || 5,
       } : {}),
+      ...(exTechnique === 'cumulative' ? {
+        cumulativeTargetReps: parseInt(exCumulativeTarget, 10) || 10,
+        cumulativeRestSeconds: parseInt(exCumulativeRest, 10) || 15,
+      } : {}),
       ...(exTechnique === 'emom' ? {
         emomMinutes: parseInt(exEmomMinutes, 10) || 10,
         emomRepsPerMinute: exEmomReps || '5',
@@ -612,6 +618,8 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExClusterReps('2');
     setExClusterSets('5');
     setExClusterRest('15');
+    setExCumulativeTarget('10');
+    setExCumulativeRest('15');
     setExNegativeSeconds('5');
     setExEmomMinutes('10');
     setExEmomReps('5');
@@ -648,6 +656,8 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExClusterReps(String(ex.clusterReps || 2));
     setExClusterSets(String(ex.clusterSets || 5));
     setExClusterRest(String(ex.clusterRestSeconds || 15));
+    setExCumulativeTarget(String(ex.cumulativeTargetReps || 10));
+    setExCumulativeRest(String(ex.cumulativeRestSeconds || 15));
     setExNegativeSeconds(String(ex.negativeSeconds || 5));
     setExEmomMinutes(String(ex.emomMinutes || 10));
     setExEmomReps(ex.emomRepsPerMinute || '5');
@@ -981,6 +991,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                           {ex.technique === 'isometric' && `Isometria: tenuta ${ex.isometricHoldSeconds || 30}s`}
                           {ex.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
                           {ex.technique === 'cluster' && `Cluster: ${ex.clusterSets || 5}x${ex.clusterReps || 2} (pausa ${ex.clusterRestSeconds || 15}s)`}
+                          {ex.technique === 'cumulative' && `Cumulative: scala 1→${ex.cumulativeTargetReps || 10} rip (attesa ${ex.cumulativeRestSeconds || 15}s)`}
                           {ex.technique === 'negative' && `Negativa: ${ex.negativeSeconds || 5}s eccentrica`}
                           {ex.technique === 'emom' && `EMOM: ${ex.emomRepsPerMinute || '5'} reps ogni minuto x ${ex.emomMinutes || 10} min`}
                         </Text>
@@ -1113,6 +1124,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                 { key: 'isometric', label: 'Isometria' },
                 { key: 'twentyone', label: '21s' },
                 { key: 'cluster', label: 'Cluster' },
+                { key: 'cumulative', label: 'Cumulative' },
                 { key: 'negative', label: 'Negativa' },
                 { key: 'emom', label: 'EMOM' },
               ] as const).map((t) => (
@@ -1267,6 +1279,22 @@ export const WorkoutPlanScreen: React.FC = () => {
                   </View>
                 </View>
                 <InputField label="Pausa tra cluster (sec)" value={exClusterRest} onChangeText={setExClusterRest} keyboardType="number-pad" placeholder="15" />
+              </View>
+            )}
+
+            {exTechnique === 'cumulative' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie cumulativa "a scala": carico fisso, 1 rip → attesa → 2 rip → attesa → ... fino all'obiettivo. Es: fino a 10 con 15s di attesa. Il n. di serie è impostato in "Serie" sopra.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Obiettivo ripetizioni" value={exCumulativeTarget} onChangeText={setExCumulativeTarget} keyboardType="number-pad" placeholder="10" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Attesa tra gradini (sec)" value={exCumulativeRest} onChangeText={setExCumulativeRest} keyboardType="number-pad" placeholder="15" />
+                  </View>
+                </View>
               </View>
             )}
 

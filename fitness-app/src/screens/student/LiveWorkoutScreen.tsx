@@ -168,6 +168,10 @@ export const LiveWorkoutScreen: React.FC = () => {
         targetClusterSets: ex.clusterSets || 5,
         targetClusterRestSeconds: ex.clusterRestSeconds || 15,
       } : {}),
+      ...(ex.technique === 'cumulative' ? {
+        targetCumulativeReps: ex.cumulativeTargetReps || 10,
+        targetCumulativeRestSeconds: ex.cumulativeRestSeconds || 15,
+      } : {}),
       ...(ex.technique === 'negative' ? { targetNegativeSeconds: ex.negativeSeconds || 5 } : {}),
       ...(ex.technique === 'emom' ? {
         targetEmomMinutes: ex.emomMinutes || 10,
@@ -328,6 +332,8 @@ export const LiveWorkoutScreen: React.FC = () => {
       ? (currentExercise?.targetMyoRestSeconds || 5)
       : tech === 'cluster'
       ? (currentExercise?.targetClusterRestSeconds || 15)
+      : tech === 'cumulative'
+      ? (currentExercise?.targetCumulativeRestSeconds || 15)
       : (currentExercise?.targetMiniRestSeconds || 20);
     startMiniRestTimer(targetRest);
   };
@@ -867,6 +873,11 @@ export const LiveWorkoutScreen: React.FC = () => {
                 CLUSTER · {currentExercise.targetClusterSets || 5} cluster da {currentExercise.targetClusterReps || 2} reps · pausa {currentExercise.targetClusterRestSeconds || 15}s
               </Text>
             )}
+            {currentExercise.technique === 'cumulative' && (
+              <Text style={styles.restPauseTag}>
+                CUMULATIVA · scala 1→{currentExercise.targetCumulativeReps || 10} rip · attesa {currentExercise.targetCumulativeRestSeconds || 15}s
+              </Text>
+            )}
             {currentExercise.technique === 'negative' && (
               <Text style={styles.restPauseTag}>
                 NEGATIVA · {currentExercise.targetNegativeSeconds || 5}s eccentrica controllata
@@ -1063,10 +1074,10 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster') ? (
+              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster' || currentExercise.technique === 'cumulative') ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>
-                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : 'Cluster'}{' '}
+                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : currentExercise.technique === 'cumulative' ? 'Serie Cumulativa' : 'Cluster'}{' '}
                     {currentExercise.sets.length + 1} di {currentExercise.targetSets}
                   </Text>
                   <Text style={styles.restPauseHint}>
@@ -1078,6 +1089,9 @@ export const LiveWorkoutScreen: React.FC = () => {
                     )}
                     {currentExercise.technique === 'cluster' && (
                       `Obiettivo: ${currentExercise.targetClusterSets || 5} cluster da ${currentExercise.targetClusterReps || 2} reps · pausa ${currentExercise.targetClusterRestSeconds || 15}s`
+                    )}
+                    {currentExercise.technique === 'cumulative' && (
+                      `Scala 1→${currentExercise.targetCumulativeReps || 10}: 1 rip, attesa ${currentExercise.targetCumulativeRestSeconds || 15}s, 2 rip, attesa, ... fino a ${currentExercise.targetCumulativeReps || 10}. Registra ogni gradino.`
                     )}
                   </Text>
 
@@ -1100,7 +1114,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                       {currentMiniSets.map((m, i) => (
                         <View key={i} style={styles.miniSetRow}>
                           <Text style={styles.miniSetRowText}>
-                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
+                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : currentExercise.technique === 'cumulative' ? `Gradino ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
                           </Text>
                           <TouchableOpacity onPress={() => handleRemoveMiniSet(i)}>
                             <Ionicons name="close-circle" size={18} color={colors.error} />
@@ -1117,7 +1131,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                         <Text style={styles.miniRestTimerLabel}>sec</Text>
                       </View>
                       <Text style={styles.miniRestTitle}>
-                        {currentExercise.technique === 'cluster' ? 'Pausa tra cluster' : currentExercise.technique === 'myo_reps' ? 'Pausa myo-reps' : 'Recupero tra mini serie'}
+                        {currentExercise.technique === 'cluster' ? 'Pausa tra cluster' : currentExercise.technique === 'myo_reps' ? 'Pausa myo-reps' : currentExercise.technique === 'cumulative' ? 'Attesa tra gradini' : 'Recupero tra mini serie'}
                       </Text>
                       <TouchableOpacity style={styles.skipMiniRestBtn} onPress={skipMiniRest}>
                         <Ionicons name="play-forward" size={18} color={colors.accent} />
@@ -1133,6 +1147,8 @@ export const LiveWorkoutScreen: React.FC = () => {
                           ? 'Serie attivante'
                           : currentExercise.technique === 'cluster'
                           ? `Cluster ${currentMiniSets.length + 1} di ${currentExercise.targetClusterSets || 5}`
+                          : currentExercise.technique === 'cumulative'
+                          ? `Gradino ${currentMiniSets.length + 1}: ${currentMiniSets.length + 1} rip (obiettivo ${currentExercise.targetCumulativeReps || 10})`
                           : currentExercise.technique === 'myo_reps'
                           ? `Mini serie ${currentMiniSets.length} di ${currentExercise.targetMyoMiniSets || 4}`
                           : `Mini serie ${currentMiniSets.length + 1} di ${currentExercise.targetMiniSets || 4}`}
@@ -1150,6 +1166,8 @@ export const LiveWorkoutScreen: React.FC = () => {
                                 ? (currentMiniSets.length === 0 ? (currentExercise.targetMyoActivationReps || '12') : (currentExercise.targetMyoMiniReps || '3'))
                                 : currentExercise.technique === 'cluster'
                                 ? String(currentExercise.targetClusterReps || 2)
+                                : currentExercise.technique === 'cumulative'
+                                ? String(currentMiniSets.length + 1)
                                 : (currentExercise.targetMiniReps || '6')
                             }
                             placeholderTextColor={colors.textLight}
@@ -1160,7 +1178,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                       <TouchableOpacity style={styles.miniSetButton} onPress={handleLogMiniSet}>
                         <Ionicons name="add-circle" size={20} color={colors.accent} />
                         <Text style={styles.miniSetButtonText}>
-                          {currentExercise.technique === 'myo_reps' && currentMiniSets.length === 0 ? 'REGISTRA ATTIVAZIONE' : currentExercise.technique === 'cluster' ? 'REGISTRA CLUSTER' : 'REGISTRA MINI SERIE'}
+                          {currentExercise.technique === 'myo_reps' && currentMiniSets.length === 0 ? 'REGISTRA ATTIVAZIONE' : currentExercise.technique === 'cluster' ? 'REGISTRA CLUSTER' : currentExercise.technique === 'cumulative' ? 'REGISTRA GRADINO' : 'REGISTRA MINI SERIE'}
                         </Text>
                       </TouchableOpacity>
                     </>
@@ -1170,7 +1188,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
                       <Ionicons name="checkmark-circle" size={24} color={colors.white} />
                       <Text style={styles.logSetButtonText}>
-                        COMPLETA SERIE ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : 'mini'})
+                        COMPLETA SERIE ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : currentExercise.technique === 'cumulative' ? 'gradini' : 'mini'})
                       </Text>
                     </TouchableOpacity>
                   )}

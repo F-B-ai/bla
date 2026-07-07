@@ -120,7 +120,8 @@ export type ExerciseTechnique =
   | 'twentyone'
   | 'cluster'
   | 'negative'
-  | 'emom';
+  | 'emom'
+  | 'cumulative';
 
 export interface Exercise {
   id: string;
@@ -162,6 +163,9 @@ export interface Exercise {
   // EMOM
   emomMinutes?: number;
   emomRepsPerMinute?: string;
+  // Serie cumulative "a scala" (1 rip → attesa → 2 rip → attesa → ... → obiettivo)
+  cumulativeTargetReps?: number;   // gradino più alto (es. 10)
+  cumulativeRestSeconds?: number;  // attesa tra un gradino e l'altro
   // Superset/Giant set grouping
   supersetGroupId?: string;
 }
@@ -663,6 +667,9 @@ export interface ExerciseLog {
   targetClusterReps?: number;
   targetClusterSets?: number;
   targetClusterRestSeconds?: number;
+  // Serie cumulative
+  targetCumulativeReps?: number;
+  targetCumulativeRestSeconds?: number;
   // Negativa enfatizzata
   targetNegativeSeconds?: number;
   // EMOM

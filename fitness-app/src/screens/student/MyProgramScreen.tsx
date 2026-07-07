@@ -103,6 +103,7 @@ export const MyProgramScreen: React.FC = () => {
               {exercise.technique === 'isometric' && `ISOMETRIA: tenuta ${exercise.isometricHoldSeconds || 30}s`}
               {exercise.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
               {exercise.technique === 'cluster' && `CLUSTER: ${exercise.clusterSets || 5}x${exercise.clusterReps || 2} reps, pausa ${exercise.clusterRestSeconds || 15}s`}
+              {exercise.technique === 'cumulative' && `CUMULATIVA: scala 1→${exercise.cumulativeTargetReps || 10} rip, attesa ${exercise.cumulativeRestSeconds || 15}s tra i gradini`}
               {exercise.technique === 'negative' && `NEGATIVA: ${exercise.negativeSeconds || 5}s eccentrica`}
               {exercise.technique === 'emom' && `EMOM: ${exercise.emomRepsPerMinute || '5'} reps ogni minuto x ${exercise.emomMinutes || 10} min`}
             </Text>

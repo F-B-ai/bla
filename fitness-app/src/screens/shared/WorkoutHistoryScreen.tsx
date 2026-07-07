@@ -298,6 +298,7 @@ export const WorkoutHistoryScreen: React.FC = () => {
                             ex.technique === 'isometric' ? 'Isometria' :
                             ex.technique === 'twentyone' ? '21s' :
                             ex.technique === 'cluster' ? 'Cluster' :
+                            ex.technique === 'cumulative' ? 'Cumulativa' :
                             ex.technique === 'negative' ? 'Negativa' :
                             ex.technique === 'emom' ? 'EMOM' : ''
                           }`}
