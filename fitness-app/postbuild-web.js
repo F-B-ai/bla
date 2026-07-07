@@ -153,12 +153,19 @@ if (!html.includes('Anti-devtools')) {
 }
 
 // Copy public/ files to dist/ (meditazione.html, etc.)
+// NB: solo AGGIUNTE — i file già prodotti dalla pipeline (manifest.json
+// col brand attivo, sw.js con la cache version stampata) non vanno
+// sovrascritti da copie statiche datate.
 const publicDir = path.join(__dirname, 'public');
 if (fs.existsSync(publicDir)) {
   fs.readdirSync(publicDir).forEach((file) => {
     const src = path.join(publicDir, file);
     const dst = path.join(__dirname, 'dist', file);
     if (fs.statSync(src).isFile()) {
+      if (fs.existsSync(dst)) {
+        console.log(`○ public/${file} saltato (già gestito dalla build)`);
+        return;
+      }
       fs.copyFileSync(src, dst);
       console.log(`✓ public/${file} copied to dist/`);
     }
