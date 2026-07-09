@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { getAllTodayChecks, WellnessCheck } from '../../services/wellnessService';
@@ -41,6 +42,7 @@ const isSameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 export const OperationsTodayScreen: React.FC = () => {
   const { user, isOwner, isManager } = useAuth();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const canSeeMoney = isOwner || isManager;
 
   const [refreshing, setRefreshing] = useState(false);
@@ -157,7 +159,7 @@ export const OperationsTodayScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xxl) }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerDay}>{dayLabel}</Text>
           <Text style={styles.headerTitle}>Oggi in palestra</Text>

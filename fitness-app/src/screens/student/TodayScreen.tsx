@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { getTodayCheck, WellnessCheck } from '../../services/wellnessService';
@@ -33,6 +34,7 @@ const dayName = (d: Date) =>
 export const TodayScreen: React.FC = () => {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [todayCheck, setTodayCheck] = useState<WellnessCheck | null>(null);
   const [plan, setPlan] = useState<WorkoutPlan | null>(null);
@@ -97,7 +99,7 @@ export const TodayScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header: saluto + QR + campanella (doc 04: persistenti, 1 tap) */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xxl) }]}>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerDay}>{dayName(today)} {today.getDate()}</Text>
           <Text style={styles.headerTitle}>Ciao {user?.name || ''} 👋</Text>
