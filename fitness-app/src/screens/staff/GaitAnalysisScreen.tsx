@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
@@ -45,6 +46,7 @@ export default function GaitAnalysisScreen() {
   const [students, setStudents] = useState<Student[]>([]);
   const [student, setStudent] = useState<Student | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
   const [view, setView] = useState<GaitView>('laterale');
   const [phase, setPhase] = useState<Phase>('setup');
   const [progress, setProgress] = useState(0);
@@ -169,15 +171,31 @@ export default function GaitAnalysisScreen() {
       </TouchableOpacity>
       {showPicker && (
         <View style={styles.pickerList}>
-          {students.map((s) => (
-            <TouchableOpacity
-              key={s.id}
-              style={styles.pickerRow}
-              onPress={() => { setStudent(s); setShowPicker(false); }}
-            >
-              <Text style={styles.pickerRowText}>{s.name} {(s as any).surname || ''}</Text>
-            </TouchableOpacity>
-          ))}
+          <TextInput
+            style={styles.pickerSearch}
+            placeholder="Cerca allievo…"
+            placeholderTextColor={colors.textSecondary}
+            value={studentSearch}
+            onChangeText={setStudentSearch}
+            autoFocus
+          />
+          <ScrollView style={styles.pickerScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {students
+              .filter((s) => {
+                const full = `${s.name} ${(s as any).surname || ''}`.toLowerCase();
+                return full.includes(studentSearch.trim().toLowerCase());
+              })
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  style={styles.pickerRow}
+                  onPress={() => { setStudent(s); setShowPicker(false); setStudentSearch(''); }}
+                >
+                  <Text style={styles.pickerRowText}>{s.name} {(s as any).surname || ''}</Text>
+                </TouchableOpacity>
+              ))}
+          </ScrollView>
         </View>
       )}
 
@@ -330,8 +348,13 @@ const styles = StyleSheet.create({
   selectorText: { color: colors.text, fontSize: fontSize.md, flex: 1 },
   pickerList: {
     backgroundColor: colors.surface, borderRadius: borderRadius.md,
-    marginTop: spacing.xs, maxHeight: 260, overflow: 'hidden',
+    marginTop: spacing.xs, overflow: 'hidden',
   },
+  pickerSearch: {
+    color: colors.text, fontSize: fontSize.md, padding: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.background,
+  },
+  pickerScroll: { maxHeight: 280 },
   pickerRow: { padding: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.background },
   pickerRowText: { color: colors.text, fontSize: fontSize.md },
   toggleRow: { flexDirection: 'row', gap: spacing.sm },
