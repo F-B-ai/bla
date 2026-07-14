@@ -83,14 +83,21 @@ webAssets.forEach((file) => {
 // Il runtime WASM viene copiato da node_modules (non committato);
 // il modello .task vive in web/models (committato, 5.7MB).
 // Caricati in lazy solo dalla schermata Analisi del cammino.
-const wasmSrc = path.join(__dirname, 'node_modules', '@mediapipe', 'tasks-vision', 'wasm');
+const mpRoot = path.join(__dirname, 'node_modules', '@mediapipe', 'tasks-vision');
+const wasmSrc = path.join(mpRoot, 'wasm');
 const wasmDst = path.join(__dirname, 'dist', 'wasm');
 if (fs.existsSync(wasmSrc)) {
   fs.mkdirSync(wasmDst, { recursive: true });
   fs.readdirSync(wasmSrc).forEach((f) => {
     fs.copyFileSync(path.join(wasmSrc, f), path.join(wasmDst, f));
   });
-  console.log('✓ MediaPipe WASM copiato in dist/wasm/');
+  // Il modulo JS della libreria viene caricato a runtime con import()
+  // nativo del browser (Metro non sa trasformarlo): self-hostato qui.
+  const bundleMjs = path.join(mpRoot, 'vision_bundle.mjs');
+  if (fs.existsSync(bundleMjs)) {
+    fs.copyFileSync(bundleMjs, path.join(wasmDst, 'vision_bundle.mjs'));
+  }
+  console.log('✓ MediaPipe WASM + vision_bundle.mjs copiati in dist/wasm/');
 }
 const modelsSrc = path.join(__dirname, 'web', 'models');
 const modelsDst = path.join(__dirname, 'dist', 'models');

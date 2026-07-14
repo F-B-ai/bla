@@ -41,12 +41,18 @@ export interface GaitAssessment {
 
 let _landmarker: any | null = null;
 
+// Import dinamico NATIVO del browser, invisibile a Metro: la libreria
+// MediaPipe contiene costrutti che il bundler non sa trasformare,
+// quindi la self-hostiamo in /wasm e la carichiamo a runtime.
+// eslint-disable-next-line no-new-func
+const nativeImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>;
+
 const getLandmarker = async (): Promise<any> => {
   if (_landmarker) return _landmarker;
   if (Platform.OS !== 'web') {
     throw new Error("L'analisi del cammino è disponibile solo dalla web app (PWA).");
   }
-  const vision = await import('@mediapipe/tasks-vision');
+  const vision = await nativeImport('/wasm/vision_bundle.mjs');
   const fileset = await vision.FilesetResolver.forVisionTasks('/wasm');
   _landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
     baseOptions: {
