@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -34,6 +35,7 @@ import { AddStudentScreen } from '../owner/AddStudentScreen';
 import { InviteStudentScreen } from '../owner/InviteStudentScreen';
 
 export const MyStudentsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, logout, isOwner, isManager } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
@@ -277,6 +279,17 @@ export const MyStudentsScreen: React.FC = () => {
           <Button
             title="Storico"
             onPress={() => handleViewHistory(item)}
+            variant="outline"
+            style={styles.actionButton}
+          />
+          <Button
+            title="Storia"
+            onPress={() =>
+              navigation.navigate('StoriaAllievo', {
+                studentId: item.id,
+                studentName: `${item.name}${(item as any).surname ? ' ' + (item as any).surname : ''}`,
+              })
+            }
             variant="outline"
             style={styles.actionButton}
           />

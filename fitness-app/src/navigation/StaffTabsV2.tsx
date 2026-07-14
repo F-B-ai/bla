@@ -29,6 +29,7 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
 import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
+import TimelineScreen from '../screens/shared/TimelineScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
@@ -192,6 +193,7 @@ const buildNavigators = (role: StaffRole) => {
   const AllieviNav = () => (
     <AllieviStack.Navigator screenOptions={stackOptions}>
       <AllieviStack.Screen name="AllieviHome" component={MyStudentsScreen} />
+      <AllieviStack.Screen name="StoriaAllievo" component={TimelineScreen} options={inner('Storia allievo')} />
     </AllieviStack.Navigator>
   );
 

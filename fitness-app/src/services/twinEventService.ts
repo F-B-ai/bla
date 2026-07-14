@@ -18,7 +18,15 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit as fsLimit,
+  startAfter,
+  getDocs,
   Timestamp,
+  QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { brand } from '../config/brand';
@@ -122,4 +130,55 @@ export const emitTwinEvent = async (
     console.warn('[twin] emissione evento fallita:', type, (e as Error)?.message);
     return null;
   }
+};
+
+// ------------------------------------------------------------
+// Lettura timeline (M3.5) — la prima UI che esiste SOLO grazie
+// al twin: cronologia unificata degli eventi della persona.
+// Query indicizzata (person_id ASC, ts DESC) → <2s garantiti.
+// ------------------------------------------------------------
+
+export interface TimelineEvent {
+  id: string;
+  type: TwinEventType;
+  ts: Date;
+  source: TwinEventSource;
+  payload: Record<string, any>;
+  confidence: number;
+}
+
+export interface TimelinePage {
+  events: TimelineEvent[];
+  /** Cursore per la pagina successiva (null = storia finita). */
+  cursor: QueryDocumentSnapshot | null;
+}
+
+export const getPersonTimeline = async (
+  subjectUid: string,
+  pageSize: number = 50,
+  after?: QueryDocumentSnapshot | null
+): Promise<TimelinePage> => {
+  const personId = await getPersonId(subjectUid);
+  const parts: any[] = [
+    where('person_id', '==', personId),
+    orderBy('ts', 'desc'),
+    fsLimit(pageSize),
+  ];
+  if (after) parts.splice(2, 0, startAfter(after));
+  const snap = await getDocs(query(collection(db, EVENTS_COLLECTION), ...parts));
+  const events: TimelineEvent[] = snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      type: data.type,
+      ts: data.ts?.toDate?.() || new Date(),
+      source: data.source || 'app',
+      payload: data.payload || {},
+      confidence: data.confidence ?? 1,
+    };
+  });
+  return {
+    events,
+    cursor: snap.docs.length === pageSize ? snap.docs[snap.docs.length - 1] : null,
+  };
 };

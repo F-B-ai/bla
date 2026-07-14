@@ -17,6 +17,7 @@ import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
 import { GamificationScreen } from '../screens/student/GamificationScreen';
 import { DiaryScreen } from '../screens/student/DiaryScreen';
 import { AICoachScreen } from '../screens/shared/AICoachScreen';
+import TimelineScreen from '../screens/shared/TimelineScreen';
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AssistantScreen } from '../screens/shared/AssistantScreen';
 import { ProfileScreen } from '../screens/shared/ProfileScreen';
@@ -129,6 +130,7 @@ const ProgressiHub = () => (
     title="Progressi"
     subtitle="Stai migliorando: eccolo nero su bianco"
     rows={[
+      { icon: 'book-outline', title: 'La mia storia', subtitle: 'Tutto il tuo percorso, giorno per giorno', route: 'Storia' },
       { icon: 'trophy-outline', title: 'Traguardi', subtitle: 'Badge, livelli e premi reali', route: 'Traguardi' },
       { icon: 'journal-outline', title: 'Diario', subtitle: 'Le tue note e riflessioni', route: 'Diario' },
       { icon: 'sparkles-outline', title: 'AI Coach', subtitle: 'Analisi e suggerimenti personalizzati', route: 'AICoach' },
@@ -139,6 +141,7 @@ const ProgressiHub = () => (
 const ProgressiNavigator = () => (
   <ProgressiStack.Navigator screenOptions={stackOptions}>
     <ProgressiStack.Screen name="ProgressiHome" component={ProgressiHub} />
+    <ProgressiStack.Screen name="Storia" component={TimelineScreen} options={innerScreenOptions('La mia storia')} />
     <ProgressiStack.Screen name="Traguardi" component={GamificationScreen} options={innerScreenOptions('Traguardi')} />
     <ProgressiStack.Screen name="Diario" component={DiaryScreen} options={innerScreenOptions('Diario')} />
     <ProgressiStack.Screen name="AICoach" component={AICoachScreen} options={innerScreenOptions('AI Coach')} />
