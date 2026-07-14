@@ -30,6 +30,7 @@ import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
 import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 import TimelineScreen from '../screens/shared/TimelineScreen';
+import GaitAnalysisScreen from '../screens/staff/GaitAnalysisScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
@@ -119,6 +120,7 @@ const trainingGroup: HubGroup = {
 const assessGroup: HubGroup = {
   title: 'Valutazioni',
   rows: [
+    { icon: 'walk-outline', title: 'Analisi del cammino', route: 'Cammino' },
     { icon: 'body-outline', title: 'Valutazione posturale', route: 'Postura' },
     { icon: 'scale-outline', title: 'Composizione corporea', route: 'Composizione' },
     { icon: 'sparkles-outline', title: 'AI Coach', route: 'AICoach' },
@@ -221,6 +223,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
       {/* Valutazioni */}
+      <StudioStack.Screen name="Cammino" component={GaitAnalysisScreen} options={inner('Analisi del cammino')} />
       <StudioStack.Screen name="Postura" component={PosturalAssessmentScreen} options={inner('Valutazione posturale')} />
       <StudioStack.Screen name="Composizione" component={BodyCompositionScreen} options={inner('Composizione corporea')} />
       <StudioStack.Screen name="AICoach" component={AICoachScreen} options={inner('AI Coach')} />

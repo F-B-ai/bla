@@ -25,6 +25,7 @@ export const H0_CLIENT_EVENT_TYPES = [
   'body.measurement_recorded',
   'body.composition_estimated',
   'posture.assessed',
+  'movement.gait_assessed',
   'event.corrected',
 ] as const;
 

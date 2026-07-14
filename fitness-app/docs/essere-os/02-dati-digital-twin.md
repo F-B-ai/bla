@@ -192,7 +192,9 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 - **Idempotenza**: gli eventi derivati da fatti "per giorno" (wearable, check-in) usano ID deterministico `hash(type|person_id|giorno|sorgente)` → il retry non duplica. Gli altri usano ULID.
 - **Il payload è un riassunto, non un dump**: l'evento porta ciò che serve al calcolo degli stati derivati; il dettaglio resta nel doc legacy puntato da `source_ref`. Esempio: `workout.completed` porta per-esercizio `{pattern, top_set: {kg, reps}, volume_kg, sets}` — non i 40 set grezzi.
 
-### 3.3 Tassonomia v1 (42 tipi, chiusa: si estende con PR sul pacchetto documenti, non ad hoc)
+### 3.3 Tassonomia v1.1 (43 tipi, chiusa: si estende con PR sul pacchetto documenti, non ad hoc)
+
+> *Changelog*: v1.1 (M3+) aggiunge il dominio **Movimento** con `movement.gait_assessed` — l'AI Biomechanics ([03 §1.2](./03-ai-engine.md)) anticipato a richiesta del founder: analisi del cammino con pose estimation on-device (il video non lascia il dispositivo, si estraggono solo i landmark scheletrici), metriche deterministiche in `src/domain/gait.ts`, LLM solo per l'interpretazione.
 
 > **Questo registro è la fonte unica dei nomi evento.** Ogni altro documento (03, 04, 05) usa questi nomi; dove un documento ne citasse di diversi, vale questo. Gli eventi di *product analytics* (`flow_*`, tempi-per-schermata di 04) **NON entrano in `human_events`**: non descrivono la persona ma l'interfaccia, e vanno in una collezione `analytics/` separata con retention 12 mesi.
 
@@ -208,6 +210,7 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 | **Gamification** (3) | `badge.earned` · `level.reached` · `reward.redeemed` | badge_id; level; reward_id | H0 |
 | **Business** (4) | `membership.started` · `membership.expired` · `payment.recorded` · `payment.overdue` | plan_id, importo, rata n/N | H0 |
 | **Academy** (3) | `academy.lesson_completed` · `academy.quiz_attempted` · `academy.certificate_earned` | course_id, score | H1 |
+| **Movimento** (1) | `movement.gait_assessed` | vista (laterale/frontale), metriche deterministiche {cadenza, simmetria passo %, inclinazione tronco °, oscillazione braccia %, caduta pelvica °, valgismo proxy}, `metrics_version`; screening wellness, MAI diagnosi ([06](./06-sicurezza-compliance.md)) | H0.5 |
 | **Wearable** (4) | `sleep.recorded` · `hr.resting_recorded` · `hrv.recorded` · `steps.recorded` | §5.2 | H1 |
 | **AI** (1) | `ai.feedback` | modulo, rating/correzione del coach o dell'allievo su un output AI (03 §4.2) | H1 |
 | **Meta** (1) | `event.corrected` | supersedes + motivo | H0 |

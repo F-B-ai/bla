@@ -79,6 +79,29 @@ webAssets.forEach((file) => {
   }
 });
 
+// --- AI BIOMECHANICS: asset pose-estimation self-hostati ---
+// Il runtime WASM viene copiato da node_modules (non committato);
+// il modello .task vive in web/models (committato, 5.7MB).
+// Caricati in lazy solo dalla schermata Analisi del cammino.
+const wasmSrc = path.join(__dirname, 'node_modules', '@mediapipe', 'tasks-vision', 'wasm');
+const wasmDst = path.join(__dirname, 'dist', 'wasm');
+if (fs.existsSync(wasmSrc)) {
+  fs.mkdirSync(wasmDst, { recursive: true });
+  fs.readdirSync(wasmSrc).forEach((f) => {
+    fs.copyFileSync(path.join(wasmSrc, f), path.join(wasmDst, f));
+  });
+  console.log('✓ MediaPipe WASM copiato in dist/wasm/');
+}
+const modelsSrc = path.join(__dirname, 'web', 'models');
+const modelsDst = path.join(__dirname, 'dist', 'models');
+if (fs.existsSync(modelsSrc)) {
+  fs.mkdirSync(modelsDst, { recursive: true });
+  fs.readdirSync(modelsSrc).forEach((f) => {
+    fs.copyFileSync(path.join(modelsSrc, f), path.join(modelsDst, f));
+  });
+  console.log('✓ Modelli pose copiati in dist/models/');
+}
+
 // --- WHITE-LABEL: allinea il manifest PWA al brand attivo (nome app
 // installata + colori splash/tema). Le icone restano quelle in web/.
 const manifestDst = path.join(__dirname, 'dist', 'manifest.json');

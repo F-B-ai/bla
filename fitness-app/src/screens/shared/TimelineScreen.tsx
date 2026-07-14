@@ -105,6 +105,18 @@ const VISUALS: Record<string, EventVisual> = {
     title: () => 'Respirazione guidata',
     subtitle: (p) => (p.duration_minutes ? `${p.duration_minutes} min` : ''),
   },
+  'movement.gait_assessed': {
+    icon: 'walk-outline',
+    color: colors.info,
+    title: (p) => `Analisi del cammino (${p.view === 'frontale' ? 'di fronte' : 'di lato'})`,
+    subtitle: (p) => {
+      const parts: string[] = [];
+      if (p.cadence_spm != null) parts.push(`${p.cadence_spm} passi/min`);
+      if (p.step_symmetry_pct != null) parts.push(`simmetria ${p.step_symmetry_pct}%`);
+      if (p.pelvic_drop_deg != null) parts.push(`bacino ${p.pelvic_drop_deg}°`);
+      return parts.join(' · ');
+    },
+  },
 };
 
 const dayLabel = (d: Date): string => {
