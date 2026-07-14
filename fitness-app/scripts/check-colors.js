@@ -30,6 +30,10 @@ const WHITELIST = new Set([
   'src/components/common/EnsōLogo.tsx', // asset di brand (SVG): i colori sono il disegno
 ]);
 
+// Cartelle whitelisted: i brand dei clienti white-label sono config,
+// i loro colori sono l'identità del cliente, non debito.
+const WHITELIST_DIRS = ['src/config/brands/'];
+
 const walk = (dir) => {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -44,6 +48,7 @@ const counts = {};
 for (const file of walk(SRC)) {
   const rel = path.relative(path.join(__dirname, '..'), file).replace(/\\/g, '/');
   if (WHITELIST.has(rel)) continue;
+  if (WHITELIST_DIRS.some((d) => rel.startsWith(d))) continue;
   const matches = fs.readFileSync(file, 'utf8').match(COLOR_RE);
   if (matches && matches.length > 0) counts[rel] = matches.length;
 }
