@@ -9,6 +9,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { emitTwinEvent } from './twinEventService';
 
 const CHECKIN_COLLECTION = 'checkins';
 
@@ -30,7 +31,8 @@ const isToday = (date: Date): boolean => {
 
 export const registerCheckin = async (
   studentId: string,
-  studentName: string
+  studentName: string,
+  method: 'qr' | 'manuale' = 'qr'
 ): Promise<{ success: boolean; alreadyCheckedIn?: boolean }> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -48,11 +50,18 @@ export const registerCheckin = async (
     return { success: false, alreadyCheckedIn: true };
   }
 
-  await addDoc(collection(db, CHECKIN_COLLECTION), {
+  const ref = await addDoc(collection(db, CHECKIN_COLLECTION), {
     studentId,
     studentName,
     timestamp: Timestamp.now(),
   });
+
+  // Dual-write twin (M3): presenza in palestra
+  emitTwinEvent(
+    'gym.checkin',
+    { method },
+    { subjectUid: studentId, sourceRef: { collection: CHECKIN_COLLECTION, doc_id: ref.id } }
+  );
 
   return { success: true };
 };

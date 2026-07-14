@@ -11,6 +11,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { PosturalAssessment, PosturalFinding, PosturalArea } from '../types';
+import { emitTwinEvent } from './twinEventService';
+import { CONFIDENCE } from '../domain/twinEvents';
 
 const ASSESSMENTS_COLLECTION = 'posturalAssessments';
 
@@ -21,6 +23,27 @@ export const createAssessment = async (
     ...assessment,
     date: Timestamp.fromDate(assessment.date),
   });
+
+  // Dual-write twin (M3): findings sintetici per distretto (02 §3.3),
+  // le foto e le note complete restano nel doc legacy via source_ref.
+  const hasAi = !!assessment.aiAnalysis;
+  emitTwinEvent(
+    'posture.assessed',
+    {
+      findings: (assessment.findings || []).map((f) => ({
+        area: f.area,
+        severity: f.severity,
+      })),
+      ai_assisted: hasAi,
+    },
+    {
+      subjectUid: assessment.studentId,
+      source: hasAi ? 'ai' : 'coach',
+      confidence: hasAi ? CONFIDENCE.aiPosture : CONFIDENCE.coach,
+      sourceRef: { collection: ASSESSMENTS_COLLECTION, doc_id: docRef.id },
+    }
+  );
+
   return docRef.id;
 };
 

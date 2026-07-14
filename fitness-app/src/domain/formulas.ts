@@ -23,6 +23,66 @@ export const computeScore = (
   return Math.round(((raw - 4) / 16) * 100);
 };
 
+// ============================================================
+// READINESS v2 — formula canonica doc 03 §2.1 (M3)
+// ------------------------------------------------------------
+// Differenza dalla v1: pesi non uniformi (il sonno è il predittore
+// soggettivo più robusto; i dolori quasi quanto, perché sono l'unico
+// segnale che deve poter bloccare). Il blend wearable (α ≤ 0.4) è H1:
+// senza wearable α = 0 e questa È la formula completa.
+// Ogni punteggio v2 è spiegabile: la scomposizione dice quanto ogni
+// slider ha contribuito (un numero inspiegabile distrugge la fiducia
+// del coach — vincolo di prodotto, doc 02 §4.2).
+// changelog: v2 introdotta in M3 (pesi 0.30/0.25/0.20/0.25); la v1
+// resta la formula mostrata in UI finché il batch non la promuove.
+// ============================================================
+
+export const READINESS_FORMULA_VERSION = 2;
+
+export const READINESS_WEIGHTS = {
+  sleep: 0.3,
+  energy: 0.25,
+  mood: 0.2,
+  soreness: 0.25, // applicato a (1 − dolori normalizzati)
+} as const;
+
+export interface ReadinessV2 {
+  score: number; // 0-100, arrotondato
+  version: number;
+  /** Contributo di ogni componente in punti (somma ≈ score). */
+  breakdown: { sleep: number; energy: number; mood: number; soreness: number };
+}
+
+const norm15 = (x: number): number => {
+  const clamped = Math.min(5, Math.max(1, x));
+  return (clamped - 1) / 4; // 1..5 → 0..1
+};
+
+export const computeReadinessV2 = (
+  sleep: number,
+  energy: number,
+  mood: number,
+  soreness: number
+): ReadinessV2 => {
+  const parts = {
+    sleep: 100 * READINESS_WEIGHTS.sleep * norm15(sleep),
+    energy: 100 * READINESS_WEIGHTS.energy * norm15(energy),
+    mood: 100 * READINESS_WEIGHTS.mood * norm15(mood),
+    soreness: 100 * READINESS_WEIGHTS.soreness * (1 - norm15(soreness)),
+  };
+  const exact = parts.sleep + parts.energy + parts.mood + parts.soreness;
+  return {
+    score: Math.round(exact),
+    version: READINESS_FORMULA_VERSION,
+    breakdown: {
+      sleep: Math.round(parts.sleep * 10) / 10,
+      energy: Math.round(parts.energy * 10) / 10,
+      mood: Math.round(parts.mood * 10) / 10,
+      soreness: Math.round(parts.soreness * 10) / 10,
+    },
+  };
+};
+
 export interface ScoreAdvice {
   title: string;
   detail: string;

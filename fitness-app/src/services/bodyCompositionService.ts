@@ -12,6 +12,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { BodyCompositionEstimate } from '../types';
+import { emitTwinEvent } from './twinEventService';
+import { CONFIDENCE } from '../domain/twinEvents';
 
 const COLLECTION_NAME = 'bodyCompositionEstimates';
 
@@ -48,6 +50,23 @@ export const saveEstimate = async (
     date: Timestamp.fromDate(estimate.date instanceof Date ? estimate.date : new Date(estimate.date)),
     createdAt: Timestamp.fromDate(estimate.createdAt instanceof Date ? estimate.createdAt : new Date(estimate.createdAt)),
   });
+
+  // Dual-write twin (M3): stima AI = la sorgente più incerta (02 §3.1),
+  // sempre range/tendenza, mai verità. Il dettaglio resta nel doc legacy.
+  emitTwinEvent(
+    'body.composition_estimated',
+    {
+      estimated_body_fat: estimate.estimatedBodyFat ?? null,
+      estimated_muscle_mass: estimate.estimatedMuscleMass ?? null,
+    },
+    {
+      subjectUid: estimate.studentId,
+      source: 'ai',
+      confidence: CONFIDENCE.aiBodyComp,
+      sourceRef: { collection: COLLECTION_NAME, doc_id: docRef.id },
+    }
+  );
+
   return docRef.id;
 };
 

@@ -33,7 +33,8 @@ export interface WellnessCheck {
 
 export { computeScore, adviceForScore } from '../domain/formulas';
 export type { ScoreAdvice } from '../domain/formulas';
-import { computeScore } from '../domain/formulas';
+import { computeScore, computeReadinessV2, FORMULA_VERSION } from '../domain/formulas';
+import { emitTwinEvent } from './twinEventService';
 
 const startOfToday = (): Date => {
   const d = new Date();
@@ -80,6 +81,25 @@ export const saveDailyCheck = async (
     score,
     timestamp: Timestamp.now(),
   });
+
+  // Dual-write twin (M3, strangler): il doc legacy resta la fonte UI.
+  // Il log porta la v1 (mostrata) E la v2 (canonica, per calibrazione).
+  const v2 = computeReadinessV2(values.sleep, values.energy, values.mood, values.soreness);
+  emitTwinEvent(
+    'wellness.checkin_submitted',
+    {
+      sleep: values.sleep,
+      energy: values.energy,
+      mood: values.mood,
+      soreness: values.soreness,
+      score,
+      formula_version: FORMULA_VERSION,
+      score_v2: v2.score,
+      formula_v2_version: v2.version,
+    },
+    { subjectUid: studentId, sourceRef: { collection: WELLNESS_COLLECTION, doc_id: ref.id } }
+  );
+
   return {
     id: ref.id,
     studentId,

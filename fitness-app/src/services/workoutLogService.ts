@@ -16,8 +16,29 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { WorkoutLog, ExerciseLog, SetLog, WorkoutLogStatus } from '../types';
+import { emitTwinEvent } from './twinEventService';
 
 const WORKOUT_LOGS_COLLECTION = 'workoutLogs';
+
+// Riassunto per il twin (02 §3.2: "il payload è un riassunto, non un
+// dump" — il set-by-set resta in workoutLogs via source_ref).
+const summarizeExercises = (logs: ExerciseLog[] = []) =>
+  logs
+    .filter((ex) => (ex.sets || []).some((s) => s.completed))
+    .map((ex) => {
+      const done = (ex.sets || []).filter((s) => s.completed);
+      const top = done.reduce(
+        (best: SetLog | null, s) => (!best || s.weight > best.weight ? s : best),
+        null
+      );
+      return {
+        name: ex.exerciseName,
+        sets: done.length,
+        top_set: top ? { kg: top.weight, reps: top.reps } : null,
+        volume_kg: Math.round(done.reduce((sum, s) => sum + s.weight * s.reps, 0)),
+        technique: ex.technique || 'standard',
+      };
+    });
 
 // --- Crea una nuova sessione di allenamento ---
 export const startWorkoutLog = async (
@@ -31,6 +52,14 @@ export const startWorkoutLog = async (
     exerciseLogs: log.exerciseLogs || [],
     notes: log.notes || '',
   });
+
+  // Dual-write twin (M3)
+  emitTwinEvent(
+    'workout.started',
+    { plan_id: log.workoutPlanId || null, day_of_week: log.dayOfWeek },
+    { subjectUid: log.studentId, sourceRef: { collection: WORKOUT_LOGS_COLLECTION, doc_id: docRef.id } }
+  );
+
   return docRef.id;
 };
 
@@ -57,14 +86,33 @@ export const completeWorkoutLog = async (
 
   // Calcola durata
   const docSnap = await getDoc(doc(db, WORKOUT_LOGS_COLLECTION, workoutLogId));
+  let twinPayload: Record<string, unknown> | null = null;
+  let subjectUid: string | undefined;
   if (docSnap.exists()) {
     const data = docSnap.data();
     const startedAt = data.startedAt?.toDate?.() || new Date();
     const now = new Date();
     updateData.durationMinutes = Math.round((now.getTime() - startedAt.getTime()) / 60000);
+
+    subjectUid = data.studentId;
+    const exercises = summarizeExercises(data.exerciseLogs as ExerciseLog[]);
+    twinPayload = {
+      plan_id: data.workoutPlanId || null,
+      duration_minutes: updateData.durationMinutes,
+      exercises,
+      total_volume_kg: exercises.reduce((s, e) => s + e.volume_kg, 0),
+    };
   }
 
   await updateDoc(doc(db, WORKOUT_LOGS_COLLECTION, workoutLogId), updateData);
+
+  // Dual-write twin (M3): dopo l'update legacy, mai prima
+  if (twinPayload && subjectUid) {
+    emitTwinEvent('workout.completed', twinPayload, {
+      subjectUid,
+      sourceRef: { collection: WORKOUT_LOGS_COLLECTION, doc_id: workoutLogId },
+    });
+  }
 };
 
 // --- Abbandona la sessione ---
@@ -72,6 +120,11 @@ export const abandonWorkoutLog = async (workoutLogId: string): Promise<void> => 
   await updateDoc(doc(db, WORKOUT_LOGS_COLLECTION, workoutLogId), {
     status: 'abandoned' as WorkoutLogStatus,
     completedAt: Timestamp.now(),
+  });
+
+  // Dual-write twin (M3): l'abbandono è un segnale, non un fallimento UI
+  emitTwinEvent('workout.abandoned', {}, {
+    sourceRef: { collection: WORKOUT_LOGS_COLLECTION, doc_id: workoutLogId },
   });
 };
 

@@ -64,7 +64,7 @@ export const CheckinScreen: React.FC = () => {
     setScannerReady(false);
   }, []);
 
-  const handleScan = useCallback(async (decodedText: string) => {
+  const handleScan = useCallback(async (decodedText: string, method: 'qr' | 'manuale' = 'qr') => {
     if (state === 'success' || state === 'already') return;
 
     stopScanner();
@@ -84,7 +84,7 @@ export const CheckinScreen: React.FC = () => {
       : user.email || 'Utente';
 
     try {
-      const result = await registerCheckin(user.id, displayName);
+      const result = await registerCheckin(user.id, displayName, method);
       if (result.success) {
         setState('success');
       } else if (result.alreadyCheckedIn) {
@@ -263,7 +263,7 @@ export const CheckinScreen: React.FC = () => {
     if (!manualCode.trim()) return;
     if (isValidCheckinQR(manualCode)) {
       setState('processing');
-      handleScan(manualCode);
+      handleScan(manualCode, 'manuale');
     } else {
       setState('error');
     }
