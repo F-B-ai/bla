@@ -1,15 +1,37 @@
-name: Deploy to Firebase Hosting
+# ============================================================
+# DEPLOY ESSĒRE — pubblica app + regole su Firebase Hosting.
+#
+# QUANDO SCATTA (mai per sbaglio):
+#  - push il cui messaggio di commit contiene "[deploy]"
+#  - oppure avvio manuale dalla tab Actions (workflow_dispatch)
+#
+# COSA SERVE (una tantum): il secret FIREBASE_SERVICE_ACCOUNT
+# in Settings → Secrets and variables → Actions, con dentro il
+# JSON completo del service account di essere-3fe6f.
+# Da quel momento: nessuna chiave passa più in chat.
+# ============================================================
+name: Deploy to Firebase (ESSĒRE)
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - master
       - claude/fitness-coaching-app-*
 
+concurrency:
+  group: firebase-deploy-essere
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    # push: solo se il commit dice esplicitamente [deploy];
+    # l'avvio manuale da Actions passa sempre.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[deploy]')
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +45,13 @@ jobs:
         run: npm install --legacy-peer-deps
         working-directory: fitness-app
 
-      - name: Build web app
+      - name: Gate di qualità (test + palette)
+        run: |
+          npx jest --ci --silent
+          node scripts/check-colors.js
+        working-directory: fitness-app
+
+      - name: Build web app (brand ESSĒRE)
         run: npm run build:web
         working-directory: fitness-app
 
@@ -31,113 +59,32 @@ jobs:
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT mancante: aggiungilo in Settings → Secrets → Actions."
+            exit 1
+          fi
           node -e "
             const sa = JSON.parse(process.env.FIREBASE_SA);
+            if (sa.project_id !== 'essere-3fe6f') { throw new Error('La chiave non è del progetto essere-3fe6f: ' + sa.project_id); }
             require('fs').writeFileSync('/tmp/firebase_sa.json', JSON.stringify(sa));
-            console.log('SA project:', sa.project_id);
-            console.log('SA email:', sa.client_email);
+            console.log('SA ok:', sa.client_email);
           "
 
-      - name: Deploy Firestore & Storage rules
+      - name: Deploy hosting
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: npx firebase-tools deploy --only hosting --project essere-3fe6f --non-interactive
+        working-directory: fitness-app
+
+      - name: Deploy Firestore rules + indexes (retry sul 409)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
         run: |
-          node -e "
-            const { execSync } = require('child_process');
-            const sa = JSON.parse(require('fs').readFileSync('/tmp/firebase_sa.json', 'utf8'));
-            const { GoogleAuth } = require('google-auth-library');
-            const auth = new GoogleAuth({
-              credentials: sa,
-              scopes: ['https://www.googleapis.com/auth/firebase', 'https://www.googleapis.com/auth/cloud-platform']
-            });
-            async function deploy() {
-              const client = await auth.getClient();
-              const token = await client.getAccessToken();
-              try {
-                execSync(
-                  'npx firebase-tools deploy --only firestore:rules,firestore:indexes,storage:rules --project essere-3fe6f --force --token ' + token.token,
-                  { stdio: 'inherit', cwd: 'fitness-app' }
-                );
-                console.log('Rules deployed successfully!');
-              } catch (e) {
-                console.error('firebase-tools deploy failed, trying REST API...');
-                // Fallback: deploy rules via REST API
-                const rules = require('fs').readFileSync('fitness-app/firestore.rules', 'utf8');
-                const https = require('https');
-                const data = JSON.stringify({
-                  source: { files: [{ name: 'firestore.rules', content: rules, fingerprint: '' }] }
-                });
-                const createOpts = {
-                  hostname: 'firebaserules.googleapis.com',
-                  path: '/v1/projects/essere-3fe6f/rulesets',
-                  method: 'POST',
-                  headers: {
-                    'Authorization': 'Bearer ' + token.token,
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(data)
-                  }
-                };
-                const rulesetName = await new Promise((resolve, reject) => {
-                  const req = https.request(createOpts, (res) => {
-                    let body = '';
-                    res.on('data', (d) => body += d);
-                    res.on('end', () => {
-                      if (res.statusCode >= 200 && res.statusCode < 300) {
-                        const result = JSON.parse(body);
-                        console.log('Ruleset created:', result.name);
-                        resolve(result.name);
-                      } else {
-                        console.error('Create ruleset failed:', res.statusCode, body);
-                        reject(new Error(body));
-                      }
-                    });
-                  });
-                  req.on('error', reject);
-                  req.write(data);
-                  req.end();
-                });
-                // Release the ruleset
-                const relData = JSON.stringify({
-                  name: 'projects/essere-3fe6f/releases/cloud.firestore',
-                  rulesetName: rulesetName
-                });
-                const relOpts = {
-                  hostname: 'firebaserules.googleapis.com',
-                  path: '/v1/projects/essere-3fe6f/releases/cloud.firestore',
-                  method: 'PATCH',
-                  headers: {
-                    'Authorization': 'Bearer ' + token.token,
-                    'Content-Type': 'application/json',
-                    'Content-Length': Buffer.byteLength(relData)
-                  }
-                };
-                await new Promise((resolve, reject) => {
-                  const req = https.request(relOpts, (res) => {
-                    let body = '';
-                    res.on('data', (d) => body += d);
-                    res.on('end', () => {
-                      if (res.statusCode >= 200 && res.statusCode < 300) {
-                        console.log('Rules released successfully!');
-                        resolve(body);
-                      } else {
-                        console.error('Release failed:', res.statusCode, body);
-                        reject(new Error(body));
-                      }
-                    });
-                  });
-                  req.on('error', reject);
-                  req.write(relData);
-                  req.end();
-                });
-              }
-            }
-            deploy().catch(e => { console.error('Deploy failed:', e.message); process.exit(1); });
-          "
-        continue-on-error: true
+          npx firebase-tools deploy --only firestore:rules,firestore:indexes --project essere-3fe6f --non-interactive \
+            || (echo "retry tra 10s (release contesa)…" && sleep 10 && \
+                npx firebase-tools deploy --only firestore:rules,firestore:indexes --project essere-3fe6f --non-interactive)
+        working-directory: fitness-app
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: essere-3fe6f
-          entryPoint: fitness-app
+      - name: Cleanup key
+        if: always()
+        run: rm -f /tmp/firebase_sa.json
