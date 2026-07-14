@@ -50,6 +50,7 @@ export default function GaitAnalysisScreen() {
   const [view, setView] = useState<GaitView>('laterale');
   const [phase, setPhase] = useState<Phase>('setup');
   const [progress, setProgress] = useState(0);
+  const [engineLoading, setEngineLoading] = useState(false);
   const [metrics, setMetrics] = useState<GaitMetrics | null>(null);
   const [narrative, setNarrative] = useState('');
   const [narrativeLoading, setNarrativeLoading] = useState(false);
@@ -87,7 +88,9 @@ export default function GaitAnalysisScreen() {
     setMetrics(null);
     setNarrative('');
     try {
-      const frames = await extractLandmarksFromVideo(file, setProgress);
+      const frames = await extractLandmarksFromVideo(file, setProgress, (s) =>
+        setEngineLoading(s === 'engine')
+      );
       const m = computeGaitMetrics(frames, view);
       setMetrics(m);
       setPhase('results');
@@ -243,11 +246,15 @@ export default function GaitAnalysisScreen() {
         <View style={styles.processing}>
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.processingText}>
-            Estraggo lo scheletro… {Math.round(progress * 100)}%
+            {engineLoading
+              ? 'Scarico il motore di analisi (~38 MB, solo la prima volta)…'
+              : `Estraggo lo scheletro… ${Math.round(progress * 100)}%`}
           </Text>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
-          </View>
+          {!engineLoading && (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+            </View>
+          )}
         </View>
       )}
 

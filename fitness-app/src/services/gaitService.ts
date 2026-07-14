@@ -47,21 +47,48 @@ let _landmarker: any | null = null;
 // eslint-disable-next-line no-new-func
 const nativeImport = new Function('p', 'return import(p)') as (p: string) => Promise<any>;
 
-const getLandmarker = async (): Promise<any> => {
+const withTimeout = <T>(p: Promise<T>, ms: number, msg: string): Promise<T> =>
+  Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(msg)), ms)),
+  ]);
+
+export type GaitStatus = 'engine' | 'analyzing';
+
+const getLandmarker = async (onStatus?: (s: GaitStatus) => void): Promise<any> => {
   if (_landmarker) return _landmarker;
   if (Platform.OS !== 'web') {
     throw new Error("L'analisi del cammino è disponibile solo dalla web app (PWA).");
   }
-  const vision = await nativeImport('/wasm/vision_bundle.mjs');
+  onStatus?.('engine');
+  const vision = await withTimeout(
+    nativeImport('/wasm/vision_bundle.mjs'),
+    60000,
+    'Il motore di analisi non si scarica: controlla la connessione e riprova.'
+  );
   const fileset = await vision.FilesetResolver.forVisionTasks('/wasm');
-  _landmarker = await vision.PoseLandmarker.createFromOptions(fileset, {
+  const options = (delegate: 'GPU' | 'CPU') => ({
     baseOptions: {
       modelAssetPath: '/models/pose_landmarker_lite.task',
-      delegate: 'GPU', // fallback CPU automatico se WebGL non c'è
+      delegate,
     },
     runningMode: 'VIDEO',
     numPoses: 1,
   });
+  try {
+    // Safari iOS a volte si blocca sul delegate GPU: timeout stretto + ripiego CPU
+    _landmarker = await withTimeout(
+      vision.PoseLandmarker.createFromOptions(fileset, options('GPU')),
+      45000,
+      'GPU_TIMEOUT'
+    );
+  } catch {
+    _landmarker = await withTimeout(
+      vision.PoseLandmarker.createFromOptions(fileset, options('CPU')),
+      60000,
+      'Il motore di analisi non parte su questo dispositivo. Riprova o usa un altro telefono.'
+    );
+  }
   return _landmarker;
 };
 
@@ -71,49 +98,87 @@ const getLandmarker = async (): Promise<any> => {
  */
 export const extractLandmarksFromVideo = async (
   file: Blob,
-  onProgress?: (p: number) => void
+  onProgress?: (p: number) => void,
+  onStatus?: (s: GaitStatus) => void
 ): Promise<LandmarkFrame[]> => {
-  const landmarker = await getLandmarker();
+  const landmarker = await getLandmarker(onStatus);
+  onStatus?.('analyzing');
   const doc = (globalThis as any).document;
   const url = (globalThis as any).URL.createObjectURL(file);
   const video = doc.createElement('video');
   video.src = url;
   video.muted = true;
   video.playsInline = true;
+  video.setAttribute('playsinline', ''); // iOS: obbligatorio anche come attributo
+  video.preload = 'auto';
 
-  await new Promise<void>((resolve, reject) => {
-    video.onloadedmetadata = () => resolve();
-    video.onerror = () => reject(new Error('Video non leggibile. Usa un formato standard (mp4/mov).'));
-  });
+  try {
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error('Video non leggibile. Usa un formato standard (mp4/mov).'));
+        video.load();
+      }),
+      20000,
+      'Il video non si apre: riprova o scegli un altro file.'
+    );
 
-  const duration = Math.min(video.duration || 0, MAX_ANALYSIS_SECONDS);
-  if (!duration || duration < 3) {
-    (globalThis as any).URL.revokeObjectURL(url);
-    throw new Error('Video troppo corto: riprendi almeno 6-8 passi (5-10 secondi).');
-  }
-
-  // Campionamento per seek: deterministico e affidabile anche quando
-  // il tab va in background (a differenza del playback in tempo reale).
-  const step = 1 / TARGET_SAMPLE_FPS;
-  const frames: LandmarkFrame[] = [];
-  for (let t = 0; t < duration; t += step) {
-    await new Promise<void>((resolve) => {
-      video.onseeked = () => resolve();
-      video.currentTime = t;
-    });
-    const res = landmarker.detectForVideo(video, Math.round(t * 1000));
-    const lm = res?.landmarks?.[0];
-    if (lm && lm.length >= 33) {
-      frames.push({
-        t: t * 1000,
-        landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
-      });
+    const duration = Math.min(video.duration || 0, MAX_ANALYSIS_SECONDS);
+    if (!duration || duration < 3) {
+      throw new Error('Video troppo corto: riprendi almeno 6-8 passi (5-10 secondi).');
     }
-    onProgress?.(Math.min(1, t / duration));
+
+    // iOS: sblocca la pipeline di decodifica (senza play il seek può
+    // non consegnare mai i fotogrammi). Muto + playsinline = permesso.
+    try {
+      await withTimeout(video.play(), 5000, 'play');
+      video.pause();
+    } catch {
+      /* alcuni browser non lo richiedono: si prosegue */
+    }
+
+    // Campionamento per seek: deterministico e affidabile. Ogni seek ha
+    // un timeout: su iOS 'seeked' a volte non scatta (es. currentTime
+    // già uguale) — si prosegue col fotogramma corrente invece di
+    // restare appesi. Si parte da un epsilon > 0 proprio per questo.
+    const step = 1 / TARGET_SAMPLE_FPS;
+    const frames: LandmarkFrame[] = [];
+    for (let t = 0.05; t < duration; t += step) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => resolve(), 800);
+        video.onseeked = () => { clearTimeout(timer); resolve(); };
+        try {
+          video.currentTime = t;
+        } catch {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+      try {
+        const res = landmarker.detectForVideo(video, Math.round(t * 1000));
+        const lm = res?.landmarks?.[0];
+        if (lm && lm.length >= 33) {
+          frames.push({
+            t: t * 1000,
+            landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
+          });
+        }
+      } catch {
+        /* singolo fotogramma illeggibile: si continua */
+      }
+      onProgress?.(Math.min(1, t / duration));
+    }
+    onProgress?.(1);
+
+    if (frames.length === 0) {
+      throw new Error(
+        'Non sono riuscito a leggere la persona nel video. Controlla: corpo intero inquadrato, buona luce, formato video standard.'
+      );
+    }
+    return frames;
+  } finally {
+    (globalThis as any).URL.revokeObjectURL(url);
   }
-  (globalThis as any).URL.revokeObjectURL(url);
-  onProgress?.(1);
-  return frames;
 };
 
 // ------------------------------------------------------------
