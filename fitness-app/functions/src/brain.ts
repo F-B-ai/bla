@@ -46,7 +46,7 @@ interface BrainRunSummary {
   errors: string[];
 }
 
-const runBrain = async (): Promise<BrainRunSummary> => {
+export const runBrain = async (): Promise<BrainRunSummary> => {
   const now = new Date();
   const cutoff = new Date(now.getTime() - DAYS_WINDOW * MS_DAY);
   const summary: BrainRunSummary = {
