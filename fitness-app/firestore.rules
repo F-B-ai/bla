@@ -97,6 +97,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Ritratto ESSĒRE: lo genera lo staff (coach nel loop), l'allievo
+    // legge il proprio. Mai cancellabile dai client.
+    match /portraits/{personId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || personId == myPersonId()
+      );
+      allow create, update: if isStaff();
+      allow delete: if false;
+    }
+
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
     match /config/{docId} {

@@ -293,6 +293,17 @@ export const MyStudentsScreen: React.FC = () => {
             variant="outline"
             style={styles.actionButton}
           />
+          <Button
+            title="Ritratto"
+            onPress={() =>
+              navigation.navigate('RitrattoAllievo', {
+                studentId: item.id,
+                studentName: `${item.name}${(item as any).surname ? ' ' + (item as any).surname : ''}`,
+              })
+            }
+            variant="outline"
+            style={styles.actionButton}
+          />
           <TouchableOpacity
             style={styles.reportButton}
             onPress={() => handleGenerateReport(item)}

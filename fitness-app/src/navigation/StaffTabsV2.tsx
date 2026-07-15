@@ -31,6 +31,7 @@ import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 import TimelineScreen from '../screens/shared/TimelineScreen';
 import GaitAnalysisScreen from '../screens/staff/GaitAnalysisScreen';
+import PortraitScreen from '../screens/staff/PortraitScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
@@ -196,6 +197,7 @@ const buildNavigators = (role: StaffRole) => {
     <AllieviStack.Navigator screenOptions={stackOptions}>
       <AllieviStack.Screen name="AllieviHome" component={MyStudentsScreen} />
       <AllieviStack.Screen name="StoriaAllievo" component={TimelineScreen} options={inner('Storia allievo')} />
+      <AllieviStack.Screen name="RitrattoAllievo" component={PortraitScreen} options={inner('Ritratto ESSĒRE')} />
     </AllieviStack.Navigator>
   );
 
