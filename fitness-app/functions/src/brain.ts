@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {onRequest} from "firebase-functions/v2/https";
+import {defineSecret} from "firebase-functions/params";
 import {
   computeReadinessV2,
   READINESS_FORMULA_VERSION,
@@ -29,8 +30,73 @@ import {
 
 const db = () => admin.firestore();
 
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+
 const DAYS_WINDOW = 35;
 const MS_DAY = 86400000;
+// Tappa 2: proposte AI solo per i segnalati, con tetto per esecuzione
+// (controllo costi: ~12 × 1.5k token ≈ centesimi/notte)
+const MAX_AI_PROPOSALS = 12;
+
+// ------------------------------------------------------------
+// Tappa 2 — la proposta: l'AI istruisce, il coach firma.
+// Output JSON rigido; se il modello divaga, la riga resta senza
+// proposta (mai bloccare la coda per un capriccio dell'LLM).
+// ------------------------------------------------------------
+
+const PROPOSAL_SYSTEM = `Sei il direttore tecnico AI di una palestra italiana. Ricevi il quadro di UN allievo (numeri già calcolati, affidabili) e proponi UNA azione concreta per il coach di domani mattina.
+
+Rispondi SOLO con un oggetto JSON, nessun testo attorno:
+{"action": "messaggio" | "chiamata" | "programma" | "reception",
+ "why": "una frase: perché questa azione, con i numeri",
+ "draft": "bozza WhatsApp in italiano, 2-4 frasi, tono amichevole da coach (dai del tu), senza firma e senza emoji eccessive — oppure null se action non è messaggio"}
+
+Regole:
+- MAI diagnosi o linguaggio medico. Sei un gestore, non un dottore.
+- Rata scaduta MA persona che si allena regolarmente → promemoria gentile, dai per scontata la dimenticanza.
+- Persona ferma da poco (≤14 giorni) → ricontatto caldo e non colpevolizzante: chiedi come sta, proponi un rientro facile.
+- Persona ferma da >30 giorni → "chiamata" più che messaggio: serve voce umana.
+- Costanza da celebrare → riconoscimento SPECIFICO (cita le settimane), mai generico.
+- La bozza deve sembrare scritta dal coach, non da un software.`;
+
+interface Proposal {
+  action: "messaggio" | "chiamata" | "programma" | "reception";
+  why: string;
+  draft: string | null;
+}
+
+const askProposal = async (
+  apiKey: string,
+  studentContext: Record<string, unknown>
+): Promise<Proposal | null> => {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 400,
+        system: [{type: "text", text: PROPOSAL_SYSTEM,
+          cache_control: {type: "ephemeral"}}],
+        messages: [{role: "user", content: JSON.stringify(studentContext)}],
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {content?: Array<{type: string; text?: string}>};
+    const text = (data.content || [])
+      .filter((b) => b.type === "text").map((b) => b.text || "").join("")
+      .replace(/```json|```/g, "").trim();
+    const p = JSON.parse(text) as Proposal;
+    if (!["messaggio", "chiamata", "programma", "reception"].includes(p.action)) return null;
+    return {action: p.action, why: String(p.why || ""), draft: p.draft ? String(p.draft) : null};
+  } catch {
+    return null; // la coda vive anche senza proposta
+  }
+};
 
 interface EventLite {
   type: string;
@@ -43,14 +109,15 @@ interface BrainRunSummary {
   twinsWritten: number;
   attentionRows: number;
   aat7d: number; // Allievi Attivamente Tracciati (≥1 evento in 7gg) — metrica H0
+  proposals: number; // proposte AI generate (Tappa 2)
   errors: string[];
 }
 
-export const runBrain = async (): Promise<BrainRunSummary> => {
+export const runBrain = async (apiKey?: string): Promise<BrainRunSummary> => {
   const now = new Date();
   const cutoff = new Date(now.getTime() - DAYS_WINDOW * MS_DAY);
   const summary: BrainRunSummary = {
-    students: 0, twinsWritten: 0, attentionRows: 0, aat7d: 0, errors: [],
+    students: 0, twinsWritten: 0, attentionRows: 0, aat7d: 0, proposals: 0, errors: [],
   };
 
   // 1. Allievi attivi + mappa uid → person_id
@@ -92,8 +159,8 @@ export const runBrain = async (): Promise<BrainRunSummary> => {
   const daysAgo = (ts: Date): number =>
     Math.floor((now.getTime() - ts.getTime()) / MS_DAY);
 
-  // 4. Un twin per allievo
-  const batchWriter = db().bulkWriter();
+  // 4. Un twin per allievo (calcolo; la scrittura avviene dopo il passo AI)
+  const twinDocs: Array<{pid: string; data: Record<string, unknown>}> = [];
   for (const student of students) {
     try {
       const pid = student.person_id as string;
@@ -168,7 +235,7 @@ export const runBrain = async (): Promise<BrainRunSummary> => {
       });
 
       const name = `${student.name || ""} ${student.surname || ""}`.trim();
-      batchWriter.set(db().collection("twins").doc(pid), {
+      twinDocs.push({pid, data: {
         person_id: pid,
         uid: student.uid,
         name,
@@ -205,14 +272,61 @@ export const runBrain = async (): Promise<BrainRunSummary> => {
         },
         attention,
         events_7d: events.filter((e) => daysAgo(e.ts) <= 7).length,
-      }, {merge: false});
+      }});
 
-      summary.twinsWritten++;
       summary.attentionRows += attention.length;
       if (events.some((e) => daysAgo(e.ts) <= 7)) summary.aat7d++;
     } catch (e) {
       summary.errors.push(`${student.uid}: ${(e as Error).message}`);
     }
+  }
+
+  // 4b. Tappa 2 — proposte AI per i segnalati (l'AI istruisce, il
+  // coach firma). Priorità: i RECUPERABILI prima (gap recente batte
+  // gap fossile), poi gialli, poi i verdi da celebrare. Cap costi.
+  if (apiKey) {
+    const flagged = twinDocs
+      .filter((t) => (t.data.attention as Array<{severity: string}>).length > 0)
+      .sort((a, b) => {
+        const sev = (t: typeof a) =>
+          (t.data.attention as Array<{severity: string}>)
+            .some((x) => x.severity === "rosso") ? 0 :
+            (t.data.attention as Array<{severity: string}>)
+              .some((x) => x.severity === "giallo") ? 1 : 2;
+        if (sev(a) !== sev(b)) return sev(a) - sev(b);
+        // dentro la stessa severità: gap più RECENTE prima (recuperabile)
+        const gap = (t: typeof a) =>
+          ((t.data.adherence as Record<string, unknown>)
+            .last_workout_gap_days as number | null) ?? 999;
+        return gap(a) - gap(b);
+      })
+      .slice(0, MAX_AI_PROPOSALS);
+
+    for (const t of flagged) {
+      const d = t.data;
+      const proposal = await askProposal(apiKey, {
+        nome: d.name,
+        segnalazioni: (d.attention as Array<{reason: string}>).map((x) => x.reason),
+        rischio_abbandono: d.churn,
+        readiness: d.readiness,
+        aderenza: d.adherence,
+        carico: d.load,
+      });
+      if (proposal) {
+        d.proposal = {...proposal, generated_at: new Date().toISOString(), model: "claude-sonnet-4-5"};
+        summary.proposals++;
+      }
+    }
+  }
+
+  // 4c. Scrittura twins
+  const batchWriter = db().bulkWriter();
+  for (const t of twinDocs) {
+    batchWriter.set(db().collection("twins").doc(t.pid), {
+      ...t.data,
+      computed_at: admin.firestore.FieldValue.serverTimestamp(),
+    }, {merge: false});
+    summary.twinsWritten++;
   }
   await batchWriter.close();
 
@@ -237,9 +351,10 @@ export const nightlyBrain = onSchedule(
     region: "europe-west1",
     memory: "256MiB",
     timeoutSeconds: 300,
+    secrets: [ANTHROPIC_API_KEY],
   },
   async () => {
-    const s = await runBrain();
+    const s = await runBrain(ANTHROPIC_API_KEY.value());
     console.log("Brain notturno:", JSON.stringify(s));
   }
 );
@@ -247,7 +362,8 @@ export const nightlyBrain = onSchedule(
 // Trigger manuale (solo owner/manager): per test e per il pulsante
 // "ricalcola ora" — stessa identica esecuzione della notte.
 export const brainRun = onRequest(
-  {region: "europe-west1", timeoutSeconds: 300, memory: "256MiB", cors: true},
+  {region: "europe-west1", timeoutSeconds: 300, memory: "256MiB", cors: true,
+    secrets: [ANTHROPIC_API_KEY]},
   async (req, res) => {
     const authHeader = req.headers.authorization || "";
     const idToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
@@ -267,7 +383,7 @@ export const brainRun = onRequest(
       res.status(401).json({error: "Token non valido"});
       return;
     }
-    const s = await runBrain();
+    const s = await runBrain(ANTHROPIC_API_KEY.value());
     res.json(s);
   }
 );

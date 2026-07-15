@@ -44,7 +44,7 @@ import {
 const EVENTS_COLLECTION = 'human_events';
 
 // tenant slug: parte "umana" del licenseId (essere-mml-001 → essere-mml)
-const TENANT_ID = brand.licenseId.replace(/-\d+$/, '');
+export const TENANT_ID = brand.licenseId.replace(/-\d+$/, '');
 
 // --- person_id stabile, con cache di sessione (1 lettura per utente) ---
 const personIdCache = new Map<string, string>();

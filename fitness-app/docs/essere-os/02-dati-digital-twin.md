@@ -195,6 +195,7 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 ### 3.3 Tassonomia v1.1 (43 tipi, chiusa: si estende con PR sul pacchetto documenti, non ad hoc)
 
 > *Changelog*: v1.1 (M3+) aggiunge il dominio **Movimento** con `movement.gait_assessed` — l'AI Biomechanics ([03 §1.2](./03-ai-engine.md)) anticipato a richiesta del founder: analisi del cammino con pose estimation on-device (il video non lascia il dispositivo, si estraggono solo i landmark scheletrici), metriche deterministiche in `src/domain/gait.ts`, LLM solo per l'interpretazione.
+> v1.2 (Brain Tappa 2) anticipa `coach.attention_handled` da H1 a H0: ogni esito della coda del mattino (gestito/ignorato) è la label umana che addestra il Brain — rimandarla avrebbe buttato via mesi di dataset.
 
 > **Questo registro è la fonte unica dei nomi evento.** Ogni altro documento (03, 04, 05) usa questi nomi; dove un documento ne citasse di diversi, vale questo. Gli eventi di *product analytics* (`flow_*`, tempi-per-schermata di 04) **NON entrano in `human_events`**: non descrivono la persona ma l'interfaccia, e vanno in una collezione `analytics/` separata con retention 12 mesi.
 

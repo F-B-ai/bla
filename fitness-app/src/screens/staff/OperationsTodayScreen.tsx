@@ -21,6 +21,13 @@ import { getTransactions } from '../../services/financialService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { daysUntilDue, isInstallmentOverdue } from '../../domain/formulas';
 import { TrainingSession, Student } from '../../types';
+import {
+  BrainRow,
+  BrainStatus,
+  getBrainQueue,
+  getBrainStatus,
+  markAttentionHandled,
+} from '../../services/brainService';
 
 // ============================================================
 // OGGI IN PALESTRA — dashboard operativa staff (M2, doc 04 §3.1)
@@ -51,10 +58,19 @@ export const OperationsTodayScreen: React.FC = () => {
   const [todaySessions, setTodaySessions] = useState<TrainingSession[]>([]);
   const [todayIncome, setTodayIncome] = useState<number | null>(null);
   const [checkinsToday, setCheckinsToday] = useState(0);
+  // Brain (Tappa 2): coda del mattino
+  const [brainRows, setBrainRows] = useState<BrainRow[]>([]);
+  const [brainStatus, setBrainStatus] = useState<BrainStatus | null>(null);
+  const [brainExpanded, setBrainExpanded] = useState<string | null>(null);
+  const [copiedPid, setCopiedPid] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
     const today = new Date();
+
+    // Brain: coda del mattino (non blocca il resto della dashboard)
+    getBrainQueue().then(setBrainRows).catch(() => setBrainRows([]));
+    getBrainStatus().then(setBrainStatus).catch(() => {});
 
     const [checksR, checkinsR, sessionsR, studentsR, plansR, txR] = await Promise.allSettled([
       getAllTodayChecks(),
@@ -213,6 +229,120 @@ export const OperationsTodayScreen: React.FC = () => {
           )}
         </View>
 
+        {/* 🧠 Brain — la coda del mattino (pattern, non solo l'oggi) */}
+        {brainRows.length > 0 && (
+          <>
+            <View style={styles.brainHeader}>
+              <Text style={styles.sectionTitle}>🧠 Coda del mattino</Text>
+              {brainStatus?.lastRun && (
+                <Text style={styles.brainMeta}>
+                  calcolata {brainStatus.lastRun.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} · {brainRows.length} da gestire
+                </Text>
+              )}
+            </View>
+            {brainRows.slice(0, 8).map((row) => {
+              const sevColor =
+                row.severity === 'rosso' ? colors.error :
+                row.severity === 'giallo' ? colors.warning : colors.success;
+              const open = brainExpanded === row.personId;
+              return (
+                <View key={row.personId} style={[styles.card, styles.brainCard, { borderLeftColor: sevColor }]}>
+                  <TouchableOpacity
+                    onPress={() => setBrainExpanded(open ? null : row.personId)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.brainRowTop}>
+                      <Text style={styles.brainName}>{row.name}</Text>
+                      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
+                    </View>
+                    <Text style={styles.brainReasons}>
+                      {row.attention.map((a) => a.reason).join(' · ')}
+                    </Text>
+                  </TouchableOpacity>
+                  {open && (
+                    <View style={styles.brainDetail}>
+                      {row.proposal ? (
+                        <>
+                          <Text style={styles.brainWhy}>
+                            💡 {row.proposal.why}
+                          </Text>
+                          {row.proposal.draft && (
+                            <View style={styles.brainDraft}>
+                              <Text style={styles.brainDraftText}>{row.proposal.draft}</Text>
+                            </View>
+                          )}
+                          <View style={styles.brainActions}>
+                            {row.proposal.draft && (
+                              <TouchableOpacity
+                                style={styles.brainBtn}
+                                onPress={() => {
+                                  try {
+                                    (globalThis as any).navigator?.clipboard?.writeText(row.proposal!.draft!);
+                                    setCopiedPid(row.personId);
+                                    setTimeout(() => setCopiedPid(null), 2000);
+                                  } catch { /* clipboard non disponibile */ }
+                                }}
+                              >
+                                <Ionicons name="copy-outline" size={15} color={colors.accent} />
+                                <Text style={styles.brainBtnText}>
+                                  {copiedPid === row.personId ? 'Copiato ✓' : 'Copia bozza'}
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                            <TouchableOpacity
+                              style={styles.brainBtn}
+                              onPress={async () => {
+                                setBrainRows((prev) => prev.filter((r) => r.personId !== row.personId));
+                                await markAttentionHandled(row, row.proposal?.draft ? 'inviato' : 'chiamato');
+                              }}
+                            >
+                              <Ionicons name="checkmark-circle-outline" size={15} color={colors.success} />
+                              <Text style={[styles.brainBtnText, { color: colors.success }]}>Gestito</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.brainBtn}
+                              onPress={async () => {
+                                setBrainRows((prev) => prev.filter((r) => r.personId !== row.personId));
+                                await markAttentionHandled(row, 'ignorato');
+                              }}
+                            >
+                              <Ionicons name="close-circle-outline" size={15} color={colors.textSecondary} />
+                              <Text style={[styles.brainBtnText, { color: colors.textSecondary }]}>Ignora</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </>
+                      ) : (
+                        <View style={styles.brainActions}>
+                          <TouchableOpacity
+                            style={styles.brainBtn}
+                            onPress={async () => {
+                              setBrainRows((prev) => prev.filter((r) => r.personId !== row.personId));
+                              await markAttentionHandled(row, 'chiamato');
+                            }}
+                          >
+                            <Ionicons name="checkmark-circle-outline" size={15} color={colors.success} />
+                            <Text style={[styles.brainBtnText, { color: colors.success }]}>Gestito</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.brainBtn}
+                            onPress={async () => {
+                              setBrainRows((prev) => prev.filter((r) => r.personId !== row.personId));
+                              await markAttentionHandled(row, 'ignorato');
+                            }}
+                          >
+                            <Ionicons name="close-circle-outline" size={15} color={colors.textSecondary} />
+                            <Text style={[styles.brainBtnText, { color: colors.textSecondary }]}>Ignora</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </>
+        )}
+
         {/* Da attenzionare — la coda di decisioni */}
         <Text style={styles.sectionTitle}>Da attenzionare</Text>
         {attention.length === 0 ? (
@@ -305,6 +435,26 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1 },
   bodyContent: { padding: spacing.md, paddingBottom: spacing.xxl },
+  brainHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  brainMeta: { color: colors.textSecondary, fontSize: fontSize.xs },
+  brainCard: { borderLeftWidth: 3, paddingVertical: spacing.sm },
+  brainRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brainName: { color: colors.text, fontSize: fontSize.md, fontWeight: '700' },
+  brainReasons: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 2 },
+  brainDetail: { marginTop: spacing.sm, gap: spacing.sm },
+  brainWhy: { color: colors.text, fontSize: fontSize.sm, lineHeight: 19 },
+  brainDraft: {
+    backgroundColor: colors.background, borderRadius: borderRadius.md,
+    padding: spacing.sm, borderLeftWidth: 2, borderLeftColor: colors.accent,
+  },
+  brainDraftText: { color: colors.text, fontSize: fontSize.sm, fontStyle: 'italic', lineHeight: 19 },
+  brainActions: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' },
+  brainBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 6, paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md, backgroundColor: colors.background,
+  },
+  brainBtnText: { color: colors.accent, fontSize: fontSize.sm, fontWeight: '600' },
   statsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   card: {
     backgroundColor: colors.surface, borderRadius: borderRadius.lg,

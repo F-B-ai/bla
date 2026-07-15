@@ -40,6 +40,7 @@ export interface GaitAssessment {
 // ------------------------------------------------------------
 
 let _landmarker: any | null = null;
+let _delegate: 'GPU' | 'CPU' | null = null;
 
 // Import dinamico NATIVO del browser, invisibile a Metro: la libreria
 // MediaPipe contiene costrutti che il bundler non sa trasformare,
@@ -55,8 +56,11 @@ const withTimeout = <T>(p: Promise<T>, ms: number, msg: string): Promise<T> =>
 
 export type GaitStatus = 'engine' | 'analyzing';
 
-const getLandmarker = async (onStatus?: (s: GaitStatus) => void): Promise<any> => {
-  if (_landmarker) return _landmarker;
+const getLandmarker = async (
+  onStatus?: (s: GaitStatus) => void,
+  forceCPU: boolean = false
+): Promise<any> => {
+  if (_landmarker && (!forceCPU || _delegate === 'CPU')) return _landmarker;
   if (Platform.OS !== 'web') {
     throw new Error("L'analisi del cammino è disponibile solo dalla web app (PWA).");
   }
@@ -75,6 +79,19 @@ const getLandmarker = async (onStatus?: (s: GaitStatus) => void): Promise<any> =
     runningMode: 'VIDEO',
     numPoses: 1,
   });
+  if (_landmarker) {
+    try { _landmarker.close(); } catch { /* già chiuso */ }
+    _landmarker = null;
+  }
+  if (forceCPU) {
+    _landmarker = await withTimeout(
+      vision.PoseLandmarker.createFromOptions(fileset, options('CPU')),
+      60000,
+      'Il motore di analisi non parte su questo dispositivo. Riprova o usa un altro telefono.'
+    );
+    _delegate = 'CPU';
+    return _landmarker;
+  }
   try {
     // Safari iOS a volte si blocca sul delegate GPU: timeout stretto + ripiego CPU
     _landmarker = await withTimeout(
@@ -82,12 +99,14 @@ const getLandmarker = async (onStatus?: (s: GaitStatus) => void): Promise<any> =
       45000,
       'GPU_TIMEOUT'
     );
+    _delegate = 'GPU';
   } catch {
     _landmarker = await withTimeout(
       vision.PoseLandmarker.createFromOptions(fileset, options('CPU')),
       60000,
       'Il motore di analisi non parte su questo dispositivo. Riprova o usa un altro telefono.'
     );
+    _delegate = 'CPU';
   }
   return _landmarker;
 };
@@ -137,36 +156,63 @@ export const extractLandmarksFromVideo = async (
       /* alcuni browser non lo richiedono: si prosegue */
     }
 
-    // Campionamento per seek: deterministico e affidabile. Ogni seek ha
-    // un timeout: su iOS 'seeked' a volte non scatta (es. currentTime
-    // già uguale) — si prosegue col fotogramma corrente invece di
-    // restare appesi. Si parte da un epsilon > 0 proprio per questo.
-    const step = 1 / TARGET_SAMPLE_FPS;
-    const frames: LandmarkFrame[] = [];
-    for (let t = 0.05; t < duration; t += step) {
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(() => resolve(), 800);
-        video.onseeked = () => { clearTimeout(timer); resolve(); };
+    // Fotogrammi letti da una TELA RIDOTTA (max 720px): su iOS il
+    // rilevatore sull'elemento video diretto a volte produce zero
+    // risultati, e il 4K è 4-8 volte più lento del necessario.
+    const doc2 = (globalThis as any).document;
+    const canvas = doc2.createElement('canvas');
+    const scale = Math.min(1, 720 / (video.videoHeight || 720));
+    canvas.width = Math.round((video.videoWidth || 720) * scale);
+    canvas.height = Math.round((video.videoHeight || 720) * scale);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const samplePass = (detector: any): Promise<LandmarkFrame[]> => (async () => {
+      const step = 1 / TARGET_SAMPLE_FPS;
+      const out: LandmarkFrame[] = [];
+      let sampleN = 0;
+      for (let t = 0.05; t < duration; t += step) {
+        // Su iOS 'seeked' a volte non scatta: timeout generoso sui primi
+        // fotogrammi (il decoder si scalda), poi più stretto.
+        const seekTimeout = sampleN < 5 ? 2000 : 1000;
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(() => resolve(), seekTimeout);
+          video.onseeked = () => { clearTimeout(timer); resolve(); };
+          try {
+            video.currentTime = t;
+          } catch {
+            clearTimeout(timer);
+            resolve();
+          }
+        });
         try {
-          video.currentTime = t;
+          if (video.readyState >= 2 && ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const res = detector.detectForVideo(canvas, Math.round(t * 1000));
+            const lm = res?.landmarks?.[0];
+            if (lm && lm.length >= 33) {
+              out.push({
+                t: t * 1000,
+                landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
+              });
+            }
+          }
         } catch {
-          clearTimeout(timer);
-          resolve();
+          /* singolo fotogramma illeggibile: si continua */
         }
-      });
-      try {
-        const res = landmarker.detectForVideo(video, Math.round(t * 1000));
-        const lm = res?.landmarks?.[0];
-        if (lm && lm.length >= 33) {
-          frames.push({
-            t: t * 1000,
-            landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
-          });
-        }
-      } catch {
-        /* singolo fotogramma illeggibile: si continua */
+        sampleN++;
+        onProgress?.(Math.min(1, t / duration));
       }
-      onProgress?.(Math.min(1, t / duration));
+      return out;
+    })();
+
+    let frames = await samplePass(landmarker);
+
+    // GPU che produce zero su tutto il video (noto su alcuni Safari):
+    // un solo retry completo con il motore in CPU, poi verdetto onesto.
+    if (frames.length === 0 && _delegate === 'GPU') {
+      const cpuDetector = await getLandmarker(onStatus, true);
+      onStatus?.('analyzing');
+      frames = await samplePass(cpuDetector);
     }
     onProgress?.(1);
 

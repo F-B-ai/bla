@@ -76,7 +76,8 @@ service cloud.firestore {
           'gym.checkin',
           'workout.started', 'workout.completed', 'workout.abandoned',
           'body.measurement_recorded', 'body.composition_estimated',
-          'posture.assessed', 'movement.gait_assessed', 'event.corrected'
+          'posture.assessed', 'movement.gait_assessed',
+          'coach.attention_handled', 'event.corrected'
         ]
         && request.resource.data.ts is timestamp
         && request.resource.data.ts < request.time + duration.value(5, 'm')
