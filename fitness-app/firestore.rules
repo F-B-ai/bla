@@ -86,6 +86,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Stati derivati del twin (scritti SOLO dal Brain notturno via
+    // Admin SDK): lo staff legge tutto (coda del mattino), l'allievo
+    // legge solo il proprio. Nessun client scrive mai.
+    match /twins/{personId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || personId == myPersonId()
+      );
+      allow write: if false;
+    }
+
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
     match /config/{docId} {
