@@ -196,6 +196,7 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 
 > *Changelog*: v1.1 (M3+) aggiunge il dominio **Movimento** con `movement.gait_assessed` — l'AI Biomechanics ([03 §1.2](./03-ai-engine.md)) anticipato a richiesta del founder: analisi del cammino con pose estimation on-device (il video non lascia il dispositivo, si estraggono solo i landmark scheletrici), metriche deterministiche in `src/domain/gait.ts`, LLM solo per l'interpretazione.
 > v1.2 (Brain Tappa 2) anticipa `coach.attention_handled` da H1 a H0: ogni esito della coda del mattino (gestito/ignorato) è la label umana che addestra il Brain — rimandarla avrebbe buttato via mesi di dataset.
+> v1.3 (AI Biomechanics v2) aggiunge `movement.squat_assessed`: analisi dello squat con la stessa pipeline on-device del cammino (pose → metriche deterministiche in `src/domain/squat.ts` → LLM interpreta). Il dominio Movimento sale a 2 tipi.
 
 > **Questo registro è la fonte unica dei nomi evento.** Ogni altro documento (03, 04, 05) usa questi nomi; dove un documento ne citasse di diversi, vale questo. Gli eventi di *product analytics* (`flow_*`, tempi-per-schermata di 04) **NON entrano in `human_events`**: non descrivono la persona ma l'interfaccia, e vanno in una collezione `analytics/` separata con retention 12 mesi.
 
@@ -211,7 +212,7 @@ Semantica di `confidence` (guida, non dogma — l'AI engine la usa per pesare gl
 | **Gamification** (3) | `badge.earned` · `level.reached` · `reward.redeemed` | badge_id; level; reward_id | H0 |
 | **Business** (4) | `membership.started` · `membership.expired` · `payment.recorded` · `payment.overdue` | plan_id, importo, rata n/N | H0 |
 | **Academy** (3) | `academy.lesson_completed` · `academy.quiz_attempted` · `academy.certificate_earned` | course_id, score | H1 |
-| **Movimento** (1) | `movement.gait_assessed` | vista (laterale/frontale), metriche deterministiche {cadenza, simmetria passo %, inclinazione tronco °, oscillazione braccia %, caduta pelvica °, valgismo proxy}, `metrics_version`; screening wellness, MAI diagnosi ([06](./06-sicurezza-compliance.md)) | H0.5 |
+| **Movimento** (2) | `movement.gait_assessed` · `movement.squat_assessed` | vista (laterale/frontale), metriche deterministiche + `metrics_version` — cammino: {cadenza, simmetria passo %, tronco °, braccia %, caduta pelvica °, valgismo proxy}; squat: {ripetizioni, angolo ginocchio al fondo °, profondità, tronco al fondo °, tempo ecc/conc s, valgismo al fondo %}; screening wellness, MAI diagnosi ([06](./06-sicurezza-compliance.md)) | H0.5 |
 | **Wearable** (4) | `sleep.recorded` · `hr.resting_recorded` · `hrv.recorded` · `steps.recorded` | §5.2 | H1 |
 | **AI** (1) | `ai.feedback` | modulo, rating/correzione del coach o dell'allievo su un output AI (03 §4.2) | H1 |
 | **Meta** (1) | `event.corrected` | supersedes + motivo | H0 |

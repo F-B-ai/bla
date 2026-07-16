@@ -117,6 +117,19 @@ const VISUALS: Record<string, EventVisual> = {
       return parts.join(' · ');
     },
   },
+  'movement.squat_assessed': {
+    icon: 'barbell-outline',
+    color: colors.info,
+    title: (p) => `Analisi dello squat (${p.view === 'frontale' ? 'di fronte' : 'di lato'})`,
+    subtitle: (p) => {
+      const parts: string[] = [];
+      if (p.reps != null) parts.push(`${p.reps} rip`);
+      if (p.depth) parts.push(String(p.depth));
+      if (p.bottom_knee_angle_deg != null) parts.push(`ginocchio ${p.bottom_knee_angle_deg}°`);
+      if (p.knee_valgus_bottom_pct?.left != null) parts.push(`valgo sx ${p.knee_valgus_bottom_pct.left}%`);
+      return parts.join(' · ');
+    },
+  },
 };
 
 const dayLabel = (d: Date): string => {
