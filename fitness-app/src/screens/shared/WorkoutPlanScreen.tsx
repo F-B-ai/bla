@@ -83,6 +83,8 @@ export const WorkoutPlanScreen: React.FC = () => {
   // Tecnica
   const [exTechnique, setExTechnique] = useState<Exercise['technique']>('standard');
   const [exMiniSets, setExMiniSets] = useState('4');
+  const [exRpPauses, setExRpPauses] = useState('2');
+  const [exRpRest, setExRpRest] = useState('15');
   const [exMiniReps, setExMiniReps] = useState('6');
   const [exMiniRest, setExMiniRest] = useState('20');
   const [exStripDrops, setExStripDrops] = useState('3');
@@ -524,6 +526,10 @@ export const WorkoutPlanScreen: React.FC = () => {
         miniReps: exMiniReps || '6',
         miniRestSeconds: parseInt(exMiniRest, 10) || 20,
       } : {}),
+      ...(exTechnique === 'rest_pause_failure' ? {
+        rpPauses: parseInt(exRpPauses, 10) || 2,
+        rpRestSeconds: parseInt(exRpRest, 10) || 15,
+      } : {}),
       ...(exTechnique === 'stripping' ? {
         stripDrops: parseInt(exStripDrops, 10) || 3,
         stripRepsPerDrop: exStripRepsPerDrop || '8',
@@ -643,6 +649,8 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExMiniSets(String(ex.miniSets || 4));
     setExMiniReps(ex.miniReps || '6');
     setExMiniRest(String(ex.miniRestSeconds || 20));
+    setExRpPauses(String(ex.rpPauses || 2));
+    setExRpRest(String(ex.rpRestSeconds || 15));
     setExStripDrops(String(ex.stripDrops || 3));
     setExStripRepsPerDrop(ex.stripRepsPerDrop || '8');
     setExStripMaxDropPct(String(ex.stripMaxDropPct || 50));
@@ -983,7 +991,8 @@ export const WorkoutPlanScreen: React.FC = () => {
                       </Text>
                       {ex.technique && ex.technique !== 'standard' && (
                         <Text style={styles.restPauseBadge}>
-                          {ex.technique === 'rest_pause' && `Rest-Pause (Serie Interrotte): ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
+                          {ex.technique === 'rest_pause' && `Serie Interrotte: ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
+                          {ex.technique === 'rest_pause_failure' && `Rest-Pause: serie a cedimento + ${ex.rpPauses || 2} paus${(ex.rpPauses || 2) === 1 ? 'a' : 'e'} da ${ex.rpRestSeconds || 15}s, mini-serie a cedimento`}
                           {ex.technique === 'stripping' && `Stripping: ${ex.stripDrops || 3} scarichi da ${ex.stripRepsPerDrop || '8'} reps (max -${ex.stripMaxDropPct || 50}%)`}
                           {ex.technique === 'pyramid' && `Piramidali: ${ex.pyramidType === 'ascending' ? 'ascendente ↑' : ex.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
                           {ex.technique === 'tempo' && `Tempo: ${ex.tempoNotation || '4-1-2-0'}`}
@@ -1116,7 +1125,8 @@ export const WorkoutPlanScreen: React.FC = () => {
             <View style={styles.categoryRow}>
               {([
                 { key: 'standard', label: 'Normale' },
-                { key: 'rest_pause', label: 'Rest-Pause' },
+                { key: 'rest_pause', label: 'Serie Interrotte' },
+                { key: 'rest_pause_failure', label: 'Rest-Pause' },
                 { key: 'stripping', label: 'Stripping' },
                 { key: 'pyramid', label: 'Piramidali' },
                 { key: 'tempo', label: 'Tempo' },
@@ -1172,6 +1182,37 @@ export const WorkoutPlanScreen: React.FC = () => {
                   keyboardType="number-pad"
                   placeholder="20"
                 />
+              </View>
+            )}
+
+            {exTechnique === 'rest_pause_failure' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Rest-Pause a cedimento: peso da 6-10 reps, serie principale
+                  vicino al cedimento, poi 1 o più pause brevi (10-20s) con
+                  mini-serie A CEDIMENTO — le ripetizioni dopo le pause non
+                  sono prestabilite: l'allievo registra quelle che escono.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Pause (1-3)"
+                      value={exRpPauses}
+                      onChangeText={setExRpPauses}
+                      keyboardType="number-pad"
+                      placeholder="2"
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Durata pausa (secondi)"
+                      value={exRpRest}
+                      onChangeText={setExRpRest}
+                      keyboardType="number-pad"
+                      placeholder="15"
+                    />
+                  </View>
+                </View>
               </View>
             )}
 

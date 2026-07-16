@@ -112,6 +112,7 @@ export interface TrainingProgram {
 export type ExerciseTechnique =
   | 'standard'
   | 'rest_pause'
+  | 'rest_pause_failure'
   | 'stripping'
   | 'pyramid'
   | 'tempo'
@@ -139,6 +140,10 @@ export interface Exercise {
   miniSets?: number;
   miniReps?: string;
   miniRestSeconds?: number;
+  // Rest-Pause a cedimento: solo la prima serie ha un target,
+  // le mini-serie dopo ogni pausa sono a cedimento (reps libere)
+  rpPauses?: number;
+  rpRestSeconds?: number;
   // Stripping (drop sets)
   stripDrops?: number;
   stripRepsPerDrop?: string;
@@ -648,6 +653,9 @@ export interface ExerciseLog {
   targetMiniSets?: number;
   targetMiniReps?: string;
   targetMiniRestSeconds?: number;
+  // Rest-Pause a cedimento
+  targetRpPauses?: number;
+  targetRpRestSeconds?: number;
   // Stripping (drop sets)
   targetStripDrops?: number;
   targetStripRepsPerDrop?: string;

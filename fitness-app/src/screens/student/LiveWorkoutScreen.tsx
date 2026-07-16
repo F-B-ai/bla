@@ -149,6 +149,10 @@ export const LiveWorkoutScreen: React.FC = () => {
         targetMiniReps: ex.miniReps || '6',
         targetMiniRestSeconds: ex.miniRestSeconds || 20,
       } : {}),
+      ...(ex.technique === 'rest_pause_failure' ? {
+        targetRpPauses: ex.rpPauses || 2,
+        targetRpRestSeconds: ex.rpRestSeconds || 15,
+      } : {}),
       ...(ex.technique === 'stripping' ? {
         targetStripDrops: ex.stripDrops || 3,
         targetStripRepsPerDrop: ex.stripRepsPerDrop || '8',
@@ -334,6 +338,8 @@ export const LiveWorkoutScreen: React.FC = () => {
       ? (currentExercise?.targetClusterRestSeconds || 15)
       : tech === 'cumulative'
       ? (currentExercise?.targetCumulativeRestSeconds || 15)
+      : tech === 'rest_pause_failure'
+      ? (currentExercise?.targetRpRestSeconds || 15)
       : (currentExercise?.targetMiniRestSeconds || 20);
     startMiniRestTimer(targetRest);
   };
@@ -838,6 +844,11 @@ export const LiveWorkoutScreen: React.FC = () => {
                 SERIE INTERROTTE · {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} · rec {currentExercise.targetMiniRestSeconds || 20}s
               </Text>
             )}
+            {currentExercise.technique === 'rest_pause_failure' && (
+              <Text style={styles.restPauseTag}>
+                REST-PAUSE · serie a cedimento + {currentExercise.targetRpPauses || 2} paus{(currentExercise.targetRpPauses || 2) === 1 ? 'a' : 'e'} da {currentExercise.targetRpRestSeconds || 15}s
+              </Text>
+            )}
             {currentExercise.technique === 'stripping' && (
               <Text style={styles.restPauseTag}>
                 STRIPPING · {currentExercise.targetStripDrops || 3} scarichi da {currentExercise.targetStripRepsPerDrop || '8'} reps · max -{currentExercise.targetStripMaxDropPct || 50}%
@@ -1074,15 +1085,18 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster' || currentExercise.technique === 'cumulative') ? (
+              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'rest_pause_failure' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster' || currentExercise.technique === 'cumulative') ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>
-                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : currentExercise.technique === 'cumulative' ? 'Serie Cumulativa' : 'Cluster'}{' '}
+                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'rest_pause_failure' ? 'Rest-Pause' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : currentExercise.technique === 'cumulative' ? 'Serie Cumulativa' : 'Cluster'}{' '}
                     {currentExercise.sets.length + 1} di {currentExercise.targetSets}
                   </Text>
                   <Text style={styles.restPauseHint}>
                     {currentExercise.technique === 'rest_pause' && (
                       `Obiettivo: ${currentExercise.targetMiniSets || 4} mini serie da ${currentExercise.targetMiniReps || '6'} reps · rec ${currentExercise.targetMiniRestSeconds || 20}s`
+                    )}
+                    {currentExercise.technique === 'rest_pause_failure' && (
+                      `Serie principale A CEDIMENTO (peso da ${currentExercise.targetReps} reps), poi ${currentExercise.targetRpPauses || 2} paus${(currentExercise.targetRpPauses || 2) === 1 ? 'a' : 'e'} da ${currentExercise.targetRpRestSeconds || 15}s: dopo ogni pausa, di nuovo a cedimento. Registra le reps che escono.`
                     )}
                     {currentExercise.technique === 'myo_reps' && (
                       `${currentMiniSets.length === 0 ? `Serie attivante: ${currentExercise.targetMyoActivationReps || '12'} reps` : `Mini serie: ${currentExercise.targetMyoMiniReps || '3'} reps · rec ${currentExercise.targetMyoRestSeconds || 5}s`} · tot ${(currentExercise.targetMyoMiniSets || 4) + 1} mini serie`
@@ -1114,7 +1128,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                       {currentMiniSets.map((m, i) => (
                         <View key={i} style={styles.miniSetRow}>
                           <Text style={styles.miniSetRowText}>
-                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : currentExercise.technique === 'cumulative' ? `Gradino ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
+                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'rest_pause_failure' && i === 0 ? 'Principale' : currentExercise.technique === 'rest_pause_failure' ? `Dopo pausa ${i}` : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : currentExercise.technique === 'cumulative' ? `Gradino ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
                           </Text>
                           <TouchableOpacity onPress={() => handleRemoveMiniSet(i)}>
                             <Ionicons name="close-circle" size={18} color={colors.error} />
@@ -1131,7 +1145,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                         <Text style={styles.miniRestTimerLabel}>sec</Text>
                       </View>
                       <Text style={styles.miniRestTitle}>
-                        {currentExercise.technique === 'cluster' ? 'Pausa tra cluster' : currentExercise.technique === 'myo_reps' ? 'Pausa myo-reps' : currentExercise.technique === 'cumulative' ? 'Attesa tra gradini' : 'Recupero tra mini serie'}
+                        {currentExercise.technique === 'cluster' ? 'Pausa tra cluster' : currentExercise.technique === 'myo_reps' ? 'Pausa myo-reps' : currentExercise.technique === 'cumulative' ? 'Attesa tra gradini' : currentExercise.technique === 'rest_pause_failure' ? 'Pausa — poi di nuovo a cedimento' : 'Recupero tra mini serie'}
                       </Text>
                       <TouchableOpacity style={styles.skipMiniRestBtn} onPress={skipMiniRest}>
                         <Ionicons name="play-forward" size={18} color={colors.accent} />
@@ -1145,6 +1159,10 @@ export const LiveWorkoutScreen: React.FC = () => {
                       <Text style={styles.inputLabel}>
                         {currentExercise.technique === 'myo_reps' && currentMiniSets.length === 0
                           ? 'Serie attivante'
+                          : currentExercise.technique === 'rest_pause_failure' && currentMiniSets.length === 0
+                          ? 'Serie principale — a cedimento'
+                          : currentExercise.technique === 'rest_pause_failure'
+                          ? `Dopo pausa ${currentMiniSets.length} di ${currentExercise.targetRpPauses || 2} — a cedimento`
                           : currentExercise.technique === 'cluster'
                           ? `Cluster ${currentMiniSets.length + 1} di ${currentExercise.targetClusterSets || 5}`
                           : currentExercise.technique === 'cumulative'
