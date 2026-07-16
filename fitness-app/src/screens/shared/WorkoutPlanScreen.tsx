@@ -983,7 +983,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                       </Text>
                       {ex.technique && ex.technique !== 'standard' && (
                         <Text style={styles.restPauseBadge}>
-                          {ex.technique === 'rest_pause' && `Serie Interrotte: ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
+                          {ex.technique === 'rest_pause' && `Rest-Pause (Serie Interrotte): ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
                           {ex.technique === 'stripping' && `Stripping: ${ex.stripDrops || 3} scarichi da ${ex.stripRepsPerDrop || '8'} reps (max -${ex.stripMaxDropPct || 50}%)`}
                           {ex.technique === 'pyramid' && `Piramidali: ${ex.pyramidType === 'ascending' ? 'ascendente ↑' : ex.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
                           {ex.technique === 'tempo' && `Tempo: ${ex.tempoNotation || '4-1-2-0'}`}
@@ -1116,7 +1116,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             <View style={styles.categoryRow}>
               {([
                 { key: 'standard', label: 'Normale' },
-                { key: 'rest_pause', label: 'Serie Interrotte' },
+                { key: 'rest_pause', label: 'Rest-Pause' },
                 { key: 'stripping', label: 'Stripping' },
                 { key: 'pyramid', label: 'Piramidali' },
                 { key: 'tempo', label: 'Tempo' },

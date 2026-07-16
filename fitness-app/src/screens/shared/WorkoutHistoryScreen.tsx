@@ -290,7 +290,7 @@ export const WorkoutHistoryScreen: React.FC = () => {
                         <Text style={styles.exerciseTarget}>
                           Target: {ex.targetSets} x {ex.targetReps}
                           {ex.technique && ex.technique !== 'standard' && ` · ${
-                            ex.technique === 'rest_pause' ? 'Serie Interrotte' :
+                            ex.technique === 'rest_pause' ? 'Rest-Pause' :
                             ex.technique === 'stripping' ? 'Stripping' :
                             ex.technique === 'pyramid' ? 'Piramidali' :
                             ex.technique === 'tempo' ? `Tempo ${ex.targetTempoNotation || ''}` :
