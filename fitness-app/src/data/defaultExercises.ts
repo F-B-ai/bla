@@ -23,7 +23,7 @@ export const maleExercises: DefaultExercise[] = [
     reps: '8-10',
     restSeconds: 120,
     category: 'forza',
-    notes: 'Scapole retratte e addotte. Piedi ben piantati a terra.',
+    notes: 'RISERVATA AI PROGRAMMI DI FORZA. Per l\'ipertrofia del petto: manubri, cavi o macchine. Scapole retratte, piedi piantati.',
     gender: 'male',
   },
   {
@@ -670,12 +670,6 @@ export const femaleExercises: DefaultExercise[] = [
 // ============================================================
 
 export const maleExercisesExtra: DefaultExercise[] = [
-  {
-    name: 'Panca declinata con bilanciere',
-    description: 'Sdraiati sulla panca declinata con le caviglie bloccate. Impugna il bilanciere poco più largo delle spalle, scapole retratte. Abbassa il bilanciere in controllo verso la parte bassa del petto e spingi verso l\'alto senza bloccare del tutto i gomiti. Enfasi sui fasci inferiori del pettorale.',
-    sets: 4, reps: '8-10', restSeconds: 120, category: 'forza',
-    notes: 'Non rimbalzare il bilanciere sul petto.', gender: 'male',
-  },
   {
     name: 'Croci con manubri su panca piana',
     description: 'Sdraiato con un manubrio per mano sopra il petto, palmi che si fronteggiano e gomiti leggermente flessi. Apri le braccia in un ampio arco fino a sentire allungare il petto, senza scendere oltre la linea delle spalle. Richiudi come per abbracciare un albero, stesso arco.',

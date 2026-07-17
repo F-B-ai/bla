@@ -73,7 +73,8 @@
   "jest": {
     "testEnvironment": "node",
     "testMatch": [
-      "**/src/domain/__tests__/**/*.test.ts"
+      "**/src/domain/__tests__/**/*.test.ts",
+      "**/src/data/__tests__/**/*.test.ts"
     ],
     "transform": {
       "^.+\\.tsx?$": "babel-jest"

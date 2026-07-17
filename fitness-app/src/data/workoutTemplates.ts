@@ -21,7 +21,8 @@ const ex = (
   rest: number,
   category: ExerciseCategory,
   description = '',
-  notes = ''
+  notes = '',
+  extra: Partial<Omit<Exercise, 'id'>> = {}
 ): Omit<Exercise, 'id'> => ({
   name,
   sets,
@@ -30,6 +31,7 @@ const ex = (
   category,
   description,
   notes,
+  ...extra,
 });
 
 // ============================================================
@@ -49,7 +51,7 @@ export const maleTemplates: WorkoutTemplate[] = [
         dayOfWeek: 0, dayName: 'Lunedì - Push',
         notes: 'Focus petto, spalle, tricipiti',
         exercises: [
-          ex('Panca piana con bilanciere', 4, '8-10', 120, 'forza', 'Presa leggermente più larga delle spalle'),
+          ex('Panca piana con manubri', 4, '8-10', 120, 'forza', 'Traiettoria libera e massimo allungamento: la scelta ESSĒRE per l\'ipertrofia del petto'),
           ex('Panca inclinata con manubri', 4, '10-12', 90, 'forza', 'Inclinazione 30-45 gradi'),
           ex('Croci ai cavi', 3, '12-15', 60, 'forza', 'Mantenere leggera flessione dei gomiti'),
           ex('Military press con bilanciere', 4, '8-10', 120, 'forza', 'In piedi o seduto'),
@@ -1150,5 +1152,297 @@ export const femaleTemplates: WorkoutTemplate[] = [
   },
 ];
 
+// ============================================================
+// TEMPLATE METODO ESSĒRE (lug 2026) — filosofia del founder:
+// petto con bilanciere SOLO nella forza pesante; per l'ipertrofia
+// manubri, cavi e macchine. Tecniche avanzate integrate.
+// ============================================================
+
+export const essereTemplates: WorkoutTemplate[] = [
+  // ---------- UOMO · POSTURA ----------
+  {
+    id: 'male-postura-essere',
+    name: 'Postura ESSĒRE - Reset da Scrivania',
+    description: 'Tre giorni per chi vive seduto: catena posteriore, spalle indietro, anche libere. Da abbinare al check-in quotidiano.',
+    gender: 'male',
+    category: 'Posturale',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Catena posteriore',
+        notes: 'Qualità prima del carico: ogni ripetizione perfetta',
+        exercises: [
+          ex('Gatto-cammello (mobilità colonna)', 2, '10-12 cicli', 30, 'mobilita'),
+          ex('Bird dog', 3, '8-10 per lato', 45, 'posturale'),
+          ex('Face pull al cavo', 4, '15', 60, 'forza', '', 'Il re degli esercizi posturali: gomiti alti, corda alla fronte'),
+          ex('Rematore con elastico', 3, '15-20', 60, 'funzionale'),
+          ex('Iperestensioni su panca (focus glutei)', 3, '12-15', 60, 'forza'),
+          ex('Stretching flessori dell\'anca', 2, '30-40 sec per lato', 20, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Spalle & scapole',
+        notes: 'Aprire il petto, rinforzare il dorso',
+        exercises: [
+          ex('Alzate posteriori con manubri', 3, '12-15', 60, 'forza'),
+          ex('Pulley basso', 4, '10-12', 90, 'forza', '', 'Petto in fuori a fine tirata'),
+          ex('Push-up inclinati (mani su panca)', 3, '10-15', 90, 'funzionale'),
+          ex('Plank frontale', 3, '30-45s', 45, 'funzionale'),
+          ex('Dead bug', 3, '8-10 per lato', 60, 'funzionale'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Anche & core',
+        notes: 'Le anche libere salvano la schiena',
+        exercises: [
+          ex('Goblet squat con kettlebell', 3, '10-12', 90, 'forza'),
+          ex('Ponte glutei con elastico', 3, '15', 60, 'forza'),
+          ex('Affondi laterali', 3, '10 per lato', 90, 'forza'),
+          ex('Bird dog', 3, '8-10 per lato', 45, 'posturale'),
+          ex('Hollow hold', 3, '20-30 sec', 60, 'funzionale'),
+          ex('Stretching flessori dell\'anca', 2, '30-40 sec per lato', 20, 'stretching'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- UOMO · FORZA ----------
+  {
+    id: 'male-forza-essere',
+    name: 'Forza ESSĒRE - Fondamentali 3 Giorni',
+    description: 'Forza pura sui fondamentali. Qui — e solo qui — il petto si allena col bilanciere.',
+    gender: 'male',
+    category: 'Forza',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Squat',
+        notes: 'Carichi 80-90%: la tecnica non si negozia',
+        exercises: [
+          ex('Squat con bilanciere', 5, '3-5', 240, 'forza', '', 'RPE 8: lascia sempre 1-2 reps nel serbatoio'),
+          ex('Affondi inversi con bilanciere', 3, '6-8 per gamba', 120, 'forza'),
+          ex('Leg curl sdraiato', 3, '8-10', 90, 'forza'),
+          ex('Ab wheel rollout', 3, '8-10', 90, 'forza'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Panca',
+        notes: 'Giorno di forza: il bilanciere sul petto vive qui',
+        exercises: [
+          ex('Panca piana con bilanciere', 5, '3-5', 240, 'forza', '', 'Setup completo a ogni serie: scapole, arco, piedi'),
+          ex('Panca piana con manubri', 3, '8-10', 120, 'forza', '', 'Volume complementare'),
+          ex('Rematore con bilanciere', 4, '6-8', 150, 'forza'),
+          ex('Estensioni tricipiti al cavo con corda', 3, '10-12', 60, 'forza'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Stacco',
+        notes: 'Il giorno del re: poco volume, massima qualità',
+        exercises: [
+          ex('Stacco da terra', 5, '3-5', 300, 'forza', '', 'Ogni singola alzata dal fermo, reset completo'),
+          ex('Trazioni alla sbarra', 4, 'max', 150, 'forza'),
+          ex('Push press con bilanciere', 4, '5-6', 150, 'forza'),
+          ex("Farmer's walk con manubri", 3, '30-40 metri', 120, 'funzionale'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- UOMO · IPERTROFIA (il fiore all'occhiello) ----------
+  {
+    id: 'male-ipertrofia-essere',
+    name: 'Ipertrofia ESSĒRE - Petto senza Bilanciere',
+    description: 'Quattro giorni Upper/Lower: petto con manubri, cavi e macchine (mai bilanciere), tecniche avanzate integrate — Superflusso, Rest-Pause e Serie Gigante.',
+    gender: 'male',
+    category: 'Ipertrofia',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Upper A (petto & dorso)',
+        notes: 'Il Superflusso finale è il marchio di fabbrica',
+        exercises: [
+          ex('Panca piana con manubri', 4, '8-10', 120, 'forza', '', 'Massimo allungamento in basso'),
+          ex('Panca inclinata con manubri', 3, '10-12', 90, 'forza'),
+          ex('Lat machine presa larga', 4, '10-12', 90, 'forza'),
+          ex('Rematore con manubrio', 3, '10-12 per lato', 90, 'forza'),
+          ex('Croci ai cavi', 3, '12-15', 90, 'forza', '', 'Superflusso: croci + push-up subito dopo, senza pausa',
+            { technique: 'compound_set', pairedExerciseName: 'Push-up (ginocchia o completo)', pairedReps: 'max' }),
+        ],
+      },
+      {
+        dayOfWeek: 1, dayName: 'Martedì - Lower A (quadricipiti)',
+        notes: 'Serie Gigante finale: gambe finite, testa contenta',
+        exercises: [
+          ex('Hack squat', 4, '8-10', 150, 'forza'),
+          ex('Leg press', 3, '10-12', 120, 'forza'),
+          ex('Affondi camminati con manubri', 3, '10 per gamba', 90, 'forza'),
+          ex('Leg extension', 3, '12-15', 90, 'forza', '', 'Serie Gigante: extension + goblet + wall sit senza pausa',
+            { technique: 'giant_set', giantExercises: [
+              { name: 'Goblet squat con kettlebell', reps: '12' },
+              { name: 'Wall sit (sedia al muro)', reps: '30 sec' },
+            ] }),
+          ex('Calf raise in piedi', 4, '12-15', 60, 'forza'),
+        ],
+      },
+      {
+        dayOfWeek: 3, dayName: 'Giovedì - Upper B (spalle & braccia)',
+        notes: 'Rest-Pause sul finale: cedimento controllato',
+        exercises: [
+          ex('Shoulder press con manubri', 4, '8-10', 120, 'forza'),
+          ex('Alzate laterali con manubri', 4, '12-15', 60, 'forza', '', 'Rest-Pause: ultima serie a cedimento + 2 pause da 15s',
+            { technique: 'rest_pause_failure', rpPauses: 2, rpRestSeconds: 15 }),
+          ex('Curl con bilanciere', 3, '8-10', 90, 'forza', '', 'Super Set con i tricipiti: senza pausa',
+            { technique: 'superset', pairedExerciseName: 'Estensioni tricipiti al cavo con corda', pairedReps: '12' }),
+          ex('Curl a martello con manubri', 3, '10-12', 60, 'forza'),
+          ex('Alzate posteriori con manubri', 3, '12-15', 60, 'forza'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Lower B (catena posteriore)',
+        notes: 'Femorali e glutei: la metà che non si vede allo specchio',
+        exercises: [
+          ex('Stacco rumeno con bilanciere', 4, '8-10', 150, 'forza'),
+          ex('Hip thrust con bilanciere', 4, '8-10', 120, 'forza'),
+          ex('Leg curl seduta', 3, '10-12', 90, 'forza'),
+          ex('Iperestensioni su panca (focus glutei)', 3, '12-15', 60, 'forza'),
+          ex('Sollevamento gambe alla sbarra', 3, '8-12', 90, 'forza'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- DONNA · POSTURA ----------
+  {
+    id: 'female-postura-essere',
+    name: 'Postura ESSĒRE Donna - Schiena Libera',
+    description: 'Tre giorni dolci ma seri: schiena, spalle e core per chi passa la giornata seduta o in piedi ferma.',
+    gender: 'female',
+    category: 'Posturale',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Risveglio della schiena',
+        notes: 'Mobilità prima, forza poi',
+        exercises: [
+          ex('Gatto-cammello (mobilità colonna)', 2, '10-12 cicli', 30, 'mobilita'),
+          ex('Bird dog', 3, '8-10 per lato', 45, 'posturale'),
+          ex('Rematore con elastico', 3, '15-20', 60, 'funzionale'),
+          ex('Face pull al cavo', 3, '15', 60, 'forza'),
+          ex('Plank frontale', 3, '20-30s', 45, 'funzionale'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Core profondo',
+        notes: 'Il corsetto naturale',
+        exercises: [
+          ex('Dead bug', 3, '8-10 per lato', 60, 'funzionale'),
+          ex('Ponte glutei con elastico', 3, '15', 60, 'forza'),
+          ex('Push-up inclinati (mani su panca)', 3, '8-12', 90, 'funzionale'),
+          ex('Plank laterale', 3, '20-30s per lato', 45, 'funzionale'),
+          ex('Stretching flessori dell\'anca', 2, '30-40 sec per lato', 20, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Anche & equilibrio',
+        notes: 'Anche forti = schiena serena',
+        exercises: [
+          ex('Goblet squat con kettlebell', 3, '10-12', 90, 'forza'),
+          ex('Clamshell con elastico', 3, '15 per lato', 45, 'forza'),
+          ex('Step-up laterale su box', 3, '10 per gamba', 90, 'funzionale'),
+          ex('Bird dog', 3, '8-10 per lato', 45, 'posturale'),
+          ex('Gatto-cammello (mobilità colonna)', 2, '10-12 cicli', 30, 'mobilita'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- DONNA · DRENANTE ----------
+  {
+    id: 'female-drenante-essere',
+    name: 'Gambe Leggere - Circolazione & Drenaggio',
+    description: 'Pensato per alleggerire le gambe: movimento continuo a basso carico e alte ripetizioni, camminata in salita e mobilità. La pompa muscolare che aiuta il ritorno venoso.',
+    gender: 'female',
+    category: 'Drenante',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Circuito pompa',
+        notes: 'Pesi leggeri, ritmo continuo, mai a cedimento: il muscolo che si contrae e rilascia è una pompa',
+        exercises: [
+          ex('Squat con elastico', 3, '20', 45, 'funzionale'),
+          ex('Ponte glutei con elastico', 3, '20', 45, 'forza'),
+          ex('Calf raise in piedi', 4, '20-25', 30, 'forza', '', 'Il polpaccio è il "secondo cuore": qui si lavora tanto e leggero'),
+          ex('Glute bridge march', 3, '10-12 per gamba', 45, 'funzionale'),
+          ex('Camminata in salita su tapis roulant', 1, '15-20 min', 0, 'cardio'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Camminata & mobilità',
+        notes: 'Giorno leggero: si muove tutto, non si affatica niente',
+        exercises: [
+          ex('Camminata in salita su tapis roulant', 1, '30 min', 0, 'cardio', '', 'Pendenza moderata, passo che permette di parlare'),
+          ex('Gatto-cammello (mobilità colonna)', 2, '10 cicli', 30, 'mobilita'),
+          ex('Stretching flessori dell\'anca', 2, '30-40 sec per lato', 20, 'stretching'),
+          ex('Jumping jack', 3, '30 sec', 45, 'cardio'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Circuito total leg',
+        notes: 'Serie Gigante leggera: 3 esercizi di fila, poi respiro',
+        exercises: [
+          ex('Sumo squat con manubrio', 3, '15', 60, 'forza', '', 'Serie Gigante: sumo + abduzioni + calf, senza pausa',
+            { technique: 'giant_set', giantExercises: [
+              { name: 'Abductor machine', reps: '20' },
+              { name: 'Calf raise in piedi', reps: '20' },
+            ] }),
+          ex('Affondi laterali', 3, '10 per lato', 60, 'forza'),
+          ex('Wall sit (sedia al muro)', 3, '30 sec', 60, 'funzionale'),
+          ex('Camminata in salita su tapis roulant', 1, '15 min', 0, 'cardio'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- DONNA · RICOMPOSIZIONE ----------
+  {
+    id: 'female-ricomposizione-essere',
+    name: 'Ricomposizione Corporea - Forza & Metabolico',
+    description: 'Tre giorni full body: carichi veri sui fondamentali per costruire muscolo, finale metabolico per il dispendio. La strada seria per cambiare composizione, non solo peso.',
+    gender: 'female',
+    category: 'Ricomposizione',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Full Body A',
+        notes: 'La forza costruisce, il metabolico rifinisce',
+        exercises: [
+          ex('Goblet squat con kettlebell', 4, '8-10', 120, 'forza', '', 'Carico vero: le ultime 2 reps devono costare'),
+          ex('Panca piana con manubri', 4, '8-10', 120, 'forza'),
+          ex('Rematore con manubrio', 3, '10 per lato', 90, 'forza'),
+          ex('Hip thrust con bilanciere', 4, '10-12', 90, 'forza'),
+          ex('Swing con kettlebell', 3, '15-20', 60, 'funzionale', '', 'Finale metabolico: cuore alto, tecnica pulita'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Full Body B',
+        notes: 'Tirare, spingere, camminare',
+        exercises: [
+          ex('Stacco rumeno con manubri', 4, '8-10', 120, 'forza'),
+          ex('Trazioni assistite alla macchina', 4, '6-10', 120, 'forza', '', 'Ogni settimana un po\' meno assistenza'),
+          ex('Shoulder press machine', 3, '10-12', 90, 'forza'),
+          ex('Affondi camminati con manubri', 3, '10 per gamba', 90, 'forza'),
+          ex('Plank frontale', 3, '30-45s', 45, 'funzionale'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Full Body C + circuito',
+        notes: 'Superflusso glutei + finale che accende il metabolismo',
+        exercises: [
+          ex('Sumo squat con manubrio', 4, '10-12', 90, 'forza'),
+          ex('Hip thrust con bilanciere', 3, '10-12', 90, 'forza', '', 'Superflusso: hip thrust + frog pump senza pausa',
+            { technique: 'compound_set', pairedExerciseName: 'Frog pump con manubrio', pairedReps: '15' }),
+          ex('Pulley basso', 3, '10-12', 90, 'forza'),
+          ex('Slam ball', 3, '10-12', 60, 'funzionale'),
+          ex('Burpees', 3, '8-10', 90, 'cardio', '', 'Finale: ritmo costante, forma pulita'),
+        ],
+      },
+    ],
+  },
+];
+
 // Tutti i template combinati
-export const allTemplates: WorkoutTemplate[] = [...maleTemplates, ...femaleTemplates];
+export const allTemplates: WorkoutTemplate[] = [...maleTemplates, ...femaleTemplates, ...essereTemplates];
