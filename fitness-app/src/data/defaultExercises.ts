@@ -665,4 +665,323 @@ export const femaleExercises: DefaultExercise[] = [
   },
 ];
 
-export const allDefaultExercises: DefaultExercise[] = [...maleExercises, ...femaleExercises];
+// ============================================================
+// ESPANSIONE LIBRERIA v2 — 25 UOMO (richiesta founder lug 2026)
+// ============================================================
+
+export const maleExercisesExtra: DefaultExercise[] = [
+  {
+    name: 'Panca declinata con bilanciere',
+    description: 'Sdraiati sulla panca declinata con le caviglie bloccate. Impugna il bilanciere poco più largo delle spalle, scapole retratte. Abbassa il bilanciere in controllo verso la parte bassa del petto e spingi verso l\'alto senza bloccare del tutto i gomiti. Enfasi sui fasci inferiori del pettorale.',
+    sets: 4, reps: '8-10', restSeconds: 120, category: 'forza',
+    notes: 'Non rimbalzare il bilanciere sul petto.', gender: 'male',
+  },
+  {
+    name: 'Croci con manubri su panca piana',
+    description: 'Sdraiato con un manubrio per mano sopra il petto, palmi che si fronteggiano e gomiti leggermente flessi. Apri le braccia in un ampio arco fino a sentire allungare il petto, senza scendere oltre la linea delle spalle. Richiudi come per abbracciare un albero, stesso arco.',
+    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Gomiti morbidi e fissi: il movimento è delle spalle, non dei gomiti.', gender: 'male',
+  },
+  {
+    name: 'Chest press machine',
+    description: 'Regola il sedile in modo che le maniglie siano all\'altezza del petto. Schiena e capo appoggiati, spingi le maniglie in avanti espirando fino quasi a distendere i gomiti, poi torna in controllo. Ottima per lavorare il petto in sicurezza vicino al cedimento.',
+    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Scapole appoggiate allo schienale per tutta la serie.', gender: 'male',
+  },
+  {
+    name: 'Trazioni presa supina (chin-up)',
+    description: 'Appenditi alla sbarra con presa supina (palmi verso di te) a larghezza spalle. Parti da braccia distese, tira il petto verso la sbarra portando i gomiti verso i fianchi. Scendi in controllo completo. Forte coinvolgimento di dorso e bicipiti.',
+    sets: 4, reps: 'max', restSeconds: 150, category: 'forza',
+    notes: 'Niente slanci: se non salgi, usa l\'elastico di assistenza.', gender: 'male',
+  },
+  {
+    name: 'Pendlay row',
+    description: 'Bilanciere a terra, busto parallelo al pavimento, schiena neutra. Tira esplosivamente il bilanciere al petto basso e riappoggialo a terra a ogni ripetizione, resettando la posizione. Costruisce forza pura nel dorso.',
+    sets: 4, reps: '6-8', restSeconds: 150, category: 'forza',
+    notes: 'Il busto resta fermo: tira il bilanciere verso di te, non te verso il bilanciere.', gender: 'male',
+  },
+  {
+    name: 'Rematore inverso al TRX',
+    description: 'Impugna le maniglie del TRX, corpo in linea inclinato all\'indietro, talloni a terra. Tira il petto verso le maniglie stringendo le scapole, poi scendi in controllo. Più cammini avanti coi piedi, più è difficile.',
+    sets: 3, reps: '10-15', restSeconds: 90, category: 'funzionale',
+    notes: 'Corpo rigido come una tavola: glutei e core sempre attivi.', gender: 'male',
+  },
+  {
+    name: 'Lat machine presa triangolo',
+    description: 'Aggancia il triangolo al cavo alto. Seduto con le cosce bloccate, tira il triangolo al petto tenendo il busto appena inclinato indietro e i gomiti stretti al corpo. Chiudi le scapole in basso a fine tirata, poi risali in controllo.',
+    sets: 4, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Petto in fuori verso il triangolo a ogni ripetizione.', gender: 'male',
+  },
+  {
+    name: 'Alzate posteriori con manubri',
+    description: 'Busto flesso in avanti quasi parallelo al pavimento, manubri leggeri sotto il petto con gomiti morbidi. Apri le braccia lateralmente fino alla linea delle spalle, mirando con i gomiti al soffitto. Deltoide posteriore: fondamentale per spalle sane.',
+    sets: 3, reps: '12-15', restSeconds: 60, category: 'forza',
+    notes: 'Peso leggero, esecuzione perfetta: qui l\'ego non serve.', gender: 'male',
+  },
+  {
+    name: 'Push press con bilanciere',
+    description: 'Bilanciere ai clavicoli, presa poco più larga delle spalle. Piccolo piegamento di gambe e spinta esplosiva: gambe e spalle insieme portano il bilanciere sopra la testa. Blocca in alto con il capo "attraverso" le braccia, scendi in controllo.',
+    sets: 4, reps: '5-6', restSeconds: 150, category: 'forza',
+    notes: 'Il drive parte dalle gambe: è la loro spinta che fa il lavoro extra.', gender: 'male',
+  },
+  {
+    name: 'Alzate frontali con disco',
+    description: 'In piedi, disco impugnato ai lati come un volante. Solleva il disco a braccia semi-tese fino all\'altezza degli occhi, pausa di un secondo, scendi in controllo. Deltoide anteriore e core anti-estensione.',
+    sets: 3, reps: '10-12', restSeconds: 60, category: 'forza',
+    notes: 'Non inarcare la zona lombare: glutei contratti.', gender: 'male',
+  },
+  {
+    name: 'Curl alla panca Scott',
+    description: 'Braccia appoggiate sul piano inclinato della panca Scott, bilanciere EZ in presa supina. Fletti i gomiti portando il bilanciere verso le spalle senza staccare i tricipiti dal piano, scendi fino a quasi distendere. Isolamento totale del bicipite.',
+    sets: 3, reps: '8-10', restSeconds: 90, category: 'forza',
+    notes: 'Non distendere di colpo i gomiti in basso: scendi frenando.', gender: 'male',
+  },
+  {
+    name: 'Curl concentrato con manubrio',
+    description: 'Seduto, gomito appoggiato all\'interno della coscia, manubrio a braccio disteso. Fletti portando il manubrio alla spalla con una torsione del polso (supinazione), strizza il bicipite in alto, scendi lentamente.',
+    sets: 3, reps: '10-12', restSeconds: 60, category: 'forza',
+    notes: 'Il gomito resta incollato alla coscia: zero slanci.', gender: 'male',
+  },
+  {
+    name: 'Curl inverso con bilanciere EZ',
+    description: 'Impugna il bilanciere EZ in presa prona (palmi verso il basso). Fletti i gomiti tenendoli fermi ai fianchi, portando il bilanciere verso le spalle. Lavora brachiale e avambracci: la presa che manca a molti.',
+    sets: 3, reps: '10-12', restSeconds: 60, category: 'forza',
+    notes: 'Polsi dritti e bloccati per tutta la serie.', gender: 'male',
+  },
+  {
+    name: 'Estensioni tricipiti al cavo con corda',
+    description: 'Al cavo alto con la corda, gomiti fissi ai fianchi. Distendi le braccia verso il basso aprendo le estremità della corda a fine corsa, poi risali in controllo fino ai gomiti a 90 gradi. L\'apertura finale accende il capo laterale.',
+    sets: 3, reps: '12-15', restSeconds: 60, category: 'forza',
+    notes: 'Solo l\'avambraccio si muove: gomiti inchiodati.', gender: 'male',
+  },
+  {
+    name: 'Kickback tricipiti con manubrio',
+    description: 'Busto flesso, braccio con il gomito alto e fermo lungo il fianco. Distendi l\'avambraccio all\'indietro fino al braccio completamente teso, strizza un secondo, torna a 90 gradi in controllo.',
+    sets: 3, reps: '12-15', restSeconds: 60, category: 'forza',
+    notes: 'A braccio teso il tricipite lavora al massimo: fermati un attimo lì.', gender: 'male',
+  },
+  {
+    name: 'Estensioni tricipiti sopra la testa al cavo',
+    description: 'Di spalle al cavo basso, corda dietro la nuca, gomiti al cielo vicino alle orecchie. Distendi le braccia in avanti-alto fino al blocco, poi torna in controllo dietro la testa. Massimo allungamento del capo lungo.',
+    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Gomiti stretti: non farli sparare verso l\'esterno.', gender: 'male',
+  },
+  {
+    name: 'Goblet squat con kettlebell',
+    description: 'Kettlebell al petto tenuta a due mani come un calice. Scendi in squat tenendo il busto eretto e i gomiti che scivolano all\'interno delle ginocchia, risali spingendo il pavimento. Insegna lo squat perfetto a chiunque.',
+    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Il peso davanti ti aiuta a stare eretto: sfruttalo.', gender: 'male',
+  },
+  {
+    name: 'Affondi inversi con bilanciere',
+    description: 'Bilanciere sulle spalle come nello squat. Fai un passo indietro e scendi finché il ginocchio posteriore sfiora il pavimento, poi risali spingendo sul tallone della gamba avanti. Più stabile e più sicuro per le ginocchia dell\'affondo in avanti.',
+    sets: 3, reps: '8-10 per gamba', restSeconds: 120, category: 'forza',
+    notes: 'Busto verticale, passo abbastanza lungo da tenere la tibia avanti verticale.', gender: 'male',
+  },
+  {
+    name: 'Swing con kettlebell',
+    description: 'Piedi poco oltre le spalle, kettlebell a terra davanti. Cerniera d\'anca: porta la kettlebell tra le gambe e proietta i fianchi in avanti con forza, facendola salire all\'altezza del petto a braccia rilassate. Non è uno squat: è un colpo d\'anca.',
+    sets: 4, reps: '15-20', restSeconds: 90, category: 'funzionale',
+    notes: 'Glutei che sparano avanti, braccia che seguono: mai sollevare con le spalle.', gender: 'male',
+  },
+  {
+    name: "Farmer's walk con manubri",
+    description: 'Due manubri pesanti ai fianchi, spalle indietro e basse, core attivo. Cammina a passi controllati per la distanza o il tempo stabiliti. Forza di presa, trapezi, core e mentalità: l\'esercizio più semplice e più completo che esista.',
+    sets: 3, reps: '30-40 metri', restSeconds: 120, category: 'funzionale',
+    notes: 'Postura da re: se ti pieghi, il peso è troppo.', gender: 'male',
+  },
+  {
+    name: 'Box jump',
+    description: 'Di fronte a un box stabile, piegamento rapido e salto esplosivo portando i piedi interi sul box. Atterra dolce a ginocchia flesse, distenditi in piedi, SCENDI con un passo (mai saltando giù). Potenza pura per le gambe.',
+    sets: 4, reps: '5-6', restSeconds: 120, category: 'funzionale',
+    notes: 'Scendere camminando: il salto giù è dove ci si fa male.', gender: 'male',
+  },
+  {
+    name: 'Burpees',
+    description: 'Dalla stazione eretta: mani a terra, piedi indietro in plank, piegamento sulle braccia, piedi di nuovo sotto e salto verticale con battito di mani sopra la testa. Il condizionamento totale in un solo movimento.',
+    sets: 4, reps: '10-15', restSeconds: 90, category: 'cardio',
+    notes: 'Ritmo costante batte velocità sporca.', gender: 'male',
+  },
+  {
+    name: 'Ab wheel rollout',
+    description: 'In ginocchio con la ruota sotto le spalle. Rotola in avanti tenendo bacino leggermente retroverso e core serrato, fino al massimo punto che controlli SENZA inarcare la schiena. Torna tirando con gli addominali.',
+    sets: 3, reps: '8-12', restSeconds: 90, category: 'forza',
+    notes: 'La schiena non deve mai cedere in avanti: meglio corto e perfetto.', gender: 'male',
+  },
+  {
+    name: 'Sollevamento gambe alla sbarra',
+    description: 'Appeso alla sbarra a braccia tese, solleva le gambe (piegate per iniziare, tese da avanzato) fino alle anche a 90 gradi o oltre, con retroversione finale del bacino. Scendi in controllo senza dondolare.',
+    sets: 3, reps: '8-12', restSeconds: 90, category: 'forza',
+    notes: 'È il bacino che si arrotola, non le gambe che dondolano.', gender: 'male',
+  },
+  {
+    name: 'Vogatore (remoergometro)',
+    description: 'Sequenza: spinta di gambe, apertura del busto, tirata delle braccia al costato — e ritorno in ordine inverso. Gambe 60%, busto 30%, braccia 10%. Cardio totale a impatto zero sulle articolazioni.',
+    sets: 1, reps: '10-20 min', restSeconds: 0, category: 'cardio',
+    notes: 'Le braccia tirano per ultime: chi tira prima con le braccia rema male.', gender: 'male',
+  },
+];
+
+// ============================================================
+// ESPANSIONE LIBRERIA v2 — 25 DONNA (richiesta founder lug 2026)
+// ============================================================
+
+export const femaleExercisesExtra: DefaultExercise[] = [
+  {
+    name: 'Hip thrust monopodalico',
+    description: 'Schiena appoggiata alla panca, un piede a terra e l\'altra gamba sollevata. Spingi sul tallone a terra portando il bacino in massima estensione, strizza il gluteo 2 secondi in alto, scendi in controllo. Doppia intensità per lato, zero bilanciere.',
+    sets: 3, reps: '10-12 per gamba', restSeconds: 90, category: 'forza',
+    notes: 'Mento verso il petto e costole chiuse: spinge il gluteo, non la lombare.', gender: 'female',
+  },
+  {
+    name: 'Frog pump con manubrio',
+    description: 'Sdraiata, piante dei piedi unite e ginocchia aperte a farfalla, manubrio sul bacino. Spingi il bacino verso l\'alto strizzando i glutei, piccola pausa in cima, scendi senza appoggiare del tutto. Pompaggio mirato del grande gluteo.',
+    sets: 3, reps: '15-20', restSeconds: 60, category: 'forza',
+    notes: 'Serie lunghe e bruciore: qui si cerca il pump.', gender: 'female',
+  },
+  {
+    name: 'Glute bridge march',
+    description: 'Dalla posizione di ponte glutei alto, solleva un ginocchio verso il petto senza far scendere o ruotare il bacino, riappoggia e alterna. Glutei e core anti-rotazione insieme.',
+    sets: 3, reps: '10-12 per gamba', restSeconds: 60, category: 'funzionale',
+    notes: 'Il bacino resta una tavola: se balla, rallenta.', gender: 'female',
+  },
+  {
+    name: 'Pull-through al cavo',
+    description: 'Di spalle al cavo basso, corda tra le gambe. Cerniera d\'anca: fianchi indietro con schiena neutra finché senti allungare i femorali, poi estendi i fianchi strizzando i glutei a fine corsa. Insegna lo stacco senza caricare la schiena.',
+    sets: 3, reps: '12-15', restSeconds: 90, category: 'forza',
+    notes: 'Sono i fianchi che vanno avanti e indietro, le braccia solo corde.', gender: 'female',
+  },
+  {
+    name: 'Stacco sumo con bilanciere',
+    description: 'Piedi molto larghi, punte aperte, presa al centro del bilanciere a braccia verticali. Spingi il pavimento con le gambe tenendo il petto alto e il bilanciere rasente al corpo, blocca in piedi strizzando i glutei. Meno stress lombare dello stacco classico.',
+    sets: 4, reps: '6-8', restSeconds: 150, category: 'forza',
+    notes: 'Ginocchia che seguono le punte: apri, non chiudere.', gender: 'female',
+  },
+  {
+    name: 'Abduzioni anca al cavo in piedi',
+    description: 'Cavigliera al cavo basso, fianco al cavo. Porta la gamba esterna lateralmente in alto tenendo il busto fermo, torna in controllo resistendo al cavo. Medio gluteo in isolamento: la chiave dei fianchi stabili.',
+    sets: 3, reps: '12-15 per gamba', restSeconds: 60, category: 'forza',
+    notes: 'Poco peso e niente inclinazioni del busto: il movimento è solo dell\'anca.', gender: 'female',
+  },
+  {
+    name: 'Affondi laterali',
+    description: 'Passo laterale ampio: scendi piegando la gamba d\'appoggio e tenendo l\'altra tesa, bacino indietro e petto alto. Risali spingendo sul tallone e torna al centro. Interno coscia e glutei su un piano che si allena poco.',
+    sets: 3, reps: '10 per lato', restSeconds: 90, category: 'forza',
+    notes: 'Il ginocchio che si piega resta in linea con la punta del piede.', gender: 'female',
+  },
+  {
+    name: 'Wall sit (sedia al muro)',
+    description: 'Schiena completamente aderente al muro, scivola giù fino a cosce parallele al pavimento, ginocchia a 90 gradi sopra le caviglie. Tieni la posizione respirando regolarmente. Resistenza isometrica dei quadricipiti.',
+    sets: 3, reps: '30-60 sec', restSeconds: 90, category: 'funzionale',
+    notes: 'Tutta la schiena al muro: non barare salendo.', gender: 'female',
+  },
+  {
+    name: 'Step-up laterale su box',
+    description: 'Di fianco a un box basso, sali di lato spingendo solo sulla gamba sul box, senza slancio dell\'altra. Scendi in controllo frenando. Glutei e stabilità del ginocchio sul piano frontale.',
+    sets: 3, reps: '10 per gamba', restSeconds: 90, category: 'funzionale',
+    notes: 'La gamba a terra è solo un appoggio: non deve spingere.', gender: 'female',
+  },
+  {
+    name: 'Camminata in salita su tapis roulant',
+    description: 'Pendenza 10-15%, velocità 5-6.5 km/h, senza appoggiarsi ai corrimano. Passo naturale e braccia che oscillano. Il cardio più sottovalutato: glutei e femorali lavorano a ogni passo, impatto minimo.',
+    sets: 1, reps: '20-30 min', restSeconds: 0, category: 'cardio',
+    notes: 'Mani libere: aggrapparsi cancella metà del lavoro.', gender: 'female',
+  },
+  {
+    name: 'Jumping jack',
+    description: 'Salta aprendo gambe e braccia sopra la testa, richiudi con un secondo saltello. Ritmo costante, atterraggi morbidi sull\'avampiede. Riscaldamento e condizionamento a corpo libero.',
+    sets: 3, reps: '30-45 sec', restSeconds: 45, category: 'cardio',
+    notes: 'Atterra morbida: il rumore dei piedi è il tuo feedback.', gender: 'female',
+  },
+  {
+    name: 'Slam ball',
+    description: 'Palla zavorrata sopra la testa in massima estensione, poi scaraventala a terra con tutto il corpo piegandoti in squat, raccogli e ripeti. Potenza, core e sfogo: l\'esercizio anti-stress per eccellenza.',
+    sets: 4, reps: '10-12', restSeconds: 90, category: 'funzionale',
+    notes: 'Usa una palla NO-rimbalzo e schiena neutra quando la raccogli.', gender: 'female',
+  },
+  {
+    name: 'Rematore con elastico',
+    description: 'Elastico ancorato davanti a te all\'altezza del petto (o sotto i piedi da seduta). Tira le maniglie ai fianchi stringendo le scapole, torna in controllo. Dorso e postura, ovunque e senza attrezzi.',
+    sets: 3, reps: '15-20', restSeconds: 60, category: 'funzionale',
+    notes: 'Spalle lontane dalle orecchie: il collo non rema.', gender: 'female',
+  },
+  {
+    name: 'Trazioni assistite alla macchina',
+    description: 'Ginocchia sul pattino di assistenza, presa prona larga. Tira il petto verso la sbarra e scendi in completo controllo. Riduci l\'assistenza nel tempo: il percorso verso la prima trazione libera.',
+    sets: 4, reps: '6-10', restSeconds: 120, category: 'forza',
+    notes: 'Scegli un\'assistenza che ti lasci 1-2 reps di margine, non di più.', gender: 'female',
+  },
+  {
+    name: 'Shoulder press machine',
+    description: 'Sedile regolato con le maniglie all\'altezza delle spalle. Spingi verso l\'alto senza bloccare i gomiti, scendi in controllo fino alle orecchie. Spalle al sicuro, sovraccarico progressivo semplice.',
+    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
+    notes: 'Schiena aderente: non inarcare per spingere di più.', gender: 'female',
+  },
+  {
+    name: 'Alzate laterali al cavo',
+    description: 'Fianco al cavo basso, maniglia nella mano esterna. Solleva il braccio lateralmente fino alla linea della spalla con gomito morbido, scendi frenando la resistenza del cavo. Tensione continua che i manubri non danno.',
+    sets: 3, reps: '12-15 per lato', restSeconds: 60, category: 'forza',
+    notes: 'Guida il movimento col gomito, non con la mano.', gender: 'female',
+  },
+  {
+    name: 'Push-up inclinati (mani su panca)',
+    description: 'Mani sulla panca poco più larghe delle spalle, corpo in linea dalla testa ai talloni. Scendi col petto verso la panca e spingi. Più la mano è in alto, più è facile: la scala perfetta verso il push-up completo.',
+    sets: 3, reps: '10-15', restSeconds: 90, category: 'funzionale',
+    notes: 'Bacino in linea: né su né giù.', gender: 'female',
+  },
+  {
+    name: 'Curl alternato con manubri',
+    description: 'In piedi, manubri lungo i fianchi con palmi in avanti. Fletti un braccio alla volta portando il manubrio alla spalla, scendi in controllo mentre l\'altro parte. Concentrazione totale su un bicipite alla volta.',
+    sets: 3, reps: '10-12 per braccio', restSeconds: 60, category: 'forza',
+    notes: 'Gomiti fermi ai fianchi: se avanzano, è slancio.', gender: 'female',
+  },
+  {
+    name: 'Dip tra panche (tricipiti)',
+    description: 'Mani sul bordo della panca dietro di te, gambe distese avanti (o piegate per facilitare). Piega i gomiti scendendo col bacino vicino alla panca, spingi fino a braccia tese. Tricipiti a corpo libero, difficoltà regolabile coi piedi.',
+    sets: 3, reps: '10-15', restSeconds: 90, category: 'forza',
+    notes: 'Gomiti indietro, non aperti; spalle lontane dalle orecchie.', gender: 'female',
+  },
+  {
+    name: 'Crunch su fitball',
+    description: 'Zona lombare appoggiata sulla palla, piedi a terra larghi. Arrotola il busto sollevando le scapole, senza tirare il collo, e torna in leggera estensione sulla palla. Escursione maggiore del crunch a terra.',
+    sets: 3, reps: '15-20', restSeconds: 60, category: 'forza',
+    notes: 'Lo sguardo al soffitto: le mani non tirano la testa.', gender: 'female',
+  },
+  {
+    name: 'Dead bug',
+    description: 'Supina, braccia al soffitto e ginocchia a 90 gradi. Distendi lentamente braccio e gamba OPPOSTI verso il pavimento tenendo la zona lombare incollata a terra, torna e alterna. Il core anti-estensione fatto bene.',
+    sets: 3, reps: '8-10 per lato', restSeconds: 60, category: 'funzionale',
+    notes: 'Se la lombare si stacca da terra, riduci l\'escursione.', gender: 'female',
+  },
+  {
+    name: 'Bird dog',
+    description: 'In quadrupedia, distendi contemporaneamente braccio e gamba opposti fino alla linea del busto, pausa di 2 secondi senza ruotare il bacino, torna e alterna. Stabilità di colonna e coordinazione.',
+    sets: 3, reps: '8-10 per lato', restSeconds: 45, category: 'posturale',
+    notes: 'Immagina un bicchiere pieno sulla schiena: non deve cadere.', gender: 'female',
+  },
+  {
+    name: 'Hollow hold',
+    description: 'Supina, braccia oltre la testa e gambe distese sollevate: solleva spalle e gambe formando una "banana" con la lombare premuta a terra. Tieni la posizione respirando. Il core degli atleti.',
+    sets: 3, reps: '20-40 sec', restSeconds: 60, category: 'funzionale',
+    notes: 'Più le gambe sono basse più è dura: regola l\'altezza, non la forma.', gender: 'female',
+  },
+  {
+    name: 'Gatto-cammello (mobilità colonna)',
+    description: 'In quadrupedia, alterna lentamente massima flessione della colonna (schiena a cupola, mento al petto) e massima estensione (pancia giù, sguardo avanti), seguendo il respiro. Vertebra per vertebra.',
+    sets: 2, reps: '10-12 cicli', restSeconds: 30, category: 'mobilita',
+    notes: 'Lentezza: ogni ciclo dura almeno 4-5 secondi.', gender: 'female',
+  },
+  {
+    name: 'Stretching flessori dell\'anca',
+    description: 'In affondo con ginocchio posteriore a terra, bacino in leggera retroversione: spingi dolcemente i fianchi in avanti finché senti allungare la parte anteriore dell\'anca posteriore. Tieni 30-40 secondi respirando, poi cambia lato. L\'antidoto alle ore da seduti.',
+    sets: 2, reps: '30-40 sec per lato', restSeconds: 20, category: 'stretching',
+    notes: 'La retroversione del bacino È lo stretching: senza, si allunga poco.', gender: 'female',
+  },
+];
+
+export const allDefaultExercises: DefaultExercise[] = [
+  ...maleExercises,
+  ...femaleExercises,
+  ...maleExercisesExtra,
+  ...femaleExercisesExtra,
+];

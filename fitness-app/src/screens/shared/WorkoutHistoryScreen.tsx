@@ -292,6 +292,9 @@ export const WorkoutHistoryScreen: React.FC = () => {
                           {ex.technique && ex.technique !== 'standard' && ` · ${
                             ex.technique === 'rest_pause' ? 'Serie Interrotte' :
                             ex.technique === 'rest_pause_failure' ? 'Rest-Pause' :
+                            ex.technique === 'superset' ? 'Super Set' :
+                            ex.technique === 'compound_set' ? 'Superflusso' :
+                            ex.technique === 'giant_set' ? 'Serie Gigante' :
                             ex.technique === 'stripping' ? 'Stripping' :
                             ex.technique === 'pyramid' ? 'Piramidali' :
                             ex.technique === 'tempo' ? `Tempo ${ex.targetTempoNotation || ''}` :

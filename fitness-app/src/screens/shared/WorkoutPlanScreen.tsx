@@ -85,6 +85,12 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exMiniSets, setExMiniSets] = useState('4');
   const [exRpPauses, setExRpPauses] = useState('2');
   const [exRpRest, setExRpRest] = useState('15');
+  const [exPairedName, setExPairedName] = useState('');
+  const [exPairedReps, setExPairedReps] = useState('');
+  const [exGiantList, setExGiantList] = useState<Array<{ name: string; reps: string }>>([
+    { name: '', reps: '' },
+    { name: '', reps: '' },
+  ]);
   const [exMiniReps, setExMiniReps] = useState('6');
   const [exMiniRest, setExMiniRest] = useState('20');
   const [exStripDrops, setExStripDrops] = useState('3');
@@ -530,6 +536,15 @@ export const WorkoutPlanScreen: React.FC = () => {
         rpPauses: parseInt(exRpPauses, 10) || 2,
         rpRestSeconds: parseInt(exRpRest, 10) || 15,
       } : {}),
+      ...(exTechnique === 'superset' || exTechnique === 'compound_set' ? {
+        pairedExerciseName: exPairedName.trim(),
+        pairedReps: exPairedReps || exReps,
+      } : {}),
+      ...(exTechnique === 'giant_set' ? {
+        giantExercises: exGiantList
+          .filter((g) => g.name.trim())
+          .map((g) => ({ name: g.name.trim(), reps: g.reps || '10' })),
+      } : {}),
       ...(exTechnique === 'stripping' ? {
         stripDrops: parseInt(exStripDrops, 10) || 3,
         stripRepsPerDrop: exStripRepsPerDrop || '8',
@@ -651,6 +666,13 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExMiniRest(String(ex.miniRestSeconds || 20));
     setExRpPauses(String(ex.rpPauses || 2));
     setExRpRest(String(ex.rpRestSeconds || 15));
+    setExPairedName(ex.pairedExerciseName || '');
+    setExPairedReps(ex.pairedReps || '');
+    setExGiantList(
+      ex.giantExercises && ex.giantExercises.length > 0
+        ? ex.giantExercises.map((g) => ({ name: g.name, reps: g.reps }))
+        : [{ name: '', reps: '' }, { name: '', reps: '' }]
+    );
     setExStripDrops(String(ex.stripDrops || 3));
     setExStripRepsPerDrop(ex.stripRepsPerDrop || '8');
     setExStripMaxDropPct(String(ex.stripMaxDropPct || 50));
@@ -993,6 +1015,9 @@ export const WorkoutPlanScreen: React.FC = () => {
                         <Text style={styles.restPauseBadge}>
                           {ex.technique === 'rest_pause' && `Serie Interrotte: ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
                           {ex.technique === 'rest_pause_failure' && `Rest-Pause: serie a cedimento + ${ex.rpPauses || 2} paus${(ex.rpPauses || 2) === 1 ? 'a' : 'e'} da ${ex.rpRestSeconds || 15}s, mini-serie a cedimento`}
+                          {ex.technique === 'superset' && `Super Set con ${ex.pairedExerciseName || 'antagonista'} (${ex.pairedReps || ex.reps} reps) — senza pausa`}
+                          {ex.technique === 'compound_set' && `Superflusso con ${ex.pairedExerciseName || 'secondo esercizio'} (${ex.pairedReps || ex.reps} reps) — senza pausa`}
+                          {ex.technique === 'giant_set' && `Serie Gigante: ${ex.name} + ${(ex.giantExercises || []).map((g) => `${g.name} (${g.reps})`).join(' + ')} · pausa tra giri ${ex.restSeconds}s`}
                           {ex.technique === 'stripping' && `Stripping: ${ex.stripDrops || 3} scarichi da ${ex.stripRepsPerDrop || '8'} reps (max -${ex.stripMaxDropPct || 50}%)`}
                           {ex.technique === 'pyramid' && `Piramidali: ${ex.pyramidType === 'ascending' ? 'ascendente ↑' : ex.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
                           {ex.technique === 'tempo' && `Tempo: ${ex.tempoNotation || '4-1-2-0'}`}
@@ -1127,6 +1152,9 @@ export const WorkoutPlanScreen: React.FC = () => {
                 { key: 'standard', label: 'Normale' },
                 { key: 'rest_pause', label: 'Serie Interrotte' },
                 { key: 'rest_pause_failure', label: 'Rest-Pause' },
+                { key: 'superset', label: 'Super Set' },
+                { key: 'compound_set', label: 'Superflusso' },
+                { key: 'giant_set', label: 'Serie Gigante' },
                 { key: 'stripping', label: 'Stripping' },
                 { key: 'pyramid', label: 'Piramidali' },
                 { key: 'tempo', label: 'Tempo' },
@@ -1213,6 +1241,79 @@ export const WorkoutPlanScreen: React.FC = () => {
                     />
                   </View>
                 </View>
+              </View>
+            )}
+
+            {(exTechnique === 'superset' || exTechnique === 'compound_set') && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  {exTechnique === 'superset'
+                    ? "Super Set: l'esercizio qui sopra è l'AGONISTA; subito dopo, SENZA pausa, si esegue l'esercizio ANTAGONISTA (es. bicipiti + tricipiti). La pausa dopo la coppia è il Recupero dell'esercizio."
+                    : 'Superflusso: STESSO muscolo con due esercizi diversi, uno di seguito all\'altro senza pausa (es. panca piana + croci). La pausa dopo la coppia è il Recupero dell\'esercizio.'}
+                </Text>
+                <InputField
+                  label={exTechnique === 'superset' ? 'Esercizio antagonista' : 'Secondo esercizio (stesso muscolo)'}
+                  value={exPairedName}
+                  onChangeText={setExPairedName}
+                  placeholder={exTechnique === 'superset' ? 'Es. Pushdown ai cavi' : 'Es. Croci con manubri'}
+                />
+                <InputField
+                  label="Ripetizioni del secondo esercizio"
+                  value={exPairedReps}
+                  onChangeText={setExPairedReps}
+                  placeholder="Es. 12"
+                />
+              </View>
+            )}
+
+            {exTechnique === 'giant_set' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie Gigante: più esercizi concatenati SENZA pausa (l'esercizio
+                  qui sopra è il primo). Le Serie sono i giri completi; la pausa
+                  tra un giro e l'altro è il Recupero dell'esercizio.
+                </Text>
+                {exGiantList.map((g, i) => (
+                  <View key={i} style={styles.row}>
+                    <View style={{ flex: 2, marginRight: 8 }}>
+                      <InputField
+                        label={`Esercizio ${i + 2}`}
+                        value={g.name}
+                        onChangeText={(v: string) =>
+                          setExGiantList((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)))
+                        }
+                        placeholder="Nome esercizio"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <InputField
+                        label="Reps"
+                        value={g.reps}
+                        onChangeText={(v: string) =>
+                          setExGiantList((prev) => prev.map((x, j) => (j === i ? { ...x, reps: v } : x)))
+                        }
+                        placeholder="10"
+                      />
+                    </View>
+                    {exGiantList.length > 1 && (
+                      <TouchableOpacity
+                        style={{ justifyContent: 'flex-end', paddingBottom: 18, paddingLeft: 6 }}
+                        onPress={() => setExGiantList((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <Ionicons name="close-circle" size={22} color={colors.error} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {exGiantList.length < 5 && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                    onPress={() => setExGiantList((prev) => [...prev, { name: '', reps: '' }])}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+                    <Text style={{ color: colors.accent, fontWeight: '600' }}>Aggiungi esercizio al giro</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 

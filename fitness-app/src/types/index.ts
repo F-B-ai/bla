@@ -122,7 +122,16 @@ export type ExerciseTechnique =
   | 'cluster'
   | 'negative'
   | 'emom'
-  | 'cumulative';
+  | 'cumulative'
+  | 'superset'
+  | 'compound_set'
+  | 'giant_set';
+
+// Esercizio concatenato dentro una Serie Gigante
+export interface GiantSetExercise {
+  name: string;
+  reps: string;
+}
 
 export interface Exercise {
   id: string;
@@ -144,6 +153,13 @@ export interface Exercise {
   // le mini-serie dopo ogni pausa sono a cedimento (reps libere)
   rpPauses?: number;
   rpRestSeconds?: number;
+  // Super Set (antagonista) / Superflusso (stesso muscolo):
+  // secondo esercizio eseguito SUBITO dopo, senza pausa
+  pairedExerciseName?: string;
+  pairedReps?: string;
+  // Serie Gigante: N esercizi concatenati senza pausa;
+  // la pausa tra un giro e l'altro è restSeconds dell'esercizio
+  giantExercises?: GiantSetExercise[];
   // Stripping (drop sets)
   stripDrops?: number;
   stripRepsPerDrop?: string;
@@ -656,6 +672,11 @@ export interface ExerciseLog {
   // Rest-Pause a cedimento
   targetRpPauses?: number;
   targetRpRestSeconds?: number;
+  // Super Set / Superflusso
+  targetPairedExerciseName?: string;
+  targetPairedReps?: string;
+  // Serie Gigante
+  targetGiantExercises?: GiantSetExercise[];
   // Stripping (drop sets)
   targetStripDrops?: number;
   targetStripRepsPerDrop?: string;
@@ -687,10 +708,13 @@ export interface ExerciseLog {
   supersetGroupId?: string;
 }
 
-// Dettaglio singola mini serie (per Serie Interrotte)
+// Dettaglio singola mini serie (per Serie Interrotte) o parte di una
+// serie concatenata (Super Set / Superflusso / Serie Gigante)
 export interface MiniSetLog {
   reps: number;
   restSeconds: number; // recupero preso dopo questa mini serie (0 per l'ultima)
+  weight?: number; // peso della singola parte (tecniche con esercizi diversi)
+  label?: string; // nome dell'esercizio della parte (tecniche concatenate)
 }
 
 // Dettaglio singolo drop (per Stripping)

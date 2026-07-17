@@ -153,6 +153,13 @@ export const LiveWorkoutScreen: React.FC = () => {
         targetRpPauses: ex.rpPauses || 2,
         targetRpRestSeconds: ex.rpRestSeconds || 15,
       } : {}),
+      ...(ex.technique === 'superset' || ex.technique === 'compound_set' ? {
+        targetPairedExerciseName: ex.pairedExerciseName || '',
+        targetPairedReps: ex.pairedReps || ex.reps,
+      } : {}),
+      ...(ex.technique === 'giant_set' ? {
+        targetGiantExercises: ex.giantExercises || [],
+      } : {}),
       ...(ex.technique === 'stripping' ? {
         targetStripDrops: ex.stripDrops || 3,
         targetStripRepsPerDrop: ex.stripRepsPerDrop || '8',
@@ -319,13 +326,29 @@ export const LiveWorkoutScreen: React.FC = () => {
     }
     // Record actual rest elapsed from previous mini-set timer (0 for the first)
     const restTaken = miniRestElapsed;
+    // Tecniche concatenate: ogni parte è un esercizio diverso → salva
+    // anche peso e nome della parte
+    const techNow = currentExercise?.technique;
+    const isCombo = techNow === 'superset' || techNow === 'compound_set' || techNow === 'giant_set';
+    const comboLabels: string[] = !isCombo || !currentExercise
+      ? []
+      : techNow === 'giant_set'
+      ? [currentExercise.exerciseName, ...(currentExercise.targetGiantExercises || []).map((g) => g.name)]
+      : [currentExercise.exerciseName, currentExercise.targetPairedExerciseName || 'Secondo esercizio'];
     // Update the previous mini-set's restSeconds with the actual time taken
     setCurrentMiniSets((prev) => {
       const updated = [...prev];
       if (updated.length > 0) {
         updated[updated.length - 1] = { ...updated[updated.length - 1], restSeconds: restTaken };
       }
-      return [...updated, { reps, restSeconds: 0 }];
+      return [...updated, {
+        reps,
+        restSeconds: 0,
+        ...(isCombo ? {
+          weight: parseFloat(inputWeight) || 0,
+          label: comboLabels[updated.length] || `Parte ${updated.length + 1}`,
+        } : {}),
+      }];
     });
     setMiniRepsInput('');
     setMiniRestElapsed(0);
@@ -340,8 +363,10 @@ export const LiveWorkoutScreen: React.FC = () => {
       ? (currentExercise?.targetCumulativeRestSeconds || 15)
       : tech === 'rest_pause_failure'
       ? (currentExercise?.targetRpRestSeconds || 15)
+      : (tech === 'superset' || tech === 'compound_set' || tech === 'giant_set')
+      ? 0 // concatenati: NESSUNA pausa tra le parti
       : (currentExercise?.targetMiniRestSeconds || 20);
-    startMiniRestTimer(targetRest);
+    if (targetRest > 0) startMiniRestTimer(targetRest);
   };
 
   const handleRemoveMiniSet = (index: number) => {
@@ -849,6 +874,21 @@ export const LiveWorkoutScreen: React.FC = () => {
                 REST-PAUSE · serie a cedimento + {currentExercise.targetRpPauses || 2} paus{(currentExercise.targetRpPauses || 2) === 1 ? 'a' : 'e'} da {currentExercise.targetRpRestSeconds || 15}s
               </Text>
             )}
+            {currentExercise.technique === 'superset' && (
+              <Text style={styles.restPauseTag}>
+                SUPER SET · con {currentExercise.targetPairedExerciseName || 'antagonista'} ({currentExercise.targetPairedReps}) · senza pausa
+              </Text>
+            )}
+            {currentExercise.technique === 'compound_set' && (
+              <Text style={styles.restPauseTag}>
+                SUPERFLUSSO · con {currentExercise.targetPairedExerciseName || 'secondo esercizio'} ({currentExercise.targetPairedReps}) · senza pausa
+              </Text>
+            )}
+            {currentExercise.technique === 'giant_set' && (
+              <Text style={styles.restPauseTag}>
+                SERIE GIGANTE · {1 + (currentExercise.targetGiantExercises || []).length} esercizi concatenati · senza pausa
+              </Text>
+            )}
             {currentExercise.technique === 'stripping' && (
               <Text style={styles.restPauseTag}>
                 STRIPPING · {currentExercise.targetStripDrops || 3} scarichi da {currentExercise.targetStripRepsPerDrop || '8'} reps · max -{currentExercise.targetStripMaxDropPct || 50}%
@@ -1085,10 +1125,10 @@ export const LiveWorkoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
-              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'rest_pause_failure' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster' || currentExercise.technique === 'cumulative') ? (
+              ) : (currentExercise.technique === 'rest_pause' || currentExercise.technique === 'rest_pause_failure' || currentExercise.technique === 'myo_reps' || currentExercise.technique === 'cluster' || currentExercise.technique === 'cumulative' || currentExercise.technique === 'superset' || currentExercise.technique === 'compound_set' || currentExercise.technique === 'giant_set') ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>
-                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'rest_pause_failure' ? 'Rest-Pause' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : currentExercise.technique === 'cumulative' ? 'Serie Cumulativa' : 'Cluster'}{' '}
+                    {currentExercise.technique === 'rest_pause' ? 'Serie Interrotta' : currentExercise.technique === 'rest_pause_failure' ? 'Rest-Pause' : currentExercise.technique === 'myo_reps' ? 'Myo-reps' : currentExercise.technique === 'cumulative' ? 'Serie Cumulativa' : currentExercise.technique === 'superset' ? 'Super Set' : currentExercise.technique === 'compound_set' ? 'Superflusso' : currentExercise.technique === 'giant_set' ? 'Giro' : 'Cluster'}{' '}
                     {currentExercise.sets.length + 1} di {currentExercise.targetSets}
                   </Text>
                   <Text style={styles.restPauseHint}>
@@ -1097,6 +1137,15 @@ export const LiveWorkoutScreen: React.FC = () => {
                     )}
                     {currentExercise.technique === 'rest_pause_failure' && (
                       `Serie principale A CEDIMENTO (peso da ${currentExercise.targetReps} reps), poi ${currentExercise.targetRpPauses || 2} paus${(currentExercise.targetRpPauses || 2) === 1 ? 'a' : 'e'} da ${currentExercise.targetRpRestSeconds || 15}s: dopo ogni pausa, di nuovo a cedimento. Registra le reps che escono.`
+                    )}
+                    {currentExercise.technique === 'superset' && (
+                      `${currentExercise.exerciseName} (${currentExercise.targetReps}) → SUBITO ${currentExercise.targetPairedExerciseName} (${currentExercise.targetPairedReps}), senza pausa. Registra ogni esercizio col suo peso.`
+                    )}
+                    {currentExercise.technique === 'compound_set' && (
+                      `${currentExercise.exerciseName} (${currentExercise.targetReps}) → SUBITO ${currentExercise.targetPairedExerciseName} (${currentExercise.targetPairedReps}), stesso muscolo, senza pausa. Registra ogni esercizio col suo peso.`
+                    )}
+                    {currentExercise.technique === 'giant_set' && (
+                      `Giro: ${[currentExercise.exerciseName, ...(currentExercise.targetGiantExercises || []).map((g) => g.name)].join(' → ')} — tutto senza pausa. Registra ogni esercizio col suo peso.`
                     )}
                     {currentExercise.technique === 'myo_reps' && (
                       `${currentMiniSets.length === 0 ? `Serie attivante: ${currentExercise.targetMyoActivationReps || '12'} reps` : `Mini serie: ${currentExercise.targetMyoMiniReps || '3'} reps · rec ${currentExercise.targetMyoRestSeconds || 5}s`} · tot ${(currentExercise.targetMyoMiniSets || 4) + 1} mini serie`
@@ -1128,7 +1177,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                       {currentMiniSets.map((m, i) => (
                         <View key={i} style={styles.miniSetRow}>
                           <Text style={styles.miniSetRowText}>
-                            {currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'rest_pause_failure' && i === 0 ? 'Principale' : currentExercise.technique === 'rest_pause_failure' ? `Dopo pausa ${i}` : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : currentExercise.technique === 'cumulative' ? `Gradino ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
+                            {m.label ? m.label : currentExercise.technique === 'myo_reps' && i === 0 ? 'Attivazione' : currentExercise.technique === 'rest_pause_failure' && i === 0 ? 'Principale' : currentExercise.technique === 'rest_pause_failure' ? `Dopo pausa ${i}` : currentExercise.technique === 'cluster' ? `Cluster ${i + 1}` : currentExercise.technique === 'cumulative' ? `Gradino ${i + 1}` : `Mini ${i + 1}`}: {m.reps} reps{m.weight ? ` · ${m.weight}kg` : ''}{m.restSeconds > 0 ? ` · rec ${m.restSeconds}s` : ''}
                           </Text>
                           <TouchableOpacity onPress={() => handleRemoveMiniSet(i)}>
                             <Ionicons name="close-circle" size={18} color={colors.error} />
@@ -1163,6 +1212,17 @@ export const LiveWorkoutScreen: React.FC = () => {
                           ? 'Serie principale — a cedimento'
                           : currentExercise.technique === 'rest_pause_failure'
                           ? `Dopo pausa ${currentMiniSets.length} di ${currentExercise.targetRpPauses || 2} — a cedimento`
+                          : (currentExercise.technique === 'superset' || currentExercise.technique === 'compound_set')
+                          ? (currentMiniSets.length === 0
+                              ? `1/2 · ${currentExercise.exerciseName} (${currentExercise.targetReps})`
+                              : `2/2 · ${currentExercise.targetPairedExerciseName} (${currentExercise.targetPairedReps}) — SUBITO, senza pausa`)
+                          : currentExercise.technique === 'giant_set'
+                          ? (() => {
+                              const names = [currentExercise.exerciseName, ...(currentExercise.targetGiantExercises || []).map((g) => g.name)];
+                              const repsList = [currentExercise.targetReps, ...(currentExercise.targetGiantExercises || []).map((g) => g.reps)];
+                              const i = Math.min(currentMiniSets.length, names.length - 1);
+                              return `${i + 1}/${names.length} · ${names[i]} (${repsList[i]})${i > 0 ? ' — senza pausa' : ''}`;
+                            })()
                           : currentExercise.technique === 'cluster'
                           ? `Cluster ${currentMiniSets.length + 1} di ${currentExercise.targetClusterSets || 5}`
                           : currentExercise.technique === 'cumulative'
@@ -1206,7 +1266,7 @@ export const LiveWorkoutScreen: React.FC = () => {
                     <TouchableOpacity style={styles.logSetButton} onPress={handleCompleteRestPauseSet}>
                       <Ionicons name="checkmark-circle" size={24} color={colors.white} />
                       <Text style={styles.logSetButtonText}>
-                        COMPLETA SERIE ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : currentExercise.technique === 'cumulative' ? 'gradini' : 'mini'})
+                        {currentExercise.technique === 'giant_set' ? 'COMPLETA GIRO' : 'COMPLETA SERIE'} ({currentMiniSets.length} {currentExercise.technique === 'cluster' ? 'cluster' : currentExercise.technique === 'cumulative' ? 'gradini' : (currentExercise.technique === 'superset' || currentExercise.technique === 'compound_set' || currentExercise.technique === 'giant_set') ? 'esercizi' : 'mini'})
                       </Text>
                     </TouchableOpacity>
                   )}
