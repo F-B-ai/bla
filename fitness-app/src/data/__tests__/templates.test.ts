@@ -45,13 +45,15 @@ describe('Template ESSĒRE — coerenza con la libreria', () => {
     expect(missing).toEqual([]);
   });
 
-  it('6 template nuovi: postura/forza/ipertrofia uomo + postura/drenante/ricomposizione donna', () => {
-    expect(essereTemplates).toHaveLength(6);
+  it('9 template nuovi: postura/forza/ipertrofia uomo + postura/ricomposizione/4×drenante donna', () => {
+    expect(essereTemplates).toHaveLength(9);
     const cats = essereTemplates.map((t) => `${t.gender}:${t.category}`);
     expect(cats).toEqual(expect.arrayContaining([
       'male:Posturale', 'male:Forza', 'male:Ipertrofia',
       'female:Posturale', 'female:Drenante', 'female:Ricomposizione',
     ]));
+    // la decongestione è una linea completa: 4 programmi drenanti
+    expect(cats.filter((c) => c === 'female:Drenante')).toHaveLength(4);
   });
 
   it('filosofia petto: bilanciere SOLO nel template di forza', () => {

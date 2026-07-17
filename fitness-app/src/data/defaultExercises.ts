@@ -966,6 +966,24 @@ export const femaleExercisesExtra: DefaultExercise[] = [
     notes: 'Lentezza: ogni ciclo dura almeno 4-5 secondi.', gender: 'female',
   },
   {
+    name: 'Respirazione diaframmatica',
+    description: 'Sdraiata o seduta comoda, una mano sul petto e una sulla pancia. Inspira dal naso gonfiando SOLO la pancia (la mano sul petto resta ferma), espira lentamente dalla bocca sgonfiandola, più lunga dell\'inspiro. Il diaframma che si muove è una pompa per la circolazione profonda e un interruttore di calma.',
+    sets: 1, reps: '10 respiri lenti', restSeconds: 0, category: 'posturale',
+    notes: 'Espiro più lungo dell\'inspiro: è lì che il corpo si rilassa.', gender: 'female',
+  },
+  {
+    name: 'Scarico gambe al muro',
+    description: 'Sdraiata a terra con i glutei vicini al muro e le gambe distese in verticale appoggiate alla parete. Braccia rilassate, respira con calma per 3-5 minuti. La posizione favorisce il ritorno dei liquidi dalle gambe: perfetta a fine seduta o la sera.',
+    sets: 1, reps: '3-5 min', restSeconds: 0, category: 'stretching',
+    notes: 'Se i femorali tirano, allontana un po\' i glutei dal muro.', gender: 'female',
+  },
+  {
+    name: 'Pedalata dolce su cyclette',
+    description: 'Sella regolata con il ginocchio quasi disteso nel punto più basso. Pedala a resistenza leggera e cadenza fluida (60-80 giri), respirando con facilità: deve essere una conversazione, non una gara. Movimento circolare continuo che pompa senza affaticare.',
+    sets: 1, reps: '15-25 min', restSeconds: 0, category: 'cardio',
+    notes: 'Leggera davvero: qui l\'obiettivo è far circolare, non consumare.', gender: 'female',
+  },
+  {
     name: 'Stretching flessori dell\'anca',
     description: 'In affondo con ginocchio posteriore a terra, bacino in leggera retroversione: spingi dolcemente i fianchi in avanti finché senti allungare la parte anteriore dell\'anca posteriore. Tieni 30-40 secondi respirando, poi cambia lato. L\'antidoto alle ore da seduti.',
     sets: 2, reps: '30-40 sec per lato', restSeconds: 20, category: 'stretching',

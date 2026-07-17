@@ -1442,6 +1442,149 @@ export const essereTemplates: WorkoutTemplate[] = [
       },
     ],
   },
+
+  // ---------- DONNA · DECONGESTIONE DOLCE (principianti/sedentarie) ----------
+  {
+    id: 'female-decongestione-dolce',
+    name: 'Decongestione Dolce - Primi Passi',
+    description: 'Per chi parte da zero o passa molte ore ferma: due sedute gentili a settimana per riattivare la circolazione delle gambe, con camminata, respirazione e scarico finale. La leggerezza si costruisce con la costanza, non con la fatica.',
+    gender: 'female',
+    category: 'Drenante',
+    weeklySchedule: [
+      {
+        dayOfWeek: 1, dayName: 'Martedì - Riattivazione',
+        notes: 'Tutto leggero e fluido: nessuna serie deve costare fatica vera',
+        exercises: [
+          ex('Respirazione diaframmatica', 1, '10 respiri lenti', 0, 'posturale', '', 'Si comincia da qui: il diaframma è la prima pompa'),
+          ex('Camminata in salita su tapis roulant', 1, '15 min', 0, 'cardio', '', 'Pendenza leggera 5-8%, passo comodo'),
+          ex('Calf raise in piedi', 3, '20', 30, 'forza', '', 'Il polpaccio è il "secondo cuore": lento e completo'),
+          ex('Ponte glutei con elastico', 2, '15', 45, 'forza'),
+          ex('Gatto-cammello (mobilità colonna)', 2, '10 cicli', 30, 'mobilita'),
+          ex('Scarico gambe al muro', 1, '3-5 min', 0, 'stretching', '', 'Il finale che fa la differenza: gambe su, respiro giù'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Fluidità',
+        notes: 'Movimento circolare e continuo',
+        exercises: [
+          ex('Pedalata dolce su cyclette', 1, '15-20 min', 0, 'cardio'),
+          ex('Squat con elastico', 2, '15', 45, 'funzionale', '', 'Solo elastico: il ritmo conta più del carico'),
+          ex('Glute bridge march', 2, '8-10 per gamba', 45, 'funzionale'),
+          ex('Stretching flessori dell\'anca', 2, '30 sec per lato', 20, 'stretching'),
+          ex('Respirazione diaframmatica', 1, '10 respiri lenti', 0, 'posturale'),
+          ex('Scarico gambe al muro', 1, '5 min', 0, 'stretching'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- DONNA · PHA CIRCOLAZIONE ----------
+  {
+    id: 'female-pha-circolazione',
+    name: 'PHA - Circolazione Totale',
+    description: 'Il metodo PHA (Peripheral Heart Action): si alternano esercizi di parte alta e parte bassa senza pausa, così il sangue viaggia continuamente per tutto il corpo. Il circuito che tiene tutto in movimento.',
+    gender: 'female',
+    category: 'Drenante',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Circuito PHA A',
+        notes: 'Alto → basso → alto: il sangue non si ferma mai in un distretto',
+        exercises: [
+          ex('Push-up inclinati (mani su panca)', 3, '10-12', 60, 'funzionale', '', 'Serie Gigante PHA: spinta alto + gambe + tirata alto, di fila',
+            { technique: 'giant_set', giantExercises: [
+              { name: 'Squat con elastico', reps: '15' },
+              { name: 'Rematore con elastico', reps: '15' },
+            ] }),
+          ex('Ponte glutei con elastico', 3, '15', 60, 'forza', '', 'Superflusso col polpaccio: senza pausa',
+            { technique: 'compound_set', pairedExerciseName: 'Calf raise in piedi', pairedReps: '20' }),
+          ex('Alzate laterali leggere', 3, '15', 60, 'forza'),
+          ex('Camminata in salita su tapis roulant', 1, '10 min', 0, 'cardio', '', 'Defaticamento in movimento'),
+          ex('Scarico gambe al muro', 1, '3-5 min', 0, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 2, dayName: 'Mercoledì - Cardio dolce & mobilità',
+        notes: 'Giorno ponte: circolare senza affaticare',
+        exercises: [
+          ex('Pedalata dolce su cyclette', 1, '20-25 min', 0, 'cardio'),
+          ex('Gatto-cammello (mobilità colonna)', 2, '10 cicli', 30, 'mobilita'),
+          ex('Dead bug', 3, '8 per lato', 45, 'funzionale'),
+          ex('Respirazione diaframmatica', 1, '10 respiri lenti', 0, 'posturale'),
+          ex('Scarico gambe al muro', 1, '5 min', 0, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 4, dayName: 'Venerdì - Circuito PHA B',
+        notes: 'Come lunedì, esercizi diversi: stesso principio',
+        exercises: [
+          ex('Shoulder press machine', 3, '12', 60, 'forza', '', 'Serie Gigante PHA: spalle + gambe + dorso',
+            { technique: 'giant_set', giantExercises: [
+              { name: 'Affondi laterali', reps: '8 per lato' },
+              { name: 'Pulley basso', reps: '12' },
+            ] }),
+          ex('Sumo squat con manubrio', 3, '15', 60, 'forza', '', 'Superflusso: sumo + abduzioni senza pausa',
+            { technique: 'compound_set', pairedExerciseName: 'Abductor machine', pairedReps: '20' }),
+          ex('Jumping jack', 3, '30 sec', 45, 'cardio'),
+          ex('Camminata in salita su tapis roulant', 1, '10 min', 0, 'cardio'),
+          ex('Scarico gambe al muro', 1, '3-5 min', 0, 'stretching'),
+        ],
+      },
+    ],
+  },
+
+  // ---------- DONNA · GAMBE LEGGERE ALTA FREQUENZA ----------
+  {
+    id: 'female-gambe-leggere-avanzato',
+    name: 'Gambe Leggere - Alta Frequenza',
+    description: 'Quattro appuntamenti brevi a settimana: poco per volta, spessissimo. Per chi sta molte ore in piedi ferma o seduta e vuole gambe più leggere ogni giorno, non solo dopo l\'allenamento.',
+    gender: 'female',
+    category: 'Drenante',
+    weeklySchedule: [
+      {
+        dayOfWeek: 0, dayName: 'Lunedì - Pompa gambe',
+        notes: 'Sedute brevi (30-35 min): la frequenza batte l\'intensità',
+        exercises: [
+          ex('Calf raise in piedi', 4, '20-25', 30, 'forza'),
+          ex('Squat con elastico', 3, '20', 45, 'funzionale'),
+          ex('Glute bridge march', 3, '10 per gamba', 45, 'funzionale'),
+          ex('Camminata in salita su tapis roulant', 1, '12 min', 0, 'cardio'),
+          ex('Scarico gambe al muro', 1, '4 min', 0, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 1, dayName: 'Martedì - Camminata & respiro',
+        notes: 'Solo movimento dolce',
+        exercises: [
+          ex('Camminata in salita su tapis roulant', 1, '25 min', 0, 'cardio'),
+          ex('Respirazione diaframmatica', 1, '10 respiri lenti', 0, 'posturale'),
+          ex('Scarico gambe al muro', 1, '5 min', 0, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 3, dayName: 'Giovedì - Circuito glutei-polpacci',
+        notes: 'I due motori del ritorno venoso',
+        exercises: [
+          ex('Ponte glutei con elastico', 3, '15-20', 45, 'forza', '', 'Superflusso: ponte + calf senza pausa',
+            { technique: 'compound_set', pairedExerciseName: 'Calf raise in piedi', pairedReps: '20' }),
+          ex('Donkey kick con elastico', 3, '12 per gamba', 45, 'forza'),
+          ex('Affondi laterali', 3, '8 per lato', 60, 'forza'),
+          ex('Pedalata dolce su cyclette', 1, '12 min', 0, 'cardio'),
+          ex('Scarico gambe al muro', 1, '4 min', 0, 'stretching'),
+        ],
+      },
+      {
+        dayOfWeek: 5, dayName: 'Sabato - Fluidità totale',
+        notes: 'Chiusura di settimana: tutto dolce',
+        exercises: [
+          ex('Pedalata dolce su cyclette', 1, '20 min', 0, 'cardio'),
+          ex('Gatto-cammello (mobilità colonna)', 2, '10 cicli', 30, 'mobilita'),
+          ex('Stretching flessori dell\'anca', 2, '30-40 sec per lato', 20, 'stretching'),
+          ex('Respirazione diaframmatica', 1, '10 respiri lenti', 0, 'posturale'),
+          ex('Scarico gambe al muro', 1, '5-8 min', 0, 'stretching', '', 'Il rito del sabato: gambe su e settimana chiusa'),
+        ],
+      },
+    ],
+  },
 ];
 
 // Tutti i template combinati
