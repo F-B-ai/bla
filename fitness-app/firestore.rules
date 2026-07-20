@@ -77,7 +77,7 @@ service cloud.firestore {
           'workout.started', 'workout.completed', 'workout.abandoned',
           'body.measurement_recorded', 'body.composition_estimated',
           'posture.assessed', 'movement.gait_assessed',
-          'movement.squat_assessed',
+          'movement.squat_assessed', 'mindmovement.assessed',
           'coach.attention_handled', 'event.corrected'
         ]
         && request.resource.data.ts is timestamp
@@ -96,6 +96,16 @@ service cloud.firestore {
         isStaff() || personId == myPersonId()
       );
       allow write: if false;
+    }
+
+    // Valutazioni Mind Movement™ (metodo proprietario): somministrate
+    // dallo staff; l'allievo legge le proprie. Mai delete dai client.
+    match /mindMovementAssessments/{assessmentId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update, delete: if false;
     }
 
     // Ritratto ESSĒRE: lo genera lo staff (coach nel loop), l'allievo

@@ -117,6 +117,17 @@ const VISUALS: Record<string, EventVisual> = {
       return parts.join(' · ');
     },
   },
+  'mindmovement.assessed': {
+    icon: 'finger-print-outline',
+    color: colors.accent,
+    title: (p) => `Valutazione Mind Movement™${p.overall != null ? ` · ${p.overall}/100` : ''}`,
+    subtitle: (p) => {
+      const d = Array.isArray(p.domini) ? p.domini : [];
+      const valutati = d.filter((x: any) => x.score !== null && x.score !== undefined);
+      const flags = d.reduce((s: number, x: any) => s + (x.flags || 0), 0);
+      return `${valutati.length}/4 domini · ${p.test_compilati || 0} test${flags > 0 ? ` · ${flags} da attenzionare` : ''}`;
+    },
+  },
   'movement.squat_assessed': {
     icon: 'barbell-outline',
     color: colors.info,

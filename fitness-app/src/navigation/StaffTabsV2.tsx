@@ -33,6 +33,7 @@ import TimelineScreen from '../screens/shared/TimelineScreen';
 import GaitAnalysisScreen from '../screens/staff/GaitAnalysisScreen';
 import PortraitScreen from '../screens/staff/PortraitScreen';
 import SquatAnalysisScreen from '../screens/staff/SquatAnalysisScreen';
+import MindMovementScreen from '../screens/staff/MindMovementScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
@@ -122,6 +123,7 @@ const trainingGroup: HubGroup = {
 const assessGroup: HubGroup = {
   title: 'Valutazioni',
   rows: [
+    { icon: 'finger-print-outline', title: 'Valutazione Mind Movement™', route: 'MindMovement' },
     { icon: 'walk-outline', title: 'Analisi del cammino', route: 'Cammino' },
     { icon: 'barbell-outline', title: 'Analisi dello squat', route: 'Squat' },
     { icon: 'body-outline', title: 'Valutazione posturale', route: 'Postura' },
@@ -227,6 +229,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
       {/* Valutazioni */}
+      <StudioStack.Screen name="MindMovement" component={MindMovementScreen} options={inner('Mind Movement™')} />
       <StudioStack.Screen name="Cammino" component={GaitAnalysisScreen} options={inner('Analisi del cammino')} />
       <StudioStack.Screen name="Squat" component={SquatAnalysisScreen} options={inner('Analisi dello squat')} />
       <StudioStack.Screen name="Postura" component={PosturalAssessmentScreen} options={inner('Valutazione posturale')} />
