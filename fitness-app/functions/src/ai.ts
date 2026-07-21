@@ -84,7 +84,11 @@ const estimateCostUsd = (
   usage: {input_tokens?: number; output_tokens?: number;
     cache_read_input_tokens?: number; cache_creation_input_tokens?: number}
 ): number => {
-  const p = PRICING[model] || PRICING["claude-sonnet-4-5"];
+  // L'API può rispondere con l'ID datato (es. claude-haiku-4-5-20251001):
+  // il listino si aggancia per prefisso, non per uguaglianza esatta.
+  const p = PRICING[model] ||
+    PRICING[Object.keys(PRICING).find((k) => model.startsWith(k)) || ""] ||
+    PRICING["claude-sonnet-4-5"];
   const inTok = usage.input_tokens || 0;
   const outTok = usage.output_tokens || 0;
   const cacheRead = usage.cache_read_input_tokens || 0;
