@@ -240,23 +240,91 @@ const frontalMetrics = (frames: LandmarkFrame[], out: GaitMetrics): void => {
 // Entry point
 // ------------------------------------------------------------
 
+// ------------------------------------------------------------
+// Pre-processing robustezza (feedback dal campo, lug 2026):
+// nei video reali la persona cammina AVANTI E INDIETRO — i giri
+// ribaltano i segni di braccia/valgismo e sporcano la simmetria.
+// Si analizza solo il tratto più lungo a direzione costante.
+// Sul tapis roulant il bacino non trasla: nessuna direzione →
+// si usa tutto il video (fallback trasparente).
+// ------------------------------------------------------------
+
+/** Scarta i fotogrammi in cui i landmark chiave sono inaffidabili. */
+export const filterReliableFrames = (
+  frames: LandmarkFrame[],
+  minVisibility: number = 0.4
+): LandmarkFrame[] =>
+  frames.filter((f) => {
+    const keys = [LM.L_HIP, LM.R_HIP, LM.L_ANKLE, LM.R_ANKLE];
+    return keys.every((i) => {
+      const v = f.landmarks[i]?.visibility;
+      return v === undefined || v >= minVisibility;
+    });
+  });
+
+/** Tratto più lungo a direzione orizzontale costante del bacino. */
+export const longestSteadySegment = (frames: LandmarkFrame[]): LandmarkFrame[] => {
+  const n = frames.length;
+  if (n < 20) return frames;
+  const durationS = (frames[n - 1].t - frames[0].t) / 1000;
+  const fps = n / Math.max(durationS, 0.1);
+  const hipX = movingAverage(
+    frames.map((f) => (f.landmarks[LM.L_HIP].x + f.landmarks[LM.R_HIP].x) / 2),
+    Math.max(3, Math.round(fps / 3))
+  );
+  const win = Math.max(2, Math.round(fps / 4));
+  const DEAD = 0.004; // sotto questa traslazione: direzione invariata (tapis roulant)
+
+  let bestStart = 0;
+  let bestLen = 0;
+  let curStart = 0;
+  let curDir = 0;
+  for (let i = 0; i < n; i++) {
+    const a = hipX[Math.max(0, i - win)];
+    const b = hipX[Math.min(n - 1, i + win)];
+    const d = b - a;
+    const dir = Math.abs(d) < DEAD ? curDir : Math.sign(d);
+    if (dir !== curDir && curDir !== 0 && dir !== 0) {
+      if (i - curStart > bestLen) { bestLen = i - curStart; bestStart = curStart; }
+      curStart = i;
+    }
+    if (dir !== 0) curDir = dir;
+  }
+  if (n - curStart > bestLen) { bestLen = n - curStart; bestStart = curStart; }
+
+  // nessuna direzione mai rilevata (tapis roulant) → tutto il video
+  if (curDir === 0 || bestLen === n) return frames;
+  return frames.slice(bestStart, bestStart + bestLen);
+};
+
 export const computeGaitMetrics = (
   frames: LandmarkFrame[],
   view: GaitView
 ): GaitMetrics => {
-  const quality = checkQuality(frames);
+  // 1. Solo fotogrammi affidabili
+  const reliable = filterReliableFrames(frames);
+  // 2. Vista laterale: solo il passaggio più lungo (i giri mentono)
+  const analyzed = view === 'laterale' ? longestSteadySegment(reliable) : reliable;
+  const truncated = analyzed.length < reliable.length * 0.85 && analyzed.length > 0;
+
+  const quality = checkQuality(analyzed);
   const out: GaitMetrics = {
     version: GAIT_METRICS_VERSION,
     view,
-    duration_s: frames.length > 1 ? round1((frames[frames.length - 1].t - frames[0].t) / 1000) : 0,
-    frames: frames.length,
+    duration_s: analyzed.length > 1 ? round1((analyzed[analyzed.length - 1].t - analyzed[0].t) / 1000) : 0,
+    frames: analyzed.length,
     quality: quality.ok ? 'ok' : 'insufficiente',
     quality_notes: [...quality.notes],
   };
+  if (truncated) {
+    out.quality_notes.push(
+      `Rilevati più passaggi/giri: analizzato il tratto più lungo a direzione costante (${out.duration_s}s). Per il massimo della precisione riprendi UN solo passaggio.`
+    );
+  }
   if (!quality.ok) return out;
 
-  if (view === 'laterale') lateralMetrics(frames, out);
-  else frontalMetrics(frames, out);
+  if (view === 'laterale') lateralMetrics(analyzed, out);
+  else frontalMetrics(analyzed, out);
 
   return out;
 };

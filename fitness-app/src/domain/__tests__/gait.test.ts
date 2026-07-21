@@ -198,3 +198,69 @@ describe('Controllo qualità input', () => {
     expect(m.quality).toBe('insufficiente');
   });
 });
+
+// ============================================================
+// Robustezza dal campo (lug 2026): andata-e-ritorno e fotogrammi
+// inaffidabili non devono più mentire sulle metriche.
+// ============================================================
+
+describe('Robustezza — andata e ritorno (segmentazione passaggi)', () => {
+  /** Camminata con traslazione reale nel quadro + eventuale ritorno. */
+  const driftingWalk = (
+    segs: Array<{ seconds: number; cadenceSpm: number; startX: number; endX: number }>
+  ): LandmarkFrame[] => {
+    const frames: LandmarkFrame[] = [];
+    let t0 = 0;
+    for (const s of segs) {
+      const base = syntheticLateralWalk({
+        seconds: s.seconds, cadenceSpm: s.cadenceSpm, trunkLeanDeg: 5, armAmpL: 0.05, armAmpR: 0.05,
+      });
+      base.forEach((f, i) => {
+        const frac = i / Math.max(1, base.length - 1);
+        const dx = s.startX + (s.endX - s.startX) * frac - 0.5;
+        frames.push({
+          t: t0 + f.t,
+          landmarks: f.landmarks.map((p) => ({ ...p, x: p.x + dx })),
+        });
+      });
+      t0 += s.seconds * 1000;
+    }
+    return frames;
+  };
+
+  it('andata (110 spm) + ritorno (150 spm) → analizza SOLO l\'andata', () => {
+    const walk = driftingWalk([
+      { seconds: 8, cadenceSpm: 110, startX: 0.2, endX: 0.8 },
+      { seconds: 5, cadenceSpm: 150, startX: 0.8, endX: 0.35 },
+    ]);
+    const m = computeGaitMetrics(walk, 'laterale');
+    expect(m.quality).toBe('ok');
+    // se avesse mischiato i due passaggi, la cadenza sarebbe ~125+
+    expect(Math.abs((m.cadence_spm as number) - 110)).toBeLessThanOrEqual(8);
+    expect(m.duration_s).toBeLessThan(10);
+    expect(m.quality_notes.join(' ')).toContain('passaggi');
+  });
+
+  it('tapis roulant (nessuna traslazione) → usa tutto il video, nessun avviso', () => {
+    const walk = syntheticLateralWalk({ seconds: 8, cadenceSpm: 110, trunkLeanDeg: 5, armAmpL: 0.05, armAmpR: 0.04 });
+    const m = computeGaitMetrics(walk, 'laterale');
+    expect(m.quality).toBe('ok');
+    expect(m.quality_notes.join(' ')).not.toContain('passaggi');
+    expect(Math.abs((m.cadence_spm as number) - 110)).toBeLessThanOrEqual(5);
+  });
+
+  it('fotogrammi con landmark inaffidabili → scartati, metriche intatte', () => {
+    const walk = syntheticLateralWalk({ seconds: 10, cadenceSpm: 110, trunkLeanDeg: 5, armAmpL: 0.05, armAmpR: 0.05 });
+    // il 20% dei fotogrammi ha il bacino "perso" dal rilevatore
+    walk.forEach((f, i) => {
+      if (i % 5 === 0) {
+        f.landmarks[27].visibility = 0.1;
+        f.landmarks[28].visibility = 0.1;
+      }
+    });
+    const m = computeGaitMetrics(walk, 'laterale');
+    expect(m.quality).toBe('ok');
+    expect(m.frames).toBeLessThan(10 * 30);
+    expect(Math.abs((m.cadence_spm as number) - 110)).toBeLessThanOrEqual(8);
+  });
+});
