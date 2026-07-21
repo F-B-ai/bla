@@ -39,14 +39,24 @@ const demoApps = (): admin.app.App[] => {
 };
 
 // Modello per feature (03 §1.7 / 07 M1): Sonnet per il volume,
-// Opus SOLO vision e riepilogo owner, Haiku per i triage.
+// Fable 5 per le ANALISI (vision + sintesi dei dati corpo/movimento:
+// sono il momento "wow" del prodotto e valgono il modello top),
+// Opus per il riepilogo owner, Haiku per i triage.
+// Fable 5 richiede accortezze API diverse (niente prefill assistant,
+// thinking sempre attivo quindi NON va passato alcun parametro
+// thinking, stop_reason "refusal" possibile): gestite più sotto.
+const FABLE = "claude-fable-5";
 const MODEL_BY_FEATURE: Record<string, string> = {
   assistant: "claude-sonnet-4-5",
   coach: "claude-sonnet-4-5",
   progression: "claude-sonnet-4-5",
   workoutplan: "claude-sonnet-4-5",
-  postural: "claude-opus-4-8",
-  bodycomp: "claude-opus-4-8",
+  postural: FABLE,
+  bodycomp: FABLE,
+  gait: FABLE,
+  squat: FABLE,
+  mindmovement: FABLE,
+  portrait: FABLE,
   weekly_summary: "claude-opus-4-8",
   triage: "claude-haiku-4-5",
   generic: "claude-sonnet-4-5",
@@ -57,6 +67,7 @@ const PRICING: Record<string, {in: number; out: number}> = {
   "claude-sonnet-4-5": {in: 3, out: 15},
   "claude-opus-4-8": {in: 5, out: 25},
   "claude-haiku-4-5": {in: 1, out: 5},
+  "claude-fable-5": {in: 10, out: 50},
 };
 
 // Limiti giornalieri per ruolo (01 §2.1)
@@ -188,10 +199,21 @@ export const aiMessages = onRequest(
     }
     const model = MODEL_BY_FEATURE[feature as string] ||
       MODEL_BY_FEATURE.generic;
-    const cappedMax = Math.min(Number(maxTokens) || 2000, 8192);
+    // Su Fable 5 il ragionamento interno (sempre attivo) consuma
+    // max_tokens PRIMA della risposta: un tetto basso (es. 700 del
+    // client) produrrebbe risposte vuote. Alziamo il pavimento.
+    let cappedMax = Math.min(Number(maxTokens) || 2000, 8192);
+    if (model === FABLE) {
+      cappedMax = Math.min(Math.max(cappedMax, 8192), 16384);
+    }
 
+    // Fable 5 rifiuta il prefill assistant (400): sui modelli Fable il
+    // prefill NON viene inoltrato. Il client ricompone `prefill + text`,
+    // quindi se la risposta inizia già col prefill lo togliamo dal testo
+    // di ritorno per non duplicarlo (vedi sotto, punto 6).
+    const usePrefill = Boolean(prefill) && model !== FABLE;
     const allMessages = [...messages];
-    if (prefill) {
+    if (usePrefill) {
       allMessages.push({role: "assistant", content: prefill});
     }
 
@@ -205,6 +227,11 @@ export const aiMessages = onRequest(
       undefined;
 
     // --- 5. Chiamata Anthropic ---
+    // Su Fable 5 attiviamo il fallback server-side: se il modello top è
+    // sovraccarico o rifiuta (stop_reason "refusal"), Anthropic ritenta
+    // da solo su Opus 4.8 e ci dice nel campo `model` chi ha risposto.
+    // Così l'analisi non fallisce mai per colpa del motore premium.
+    const isFable = model === FABLE;
     let anthropicRes: Response;
     try {
       anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
@@ -213,11 +240,14 @@ export const aiMessages = onRequest(
           "Content-Type": "application/json",
           "x-api-key": ANTHROPIC_API_KEY.value(),
           "anthropic-version": "2023-06-01",
+          ...(isFable ?
+            {"anthropic-beta": "server-side-fallback-2026-06-01"} : {}),
         },
         body: JSON.stringify({
           model,
           max_tokens: cappedMax,
           ...(systemPayload ? {system: systemPayload} : {}),
+          ...(isFable ? {fallbacks: [{model: "claude-opus-4-8"}]} : {}),
           messages: allMessages,
         }),
       });
@@ -228,6 +258,7 @@ export const aiMessages = onRequest(
 
     const data = await anthropicRes.json() as {
       content?: Array<{type: string; text?: string}>;
+      model?: string;
       usage?: {input_tokens?: number; output_tokens?: number;
         cache_read_input_tokens?: number;
         cache_creation_input_tokens?: number};
@@ -249,8 +280,11 @@ export const aiMessages = onRequest(
     }
 
     // --- 6. Log costi (fire-and-forget) ---
+    // `data.model` è il modello che ha DAVVERO risposto (può essere il
+    // fallback Opus): costi e log seguono quello, non quello richiesto.
+    const servedModel = data.model || model;
     const usage = data.usage || {};
-    const costUsd = estimateCostUsd(model, usage);
+    const costUsd = estimateCostUsd(servedModel, usage);
     usageRef.set({
       inputTokens: admin.firestore.FieldValue
         .increment(usage.input_tokens || 0),
@@ -260,17 +294,22 @@ export const aiMessages = onRequest(
         .increment(usage.cache_read_input_tokens || 0),
       costUsd: admin.firestore.FieldValue.increment(costUsd),
       lastFeature: feature || "generic",
-      lastModel: model,
+      lastModel: servedModel,
     }, {merge: true}).catch(() => undefined);
 
-    const text = (data.content || [])
+    let text = (data.content || [])
       .filter((b) => b.type === "text")
       .map((b) => b.text || "")
       .join("");
+    // Prefill richiesto ma non inoltrato (Fable): il client lo riantepone
+    // comunque, quindi se la risposta inizia già col prefill lo leviamo.
+    if (prefill && !usePrefill && text.startsWith(prefill)) {
+      text = text.slice((prefill as string).length);
+    }
 
     res.json({
       text, // grezzo: è il client a ricomporre l'eventuale prefill
-      model,
+      model: servedModel,
       stopReason: data.stop_reason,
       usage: {
         inputTokens: usage.input_tokens || 0,

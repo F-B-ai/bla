@@ -609,7 +609,10 @@ Sii specifico, professionale e motivante.`;
     [{ role: 'user', content: hasImages ? content : contextText }],
     systemPrompt,
     3000,
-    '{',
+    // Niente prefill '{': la feature postural gira su Claude Fable 5,
+    // che non accetta il prefill assistant. extractJSON gestisce
+    // comunque eventuali fence markdown attorno al JSON.
+    undefined,
     'claude-sonnet-4-5',
     'postural'
   );

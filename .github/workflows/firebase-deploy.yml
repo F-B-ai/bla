@@ -5,6 +5,10 @@
 #  - push il cui messaggio di commit contiene "[deploy]"
 #  - oppure avvio manuale dalla tab Actions (workflow_dispatch)
 #
+# EXTRA: se il messaggio contiene anche "[deploy-functions]"
+# vengono pubblicate pure le Cloud Functions (gateway AI, brain).
+# Tenuto opt-in perché è lo step più lento e tocca il backend.
+#
 # COSA SERVE (una tantum): il secret FIREBASE_SERVICE_ACCOUNT
 # in Settings → Secrets and variables → Actions, con dentro il
 # JSON completo del service account di essere-3fe6f.
@@ -74,6 +78,17 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
         run: npx firebase-tools deploy --only hosting --project essere-3fe6f --non-interactive
+        working-directory: fitness-app
+
+      - name: Deploy Cloud Functions (solo con [deploy-functions])
+        if: contains(github.event.head_commit.message, '[deploy-functions]')
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: |
+          npm install --no-audit --no-fund --prefix functions
+          npx firebase-tools deploy --only functions --project essere-3fe6f --non-interactive --force \
+            || (echo "retry tra 20s…" && sleep 20 && \
+                npx firebase-tools deploy --only functions --project essere-3fe6f --non-interactive --force)
         working-directory: fitness-app
 
       - name: Deploy Firestore rules + indexes (retry sul 409)
