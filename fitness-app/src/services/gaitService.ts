@@ -228,6 +228,88 @@ export const extractLandmarksFromVideo = async (
 };
 
 // ------------------------------------------------------------
+// 1-bis. Pose estimation da FOTO (per l'analisi posturale)
+// ------------------------------------------------------------
+// Modalità IMAGE (non VIDEO): un rilevatore dedicato, singleton
+// separato per non toccare quello del cammino. Stessa self-host
+// del modello: la foto non lascia mai il dispositivo.
+
+let _imageLandmarker: any | null = null;
+
+const getImageLandmarker = async (
+  onStatus?: (s: GaitStatus) => void
+): Promise<any> => {
+  if (_imageLandmarker) return _imageLandmarker;
+  if (Platform.OS !== 'web') {
+    throw new Error("L'analisi su foto è disponibile solo dalla web app (PWA).");
+  }
+  onStatus?.('engine');
+  const vision = await withTimeout(
+    nativeImport('/wasm/vision_bundle.mjs'),
+    60000,
+    'Il motore di analisi non si scarica: controlla la connessione e riprova.'
+  );
+  const fileset = await vision.FilesetResolver.forVisionTasks('/wasm');
+  const make = (delegate: 'GPU' | 'CPU') =>
+    withTimeout(
+      vision.PoseLandmarker.createFromOptions(fileset, {
+        baseOptions: { modelAssetPath: '/models/pose_landmarker_lite.task', delegate },
+        runningMode: 'IMAGE',
+        numPoses: 1,
+      }),
+      delegate === 'GPU' ? 45000 : 60000,
+      delegate === 'GPU' ? 'GPU_TIMEOUT' : 'Il motore di analisi non parte su questo dispositivo.'
+    );
+  try {
+    _imageLandmarker = await make('GPU');
+  } catch {
+    _imageLandmarker = await make('CPU');
+  }
+  return _imageLandmarker;
+};
+
+/**
+ * Estrae i 33 landmark scheletrici da una SINGOLA foto (data URI o
+ * URL), interamente on-device. Ritorna null se non riconosce una
+ * persona. La foto viene ridotta a max 1080px per lato: precisione
+ * piena, ma senza far esplodere memoria e tempi su mobile.
+ */
+export const extractLandmarksFromImage = async (
+  uri: string,
+  onStatus?: (s: GaitStatus) => void
+): Promise<{ x: number; y: number; visibility?: number }[] | null> => {
+  const landmarker = await getImageLandmarker(onStatus);
+  onStatus?.('analyzing');
+  const doc = (globalThis as any).document;
+  const img: any = doc.createElement('img');
+  img.crossOrigin = 'anonymous';
+  img.decoding = 'async';
+
+  await withTimeout(
+    new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Foto non leggibile. Usa un formato standard (jpg/png).'));
+      img.src = uri;
+    }),
+    20000,
+    'La foto non si apre: riprova o scegli un altro file.'
+  );
+
+  const scale = Math.min(1, 1080 / Math.max(img.naturalWidth || 1080, img.naturalHeight || 1080));
+  const canvas = doc.createElement('canvas');
+  canvas.width = Math.max(1, Math.round((img.naturalWidth || 1080) * scale));
+  canvas.height = Math.max(1, Math.round((img.naturalHeight || 1080) * scale));
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const res = landmarker.detect(canvas);
+  const lm = res?.landmarks?.[0];
+  if (!lm || lm.length < 33) return null;
+  return lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility }));
+};
+
+// ------------------------------------------------------------
 // 2. Interpretazione AI (l'AI spiega, non calcola)
 // ------------------------------------------------------------
 

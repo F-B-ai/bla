@@ -6,6 +6,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PosturalFinding, Exercise, WorkoutPlan } from '../types';
 import { auth } from '../config/firebase';
+import type { PostureMetrics } from '../domain/posture';
+
+// Le misure oggettive che il motore posturale passa all'AI da spiegare.
+export type PostureMetricsInput = PostureMetrics;
 
 // La chiave API va impostata in config. In produzione usare un backend proxy.
 // MAI esporre la chiave in un'app client in produzione.
@@ -310,6 +314,8 @@ export interface AIPosturalAnalysis {
   summary: string;
   recommendations: string[];
   exerciseProgram: string[];
+  /** misure oggettive per vista (v3), quando disponibili */
+  measured?: PostureMetricsInput[];
 }
 
 export const analyzePostureWithAI = async (
@@ -319,16 +325,26 @@ export const analyzePostureWithAI = async (
     back?: string;
   },
   manualFindings?: PosturalFinding[],
-  studentInfo?: { name: string; goals: string; medicalNotes?: string }
+  studentInfo?: { name: string; goals: string; medicalNotes?: string },
+  // v3: MISURE OGGETTIVE già calcolate on-device (posture.ts) dai
+  // landmark scheletrici. Quando presenti, l'AI NON stima più a
+  // occhio: spiega questi numeri. È il salto di precisione.
+  measured?: PostureMetricsInput[]
 ): Promise<AIPosturalAnalysis> => {
-  const systemPrompt = `Sei l'assistente di screening posturale di una palestra (valutazione funzionale wellness, MAI clinica). Il coach ha gli occhi sulla persona: tu sei un secondo sguardo PRUDENTE sulle foto, non un oracolo.
+  const hasMeasured = Array.isArray(measured) && measured.length > 0;
+
+  const systemPrompt = `Sei l'assistente di screening posturale di una palestra (valutazione funzionale wellness, MAI clinica). Il coach ha gli occhi sulla persona: tu sei un secondo sguardo PRUDENTE.
+
+${hasMeasured ?
+    `HAI A DISPOSIZIONE MISURE OGGETTIVE calcolate dallo scheletro (angoli reali in gradi, scostamenti in %), NON stime a occhio. Il tuo compito NON è rimisurare guardando le foto: è SPIEGARE questi numeri al coach. Le foto servono solo per il contesto (vestiti, luce, appoggio). Se un numero dice "normale", NON trasformarlo in un rilievo perché "ti sembra". Fidati della misura; l'occhio umano sbaglia gli angoli, il calcolo no.` :
+    `Non hai misure strumentali: sei un secondo sguardo PRUDENTE sulle foto, non un oracolo. Segnala SOLO ciò che è chiaramente visibile; in dubbio, "normal".`}
 
 RISPONDI SEMPRE in formato JSON valido con questa struttura:
 {
   "findings": [
     {
       "area": "head_neck|shoulders|upper_back|lower_back|pelvis|knees|ankles_feet|spine_alignment",
-      "observation": "descrizione di ciò che SI VEDE nella foto, in italiano",
+      "observation": "spiegazione in italiano del rilievo${hasMeasured ? ' — cita il numero misurato, es. \\"spalla sinistra più alta di 6°\\"' : ' di ciò che SI VEDE'}",
       "severity": "normal|mild|moderate|severe"
     }
   ],
@@ -337,13 +353,17 @@ RISPONDI SEMPRE in formato JSON valido con questa struttura:
   "exerciseProgram": ["esercizio 1 con serie/reps", ...]
 }
 
+MAPPATURA gravità misure → severity: normale→normal, lieve→mild, moderato→moderate. "severe" solo per quadri macroscopici oltre le misure.
+
 REGOLE DI PRUDENZA (più importanti di tutto):
-- Segnala SOLO ciò che è chiaramente visibile nelle foto. Un dubbio NON è un rilievo: in dubbio, severity "normal".
-- Da foto non si valutano in modo affidabile: appoggio del piede fine (pronazione/supinazione), rotazioni vertebrali, differenze sotto i ~5°. NON inventarli: se non si vedono con chiarezza, ometti l'area o segna "normal".
-- "severe" è raro e va usato solo per quadri macroscopici evidenti.
-- Qualità insufficiente (angolo storto, vestiti coprenti, luce, distanza)? Dillo esplicitamente nel summary e limita i findings alle sole cose certe. Meglio 2 rilievi solidi che 8 suggestioni.
-- Le asimmetrie vanno descritte con il DUBBIO quando la foto non è perfettamente frontale ("possibile, da verificare dal vivo").
-- MAI diagnosi, mai nomi di patologie: descrivi ciò che si vede, il giudizio resta al professionista.
+${hasMeasured ?
+    `- Basa i findings sulle MISURE. Un\'area con misura "normale" resta "normal", anche se la foto "ti insospettisce".
+- Puoi aggiungere UN rilievo visivo solo se macroscopico e non coperto dalle misure (es. piede palesemente ruotato), segnalando che è a occhio.
+- Le misure sono proxy 2D da foto: se una vista era di qualità insufficiente te lo diciamo nei dati — in quel caso dillo nel summary e non forzare rilievi su quella vista.` :
+    `- Da foto non si valutano in modo affidabile differenze sotto i ~5°, rotazioni vertebrali, appoggio fine del piede. NON inventarli.
+- Le asimmetrie vanno descritte col DUBBIO quando la foto non è perfettamente frontale.`}
+- "severe" è raro. Meglio 2 rilievi solidi che 8 suggestioni.
+- MAI diagnosi, mai nomi di patologie: il giudizio resta al professionista.
 - Esercizi: generici da sala, prudenti, con serie/reps.`;
 
   const content: any[] = [];
@@ -377,7 +397,26 @@ REGOLE DI PRUDENZA (più importanti di tutto):
   }
 
   // Aggiungi contesto testuale
-  let contextText = 'Analizza la postura di questo paziente basandoti sulle immagini fornite.';
+  let contextText = hasMeasured ?
+    'Spiega al coach queste MISURE OGGETTIVE della postura (angoli reali calcolati dallo scheletro). Le foto sono solo contesto.' :
+    'Analizza la postura di questo paziente basandoti sulle immagini fornite.';
+
+  if (hasMeasured) {
+    contextText += '\n\n=== MISURE OGGETTIVE (calcolate on-device, deterministiche) ===';
+    for (const mv of measured!) {
+      contextText += `\n\nVista ${mv.view.toUpperCase()} — qualità: ${mv.quality}`;
+      if (mv.quality === 'insufficiente') {
+        contextText += ` (${(mv.quality_notes || []).join('; ') || 'foto non adatta'})`;
+        continue;
+      }
+      for (const f of mv.findings) {
+        const val = f.value_deg != null ? `${f.value_deg}°` :
+          f.value_pct != null ? `${f.value_pct}%` : '—';
+        contextText += `\n- ${f.label}: ${val} [${f.severity}]${f.direction ? ` (${f.direction})` : ''}`;
+      }
+    }
+    contextText += '\n\nNON rimisurare a occhio: spiega questi numeri.';
+  }
 
   if (studentInfo) {
     contextText += `\n\nInformazioni paziente:
@@ -412,13 +451,18 @@ REGOLE DI PRUDENZA (più importanti di tutto):
     'postural'
   );
 
+  // Le misure oggettive viaggiano SEMPRE col risultato (v3), qualunque
+  // sia l'esito del parsing: la UI mostra i numeri veri accanto al testo.
+  const withMeasured = (a: AIPosturalAnalysis): AIPosturalAnalysis =>
+    hasMeasured ? { ...a, measured } : a;
+
   // Parse JSON dalla risposta
   try {
     // Strip markdown code fences if present
     const cleaned = responseText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Risposta non valida');
-    return JSON.parse(jsonMatch[0]);
+    return withMeasured(JSON.parse(jsonMatch[0]));
   } catch {
     // Try to extract structured data from truncated/malformed JSON
     try {
@@ -447,7 +491,7 @@ REGOLE DI PRUDENZA (più importanti di tutto):
       }
 
       if (findings.length > 0 || summary) {
-        return { findings, summary, recommendations, exerciseProgram: [] };
+        return withMeasured({ findings, summary, recommendations, exerciseProgram: [] });
       }
     } catch { /* fallback below */ }
 
@@ -458,12 +502,12 @@ REGOLE DI PRUDENZA (più importanti di tutto):
       .replace(/,\s*$/gm, '')
       .replace(/^\s*\w+\s*:\s*/gm, '')
       .trim();
-    return {
+    return withMeasured({
       findings: [],
       summary: readableText || 'Analisi completata',
       recommendations: [],
       exerciseProgram: [],
-    };
+    });
   }
 };
 

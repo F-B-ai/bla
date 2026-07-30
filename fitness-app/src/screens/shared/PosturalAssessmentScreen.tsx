@@ -32,6 +32,7 @@ import {
   generateProgressReport,
 } from '../../services/posturalService';
 import { analyzePostureWithAI, comparePostureWithAI, AIPosturalAnalysis, AIPosturalComparison, ensureAIApiKey } from '../../services/aiService';
+import { measurePostureFromPhotos } from '../../services/postureMeasure';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
@@ -244,6 +245,17 @@ export const PosturalAssessmentScreen: React.FC = () => {
     setAiAnalyzing(true);
     try {
       const student = students.find((s) => s.id === selectedStudentId);
+
+      // v3 — MISURA prima di spiegare: estrai i landmark dalle foto
+      // on-device e calcola gli angoli reali (posture.ts). Solo web
+      // (PWA); se non riesce, si prosegue senza misure (l'AI torna al
+      // solo-visivo prudente). La foto non lascia mai il dispositivo.
+      const measured = await measurePostureFromPhotos({
+        frontale: frontImage,
+        laterale: sideLeftImage || sideRightImage,
+        posteriore: backImage,
+      });
+
       const result = await analyzePostureWithAI(
         {
           front: frontImage || undefined,
@@ -252,6 +264,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
         },
         findings.length > 0 ? findings : undefined,
         student ? { name: `${student.name} ${student.surname}`, goals: student.goals, medicalNotes: student.medicalNotes } : undefined,
+        measured.length > 0 ? measured : undefined,
       );
       setAiResult(result);
       if (findings.length === 0 && result.findings.length > 0) {
@@ -669,6 +682,46 @@ export const PosturalAssessmentScreen: React.FC = () => {
               <Text style={styles.aiSummary}>{aiResult.summary}</Text>
             </Card>
           ) : null}
+          {aiResult.measured && aiResult.measured.length > 0 && (
+            <Card variant="outlined">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs }}>
+                <Ionicons name="analytics-outline" size={16} color={colors.primary} />
+                <Text style={styles.aiSubtitle}>Misure oggettive (angoli reali)</Text>
+              </View>
+              <Text style={{ fontSize: fontSize.xs, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                Calcolate dallo scheletro, non stimate a occhio. Screening wellness — non valutazione clinica.
+              </Text>
+              {aiResult.measured.map((mv, vi) => (
+                <View key={vi} style={{ marginBottom: spacing.sm }}>
+                  <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: colors.text, textTransform: 'capitalize' }}>
+                    Vista {mv.view}
+                  </Text>
+                  {mv.quality === 'insufficiente' ? (
+                    <Text style={{ fontSize: fontSize.xs, color: colors.warning, marginTop: 2 }}>
+                      {mv.quality_notes[0] || 'Foto non adatta alla misura.'}
+                    </Text>
+                  ) : (
+                    mv.findings.map((f, fi) => {
+                      const sevColor = f.severity === 'moderato' ? colors.error
+                        : f.severity === 'lieve' ? colors.warning : colors.success;
+                      const val = f.value_deg != null ? `${f.value_deg}°`
+                        : f.value_pct != null ? `${f.value_pct}%` : '—';
+                      return (
+                        <View key={fi} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                          <Text style={{ fontSize: fontSize.sm, color: colors.textSecondary, flex: 1 }}>
+                            {f.label}{f.direction ? ` · ${f.direction}` : ''}
+                          </Text>
+                          <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: sevColor, fontVariant: ['tabular-nums'] }}>
+                            {val}
+                          </Text>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              ))}
+            </Card>
+          )}
           {aiResult.findings && aiResult.findings.length > 0 && (
             <Card variant="outlined">
               <Text style={styles.aiSubtitle}>Osservazioni</Text>
