@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
@@ -1046,17 +1047,24 @@ const AcademyOnlyAdminTabs = () => (
 );
 
 // Logout header for Academy mode
-const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => (
-  <View style={styles.academyLogoutHeader}>
-    <View style={styles.academyLogoutBrand}>
-      <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => {
+  // Rispetta la "safe area" in alto (notch / Dynamic Island / barra di
+  // stato): senza questo, su PWA iPhone titolo e "Esci" finivano SOTTO
+  // l'orologio. Floor prudente così è sempre raggiungibile.
+  const insets = useSafeAreaInsets();
+  const topPad = Math.max(insets.top, Platform.OS === 'web' ? 12 : 0) + 10;
+  return (
+    <View style={[styles.academyLogoutHeader, { paddingTop: topPad }]}>
+      <View style={styles.academyLogoutBrand}>
+        <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+      </View>
+      <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+        <Ionicons name="log-out-outline" size={20} color={GOLD} />
+        <Text style={styles.logoutBtnText}>Esci</Text>
+      </TouchableOpacity>
     </View>
-    <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-      <Ionicons name="log-out-outline" size={20} color={GOLD} />
-      <Text style={styles.logoutBtnText}>Esci</Text>
-    </TouchableOpacity>
-  </View>
-);
+  );
+};
 
 // --- Loading screen ---
 const LoadingScreen = () => (
@@ -1313,7 +1321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0D0D0D',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'web' ? 12 : 64,
+    // paddingTop impostato a runtime da AcademyLogoutHeader (safe-area).
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: GOLD_DARK + '30',
