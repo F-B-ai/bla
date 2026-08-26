@@ -108,6 +108,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Esame del Sistema Stellato (valutazione in due sessioni).
+    // Dato sanitario di categoria particolare: lo somministra lo staff,
+    // l'allievo legge solo il proprio. Append-only — un referto firmato
+    // non si riscrive: si registra una nuova sessione.
+    match /stellatoSessions/{sessionId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update, delete: if false;
+    }
+
     // Ritratto ESSĒRE: lo genera lo staff (coach nel loop), l'allievo
     // legge il proprio. Mai cancellabile dai client.
     match /portraits/{personId} {
