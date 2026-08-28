@@ -135,7 +135,6 @@ const ProgressiHub = () => (
     rows={[
       { icon: 'body-outline', title: 'Il mio quadro', subtitle: 'Come sei cambiato, valutazione dopo valutazione', route: 'Quadro' },
       { icon: 'book-outline', title: 'La mia storia', subtitle: 'Tutto il tuo percorso, giorno per giorno', route: 'Storia' },
-      { icon: 'trophy-outline', title: 'Traguardi', subtitle: 'Badge, livelli e premi reali', route: 'Traguardi' },
       { icon: 'journal-outline', title: 'Diario', subtitle: 'Le tue note e riflessioni', route: 'Diario' },
       { icon: 'sparkles-outline', title: 'AI Coach', subtitle: 'Analisi e suggerimenti personalizzati', route: 'AICoach' },
       { icon: 'analytics-outline', title: 'Storico allenamenti', subtitle: 'Volume e costanza nel tempo', route: 'StoricoProgressi' },

@@ -24,7 +24,6 @@ import {
   computeScore,
   adviceForScore,
 } from '../../services/wellnessService';
-import { awardXp } from '../../services/gamificationService';
 import { crossAlert } from '../../utils/alert';
 import { WELLNESS_QUESTIONS as QUESTIONS } from '../../data/wellnessQuestions';
 
@@ -81,7 +80,6 @@ export const EssereScreen: React.FC = () => {
       });
       setTodayCheck(check);
       setRecent((prev) => [check, ...prev]);
-      awardXp(user.id, 10).catch(() => {});
     } catch {
       crossAlert('Errore', 'Impossibile salvare il tuo stato. Riprova.');
     } finally {
