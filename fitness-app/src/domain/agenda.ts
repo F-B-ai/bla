@@ -22,8 +22,36 @@
 
 export const AGENDA_VERSION = 1;
 
-/** Il tetto. Cambiarlo qui lo cambia ovunque. */
+// ------------------------------------------------------------
+// LE REGOLE DELLA GIORNATA DEL FONDATORE
+// Non sono inventate qui: sono quelle scritte nel sistema
+// operativo del fondatore, e valgono perché ogni ora di personal
+// oltre le quindici settimanali costa 776 € di Academy mancata.
+// ------------------------------------------------------------
+
+/** Massimo appuntamenti in un giorno. Il quinto non si scrive. */
 export const TETTO_GIORNALIERO = 4;
+
+/** Massimo appuntamenti in una settimana. Il sedicesimo costa, non rende. */
+export const TETTO_SETTIMANALE = 15;
+
+/** Le due finestre in cui la giornata prevede gli appuntamenti. */
+export const FINESTRE: Array<[string, string]> = [
+  ['10:30', '13:00'],
+  ['15:00', '17:30'],
+];
+
+/** Gli orari che si propongono a chi chiede: quattro, dentro le finestre. */
+export const ORARI_CONSIGLIATI = ['10:30', '11:30', '15:00', '16:00'];
+
+/** Le due ore che producono 816 € l'ora: qui non entra nessuno. */
+export const BLOCCO_ACADEMY: [string, string] = ['08:30', '10:30'];
+
+/** 0 = domenica. Spenta: è la tappa più difficile del piano. */
+export const GIORNI_CHIUSI = [0];
+
+/** Il sabato è solo mattina. Il pomeriggio è libero, sempre. */
+export const SABATO_SOLO_MATTINA = true;
 
 export type TipoImpegno = 'visita' | 'allenamento' | 'consulenza' | 'altro';
 
@@ -216,7 +244,9 @@ export const postiLiberi = (impegni: Impegno[], giorno: string): number =>
 
 export type EsitoRichiesta =
   | 'ok'
+  | 'giorno_chiuso'
   | 'giorno_pieno'
+  | 'settimana_piena'
   | 'orario_occupato'
   | 'dati_mancanti';
 
@@ -227,11 +257,57 @@ export interface Valutazione {
   motivo: string;
   quantiQuelGiorno: number;
   postiLiberi: number;
+  quantiQuellaSettimana: number;
   /** chi occupa già quell'ora, se occupata */
   conflittoCon: string | null;
   /** giorni vicini con almeno un posto: si propongono a chi ha chiesto */
   alternative: string[];
+  /**
+   * Non bloccano, ma vanno detti: quell'ora costa qualcosa alla
+   * giornata del fondatore, e chi conferma deve saperlo.
+   */
+  avvisi: string[];
 }
+
+const aDataUTC = (giorno: string): Date => {
+  const [a, m, d] = giorno.split('-').map((x) => parseInt(x, 10));
+  return new Date(Date.UTC(a, (m || 1) - 1, d || 1));
+};
+
+/** 0 = domenica, 1 = lunedì … 6 = sabato. */
+export const giornoDellaSettimana = (giorno: string): number =>
+  aDataUTC(giorno).getUTCDay();
+
+/** I sette giorni della settimana (lunedì → domenica) che contengono `giorno`. */
+export const settimanaDi = (giorno: string): string[] => {
+  const d = aDataUTC(giorno);
+  const scarto = (d.getUTCDay() + 6) % 7; // lunedì = 0
+  const lunedi = new Date(d.getTime() - scarto * 86400000);
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(lunedi.getTime() + i * 86400000).toISOString().slice(0, 10));
+};
+
+export const quantiNellaSettimana = (impegni: Impegno[], giorno: string): number =>
+  settimanaDi(giorno).reduce((s, g) => s + quantiIl(impegni, g), 0);
+
+const dentro = (ora: string, da: string, a: string): boolean =>
+  ora >= da && ora < a;
+
+export const dentroLeFinestre = (ora: string): boolean =>
+  FINESTRE.some(([da, a]) => dentro(ora, da, a));
+
+export const nelBloccoAcademy = (ora: string): boolean =>
+  dentro(ora, BLOCCO_ACADEMY[0], BLOCCO_ACADEMY[1]);
+
+/** Il giorno è chiuso agli appuntamenti? (domenica, sabato pomeriggio) */
+export const giornoChiuso = (giorno: string, ora?: string): string | null => {
+  const g = giornoDellaSettimana(giorno);
+  if (GIORNI_CHIUSI.includes(g)) return 'La domenica è spenta: nessun appuntamento.';
+  if (SABATO_SOLO_MATTINA && g === 6 && ora && ora >= '13:00') {
+    return 'Il sabato è solo mattina: il pomeriggio è libero, sempre.';
+  }
+  return null;
+};
 
 const giorniSuccessivi = (da: string, quanti: number): string[] => {
   const out: string[] = [];
@@ -263,23 +339,68 @@ export const valutaRichiesta = (input: {
       esito: 'dati_mancanti', confermabile: false,
       motivo: 'Servono giorno e ora prima di poter confermare.',
       quantiQuelGiorno: 0, postiLiberi: TETTO_GIORNALIERO,
-      conflittoCon: null, alternative: [],
+      quantiQuellaSettimana: 0, conflittoCon: null, alternative: [], avvisi: [],
     };
   }
 
   const delGiorno = impegniDi(impegni, richiesta.giorno);
   const quanti = delGiorno.length;
   const liberi = Math.max(0, TETTO_GIORNALIERO - quanti);
+  const nellaSettimana = quantiNellaSettimana(impegni, richiesta.giorno);
+
+  // Un giorno vale come alternativa solo se è aperto, non è pieno,
+  // e la sua settimana ha ancora spazio.
   const alternative = giorniSuccessivi(richiesta.giorno, orizzonte)
-    .filter((g) => quantiIl(impegni, g) < TETTO_GIORNALIERO)
+    .filter((g) => !giornoChiuso(g)
+      && quantiIl(impegni, g) < TETTO_GIORNALIERO
+      && quantiNellaSettimana(impegni, g) < TETTO_SETTIMANALE)
     .slice(0, 3);
+
+  // Avvisi: non fermano, ma dicono che cosa costa quell'ora.
+  const avvisi: string[] = [];
+  if (nelBloccoAcademy(richiesta.ora)) {
+    avvisi.push('Sono le due ore dell\'Academy: quell\'ora vale 816 €, '
+      + 'e il blocco profondo è ciò che porta al milione.');
+  } else if (!dentroLeFinestre(richiesta.ora)) {
+    avvisi.push('Fuori dalle finestre della giornata (10:30-13:00 e 15:00-17:30): '
+      + 'un appuntamento sparso costa più dell\'ora che occupa.');
+  }
+  if (giornoDellaSettimana(richiesta.giorno) === 5 && richiesta.ora >= '13:00') {
+    avvisi.push('Venerdì pomeriggio è amministrazione e delega per la settimana dopo.');
+  }
+  if (nellaSettimana === TETTO_SETTIMANALE - 1) {
+    avvisi.push(`È il quindicesimo della settimana: dopo questo, il tetto è raggiunto.`);
+  }
+
+  const chiuso = giornoChiuso(richiesta.giorno, richiesta.ora);
+  if (chiuso) {
+    return {
+      esito: 'giorno_chiuso', confermabile: false, motivo: chiuso,
+      quantiQuelGiorno: quanti, postiLiberi: liberi,
+      quantiQuellaSettimana: nellaSettimana,
+      conflittoCon: null, alternative, avvisi,
+    };
+  }
 
   if (quanti >= TETTO_GIORNALIERO) {
     return {
       esito: 'giorno_pieno', confermabile: false,
       motivo: `Il ${richiesta.giorno} ha già ${quanti} appuntamenti: è pieno. `
         + 'Il quinto non si scrive.',
-      quantiQuelGiorno: quanti, postiLiberi: 0, conflittoCon: null, alternative,
+      quantiQuelGiorno: quanti, postiLiberi: 0,
+      quantiQuellaSettimana: nellaSettimana,
+      conflittoCon: null, alternative, avvisi,
+    };
+  }
+
+  if (nellaSettimana >= TETTO_SETTIMANALE) {
+    return {
+      esito: 'settimana_piena', confermabile: false,
+      motivo: `Questa settimana ha già ${nellaSettimana} appuntamenti su ${TETTO_SETTIMANALE}. `
+        + 'Il sedicesimo non rende: costa 776 € di Academy mancata.',
+      quantiQuelGiorno: quanti, postiLiberi: liberi,
+      quantiQuellaSettimana: nellaSettimana,
+      conflittoCon: null, alternative, avvisi,
     };
   }
 
@@ -289,17 +410,20 @@ export const valutaRichiesta = (input: {
       esito: 'orario_occupato', confermabile: false,
       motivo: `Le ${richiesta.ora} del ${richiesta.giorno} sono già di ${occupato.chi}.`,
       quantiQuelGiorno: quanti, postiLiberi: liberi,
-      conflittoCon: occupato.chi, alternative,
+      quantiQuellaSettimana: nellaSettimana,
+      conflittoCon: occupato.chi, alternative, avvisi,
     };
   }
 
   return {
     esito: 'ok', confermabile: true,
-    motivo: liberi === 1
+    motivo: (liberi === 1
       ? 'Si può confermare: è l\'ultimo posto della giornata.'
-      : `Si può confermare: restano ${liberi} posti quel giorno.`,
+      : `Si può confermare: restano ${liberi} posti quel giorno.`)
+      + ` Settimana: ${nellaSettimana + 1} su ${TETTO_SETTIMANALE}.`,
     quantiQuelGiorno: quanti, postiLiberi: liberi,
-    conflittoCon: null, alternative,
+    quantiQuellaSettimana: nellaSettimana,
+    conflittoCon: null, alternative, avvisi,
   };
 };
 
@@ -330,11 +454,18 @@ export const rispostaWhatsApp = (input: {
   orariPossibili?: string[];
 }): string => {
   const { richiesta: r, valutazione: v, impegni } = input;
-  const orari = input.orariPossibili || ['09:00', '10:00', '17:00', '18:00'];
+  const orari = input.orariPossibili || ORARI_CONSIGLIATI;
   const nome = primo(r.persona);
   const ciao = nome ? `Ciao ${nome}, ` : '';
 
   if (r.comando === 'chiedi-liberi') {
+    const chiuso = giornoChiuso(r.giorno);
+    if (chiuso) {
+      return `${ciao}${dataParlata(r.giorno)} sono chiuso. `
+        + (v.alternative.length
+          ? `Ti va ${dataParlata(v.alternative[0])}?`
+          : 'Dimmi un altro giorno e ti trovo lo spazio.');
+    }
     const occupate = new Set(impegniDi(impegni, r.giorno).map((i) => i.ora));
     const liberi = orari.filter((o) => !occupate.has(o));
     const posti = postiLiberi(impegni, r.giorno);
@@ -353,6 +484,21 @@ export const rispostaWhatsApp = (input: {
     return `${ciao}ho tolto l'appuntamento di ${dataParlata(r.giorno)}`
       + (r.ora ? ` alle ${r.ora}` : '') + '. '
       + 'Quando vuoi rientrare scrivimi e ti ridò il tuo posto.';
+  }
+
+  if (v.esito === 'giorno_chiuso') {
+    return `${ciao}${dataParlata(r.giorno)} sono chiuso. `
+      + (v.alternative.length
+        ? `Il primo giorno buono è ${dataParlata(v.alternative[0])}: te lo tengo?`
+        : 'Dimmi un altro giorno e ti trovo lo spazio.');
+  }
+
+  if (v.esito === 'settimana_piena') {
+    return `${ciao}questa settimana sono al completo — tengo un numero fisso di `
+      + 'appuntamenti per seguire bene tutti. '
+      + (v.alternative.length
+        ? `Il primo posto libero è ${dataParlata(v.alternative[0])}: lo blocco per te?`
+        : 'Dimmi due giorni della prossima settimana e te ne tengo uno.');
   }
 
   if (v.esito === 'giorno_pieno') {

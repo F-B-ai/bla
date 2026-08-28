@@ -12,7 +12,8 @@ import { Student } from '../../types';
 import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import {
   leggiCAL, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
-  RichiestaCAL, Impegno, Valutazione, TETTO_GIORNALIERO,
+  RichiestaCAL, Impegno, Valutazione,
+  TETTO_GIORNALIERO, TETTO_SETTIMANALE,
 } from '../../domain/agenda';
 import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
@@ -35,7 +36,7 @@ const ESEMPIO = `CAL prenota
 persona: Maria Rossi
 telefono: 333 1234567
 giorno: 2026-09-02
-ora: 17:00
+ora: 15:00
 tipo: visita
 note: prima volta, arriva da Instagram`;
 
@@ -57,6 +58,21 @@ const copia = (testo: string) => {
     }
   } catch { /* niente appunti: resta leggibile a schermo */ }
   crossAlert('Messaggio', testo);
+};
+
+/** Gli avvisi non fermano niente: dicono che cosa costa quell'ora. */
+const Avvisi: React.FC<{ v: Valutazione }> = ({ v }) => {
+  if (!v.avvisi.length) return null;
+  return (
+    <View style={s.avvisi}>
+      {v.avvisi.map((a, i) => (
+        <View key={i} style={s.avvisoRiga}>
+          <Ionicons name="alert-circle-outline" size={13} color={colors.warning} />
+          <Text style={s.avvisoTxt}>{a}</Text>
+        </View>
+      ))}
+    </View>
+  );
 };
 
 export function RichiesteWhatsAppScreen() {
@@ -164,7 +180,8 @@ export function RichiesteWhatsAppScreen() {
       <Text style={s.intro}>
         Alessia incolla qui la richiesta arrivata su WhatsApp. Diventa appuntamento
         solo quando la confermi tu. <Text style={s.forte}>Massimo {TETTO_GIORNALIERO} al
-        giorno: il quinto non si scrive.</Text>
+        giorno e {TETTO_SETTIMANALE} a settimana: il quinto e il sedicesimo non si
+        scrivono.</Text> Domenica chiusa, sabato solo mattina.
       </Text>
 
       {/* --- incolla --- */}
@@ -222,6 +239,8 @@ export function RichiesteWhatsAppScreen() {
                 <Text style={s.esitoTxt}>{valutazioneNuova.motivo}</Text>
               </View>
             )}
+
+            {valutazioneNuova && <Avvisi v={valutazioneNuova} />}
 
             <TouchableOpacity
               style={s.btnPrimario}
@@ -290,6 +309,8 @@ export function RichiesteWhatsAppScreen() {
               />
               <Text style={s.esitoTxt}>{v.motivo}</Text>
             </View>
+
+            <Avvisi v={v} />
 
             {v.confermabile && (
               <View style={{ marginTop: spacing.sm }}>
@@ -376,6 +397,9 @@ const s = StyleSheet.create({
     padding: spacing.sm, marginTop: spacing.sm,
   },
   problema: { color: colors.warning, fontSize: fontSize.xs, lineHeight: 18 },
+  avvisi: { marginTop: spacing.sm, gap: 5 },
+  avvisoRiga: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  avvisoTxt: { color: colors.warning, fontSize: fontSize.xs, lineHeight: 17, flex: 1 },
   riassunto: { marginTop: spacing.sm },
   riassuntoRiga: { color: colors.text, fontSize: fontSize.sm, lineHeight: 20 },
   riassuntoNota: { color: colors.textLight, fontSize: fontSize.xs, marginTop: 2 },

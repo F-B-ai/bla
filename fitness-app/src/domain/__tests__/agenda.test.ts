@@ -1,7 +1,9 @@
 import {
   leggiCAL, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
-  impegniDi, quantiIl, postiLiberi,
-  TETTO_GIORNALIERO, AGENDA_VERSION, Impegno, RichiestaCAL,
+  impegniDi, quantiIl, postiLiberi, quantiNellaSettimana, settimanaDi,
+  giornoChiuso, dentroLeFinestre, nelBloccoAcademy,
+  TETTO_GIORNALIERO, TETTO_SETTIMANALE, ORARI_CONSIGLIATI,
+  AGENDA_VERSION, Impegno, RichiestaCAL,
 } from '../agenda';
 
 // ============================================================
@@ -16,11 +18,12 @@ const imp = (giorno: string, ora: string, chi: string, attivo = true): Impegno =
 
 const GIORNO = '2026-09-02';
 
+// I quattro orari veri della giornata del fondatore.
 const pieno: Impegno[] = [
-  imp(GIORNO, '09:00', 'Maria'),
-  imp(GIORNO, '10:00', 'Luca'),
-  imp(GIORNO, '17:00', 'Anna'),
-  imp(GIORNO, '18:00', 'Paolo'),
+  imp(GIORNO, '10:30', 'Maria'),
+  imp(GIORNO, '11:30', 'Luca'),
+  imp(GIORNO, '15:00', 'Anna'),
+  imp(GIORNO, '16:00', 'Paolo'),
 ];
 
 const cal = (testo: string) => leggiCAL(testo);
@@ -175,7 +178,7 @@ describe('IL QUINTO NON SI SCRIVE', () => {
 
   it('con tre appuntamenti il quarto passa, ed è l\'ultimo posto', () => {
     const v = valutaRichiesta({
-      richiesta: { giorno: GIORNO, ora: '19:00', persona: 'Nuova' },
+      richiesta: { giorno: GIORNO, ora: '16:00', persona: 'Nuova' },
       impegni: pieno.slice(0, 3),
     });
     expect(v.confermabile).toBe(true);
@@ -184,7 +187,7 @@ describe('IL QUINTO NON SI SCRIVE', () => {
 
   it('l\'ora già presa si dice, con il nome di chi ce l\'ha', () => {
     const v = valutaRichiesta({
-      richiesta: { giorno: GIORNO, ora: '10:00', persona: 'Nuova' },
+      richiesta: { giorno: GIORNO, ora: '11:30', persona: 'Nuova' },
       impegni: pieno.slice(0, 2),
     });
     expect(v.esito).toBe('orario_occupato');
@@ -202,10 +205,179 @@ describe('IL QUINTO NON SI SCRIVE', () => {
 
   it('giornata vuota: quattro posti', () => {
     const v = valutaRichiesta({
-      richiesta: { giorno: GIORNO, ora: '09:00', persona: 'X' }, impegni: [],
+      richiesta: { giorno: GIORNO, ora: '10:30', persona: 'X' }, impegni: [],
     });
     expect(v.confermabile).toBe(true);
     expect(v.postiLiberi).toBe(4);
+  });
+});
+
+// ------------------------------------------------------------
+
+describe('LE REGOLE DELLA GIORNATA DEL FONDATORE', () => {
+  // 2026-09-02 è un mercoledì. La settimana va da lunedì 31 agosto
+  // a domenica 6 settembre.
+  const lunedi = '2026-08-31';
+
+  it('la settimana è lunedì → domenica, e li conta tutti', () => {
+    const s = settimanaDi(GIORNO);
+    expect(s).toHaveLength(7);
+    expect(s[0]).toBe(lunedi);
+    expect(s[6]).toBe('2026-09-06');
+    expect(settimanaDi(lunedi)[0]).toBe(lunedi);
+  });
+
+  it('quindici a settimana: il sedicesimo non si scrive', () => {
+    expect(TETTO_SETTIMANALE).toBe(15);
+    // 15 impegni sparsi su lunedì-giovedì, dentro il tetto giornaliero
+    const impegni: Impegno[] = [];
+    ['2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03']
+      .forEach((g, i) => {
+        ORARI_CONSIGLIATI.slice(0, i === 3 ? 3 : 4)
+          .forEach((o) => impegni.push(imp(g, o, `p${g}${o}`)));
+      });
+    expect(quantiNellaSettimana(impegni, GIORNO)).toBe(15);
+
+    const v = valutaRichiesta({
+      richiesta: { giorno: '2026-09-04', ora: '10:30', persona: 'Sedicesima' },
+      impegni,
+    });
+    expect(v.esito).toBe('settimana_piena');
+    expect(v.confermabile).toBe(false);
+    expect(v.motivo).toContain('776');
+  });
+
+  it('e l\'alternativa proposta è nella settimana dopo, non in una già piena', () => {
+    const impegni: Impegno[] = [];
+    ['2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03']
+      .forEach((g, i) => {
+        ORARI_CONSIGLIATI.slice(0, i === 3 ? 3 : 4)
+          .forEach((o) => impegni.push(imp(g, o, 'x')));
+      });
+    const v = valutaRichiesta({
+      richiesta: { giorno: '2026-09-04', ora: '10:30', persona: 'X' }, impegni,
+    });
+    expect(v.alternative.length).toBeGreaterThan(0);
+    expect(v.alternative[0] >= '2026-09-07').toBe(true);
+  });
+
+  it('al quattordicesimo avvisa che il prossimo è l\'ultimo', () => {
+    const impegni: Impegno[] = [];
+    ['2026-08-31', '2026-09-01', '2026-09-02']
+      .forEach((g, i) => {
+        ORARI_CONSIGLIATI.slice(0, i === 2 ? 2 : 4)
+          .forEach((o) => impegni.push(imp(g, o, 'x')));
+      });
+    expect(quantiNellaSettimana(impegni, GIORNO)).toBe(10);
+    const v = valutaRichiesta({
+      richiesta: { giorno: GIORNO, ora: '15:00', persona: 'X' }, impegni,
+    });
+    expect(v.confermabile).toBe(true);
+    expect(v.motivo).toContain('su 15');
+  });
+
+  it('la domenica è spenta: nessun appuntamento, nemmeno se il giorno è vuoto', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: '2026-09-06', ora: '10:30', persona: 'X' }, impegni: [],
+    });
+    expect(v.esito).toBe('giorno_chiuso');
+    expect(v.confermabile).toBe(false);
+    expect(v.motivo.toLowerCase()).toContain('domenica');
+  });
+
+  it('nessuna alternativa proposta cade di domenica', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: '2026-09-05', ora: '10:30', persona: 'X' },
+      impegni: [
+        ...pieno.map((i) => ({ ...i, giorno: '2026-09-05' })),
+      ],
+    });
+    v.alternative.forEach((g) => expect(giornoChiuso(g)).toBeNull());
+  });
+
+  it('il sabato è solo mattina', () => {
+    const mattina = valutaRichiesta({
+      richiesta: { giorno: '2026-09-05', ora: '10:30', persona: 'X' }, impegni: [],
+    });
+    expect(mattina.confermabile).toBe(true);
+
+    const pomeriggio = valutaRichiesta({
+      richiesta: { giorno: '2026-09-05', ora: '15:00', persona: 'X' }, impegni: [],
+    });
+    expect(pomeriggio.esito).toBe('giorno_chiuso');
+    expect(pomeriggio.motivo.toLowerCase()).toContain('sabato');
+  });
+
+  it('le finestre della giornata sono 10:30-13:00 e 15:00-17:30', () => {
+    expect(dentroLeFinestre('10:30')).toBe(true);
+    expect(dentroLeFinestre('12:59')).toBe(true);
+    expect(dentroLeFinestre('13:00')).toBe(false);
+    expect(dentroLeFinestre('15:00')).toBe(true);
+    expect(dentroLeFinestre('17:30')).toBe(false);
+    expect(dentroLeFinestre('09:00')).toBe(false);
+    ORARI_CONSIGLIATI.forEach((o) => expect(dentroLeFinestre(o)).toBe(true));
+  });
+
+  it('IL BLOCCO ACADEMY si può occupare, ma il software dice quanto costa', () => {
+    expect(nelBloccoAcademy('09:00')).toBe(true);
+    expect(nelBloccoAcademy('10:30')).toBe(false);
+    const v = valutaRichiesta({
+      richiesta: { giorno: GIORNO, ora: '09:00', persona: 'X' }, impegni: [],
+    });
+    expect(v.confermabile).toBe(true); // non è un divieto: è una scelta consapevole
+    expect(v.avvisi.join(' ')).toContain('816');
+  });
+
+  it('un\'ora fuori dalle finestre avvisa, ma non blocca', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: GIORNO, ora: '19:00', persona: 'X' }, impegni: [],
+    });
+    expect(v.confermabile).toBe(true);
+    expect(v.avvisi.join(' ')).toContain('sparso');
+  });
+
+  it('venerdì pomeriggio è amministrazione: avviso, non divieto', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: '2026-09-04', ora: '15:00', persona: 'X' }, impegni: [],
+    });
+    expect(v.confermabile).toBe(true);
+    expect(v.avvisi.join(' ').toLowerCase()).toContain('venerdì');
+  });
+
+  it('la risposta a chi scrive di domenica non spiega la nostra organizzazione', () => {
+    const r: RichiestaCAL = {
+      comando: 'prenota', persona: 'Maria Rossi', telefono: '333',
+      giorno: '2026-09-06', ora: '10:30', tipo: 'visita', note: '', whatsapp: '333',
+    };
+    const testo = rispostaWhatsApp({
+      richiesta: r,
+      valutazione: valutaRichiesta({ richiesta: r, impegni: [] }),
+      impegni: [],
+    });
+    expect(testo.toLowerCase()).toContain('chiuso');
+    expect(testo).not.toContain('816');
+    expect(testo).not.toContain('Academy');
+  });
+
+  it('a settimana piena la risposta parla di seguire bene tutti, non di tetti interni', () => {
+    const impegni: Impegno[] = [];
+    ['2026-08-31', '2026-09-01', '2026-09-02', '2026-09-03']
+      .forEach((g, i) => {
+        ORARI_CONSIGLIATI.slice(0, i === 3 ? 3 : 4)
+          .forEach((o) => impegni.push(imp(g, o, 'x')));
+      });
+    const r: RichiestaCAL = {
+      comando: 'prenota', persona: 'Maria', telefono: '333',
+      giorno: '2026-09-04', ora: '10:30', tipo: 'visita', note: '', whatsapp: '333',
+    };
+    const testo = rispostaWhatsApp({
+      richiesta: r,
+      valutazione: valutaRichiesta({ richiesta: r, impegni }),
+      impegni,
+    });
+    expect(testo.toLowerCase()).toContain('seguire bene tutti');
+    expect(testo).not.toContain('776');
+    expect(testo).not.toContain('15');
   });
 });
 
@@ -225,7 +397,7 @@ describe('la risposta che torna su WhatsApp', () => {
     });
 
   it('usa il nome di battesimo, non il cognome', () => {
-    const t = rispondi(richiesta({ ora: '11:00' }), []);
+    const t = rispondi(richiesta({ ora: '11:30' }), []);
     expect(t).toContain('Maria');
     expect(t).not.toContain('Rossi');
   });
@@ -244,22 +416,22 @@ describe('la risposta che torna su WhatsApp', () => {
   });
 
   it('ora occupata: propone gli altri orari dello stesso giorno', () => {
-    const t = rispondi(richiesta({ ora: '10:00' }), pieno.slice(0, 2));
-    expect(t).toContain('10:00');
-    expect(t).toMatch(/17:00|18:00/);
+    const t = rispondi(richiesta({ ora: '11:30' }), pieno.slice(0, 2));
+    expect(t).toContain('11:30');
+    expect(t).toMatch(/15:00|16:00/);
   });
 
   it('conferma: ricorda le dieci ore, come nel patto', () => {
-    const t = rispondi(richiesta({ ora: '11:00' }), []);
+    const t = rispondi(richiesta({ ora: '11:30' }), []);
     expect(t.toLowerCase()).toContain('confermato');
     expect(t).toContain('dieci ore');
   });
 
-  it('chiedi-liberi elenca gli orari davvero liberi', () => {
+  it('chiedi-liberi elenca gli orari davvero liberi, quelli della giornata', () => {
     const t = rispondi(richiesta({ comando: 'chiedi-liberi' }), pieno.slice(0, 2));
-    expect(t).toContain('17:00');
-    expect(t).toContain('18:00');
-    expect(t).not.toContain('09:00');
+    expect(t).toContain('15:00');
+    expect(t).toContain('16:00');
+    expect(t).not.toContain('10:30');
   });
 
   it('chiedi-liberi su un giorno pieno manda al giorno dopo', () => {
@@ -270,10 +442,10 @@ describe('la risposta che torna su WhatsApp', () => {
 
   it('lo spostamento conferma la nuova data', () => {
     const t = rispondi(
-      richiesta({ comando: 'sposta', ora: '09:00', nuovoGiorno: '2026-09-04', nuovaOra: '18:00' }),
+      richiesta({ comando: 'sposta', ora: '10:30', nuovoGiorno: '2026-09-04', nuovaOra: '16:00' }),
       []
     );
-    expect(t).toContain('18:00');
+    expect(t).toContain('16:00');
     expect(t.toLowerCase()).toContain('venerdì 4 settembre');
   });
 
@@ -284,7 +456,7 @@ describe('la risposta che torna su WhatsApp', () => {
   });
 
   it('nessuna risposta è mai scortese', () => {
-    [richiesta(), richiesta({ ora: '10:00' }), richiesta({ comando: 'chiedi-liberi' })]
+    [richiesta(), richiesta({ ora: '11:30' }), richiesta({ comando: 'chiedi-liberi' })]
       .forEach((r) => {
         const t = rispondi(r, pieno).toLowerCase();
         ['impossibile', 'non possiamo', 'devi', 'purtroppo no']
@@ -302,7 +474,7 @@ describe('il riepilogo del giorno per il coach', () => {
     expect(r.liberi).toBe(2);
     expect(r.pieno).toBe(false);
     expect(r.riga).toContain('2 su 4');
-    expect(r.riga).toContain('09:00 Maria');
+    expect(r.riga).toContain('10:30 Maria');
   });
 
   it('quando è pieno lo dice in fondo alla riga', () => {
