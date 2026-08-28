@@ -36,6 +36,7 @@ import SquatAnalysisScreen from '../screens/staff/SquatAnalysisScreen';
 import MindMovementScreen from '../screens/staff/MindMovementScreen';
 import StellatoScreen from '../screens/staff/StellatoScreen';
 import ProgressioneScreen from '../screens/staff/ProgressioneScreen';
+import RichiesteWhatsAppScreen from '../screens/staff/RichiesteWhatsAppScreen';
 import { OnboardingScreen } from '../screens/staff/OnboardingScreen';
 import { PattoScreen } from '../screens/staff/PattoScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -125,6 +126,12 @@ const trainingGroup: HubGroup = {
     { icon: 'analytics-outline', title: 'Storico allenamenti', route: 'Storico' },
   ],
 };
+const agendaGroup: HubGroup = {
+  title: 'Agenda',
+  rows: [
+    { icon: 'logo-whatsapp', title: 'Richieste da WhatsApp', route: 'RichiesteWhatsApp' },
+  ],
+};
 const assessGroup: HubGroup = {
   title: 'Valutazioni',
   rows: [
@@ -163,6 +170,7 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
       ],
     },
     trainingGroup,
+    agendaGroup,
     assessGroup,
     accountGroup,
   ],
@@ -177,6 +185,7 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
       ],
     },
     trainingGroup,
+    agendaGroup,
     assessGroup,
     accountGroup,
   ],
@@ -191,6 +200,7 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
       ],
     },
     trainingGroup,
+    agendaGroup,
     assessGroup,
     accountGroup,
   ],
@@ -216,6 +226,7 @@ const buildNavigators = (role: StaffRole) => {
   const AgendaNav = () => (
     <AgendaStack.Navigator screenOptions={stackOptions}>
       <AgendaStack.Screen name="AgendaHome" component={CalendarScreen} />
+      <AgendaStack.Screen name="Richieste" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
     </AgendaStack.Navigator>
   );
 
@@ -237,6 +248,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
       <StudioStack.Screen name="Progressione" component={ProgressioneScreen} options={inner('Gerarchia della progressione')} />
+      <StudioStack.Screen name="RichiesteWhatsApp" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
       {/* Valutazioni */}
       <StudioStack.Screen name="Onboarding" component={OnboardingScreen} options={inner('Scheda onboarding')} />
       <StudioStack.Screen name="Patto" component={PattoScreen} options={inner('Patto di percorso')} />

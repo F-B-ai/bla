@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -151,6 +152,7 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 export const CalendarScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const canSeeAll = isOwner;
   const isStaff = isOwner || isManager || isCollaborator;
 
@@ -1018,6 +1020,17 @@ export const CalendarScreen: React.FC = () => {
                   {todayLabel}
                 </Text>
               </View>
+              {/* Le richieste arrivate da WhatsApp: si confermano da qui */}
+              {!isStudent && (
+                <TouchableOpacity
+                  style={styles.richiesteBtn}
+                  onPress={() => navigation.navigate('Richieste')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-whatsapp" size={18} color={colors.accent} />
+                  <Text style={styles.richiesteBtnText}>Richieste</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -2422,6 +2435,21 @@ const styles = StyleSheet.create({
   },
 
   // View tabs bar
+  richiesteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: borderRadius.round,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+  },
+  richiesteBtnText: {
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
   viewTabsBar: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
