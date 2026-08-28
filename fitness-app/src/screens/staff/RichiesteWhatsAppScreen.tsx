@@ -23,8 +23,11 @@ import {
 // ============================================================
 // RICHIESTE DA WHATSAPP
 // ------------------------------------------------------------
-// Alessia riceve le richieste su WhatsApp e le incolla qui. Il
-// coach conferma, e solo allora nascono in agenda.
+// Le richieste arrivano su WhatsApp e si incollano qui. Solo il
+// TITOLARE vede questa schermata e conferma: per decisione di
+// Francesco le chiamate arrivano a lui e a nessun collaboratore.
+// Qui dentro ci sono nome e telefono di persone che non sono
+// ancora allieve.
 //
 // La regola che questa schermata rende impossibile da violare:
 // MAI un quinto appuntamento in un giorno. Il tasto non si può
@@ -178,8 +181,8 @@ export function RichiesteWhatsAppScreen() {
   return (
     <ScrollView style={s.wrap} contentContainerStyle={{ padding: spacing.md, paddingBottom: 60 }}>
       <Text style={s.intro}>
-        Alessia incolla qui la richiesta arrivata su WhatsApp. Diventa appuntamento
-        solo quando la confermi tu. <Text style={s.forte}>Massimo {TETTO_GIORNALIERO} al
+        Incolla qui la richiesta arrivata su WhatsApp. Diventa appuntamento
+        solo quando la confermi tu — e questa schermata la vedi solo tu. <Text style={s.forte}>Massimo {TETTO_GIORNALIERO} al
         giorno e {TETTO_SETTIMANALE} a settimana: il quinto e il sedicesimo non si
         scrivono.</Text> Domenica chiusa, sabato solo mattina.
       </Text>

@@ -1020,8 +1020,9 @@ export const CalendarScreen: React.FC = () => {
                   {todayLabel}
                 </Text>
               </View>
-              {/* Le richieste arrivate da WhatsApp: si confermano da qui */}
-              {!isStudent && (
+              {/* Le richieste da WhatsApp arrivano solo al titolare:
+                  contengono i contatti di chi non è ancora allievo. */}
+              {isOwner && (
                 <TouchableOpacity
                   style={styles.richiesteBtn}
                   onPress={() => navigation.navigate('Richieste')}

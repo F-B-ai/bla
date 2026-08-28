@@ -185,7 +185,6 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
       ],
     },
     trainingGroup,
-    agendaGroup,
     assessGroup,
     accountGroup,
   ],
@@ -200,7 +199,6 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
       ],
     },
     trainingGroup,
-    agendaGroup,
     assessGroup,
     accountGroup,
   ],
@@ -226,7 +224,9 @@ const buildNavigators = (role: StaffRole) => {
   const AgendaNav = () => (
     <AgendaStack.Navigator screenOptions={stackOptions}>
       <AgendaStack.Screen name="AgendaHome" component={CalendarScreen} />
-      <AgendaStack.Screen name="Richieste" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
+      {role === 'owner' && (
+        <AgendaStack.Screen name="Richieste" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
+      )}
     </AgendaStack.Navigator>
   );
 
@@ -248,7 +248,6 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
       <StudioStack.Screen name="Progressione" component={ProgressioneScreen} options={inner('Gerarchia della progressione')} />
-      <StudioStack.Screen name="RichiesteWhatsApp" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
       {/* Valutazioni */}
       <StudioStack.Screen name="Onboarding" component={OnboardingScreen} options={inner('Scheda onboarding')} />
       <StudioStack.Screen name="Patto" component={PattoScreen} options={inner('Patto di percorso')} />
@@ -268,6 +267,7 @@ const buildNavigators = (role: StaffRole) => {
       {/* Per ruolo */}
       {role === 'owner' && (
         <>
+          <StudioStack.Screen name="RichiesteWhatsApp" component={RichiesteWhatsAppScreen} options={inner('Richieste da WhatsApp')} />
           <StudioStack.Screen name="DashboardCompleta" component={DashboardScreen} options={inner('Dashboard')} />
           <StudioStack.Screen name="Finanza" component={FinancialScreen} options={inner('Finanza')} />
           <StudioStack.Screen name="Listino" component={PricingScreen} options={inner('Listino')} />

@@ -240,13 +240,13 @@ service cloud.firestore {
 
     // Sessions
     // Richieste di appuntamento arrivate da WhatsApp.
-    // Non sono appuntamenti: lo diventano quando il coach conferma
-    // e nasce una sessione. Solo lo staff le vede e le scrive —
-    // contengono nome e telefono di persone che non sono ancora
-    // allieve, e non devono finire sotto gli occhi di nessun altro.
+    // Non sono appuntamenti: lo diventano quando il titolare conferma
+    // e nasce una sessione. Le vede e le scrive SOLO il titolare —
+    // per decisione di Francesco tutte le chiamate arrivano a lui e a
+    // nessun collaboratore, e qui dentro ci sono nome e telefono di
+    // persone che non sono ancora allieve.
     match /bookingRequests/{requestId} {
-      allow read, create, update: if isStaff();
-      allow delete: if isOwnerOrManager();
+      allow read, create, update, delete: if isOwner();
     }
 
     match /sessions/{sessionId} {
