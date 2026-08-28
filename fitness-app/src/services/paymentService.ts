@@ -10,6 +10,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { messaggioPromemoria } from '../domain/patto';
 import { PaymentPlan, Installment, CollaboratorEarning, PaymentStatus } from '../types';
 
 const PAYMENTS_COLLECTION = 'paymentPlans';
@@ -133,13 +134,12 @@ export const getPaymentReminderMessage = (
   dueDate: Date,
   daysUntil: number
 ): string => {
-  if (daysUntil === 15) {
-    return `Ciao ${studentName}! Ti ricordiamo che tra 15 giorni (${dueDate.toLocaleDateString('it-IT')}) è previsto il pagamento della rata di €${amount}. Organizzati per tempo!`;
-  }
-  if (daysUntil <= 7 && daysUntil > 1) {
-    return `Ciao ${studentName}, mancano ${daysUntil} giorni al pagamento della rata di €${amount} (${dueDate.toLocaleDateString('it-IT')}). Non dimenticare!`;
-  }
-  return `Ciao ${studentName}, domani scade la rata di €${amount}. Ricordati di effettuare il pagamento!`;
+  // Il testo vive nel dominio (patto.ts) insieme alle regole del
+  // patto firmato: messaggio e contratto non possono divergere.
+  return messaggioPromemoria({
+    nome: studentName, importo: amount, scadenza: dueDate,
+    giorniAllaScadenza: daysUntil,
+  }) || `Ciao ${studentName}, la rata di ${amount} € è in scadenza il ${dueDate.toLocaleDateString('it-IT')}.`;
 };
 
 // Decrement a lesson from a payment plan

@@ -36,6 +36,7 @@ import SquatAnalysisScreen from '../screens/staff/SquatAnalysisScreen';
 import MindMovementScreen from '../screens/staff/MindMovementScreen';
 import StellatoScreen from '../screens/staff/StellatoScreen';
 import { OnboardingScreen } from '../screens/staff/OnboardingScreen';
+import { PattoScreen } from '../screens/staff/PattoScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
@@ -126,6 +127,7 @@ const assessGroup: HubGroup = {
   title: 'Valutazioni',
   rows: [
     { icon: 'person-add-outline', title: 'Scheda onboarding — nuovo allievo', route: 'Onboarding' },
+    { icon: 'document-text-outline', title: 'Patto di percorso — da firmare', route: 'Patto' },
     { icon: 'finger-print-outline', title: 'Valutazione Mind Movement™', route: 'MindMovement' },
     { icon: 'star-outline', title: 'Esame del Sistema Stellato', route: 'Stellato' },
     { icon: 'walk-outline', title: 'Analisi del cammino', route: 'Cammino' },
@@ -234,6 +236,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
       {/* Valutazioni */}
       <StudioStack.Screen name="Onboarding" component={OnboardingScreen} options={inner('Scheda onboarding')} />
+      <StudioStack.Screen name="Patto" component={PattoScreen} options={inner('Patto di percorso')} />
       <StudioStack.Screen name="MindMovement" component={MindMovementScreen} options={inner('Mind Movement™')} />
       <StudioStack.Screen name="Stellato" component={StellatoScreen} options={inner('Sistema Stellato')} />
       <StudioStack.Screen name="Cammino" component={GaitAnalysisScreen} options={inner('Analisi del cammino')} />

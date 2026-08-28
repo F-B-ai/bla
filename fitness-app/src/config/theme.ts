@@ -32,6 +32,17 @@ export const colors = {
   textOnPrimary: '#F2F2F7',
   textOnAccent: '#FFFFFF',
 
+  // --- Carta: i documenti che si stampano ---
+  // Un patto stampato è nero su bianco, sempre: non segue il tema
+  // dell'app. Vivono qui perché il cancello della palette li veda.
+  cartaInchiostro: '#111111',
+  cartaTesto: '#333333',
+  cartaGrigio: '#555555',
+  cartaGrigioChiaro: '#666666',
+  cartaLinea: '#999999',
+  cartaLineaTenue: '#CCCCCC',
+  cartaFondo: '#F4F4F2',
+
   // --- Il Twin: contratto visivo del gemello ---
   // La seta cremisi e la scintilla d'oro. Non sono decorazione:
   // sono il segno di ESSĒRE. Vivono qui perché siano UNA sola
