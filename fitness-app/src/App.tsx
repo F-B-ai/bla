@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { registerRootComponent } from 'expo';
@@ -118,6 +119,7 @@ function App() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ErrorBoundary>
       <AuthProvider>
         <SafeAreaProvider>
@@ -126,6 +128,7 @@ function App() {
         </SafeAreaProvider>
       </AuthProvider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 
