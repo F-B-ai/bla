@@ -263,6 +263,10 @@ export interface LibraryExercise {
   category: ExerciseCategory;
   notes: string;
   videoUrl?: string;
+  videoLabel?: string;
+  /** secondo filmato (es. versione uomo), quando esiste */
+  videoUrlAlt?: string;
+  videoAltLabel?: string;
   imageUrl?: string;
   gender: 'male' | 'female' | 'unisex';
   fromFirestore: boolean;
@@ -307,6 +311,11 @@ export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
       restSeconds: def.restSeconds,
       category: def.category,
       notes: def.notes,
+      // gli esercizi del canone arrivano col filmato già attaccato
+      videoUrl: def.videoUrl,
+      videoLabel: def.videoLabel,
+      videoUrlAlt: def.videoUrlAlt,
+      videoAltLabel: def.videoAltLabel,
       gender: def.gender,
       fromFirestore: false,
     });

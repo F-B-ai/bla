@@ -517,14 +517,16 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   };
 
-  const selectFromLibrary = (libEx: LibraryExercise) => {
+  // Alcuni esercizi hanno due filmati (donna e uomo): si sceglie
+  // quello giusto per l'allievo mentre lo si inserisce in scheda.
+  const selectFromLibrary = (libEx: LibraryExercise, quale: 'principale' | 'alt' = 'principale') => {
     setExName(libEx.name);
     setExDescription(libEx.description);
     setExSets(String(libEx.sets));
     setExReps(libEx.reps);
     setExRest(String(libEx.restSeconds));
     setExCategory(libEx.category);
-    setExVideoUrl(libEx.videoUrl || '');
+    setExVideoUrl((quale === 'alt' ? libEx.videoUrlAlt : libEx.videoUrl) || '');
     setExNotes(libEx.notes);
     setShowLibraryPicker(false);
     setLibrarySearch('');
@@ -2037,13 +2039,37 @@ export const WorkoutPlanScreen: React.FC = () => {
                     <Text style={styles.libraryItemBadge}>{libEx.sets}x{libEx.reps}</Text>
                     <Text style={styles.libraryItemBadge}>Rec: {libEx.restSeconds}s</Text>
                     <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
-                    {libEx.videoUrl && (
+                    {libEx.videoUrl && !libEx.videoUrlAlt && (
                       <View style={styles.libraryVideoBadge}>
                         <Ionicons name="videocam" size={12} color={colors.white} />
-                        <Text style={styles.libraryVideoBadgeText}>Video</Text>
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoLabel || 'Video'}
+                        </Text>
                       </View>
                     )}
                   </View>
+                  {libEx.videoUrl && libEx.videoUrlAlt && (
+                    <View style={styles.libraryVideoChoice}>
+                      <TouchableOpacity
+                        style={styles.libraryVideoBadge}
+                        onPress={() => selectFromLibrary(libEx, 'principale')}
+                      >
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoLabel || 'Film 1'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.libraryVideoBadge}
+                        onPress={() => selectFromLibrary(libEx, 'alt')}
+                      >
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoAltLabel || 'Film 2'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
                 <Ionicons name="add-circle" size={26} color={colors.accent} />
               </TouchableOpacity>
@@ -2649,6 +2675,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
     overflow: 'hidden',
+  },
+  libraryVideoChoice: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   libraryVideoBadge: {
     flexDirection: 'row',

@@ -44,6 +44,11 @@ self.addEventListener('fetch', (event) => {
   // Only handle same-origin requests
   if (url.origin !== location.origin) return;
 
+  // Filmati degli esercizi: il browser se li gestisce da solo.
+  // Passano per richieste Range (206) che la cache non può contenere,
+  // e sono file pesanti: fuori dal service worker.
+  if (url.pathname.startsWith('/video/') || request.destination === 'video') return;
+
   // Font files: cache-first (serve from cache immediately, update in background)
   if (request.url.endsWith('.ttf') || request.url.endsWith('.woff') || request.url.endsWith('.woff2') || request.destination === 'font') {
     event.respondWith(

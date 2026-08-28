@@ -1,4 +1,5 @@
 import { ExerciseCategory } from '../types';
+import { canonExercises } from './canonExercises';
 
 export interface DefaultExercise {
   name: string;
@@ -9,6 +10,12 @@ export interface DefaultExercise {
   category: ExerciseCategory;
   notes: string;
   gender: 'male' | 'female' | 'unisex';
+  /** filmato dell'esecuzione: l'esercizio entra in libreria già completo */
+  videoUrl?: string;
+  videoLabel?: string;
+  /** secondo filmato (es. versione uomo), quando esiste */
+  videoUrlAlt?: string;
+  videoAltLabel?: string;
 }
 
 // ============================================================
@@ -991,7 +998,10 @@ export const femaleExercisesExtra: DefaultExercise[] = [
   },
 ];
 
+// Il canone di Francesco apre la libreria: descrizione del metodo
+// e filmato già dentro (docs/schede-esercizi.md è la fonte del testo).
 export const allDefaultExercises: DefaultExercise[] = [
+  ...canonExercises,
   ...maleExercises,
   ...femaleExercises,
   ...maleExercisesExtra,
