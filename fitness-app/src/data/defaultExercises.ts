@@ -16,6 +16,13 @@ export interface DefaultExercise {
   /** secondo filmato (es. versione uomo), quando esiste */
   videoUrlAlt?: string;
   videoAltLabel?: string;
+  /**
+   * Eccezione DICHIARATA: la descrizione è canone e definitiva, il
+   * filmato è annunciato ma non ancora consegnato. Serve a non tenere
+   * fuori dalla libreria un metodo già scritto, senza far finta che
+   * il film ci sia. Si toglie il giorno che il film arriva.
+   */
+  filmInArrivo?: boolean;
 }
 
 // ============================================================
