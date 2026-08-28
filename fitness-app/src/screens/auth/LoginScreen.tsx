@@ -19,6 +19,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { resetPassword } from '../../services/authService';
 import { RegisterStudentScreen } from './RegisterStudentScreen';
 import { EnsoLogo } from '../../components/common/EnsōLogo';
+import { brand } from '../../config/brand';
 
 interface LoginScreenProps {
   onBack?: () => void;
@@ -100,8 +101,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
       >
         <View style={styles.header}>
           <EnsoLogo size={120} />
-          <Text style={styles.title}>Essère</Text>
-          <Text style={styles.subtitle}>Il tuo percorso di benessere</Text>
+          <Text style={styles.title}>{brand.appName}</Text>
+          <Text style={styles.subtitle}>Comprendi chi sei attraverso il movimento.</Text>
         </View>
 
         <View style={styles.form}>

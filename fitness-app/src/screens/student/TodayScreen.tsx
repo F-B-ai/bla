@@ -1,303 +1,203 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+  RefreshControl, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
+import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
-import { getTodayCheck, WellnessCheck } from '../../services/wellnessService';
-import { adviceForScore } from '../../domain/formulas';
+import { getTodayCheck } from '../../services/wellnessService';
 import { getActiveWorkoutPlan } from '../../services/programService';
-import { getStudentSessions } from '../../services/sessionService';
-import { getStudentGamification } from '../../services/gamificationService';
-import { getStudentPaymentPlans } from '../../services/paymentService';
-import { daysUntilDue } from '../../domain/formulas';
-import { WorkoutPlan, TrainingSession } from '../../types';
+import { getMyTwinState } from '../../services/twinStateService';
+import { computeOggi, Oggi, Tono } from '../../domain/oggi';
 
 // ============================================================
-// OGGI — home allievo (M2, doc 04 §2.1)
-// La risposta alla domanda quotidiana "cosa faccio oggi":
-// Stato ESSĒRE, seduta del giorno, prossimo appuntamento,
-// avvisi (rata in scadenza), QR palestra sempre a un tap.
+// OGGI — il gemello, non il login.
+// ------------------------------------------------------------
+// Disciplina: silenzio, UNA cosa per schermata. Tre strati:
+// lo stato (una riga), il perché (l'evidenza), l'azione (una).
+// Il Metodo è presente ogni giorno, anche quando il gemello
+// non sa ancora nulla di te.
 // ============================================================
 
-const dayName = (d: Date) =>
-  ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'][d.getDay()];
+const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 
-export const TodayScreen: React.FC = () => {
+const tonoColor = (t: Tono): string => {
+  switch (t) {
+    case 'pronto': return colors.success;
+    case 'misura': return colors.warning;
+    case 'recupero': return colors.info;
+    default: return colors.accent;
+  }
+};
+
+export function TodayScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const [oggi, setOggi] = useState<Oggi | null>(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [todayCheck, setTodayCheck] = useState<WellnessCheck | null>(null);
-  const [plan, setPlan] = useState<WorkoutPlan | null>(null);
-  const [nextSession, setNextSession] = useState<TrainingSession | null>(null);
-  const [streak, setStreak] = useState(0);
-  const [badgeCount, setBadgeCount] = useState(0);
-  const [dueSoon, setDueSoon] = useState<{ amount: number; days: number } | null>(null);
 
-  const load = useCallback(async () => {
+  const carica = useCallback(async () => {
     if (!user) return;
-    const results = await Promise.allSettled([
-      getTodayCheck(user.id),
-      getActiveWorkoutPlan(user.id),
-      getStudentSessions(user.id),
-      getStudentGamification(user.id),
-      getStudentPaymentPlans(user.id),
+    const [twin, check, piano] = await Promise.all([
+      getMyTwinState(user.id).catch(() => null),
+      getTodayCheck(user.id).catch(() => null),
+      getActiveWorkoutPlan(user.id).catch(() => null),
     ]);
-    if (results[0].status === 'fulfilled') setTodayCheck(results[0].value);
-    if (results[1].status === 'fulfilled') setPlan(results[1].value);
-    if (results[2].status === 'fulfilled') {
-      const now = new Date();
-      const upcoming = (results[2].value || [])
-        .filter((s: TrainingSession) => s.status === 'scheduled' && new Date(s.date) >= new Date(now.toDateString()))
-        .sort((a: TrainingSession, b: TrainingSession) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      setNextSession(upcoming[0] || null);
-    }
-    if (results[3].status === 'fulfilled' && results[3].value) {
-      setStreak(results[3].value.currentStreak || 0);
-      setBadgeCount((results[3].value.badges || []).length);
-    }
-    if (results[4].status === 'fulfilled') {
-      let best: { amount: number; days: number } | null = null;
-      for (const p of results[4].value || []) {
-        for (const inst of (p as any).installments || []) {
-          if (inst.isPaid || !inst.dueDate) continue;
-          const due = inst.dueDate?.toDate ? inst.dueDate.toDate() : new Date(inst.dueDate);
-          const days = daysUntilDue(due);
-          if (days <= 7 && (best === null || days < best.days)) {
-            best = { amount: inst.amount || 0, days };
-          }
-        }
-      }
-      setDueSoon(best);
-    }
+    setOggi(computeOggi({
+      date: new Date(),
+      twin,
+      checkinOggi: Boolean(check),
+      haSchedaAttiva: Boolean(piano),
+      allenatoOggi: false,
+      nome: user.name,
+    }));
   }, [user]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  useFocusEffect(useCallback(() => {
+    let vivo = true;
+    setLoading(true);
+    carica().finally(() => { if (vivo) setLoading(false); });
+    return () => { vivo = false; };
+  }, [carica]));
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
+    await carica();
     setRefreshing(false);
+  }, [carica]);
+
+  // L'azione del dominio → destinazione reale nell'app
+  const vaiAllAzione = () => {
+    if (!oggi) return;
+    switch (oggi.azione.route) {
+      case 'Checkin':                       // l'ascolto vive dentro Stato ESSĒRE
+        navigation.navigate('StatoEssere'); break;
+      case 'Scheda':
+        navigation.navigate('Allenati', { screen: 'Scheda' }); break;
+      case 'Storia':
+      default:
+        navigation.navigate('Progressi', { screen: 'Storia' }); break;
+    }
   };
 
-  const today = new Date();
-  const advice = todayCheck ? adviceForScore(todayCheck.score) : null;
+  if (loading || !oggi) {
+    return (
+      <View style={[s.center, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  const d = new Date();
+  const accent = tonoColor(oggi.tono);
 
   return (
-    <View style={styles.container}>
-      {/* Header: saluto + QR + campanella (doc 04: persistenti, 1 tap) */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xxl) }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerDay}>{dayName(today)} {today.getDate()}</Text>
-          <Text style={styles.headerTitle}>Ciao {user?.name || ''} 👋</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.navigate('CheckinPalestra')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="qr-code-outline" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => navigation.navigate('Notifiche')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="notifications-outline" size={24} color={colors.textOnPrimary} />
-        </TouchableOpacity>
+    <ScrollView
+      style={s.wrap}
+      contentContainerStyle={[s.content, { paddingTop: insets.top + spacing.xl }]}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+      }
+    >
+      {/* il giorno, sottovoce */}
+      <Text style={s.giorno}>
+        {GIORNI[d.getDay()]} {d.getDate()}
+      </Text>
+
+      {/* ——— LO STATO ——— */}
+      <View style={s.statoBlocco}>
+        <View style={[s.polso, { backgroundColor: accent }]} />
+        <Text style={s.stato}>{oggi.stato}</Text>
       </View>
 
-      <ScrollView
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-      >
-        {/* Avviso rata in scadenza (proattivo, doc 04 §2.2) */}
-        {dueSoon && (
-          <TouchableOpacity
-            style={styles.alertCard}
-            onPress={() => navigation.navigate('Profilo', { screen: 'Pagamenti' })}
-          >
-            <Ionicons name="card-outline" size={20} color={colors.warning} />
-            <Text style={styles.alertText}>
-              {dueSoon.days < 0
-                ? `Rata di €${dueSoon.amount} scaduta da ${-dueSoon.days} giorni`
-                : dueSoon.days === 0
-                  ? `Rata di €${dueSoon.amount} in scadenza oggi`
-                  : `Rata di €${dueSoon.amount} tra ${dueSoon.days} giorni`}
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-
-        {/* Stato ESSĒRE — card in testa (1 tap) */}
-        <TouchableOpacity
-          style={[styles.card, styles.essereCard]}
-          onPress={() => navigation.navigate('StatoEssere')}
-          activeOpacity={0.85}
-        >
-          {todayCheck ? (
-            <View style={styles.essereRow}>
-              <View style={[styles.scoreRing, { borderColor:
-                advice?.color === 'success' ? colors.success :
-                advice?.color === 'warning' ? colors.warning : colors.error }]}
-              >
-                <Text style={styles.scoreText}>{todayCheck.score}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{advice?.title}</Text>
-                <Text style={styles.cardSub} numberOfLines={2}>{advice?.detail}</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.essereRow}>
-              <View style={[styles.scoreRing, { borderColor: colors.accent }]}>
-                <Ionicons name="pulse" size={26} color={colors.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Come stai oggi?</Text>
-                <Text style={styles.cardSub}>Fai il check-in Stato ESSĒRE: 30 secondi per il consiglio di allenamento di oggi</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Seduta del giorno */}
-        <TouchableOpacity
-          style={styles.card}
-          onPress={() => navigation.navigate('Allenati')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.cardHeaderRow}>
-            <Ionicons name="barbell-outline" size={20} color={colors.accent} />
-            <Text style={styles.cardLabel}>Il tuo allenamento</Text>
-          </View>
-          {plan ? (
-            <>
-              <Text style={styles.cardTitle}>{(plan as any).name || 'Scheda attiva'}</Text>
-              <Text style={styles.cardSub}>Apri la scheda o inizia la seduta dal vivo</Text>
-            </>
-          ) : (
-            <Text style={styles.cardSub}>Nessuna scheda attiva: parlane col tuo coach in Chat</Text>
-          )}
-        </TouchableOpacity>
-
-        {/* Prossimo appuntamento */}
-        {nextSession && (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate('Agenda')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.cardHeaderRow}>
-              <Ionicons name="calendar-outline" size={20} color={colors.accent} />
-              <Text style={styles.cardLabel}>Prossimo appuntamento</Text>
-            </View>
-            <Text style={styles.cardTitle}>
-              {dayName(new Date(nextSession.date))} {new Date(nextSession.date).getDate()} · {nextSession.startTime}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Streak + traguardi */}
-        <View style={styles.statsRow}>
-          <TouchableOpacity
-            style={[styles.card, styles.statCard]}
-            onPress={() => navigation.navigate('Progressi', { screen: 'Traguardi' })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.statValue}>🔥 {streak}</Text>
-            <Text style={styles.statLabel}>giorni di fila</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.card, styles.statCard]}
-            onPress={() => navigation.navigate('Progressi', { screen: 'Traguardi' })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.statValue}>🏆 {badgeCount}/50</Text>
-            <Text style={styles.statLabel}>traguardi</Text>
-          </TouchableOpacity>
+      {/* ——— IL PERCHÉ ——— */}
+      {oggi.perche.length > 0 && (
+        <View style={s.perche}>
+          {oggi.perche.map((p, i) => (
+            <Text key={i} style={s.perchéRiga}>{p}</Text>
+          ))}
         </View>
+      )}
 
-        {/* Assistente */}
-        <TouchableOpacity
-          style={styles.assistantRow}
-          onPress={() => navigation.navigate('Chat', { screen: 'Assistente' })}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="sparkles" size={18} color={colors.accent} />
-          <Text style={styles.assistantText}>Domande su orari, prezzi o servizi? Chiedi all'Assistente</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+      {/* ——— L'AZIONE: una sola ——— */}
+      <TouchableOpacity
+        style={[s.azione, { borderColor: accent + '55' }]}
+        onPress={vaiAllAzione}
+        activeOpacity={0.85}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={[s.azioneTitolo, { color: accent }]}>{oggi.azione.titolo}</Text>
+          <Text style={s.azioneSub}>{oggi.azione.sottotitolo}</Text>
+        </View>
+        <Ionicons name="arrow-forward" size={20} color={accent} />
+      </TouchableOpacity>
+
+      {/* ——— IL METODO: presente ogni giorno, sottovoce ——— */}
+      <View style={s.metodo}>
+        <Text style={s.metodoEtichetta}>OGGI · {oggi.dimensione.nome.toUpperCase()}</Text>
+        <Text style={s.metodoDomanda}>{oggi.dimensione.domanda}</Text>
+      </View>
+
+      {/* la porta verso la storia, discreta */}
+      <TouchableOpacity
+        style={s.porta}
+        onPress={() => navigation.navigate('Progressi', { screen: 'Storia' })}
+      >
+        <Text style={s.portaTxt}>La tua storia</Text>
+        <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+      </TouchableOpacity>
+    </ScrollView>
   );
-};
+}
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+const s = StyleSheet.create({
+  wrap: { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl * 2 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+
+  giorno: {
+    color: colors.textSecondary, fontSize: fontSize.xs,
+    letterSpacing: 2, textTransform: 'uppercase',
   },
-  headerDay: { fontSize: fontSize.sm, color: colors.textLight, textTransform: 'capitalize' },
-  headerTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
-  headerBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: colors.glass,
-    alignItems: 'center', justifyContent: 'center',
+
+  statoBlocco: { marginTop: spacing.xl, flexDirection: 'row', alignItems: 'flex-start' },
+  polso: { width: 3, height: 44, borderRadius: 2, marginRight: spacing.md, marginTop: 6 },
+  stato: {
+    flex: 1, color: colors.text, fontSize: 34, lineHeight: 41,
+    fontWeight: '300', letterSpacing: -0.5,
   },
-  body: { flex: 1 },
-  bodyContent: { padding: spacing.md, paddingBottom: spacing.xxl },
-  alertCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: borderRadius.lg,
-    borderLeftWidth: 4, borderLeftColor: colors.warning,
-    padding: spacing.md, marginBottom: spacing.md, ...shadows.small,
+
+  perche: { marginTop: spacing.lg, gap: 6, paddingLeft: spacing.md + 3 },
+  perchéRiga: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 21 },
+
+  azione: {
+    marginTop: spacing.xl, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: borderRadius.lg,
+    paddingVertical: spacing.md + 2, paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface, gap: spacing.sm,
   },
-  alertText: { flex: 1, fontSize: fontSize.sm, color: colors.text, fontWeight: '600' },
-  card: {
-    backgroundColor: colors.surface, borderRadius: borderRadius.lg,
-    padding: spacing.md, marginBottom: spacing.md, ...shadows.small,
+  azioneTitolo: { fontSize: fontSize.md, fontWeight: '700' },
+  azioneSub: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 3, lineHeight: 19 },
+
+  metodo: { marginTop: spacing.xl * 1.4 },
+  metodoEtichetta: {
+    color: colors.accent, fontSize: 10, letterSpacing: 2.5, fontWeight: '700',
   },
-  essereCard: { paddingVertical: spacing.lg },
-  essereRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  scoreRing: {
-    width: 64, height: 64, borderRadius: 32, borderWidth: 4,
-    alignItems: 'center', justifyContent: 'center',
+  metodoDomanda: {
+    color: colors.text, fontSize: fontSize.md, marginTop: 6,
+    fontWeight: '300', lineHeight: 24,
   },
-  scoreText: { fontSize: fontSize.xl, fontWeight: '800', color: colors.text },
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
-  cardLabel: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
-  cardTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
-  cardSub: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  statsRow: { flexDirection: 'row', gap: spacing.md },
-  statCard: { flex: 1, alignItems: 'center', paddingVertical: spacing.lg },
-  statValue: { fontSize: fontSize.xl, fontWeight: '800', color: colors.text },
-  statLabel: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
-  assistantRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surface, borderRadius: borderRadius.lg,
-    padding: spacing.md, ...shadows.small,
+
+  porta: {
+    marginTop: spacing.xl * 1.4, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 4, paddingVertical: spacing.sm,
   },
-  assistantText: { flex: 1, fontSize: fontSize.sm, color: colors.text },
+  portaTxt: { color: colors.textSecondary, fontSize: fontSize.sm },
 });
+
+export default TodayScreen;

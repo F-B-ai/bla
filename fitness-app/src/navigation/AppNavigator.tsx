@@ -1066,6 +1066,80 @@ const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => {
   );
 };
 
+// ============================================================
+// ROUTE VERE (web + deep link)
+// ------------------------------------------------------------
+// Fino a qui non esisteva alcuna configurazione `linking`: ogni
+// URL cadeva su index.html e riportava al gate. Un indirizzo non
+// era condivisibile, il tasto "indietro" del browser non tornava
+// dove eri stato, e nessuna schermata era raggiungibile da fuori.
+// Le rotte qui sotto sono l'indirizzo pubblico del sistema.
+// ============================================================
+const LINKING = {
+  prefixes: [
+    'https://essere-3fe6f.web.app',
+    'https://essere-3fe6f.firebaseapp.com',
+    'essere://',
+  ],
+  config: {
+    screens: {
+      // --- ingresso ---
+      LoginSelector: 'entra',
+      Login: 'accedi',
+      AcademyLogin: 'academy/accedi',
+
+      // --- allievo ---
+      StudentTabs: {
+        path: '',
+        screens: {
+          Oggi: {
+            path: 'oggi',
+            screens: {
+              OggiHome: '',
+              StatoEssere: 'stato',
+              CheckinPalestra: 'checkin',
+              Agenda: 'agenda',
+              Notifiche: 'notifiche',
+            },
+          },
+          Allenati: {
+            path: 'allenati',
+            screens: {
+              AllenatiHome: '',
+              Scheda: 'scheda',
+              SedutaLive: 'seduta',
+              Storico: 'storico',
+            },
+          },
+          Progressi: {
+            path: 'progressi',
+            screens: {
+              ProgressiHome: '',
+              Storia: 'storia',
+              Traguardi: 'traguardi',
+              Diario: 'diario',
+              AICoach: 'ai-coach',
+            },
+          },
+          Chat: { path: 'messaggi', screens: { ChatHome: '', Assistente: 'assistente' } },
+          Profilo: {
+            path: 'profilo',
+            screens: { ProfiloHome: '', MieiDati: 'dati', Pagamenti: 'pagamenti' },
+          },
+        },
+      },
+
+      // --- academy ---
+      AcademyTabs: { path: 'academy' },
+
+      // --- staff: un solo prefisso, le sotto-rotte le risolve lo stack ---
+      OwnerTabs: { path: 'studio' },
+      ManagerTabs: { path: 'studio' },
+      CollaboratorTabs: { path: 'studio' },
+    },
+  },
+};
+
 // --- Loading screen ---
 const LoadingScreen = () => (
   <View style={styles.loading}>
@@ -1201,6 +1275,7 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer
+      linking={LINKING}
       documentTitle={{
         formatter: () => effectiveLoginMode === 'academy' ? brand.academyName : brand.appName,
       }}
