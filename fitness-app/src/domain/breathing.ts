@@ -72,6 +72,18 @@ export const PRATICHE: Pratica[] = [
     durataDefault: 3,
   },
   {
+    id: 'calma',
+    nome: 'Calma',
+    intento: "L'uscita molto più lunga dell'entrata, con una sosta in mezzo. Per la sera.",
+    ciclo: [
+      { key: 'inspira', secondi: 4 },
+      { key: 'trattieni', secondi: 7 },
+      { key: 'espira', secondi: 8 },
+    ],
+    durate: [1, 3, 5],
+    durataDefault: 3,
+  },
+  {
     id: 'quadrato',
     nome: 'Quadrato',
     intento: 'Quattro tempi uguali. Chiede attenzione: la testa smette di andare altrove.',

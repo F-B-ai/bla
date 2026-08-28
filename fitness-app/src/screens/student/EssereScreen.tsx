@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { brand } from '../../config/brand';
 import { useAuth } from '../../hooks/useAuth';
@@ -37,43 +38,12 @@ const QUESTIONS: { key: 'sleep' | 'energy' | 'mood' | 'soreness'; icon: string; 
 ];
 
 // ------------------------------------------------------------
-// Protocolli di respirazione
-// ------------------------------------------------------------
-interface BreathPhase { label: string; ms: number; to: number }
-interface BreathProtocol { key: string; name: string; desc: string; icon: string; phases: BreathPhase[] }
-
-const PROTOCOLS: BreathProtocol[] = [
-  {
-    key: 'calma', name: 'Calma', desc: '4-7-8 · rilassamento profondo', icon: 'moon-outline',
-    phases: [
-      { label: 'Inspira', ms: 4000, to: 1 },
-      { label: 'Trattieni', ms: 7000, to: 1 },
-      { label: 'Espira', ms: 8000, to: 0.35 },
-    ],
-  },
-  {
-    key: 'focus', name: 'Focus', desc: 'Box 4-4-4-4 · concentrazione', icon: 'square-outline',
-    phases: [
-      { label: 'Inspira', ms: 4000, to: 1 },
-      { label: 'Trattieni', ms: 4000, to: 1 },
-      { label: 'Espira', ms: 4000, to: 0.35 },
-      { label: 'Trattieni', ms: 4000, to: 0.35 },
-    ],
-  },
-  {
-    key: 'equilibrio', name: 'Equilibrio', desc: 'Coerenza 5-5 · pre-allenamento', icon: 'infinite-outline',
-    phases: [
-      { label: 'Inspira', ms: 5000, to: 1 },
-      { label: 'Espira', ms: 5000, to: 0.35 },
-    ],
-  },
-];
-
 const scoreColor = (score: number): string =>
   score >= 75 ? colors.success : score >= 50 ? colors.warning : colors.error;
 
 export const EssereScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
 
   // --- Stato check-in ---
@@ -82,14 +52,6 @@ export const EssereScreen: React.FC = () => {
   const [todayCheck, setTodayCheck] = useState<WellnessCheck | null>(null);
   const [recent, setRecent] = useState<WellnessCheck[]>([]);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-
-  // --- Stato respirazione ---
-  const [activeProtocol, setActiveProtocol] = useState<BreathProtocol | null>(null);
-  const [phaseLabel, setPhaseLabel] = useState('');
-  const [cycles, setCycles] = useState(0);
-  const breathAnim = useRef(new Animated.Value(0.35)).current;
-  const breathingRef = useRef(false);
-  const phaseTimerRef = useRef<any>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -135,44 +97,6 @@ export const EssereScreen: React.FC = () => {
     }
   };
 
-  // --- Respirazione: ciclo di fasi con animazione ---
-  const stopBreathing = useCallback(() => {
-    breathingRef.current = false;
-    if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
-    breathAnim.stopAnimation();
-    breathAnim.setValue(0.35);
-    setActiveProtocol(null);
-    setPhaseLabel('');
-    setCycles(0);
-  }, [breathAnim]);
-
-  const runPhase = useCallback((protocol: BreathProtocol, index: number) => {
-    if (!breathingRef.current) return;
-    const phase = protocol.phases[index];
-    setPhaseLabel(phase.label);
-    Animated.timing(breathAnim, {
-      toValue: phase.to,
-      duration: phase.ms,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-    phaseTimerRef.current = setTimeout(() => {
-      const next = (index + 1) % protocol.phases.length;
-      if (next === 0) setCycles((c) => c + 1);
-      runPhase(protocol, next);
-    }, phase.ms);
-  }, [breathAnim]);
-
-  const startBreathing = useCallback((protocol: BreathProtocol) => {
-    stopBreathing();
-    breathingRef.current = true;
-    setActiveProtocol(protocol);
-    setCycles(0);
-    runPhase(protocol, 0);
-  }, [runPhase, stopBreathing]);
-
-  useEffect(() => () => { breathingRef.current = false; if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current); }, []);
-
   const advice = todayCheck ? adviceForScore(todayCheck.score) : null;
   const adviceColor = advice ? colors[advice.color] : colors.accent;
 
@@ -185,28 +109,7 @@ export const EssereScreen: React.FC = () => {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ================= RESPIRAZIONE ATTIVA ================= */}
-        {activeProtocol ? (
-          <View style={styles.breathSession}>
-            <Text style={styles.breathProtocolName}>{activeProtocol.name}</Text>
-            <View style={styles.breathCircleWrap}>
-              <Animated.View
-                style={[
-                  styles.breathCircle,
-                  { transform: [{ scale: breathAnim }] },
-                ]}
-              />
-              <View style={styles.breathLabelWrap} pointerEvents="none">
-                <Text style={styles.breathPhase}>{phaseLabel}</Text>
-                <Text style={styles.breathCycles}>{cycles} cicli</Text>
-              </View>
-            </View>
-            <TouchableOpacity style={styles.breathStop} onPress={stopBreathing} activeOpacity={0.8}>
-              <Ionicons name="stop" size={18} color={colors.text} />
-              <Text style={styles.breathStopText}>Termina</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
+                <>
             {/* ================= STATO DEL GIORNO ================= */}
             {loading ? (
               <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.xxl }} />
@@ -290,30 +193,28 @@ export const EssereScreen: React.FC = () => {
               </View>
             )}
 
-            {/* ================= RESPIRAZIONE ================= */}
-            <Text style={styles.sectionTitle}>Respirazione guidata</Text>
+            {/* ================= RESPIRO ================= */}
+            {/* L'atto vive in una schermata sola (Oggi → Respiro): qui
+                c'e la porta, non una seconda copia della pratica. */}
+            <Text style={styles.sectionTitle}>Respiro</Text>
             <Text style={styles.sectionSub}>
-              La mente guida il movimento: pochi minuti di respiro consapevole cambiano la seduta.
+              Il respiro e una delle dimensioni del Metodo: quello che fai resta nella tua storia.
             </Text>
-            {PROTOCOLS.map((p) => (
-              <TouchableOpacity
-                key={p.key}
-                style={styles.protocolCard}
-                onPress={() => startBreathing(p)}
-                activeOpacity={0.75}
-              >
-                <View style={styles.protocolIcon}>
-                  <Ionicons name={p.icon as any} size={22} color={colors.accent} />
-                </View>
-                <View style={styles.protocolInfo}>
-                  <Text style={styles.protocolName}>{p.name}</Text>
-                  <Text style={styles.protocolDesc}>{p.desc}</Text>
-                </View>
-                <Ionicons name="play-circle" size={30} color={colors.accent} />
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
+            <TouchableOpacity
+              style={styles.protocolCard}
+              onPress={() => navigation.navigate('Respiro')}
+              activeOpacity={0.75}
+            >
+              <View style={styles.protocolIcon}>
+                <Ionicons name="leaf-outline" size={22} color={colors.accent} />
+              </View>
+              <View style={styles.protocolInfo}>
+                <Text style={styles.protocolName}>Pratica guidata</Text>
+                <Text style={styles.protocolDesc}>Coerenza, calma, quadrato, diaframmatico</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color={colors.accent} />
+            </TouchableOpacity>
+        </>
 
         <View style={{ height: 100 }} />
       </ScrollView>
