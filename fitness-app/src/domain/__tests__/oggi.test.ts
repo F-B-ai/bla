@@ -1,6 +1,6 @@
 import {
   computeOggi, dimensioneDelGiorno, maturitaDi, DIMENSIONI, OGGI_VERSION,
-  TwinState, OggiInput,
+  toTwinContract, TwinState, OggiInput,
 } from '../oggi';
 
 // ============================================================
@@ -51,18 +51,17 @@ describe('COLD START — il caso principale', () => {
   it('gemello assente: dichiara di non sapere, non finge', () => {
     const o = computeOggi(base());
     expect(o.maturita).toBe('sconosciuto');
-    expect(o.stato).toBe('Non ti conosco ancora.');
+    expect(o.stato).toBe('Il tuo sistema non ha ancora voce.');
     expect(o.tono).toBe('neutro');
     // nessun numero inventato nel perché
     expect(o.perche.join(' ')).not.toMatch(/\d+ ascolti/);
   });
 
-  it('gemello assente: l\'azione è aprire il gemello, dentro il linguaggio del Metodo', () => {
+  it('gemello assente: il primo passo è un GESTO, non un modulo', () => {
     const o = computeOggi(base());
     expect(o.azione.apreIlGemello).toBe(true);
-    expect(o.azione.route).toBe('Checkin');
-    // il sottotitolo è la voce della dimensione, non un modulo da compilare
-    expect(o.azione.sottotitolo).toBe(o.dimensione.osserva);
+    expect(o.azione.route).toBe('Respiro');
+    expect(o.azione.titolo).toContain('respiro');
   });
 
   it('pochi ascolti: sta conoscendo, non emette ancora verdetti', () => {
@@ -154,12 +153,12 @@ describe('IL PERCHÉ — solo evidenze vere', () => {
 
   it('gemello vuoto: nessuna evidenza fabbricata', () => {
     const o = computeOggi(base());
-    expect(o.perche).toEqual(['Il gemello si apre con il primo ascolto.']);
+    expect(o.perche).toEqual(['Il gemello nasce dal gesto, non dai numeri.']);
   });
 });
 
 describe("L'AZIONE — una sola, con gerarchia", () => {
-  it('senza check-in di oggi, l\'ascolto viene prima di tutto', () => {
+  it('gemello che ha già voce, senza check-in: l\'ascolto viene prima', () => {
     const o = computeOggi(base({
       checkinOggi: false, haSchedaAttiva: true,
       twin: twin(),
@@ -274,6 +273,67 @@ describe('garanzie', () => {
       const o = computeOggi(i);
       expect(o.azione.titolo.length).toBeGreaterThan(0);
       expect(o.azione.route.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+
+describe('CONTRATTO verso la vista (concordato col CTO architettura)', () => {
+  it('presence rispecchia la maturità: empty · thin · alive', () => {
+    expect(toTwinContract(computeOggi(base())).presence).toBe('empty');
+    expect(toTwinContract(computeOggi(base({
+      twin: twin({ readiness: { checkins_14d: 2 } }),
+    }))).presence).toBe('thin');
+    expect(toTwinContract(computeOggi(base({
+      checkinOggi: true, twin: twin(),
+    }))).presence).toBe('alive');
+  });
+
+  it('a gemello vuoto: scintilla bassa, e il gesto è il respiro', () => {
+    const c = toTwinContract(computeOggi(base()));
+    expect(c.spark.intensity).toBeLessThan(0.35);
+    expect(c.next?.kind).toBe('respiro');
+    expect(c.next?.minutes).toBe(6);
+  });
+
+  it('la scintilla sale quando il corpo è pronto', () => {
+    const pronto = toTwinContract(computeOggi(base({
+      checkinOggi: true,
+      twin: twin({ readiness: {
+        latest_v2: 85, latest_penalized: 85, checkins_14d: 9, slope_14d: 0, checkin_gap_days: 0,
+      } }),
+    })));
+    const giu = toTwinContract(computeOggi(base({
+      checkinOggi: true,
+      twin: twin({ readiness: {
+        latest_v2: 30, latest_penalized: 30, checkins_14d: 9, slope_14d: 0, checkin_gap_days: 0,
+      } }),
+    })));
+    expect(pronto.spark.intensity).toBeGreaterThan(giu.spark.intensity);
+  });
+
+  it('l\'intensità resta sempre fra 0 e 1', () => {
+    [base(), base({ checkinOggi: true, twin: twin() })].forEach((i) => {
+      const v = toTwinContract(computeOggi(i)).spark.intensity;
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it('NESSUN numero finto arriva alla vista: le righe non contengono cifre inventate', () => {
+    const c = toTwinContract(computeOggi(base()));
+    // a gemello vuoto nessuna riga può contenere una misura
+    expect(c.lines!.stato).not.toMatch(/\d/);
+    expect(c.lines!.perche).not.toMatch(/\d/);
+  });
+
+  it('ci sono sempre tre righe e un next', () => {
+    [base(), base({ checkinOggi: true, twin: twin() })].forEach((i) => {
+      const c = toTwinContract(computeOggi(i));
+      expect(c.lines?.stato.length).toBeGreaterThan(0);
+      expect(c.lines?.perche.length).toBeGreaterThan(0);
+      expect(c.lines?.azione.length).toBeGreaterThan(0);
+      expect(c.next?.href.length).toBeGreaterThan(0);
     });
   });
 });

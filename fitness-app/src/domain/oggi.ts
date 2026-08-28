@@ -195,9 +195,21 @@ const costruisciPerche = (input: OggiInput): string[] => {
 // L'azione: UNA sola. Gerarchia esplicita.
 // ------------------------------------------------------------
 
-const scegliAzione = (input: OggiInput, tono: Tono, dim: Dimensione): AzioneOggi => {
-  // 1. Il gemello si apre con l'ascolto: è sempre la prima richiesta
-  //    quando manca (innesto A dentro il linguaggio del Metodo).
+const scegliAzione = (
+  input: OggiInput, tono: Tono, dim: Dimensione, maturita: Maturita
+): AzioneOggi => {
+  // 0. A gemello vuoto il primo passo è un GESTO, non un modulo.
+  //    "Il gemello nasce dal gesto, non dai numeri": a chi non ha
+  //    ancora niente si chiede di fare, non di compilare.
+  if (maturita === 'sconosciuto' && !input.respiratoOggi) {
+    return {
+      titolo: 'Un respiro. Sei minuti.',
+      sottotitolo: 'È da qui che il gemello comincia a conoscerti.',
+      route: 'Respiro',
+      apreIlGemello: true,
+    };
+  }
+  // 1. Poi l'ascolto: è il dato che dà voce al gemello.
   if (!input.checkinOggi) {
     return {
       titolo: 'Ascoltati un minuto',
@@ -252,6 +264,69 @@ const scegliAzione = (input: OggiInput, tono: Tono, dim: Dimensione): AzioneOggi
 // API
 // ------------------------------------------------------------
 
+// ============================================================
+// CONTRATTO VERSO LA VISTA (concordato col CTO architettura)
+// ------------------------------------------------------------
+// La schermata riceve, non calcola. `presence` la decide questo
+// dominio, mai la grafica; le righe sono già linguaggio; la
+// scintilla è un'intensità, non un punteggio da mostrare.
+// ============================================================
+
+export type Presence = 'empty' | 'thin' | 'alive';
+
+export interface TwinContract {
+  presence: Presence;
+  lines: { stato: string; perche: string; azione: string } | null;
+  spark: { intensity: number };
+  next: { kind: string; minutes: number | null; href: string } | null;
+}
+
+const PRESENCE_DA_MATURITA: Record<Maturita, Presence> = {
+  sconosciuto: 'empty',
+  in_ascolto: 'thin',
+  noto: 'alive',
+};
+
+/**
+ * Intensità della scintilla: 0..1.
+ * Non è un punteggio travestito — dice quanto il gemello ha da
+ * dire. A gemello vuoto resta bassa ("filo sottile, scintilla
+ * bassa"), e sale col tono di chi è pronto.
+ */
+const intensitaScintilla = (presence: Presence, tono: Tono): number => {
+  const base = presence === 'empty' ? 0.18 : presence === 'thin' ? 0.42 : 0.7;
+  const perTono = tono === 'pronto' ? 0.3 : tono === 'misura' ? 0.12
+    : tono === 'recupero' ? 0.0 : 0.08;
+  return Math.round(Math.min(1, base + perTono) * 100) / 100;
+};
+
+/** Da quale atto è fatta l'azione, e quanto dura. */
+const kindDiRoute = (route: string): { kind: string; minutes: number | null } => {
+  switch (route) {
+    case 'Respiro': return { kind: 'respiro', minutes: 6 };
+    case 'Checkin': return { kind: 'ascolto', minutes: 1 };
+    case 'Scheda': return { kind: 'seduta', minutes: null };
+    default: return { kind: 'storia', minutes: null };
+  }
+};
+
+/** Adatta l'esito del dominio alla forma che la vista si aspetta. */
+export const toTwinContract = (o: Oggi): TwinContract => {
+  const presence = PRESENCE_DA_MATURITA[o.maturita];
+  const { kind, minutes } = kindDiRoute(o.azione.route);
+  return {
+    presence,
+    lines: {
+      stato: o.stato,
+      // una riga sola: la prima evidenza, o la voce del Metodo
+      perche: o.perche[0] || o.dimensione.osserva,
+      azione: o.azione.titolo,
+    },
+    spark: { intensity: intensitaScintilla(presence, o.tono) },
+    next: { kind, minutes, href: o.azione.route },
+  };
+};
+
 export const computeOggi = (input: OggiInput): Oggi => {
   const dim = dimensioneDelGiorno(input.date);
   const maturita = maturitaDi(input.twin);
@@ -261,7 +336,9 @@ export const computeOggi = (input: OggiInput): Oggi => {
 
   if (maturita === 'sconosciuto') {
     // Il Metodo regge la schermata: non fingiamo di sapere.
-    stato = 'Non ti conosco ancora.';
+    // NB: qui NON si dichiara uno stato del corpo ("è quieto"),
+    // perché non lo sappiamo. Si dichiara l'assenza di voce.
+    stato = 'Il tuo sistema non ha ancora voce.';
     tono = 'neutro';
   } else if (maturita === 'in_ascolto') {
     stato = 'Ti sto conoscendo.';
@@ -281,7 +358,7 @@ export const computeOggi = (input: OggiInput): Oggi => {
   }
 
   const perche = maturita === 'sconosciuto'
-    ? ['Il gemello si apre con il primo ascolto.']
+    ? ['Il gemello nasce dal gesto, non dai numeri.']
     : costruisciPerche(input);
 
   return {
@@ -290,7 +367,7 @@ export const computeOggi = (input: OggiInput): Oggi => {
     stato,
     tono,
     perche,
-    azione: scegliAzione(input, tono, dim),
+    azione: scegliAzione(input, tono, dim, maturita),
     dimensione: dim,
   };
 };

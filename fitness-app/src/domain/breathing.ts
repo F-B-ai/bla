@@ -57,7 +57,7 @@ export const PRATICHE: Pratica[] = [
       { key: 'inspira', secondi: 5 },
       { key: 'espira', secondi: 5 },
     ],
-    durate: [1, 3, 5, 10],
+    durate: [1, 3, 5, 6, 10],
     durataDefault: 3,
   },
   {
