@@ -1127,6 +1127,7 @@ const buildLinking = (role?: string | null) => ({
             path: 'progressi',
             screens: {
               ProgressiHome: '',
+              Quadro: 'quadro',
               Storia: 'storia',
               Traguardi: 'traguardi',
               Diario: 'diario',
