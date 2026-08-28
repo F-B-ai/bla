@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getTodayCheck } from '../../services/wellnessService';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import { getMyTwinState } from '../../services/twinStateService';
+import { getTodayBreathing } from '../../services/breathingService';
 import { computeOggi, Oggi, Tono } from '../../domain/oggi';
 
 // ============================================================
@@ -43,10 +44,11 @@ export function TodayScreen() {
 
   const carica = useCallback(async () => {
     if (!user) return;
-    const [twin, check, piano] = await Promise.all([
+    const [twin, check, piano, respiro] = await Promise.all([
       getMyTwinState(user.id).catch(() => null),
       getTodayCheck(user.id).catch(() => null),
       getActiveWorkoutPlan(user.id).catch(() => null),
+      getTodayBreathing(user.id).catch(() => null),
     ]);
     setOggi(computeOggi({
       date: new Date(),
@@ -54,6 +56,7 @@ export function TodayScreen() {
       checkinOggi: Boolean(check),
       haSchedaAttiva: Boolean(piano),
       allenatoOggi: false,
+      respiratoOggi: Boolean(respiro),
       nome: user.name,
     }));
   }, [user]);
@@ -77,6 +80,8 @@ export function TodayScreen() {
     switch (oggi.azione.route) {
       case 'Checkin':                       // l'ascolto vive dentro Stato ESSĒRE
         navigation.navigate('StatoEssere'); break;
+      case 'Respiro':
+        navigation.navigate('Respiro'); break;
       case 'Scheda':
         navigation.navigate('Allenati', { screen: 'Scheda' }); break;
       case 'Storia':

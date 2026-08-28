@@ -1108,6 +1108,7 @@ const buildLinking = (role?: string | null) => ({
             screens: {
               OggiHome: '',
               StatoEssere: 'stato',
+              Respiro: 'respiro',
               CheckinPalestra: 'checkin',
               Agenda: 'agenda',
               Notifiche: 'notifiche',

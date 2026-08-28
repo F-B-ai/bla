@@ -175,7 +175,8 @@ describe("L'AZIONE — una sola, con gerarchia", () => {
       } }),
     }));
     expect(o.azione.route).not.toBe('Scheda');
-    expect(o.azione.titolo).toContain('recupera');
+    // in recupero l'azione è il respiro: un atto, non un consiglio scritto
+    expect(o.azione.route).toBe('Respiro');
   });
 
   it('corpo pronto con scheda: la seduta è la cosa di oggi', () => {
@@ -204,6 +205,51 @@ describe("L'AZIONE — una sola, con gerarchia", () => {
       twin: twin(),
     }));
     expect(o.azione.titolo).toBe(o.dimensione.domanda);
+  });
+});
+
+describe('IL RESPIRO come atto, non come consiglio', () => {
+  it('corpo in recupero e non ha respirato: l\'azione È il respiro', () => {
+    const o = computeOggi(base({
+      checkinOggi: true, haSchedaAttiva: true, respiratoOggi: false,
+      twin: twin({ readiness: {
+        latest_v2: 30, latest_penalized: 30, checkins_14d: 8, slope_14d: 0, checkin_gap_days: 0,
+      } }),
+    }));
+    expect(o.azione.route).toBe('Respiro');
+    expect(o.azione.titolo).toContain('Respira');
+  });
+
+  it('corpo in recupero ma ha già respirato: non lo richiede due volte', () => {
+    const o = computeOggi(base({
+      checkinOggi: true, haSchedaAttiva: true, respiratoOggi: true,
+      twin: twin({ readiness: {
+        latest_v2: 30, latest_penalized: 30, checkins_14d: 8, slope_14d: 0, checkin_gap_days: 0,
+      } }),
+    }));
+    expect(o.azione.route).not.toBe('Respiro');
+    expect(o.azione.sottotitolo).toContain('già respirato');
+  });
+
+  it('quando la dimensione del giorno è il respiro, diventa un atto', () => {
+    // domenica: la prima dimensione della lista è "respiro"
+    const domenica = new Date('2026-08-23T09:00:00');
+    const o = computeOggi(base({
+      date: domenica, checkinOggi: true, haSchedaAttiva: true,
+      allenatoOggi: true, respiratoOggi: false, twin: twin(),
+    }));
+    expect(o.dimensione.key).toBe('respiro');
+    expect(o.azione.route).toBe('Respiro');
+  });
+
+  it('la seduta resta prioritaria sul respiro quando il corpo risponde', () => {
+    const o = computeOggi(base({
+      checkinOggi: true, haSchedaAttiva: true, allenatoOggi: false, respiratoOggi: false,
+      twin: twin({ readiness: {
+        latest_v2: 80, latest_penalized: 80, checkins_14d: 8, slope_14d: 0, checkin_gap_days: 0,
+      } }),
+    }));
+    expect(o.azione.route).toBe('Scheda');
   });
 });
 

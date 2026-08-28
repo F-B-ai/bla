@@ -8,6 +8,7 @@ import { colors, spacing, fontSize, borderRadius, shadows } from '../config/them
 
 import { TodayScreen } from '../screens/student/TodayScreen';
 import { EssereScreen } from '../screens/student/EssereScreen';
+import { BreathScreen } from '../screens/student/BreathScreen';
 import { CheckinScreen } from '../screens/student/CheckinScreen';
 import { CalendarScreen } from '../screens/shared/CalendarScreen';
 import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
@@ -97,6 +98,7 @@ const OggiNavigator = () => (
   <OggiStack.Navigator screenOptions={stackOptions}>
     <OggiStack.Screen name="OggiHome" component={TodayScreen} />
     <OggiStack.Screen name="StatoEssere" component={EssereScreen} options={innerScreenOptions('Stato ESSĒRE')} />
+    <OggiStack.Screen name="Respiro" component={BreathScreen} options={{ headerShown: false }} />
     <OggiStack.Screen name="CheckinPalestra" component={CheckinScreen} options={innerScreenOptions('Check-in palestra')} />
     <OggiStack.Screen name="Agenda" component={CalendarScreen} options={innerScreenOptions('Agenda')} />
     <OggiStack.Screen name="Notifiche" component={NotificationsScreen} options={innerScreenOptions('Notifiche')} />

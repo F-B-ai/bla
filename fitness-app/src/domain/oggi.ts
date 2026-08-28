@@ -96,6 +96,8 @@ export interface OggiInput {
   haSchedaAttiva: boolean;
   /** si è già allenato oggi */
   allenatoOggi: boolean;
+  /** ha già respirato oggi */
+  respiratoOggi?: boolean;
   nome?: string;
 }
 
@@ -204,13 +206,20 @@ const scegliAzione = (input: OggiInput, tono: Tono, dim: Dimensione): AzioneOggi
       apreIlGemello: true,
     };
   }
-  // 2. Se il corpo chiede recupero, l'allenamento non è l'azione di oggi.
+  // 2. Se il corpo chiede recupero, l'allenamento non è l'azione di oggi:
+  //    è il respiro. Non un consiglio scritto — un atto da fare adesso.
   if (tono === 'recupero') {
-    return {
-      titolo: 'Oggi si recupera',
-      sottotitolo: 'Respiro e movimento leggero. Il carico può aspettare un giorno.',
-      route: 'Storia',
-    };
+    return input.respiratoOggi
+      ? {
+        titolo: 'Oggi si recupera',
+        sottotitolo: 'Hai già respirato. Movimento leggero, il carico può aspettare un giorno.',
+        route: 'Storia',
+      }
+      : {
+        titolo: 'Respira, prima di tutto',
+        sottotitolo: 'Il corpo chiede recupero: cinque minuti di respiro valgono più di una seduta.',
+        route: 'Respiro',
+      };
   }
   // 3. Se c'è una scheda e non ti sei ancora allenato, quella è la cosa.
   if (input.haSchedaAttiva && !input.allenatoOggi) {
@@ -222,7 +231,16 @@ const scegliAzione = (input: OggiInput, tono: Tono, dim: Dimensione): AzioneOggi
       route: 'Scheda',
     };
   }
-  // 4. Nient'altro in coda: resta il Metodo.
+  // 4. Nient'altro in coda: resta il Metodo. E quando la dimensione del
+  //    giorno è il respiro, il Metodo non è una frase da leggere: è un
+  //    atto da fare, e finisce dentro il gemello.
+  if (dim.key === 'respiro' && !input.respiratoOggi) {
+    return {
+      titolo: dim.domanda,
+      sottotitolo: 'Tre minuti. Il respiro è la dimensione di oggi.',
+      route: 'Respiro',
+    };
+  }
   return {
     titolo: dim.domanda,
     sottotitolo: dim.osserva,
