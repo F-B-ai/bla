@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path, Defs, LinearGradient, Stop, G } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, RadialGradient, Stop, G, Circle } from 'react-native-svg';
 import Animated, {
-  useSharedValue, useAnimatedStyle, useAnimatedProps,
-  withRepeat, withTiming, withSpring, Easing, runOnJS,
+  useSharedValue, useAnimatedStyle, useAnimatedProps, useDerivedValue,
+  withRepeat, withTiming, withSpring, Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
@@ -30,7 +30,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 // ============================================================
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 /** Lunghezza approssimata del tratto dell'ensō, per il dash del gate. */
 const ENSO_LEN = 430;
@@ -46,9 +45,46 @@ interface TwinViewProps {
   onGateComplete?: () => void;
   /** false = organismo fermo (per chi ha animazioni ridotte) */
   animato?: boolean;
+  /** lente Academy: stesso organismo, scintilla più oro. MAI un globo. */
+  oroLente?: boolean;
 }
 
-/** Il tono non cambia i colori del marchio: cambia respiro e presenza. */
+/**
+ * Il respiro NON è un metronomo: l'inspirazione è più corta
+ * dell'espirazione, come in un corpo. Rapporto 0.42 / 0.58 —
+ * sul ciclo quieto di 6.5s fa 2.73s dentro e 3.77s fuori.
+ * Il tono cambia il ritmo, mai i colori del marchio.
+ *
+ * Le due buste sono quelle esatte del contratto visivo
+ * (silk.js · breathEnvelope / sparkEnvelope): coseno asimmetrico
+ * per il respiro, gaussiana sulla cresta per la scintilla d'oro,
+ * che compare UNA volta per respiro nel punto di incrocio.
+ */
+const INHALE_FRAC = 0.42;
+
+/** 0 → 1 sull'inspirazione, 1 → 0 sull'espirazione. */
+const bustaRespiro = (phase: number): number => {
+  'worklet';
+  if (phase < INHALE_FRAC) {
+    return 0.5 - 0.5 * Math.cos(Math.PI * (phase / INHALE_FRAC));
+  }
+  return 0.5 + 0.5 * Math.cos(Math.PI * ((phase - INHALE_FRAC) / (1 - INHALE_FRAC)));
+};
+
+/** Una scintilla per respiro, sulla cresta dell'inspirazione. */
+const bustaScintilla = (phase: number): number => {
+  'worklet';
+  const d = Math.min(
+    Math.abs(phase - INHALE_FRAC),
+    Math.abs(phase - INHALE_FRAC + 1),
+    Math.abs(phase - INHALE_FRAC - 1)
+  );
+  return Math.exp(-(d * 12.2) * (d * 12.2));
+};
+
+/** L'oro della scintilla: nucleo → alone → bordo. */
+const ORO = { nucleo: '#FFFCF5', mezzo: '#FFDC96', bordo: '#C9943A' };
+
 const perTono = (t: TwinTono) => {
   switch (t) {
     case 'pronto':   return { respiroMs: 5200, ampiezza: 0.075, presenza: 1.0 };
@@ -64,6 +100,7 @@ export const TwinView: React.FC<TwinViewProps> = ({
   gate = false,
   onGateComplete,
   animato = true,
+  oroLente = false,
 }) => {
   const { respiroMs, ampiezza, presenza } = perTono(tono);
 
@@ -79,9 +116,10 @@ export const TwinView: React.FC<TwinViewProps> = ({
 
   useEffect(() => {
     if (!animato) { respiro.value = 0.5; elica.value = 0; return; }
+    // fase lineare 0→1: la forma la danno le buste, non l'easing
     respiro.value = withRepeat(
-      withTiming(1, { duration: respiroMs, easing: Easing.inOut(Easing.ease) }),
-      -1, true
+      withTiming(1, { duration: respiroMs, easing: Easing.linear }),
+      -1, false
     );
     elica.value = withRepeat(
       withTiming(1, { duration: 21000, easing: Easing.linear }),
@@ -104,10 +142,26 @@ export const TwinView: React.FC<TwinViewProps> = ({
     .onChange((e) => { piega.value = Math.max(-26, Math.min(26, e.translationX * 0.35)); })
     .onEnd(() => { piega.value = withSpring(0, { damping: 12, stiffness: 90 }); });
 
-  // --- stile: respiro (scale + opacity) ---
+  // --- le due buste, derivate dalla fase ---
+  const b = useDerivedValue(() => bustaRespiro(respiro.value));
+  const scintilla = useDerivedValue(() => bustaScintilla(respiro.value));
+
+  // --- stile: respiro (scale + opacity, native driver) ---
   const stileRespiro = useAnimatedStyle(() => ({
-    opacity: (0.72 + respiro.value * 0.28) * presenza,
-    transform: [{ scale: 1 - ampiezza / 2 + respiro.value * ampiezza }],
+    opacity: (0.72 + b.value * 0.28) * presenza,
+    transform: [{ scale: 1 - ampiezza / 2 + b.value * ampiezza }],
+  }));
+
+  // --- la scintilla d'oro all'incrocio: mote quieto + cresta ---
+  const moteBase = oroLente ? 0.34 : 0.20;
+  const stileScintilla = useAnimatedStyle(() => ({
+    opacity: Math.min(1, moteBase + scintilla.value * 0.8),
+    transform: [{ scale: 0.7 + scintilla.value * 0.75 }],
+  }));
+
+  // --- i fili si ispessiscono sull'inspirazione (silk.js: 0.58 + b*1.05) ---
+  const propsFili = useAnimatedProps(() => ({
+    strokeWidth: 0.6 * (0.58 + b.value * 1.05),
   }));
 
   // --- stile: elica nello spazio (perspective + rotateY) ---
@@ -164,13 +218,13 @@ export const TwinView: React.FC<TwinViewProps> = ({
                 {fili.map((i) => {
                   const off = (i - 7) * 2.4;
                   return (
-                    <Path
+                    <AnimatedPath
                       key={i}
+                      animatedProps={propsFili}
                       d={`M ${42 + off * 0.4} ${82 + off}
                           C ${55 + off} ${72 + off}, ${68 + off} ${72 + off}, ${80 + off * 0.3} ${80 + off}
                           C ${92 - off * 0.2} ${88 + off}, ${105 - off} ${88 + off}, ${118 - off * 0.4} ${78 + off}`}
                       stroke="#D40000"
-                      strokeWidth={0.6}
                       strokeLinecap="round"
                       fill="none"
                     />
@@ -211,6 +265,21 @@ export const TwinView: React.FC<TwinViewProps> = ({
           </Animated.View>
         </Animated.View>
 
+        {/* la scintilla d'oro all'incrocio: una per respiro */}
+        <Animated.View style={[styles.scintillaBox, stileScintilla]} pointerEvents="none">
+          <Svg width={size} height={size} viewBox="0 0 160 160">
+            <Defs>
+              <RadialGradient id="oroGrad" cx="50%" cy="50%" r="50%">
+                <Stop offset="0%" stopColor={ORO.nucleo} stopOpacity="1" />
+                <Stop offset="42%" stopColor={ORO.mezzo} stopOpacity="0.75" />
+                <Stop offset="100%" stopColor={ORO.bordo} stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            <Circle cx={80} cy={80} r={oroLente ? 13 : 10} fill="url(#oroGrad)" />
+            <Circle cx={80} cy={80} r={1.6} fill={ORO.nucleo} />
+          </Svg>
+        </Animated.View>
+
         {/* il nome, solo durante il gate */}
         {gate && (
           <Animated.View style={[styles.wordmarkBox, stileWordmark]} pointerEvents="none">
@@ -225,6 +294,7 @@ export const TwinView: React.FC<TwinViewProps> = ({
 const styles = StyleSheet.create({
   box: { alignItems: 'center', justifyContent: 'center' },
   pieno: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  scintillaBox: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   wordmarkBox: { position: 'absolute', bottom: -6 },
   wordmark: {
     color: '#F2F2F7', fontSize: 15, letterSpacing: 7, fontWeight: '300',
