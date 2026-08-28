@@ -39,7 +39,7 @@ export const LoginSelectorScreen: React.FC<LoginSelectorScreenProps> = ({
             <EnsoLogo size={70} />
             <Text style={styles.cardTitle}>{brand.appName}</Text>
             <Text style={styles.cardDescription}>
-              Fitness, Coaching{'\n'}& Benessere
+              Comprendi chi sei{'\n'}attraverso il movimento
             </Text>
           </View>
           <View style={styles.cardFooter}>

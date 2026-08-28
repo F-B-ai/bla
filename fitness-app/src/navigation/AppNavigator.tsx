@@ -1075,7 +1075,18 @@ const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => {
 // dove eri stato, e nessuna schermata era raggiungibile da fuori.
 // Le rotte qui sotto sono l'indirizzo pubblico del sistema.
 // ============================================================
-const LINKING = {
+// NB: a runtime è montato UN SOLO stack staff (dipende dal ruolo), ma la
+// configurazione dei link viene validata tutta insieme: tre schermate con
+// lo stesso path 'studio' fanno rifiutare l'avvio all'intero navigatore.
+// Quindi lo staff entra nella mappa in base al ruolo corrente.
+const staffLink = (role?: string | null) => {
+  if (role === 'owner') return { OwnerTabs: { path: 'studio' } };
+  if (role === 'manager') return { ManagerTabs: { path: 'studio' } };
+  if (role === 'collaborator') return { CollaboratorTabs: { path: 'studio' } };
+  return {};
+};
+
+const buildLinking = (role?: string | null) => ({
   prefixes: [
     'https://essere-3fe6f.web.app',
     'https://essere-3fe6f.firebaseapp.com',
@@ -1132,13 +1143,11 @@ const LINKING = {
       // --- academy ---
       AcademyTabs: { path: 'academy' },
 
-      // --- staff: un solo prefisso, le sotto-rotte le risolve lo stack ---
-      OwnerTabs: { path: 'studio' },
-      ManagerTabs: { path: 'studio' },
-      CollaboratorTabs: { path: 'studio' },
+      // --- staff: 'studio' per tutti, ma una sola voce alla volta ---
+      ...staffLink(role),
     },
   },
-};
+});
 
 // --- Loading screen ---
 const LoadingScreen = () => (
@@ -1151,6 +1160,8 @@ const LoadingScreen = () => (
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
   const { isAuthenticated, loading, role, user, logout } = useAuth();
+  // Le route dipendono dal ruolo: 'studio' deve risolvere a UNA sola schermata.
+  const linking = React.useMemo(() => buildLinking(role), [role]);
   // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
@@ -1275,7 +1286,7 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer
-      linking={LINKING}
+      linking={linking}
       documentTitle={{
         formatter: () => effectiveLoginMode === 'academy' ? brand.academyName : brand.appName,
       }}
