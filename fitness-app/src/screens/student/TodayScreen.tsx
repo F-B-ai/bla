@@ -8,7 +8,9 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
-import { getTodayCheck } from '../../services/wellnessService';
+import { crossAlert } from '../../utils/alert';
+import { getTodayCheck, saveDailyCheck } from '../../services/wellnessService';
+import { WELLNESS_QUESTIONS } from '../../data/wellnessQuestions';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import { getMyTwinState } from '../../services/twinStateService';
 import { getTodayBreathing } from '../../services/breathingService';
@@ -42,6 +44,10 @@ export function TodayScreen() {
   const [oggi, setOggi] = useState<Oggi | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // L'ascolto si fa QUI: le domande non stanno più a un tap di distanza
+  const [risposte, setRisposte] = useState<Record<string, number>>({});
+  const [salvando, setSalvando] = useState(false);
+  const [fattoOggi, setFattoOggi] = useState(false);
 
   const carica = useCallback(async () => {
     if (!user) return;
@@ -60,7 +66,28 @@ export function TodayScreen() {
       respiratoOggi: Boolean(respiro),
       nome: user.name,
     }));
+    setFattoOggi(Boolean(check));
   }, [user]);
+
+  const tutteRisposte = WELLNESS_QUESTIONS.every((q) => risposte[q.key]);
+
+  const salvaAscolto = async () => {
+    if (!user || !tutteRisposte) return;
+    setSalvando(true);
+    try {
+      const nome = `${user.name || ''}`.trim() || user.email || 'Allievo';
+      await saveDailyCheck(user.id, nome, {
+        sleep: risposte.sleep, energy: risposte.energy,
+        mood: risposte.mood, soreness: risposte.soreness,
+      });
+      setFattoOggi(true);
+      await carica();
+    } catch {
+      crossAlert('Errore', 'Non sono riuscito a salvare. Riprova.');
+    } finally {
+      setSalvando(false);
+    }
+  };
 
   useFocusEffect(useCallback(() => {
     let vivo = true;
@@ -148,6 +175,61 @@ export function TodayScreen() {
         <Ionicons name="arrow-forward" size={20} color={accent} />
       </TouchableOpacity>
 
+      {/* ——— LE DOMANDE: l'ascolto si fa qui, non altrove ——— */}
+      {!fattoOggi && (
+        <View style={s.ascolto}>
+          <Text style={s.ascoltoTitolo}>Come stai, oggi?</Text>
+          {WELLNESS_QUESTIONS.map((q) => (
+            <View key={q.key} style={s.domanda}>
+              <Text style={s.domandaLabel}>{q.label}</Text>
+              <View style={s.scala}>
+                {[1, 2, 3, 4, 5].map((v) => {
+                  const on = risposte[q.key] === v;
+                  return (
+                    <TouchableOpacity
+                      key={v}
+                      style={[s.pallino, on && s.pallinoOn]}
+                      onPress={() => setRisposte((p) => ({ ...p, [q.key]: v }))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.pallinoTxt, on && s.pallinoTxtOn]}>{v}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={s.estremi}>
+                <Text style={s.estremo}>{q.low}</Text>
+                <Text style={s.estremo}>{q.high}</Text>
+              </View>
+            </View>
+          ))}
+          <TouchableOpacity
+            style={[s.salva, !tutteRisposte && { opacity: 0.35 }]}
+            onPress={salvaAscolto}
+            disabled={!tutteRisposte || salvando}
+            activeOpacity={0.85}
+          >
+            {salvando
+              ? <ActivityIndicator color={colors.textOnAccent} />
+              : <Text style={s.salvaTxt}>Registra come stai</Text>}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* ——— LE PORTE: poche, quelle di ogni giorno ——— */}
+      <View style={s.porte}>
+        {[
+          { icona: 'fitness-outline' as const, testo: 'La mia scheda', vai: () => navigation.navigate('Allenati', { screen: 'Scheda' }) },
+          { icona: 'calendar-outline' as const, testo: 'Agenda', vai: () => navigation.navigate('Agenda') },
+          { icona: 'analytics-outline' as const, testo: 'Storico', vai: () => navigation.navigate('Allenati', { screen: 'Storico' }) },
+        ].map((p) => (
+          <TouchableOpacity key={p.testo} style={s.porta2} onPress={p.vai} activeOpacity={0.8}>
+            <Ionicons name={p.icona} size={20} color={colors.accent} />
+            <Text style={s.porta2Txt}>{p.testo}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* ——— IL METODO: presente ogni giorno, sottovoce ——— */}
       <View style={s.metodo}>
         <Text style={s.metodoEtichetta}>OGGI · {oggi.dimensione.nome.toUpperCase()}</Text>
@@ -204,6 +286,44 @@ const s = StyleSheet.create({
     color: colors.text, fontSize: fontSize.md, marginTop: 6,
     fontWeight: '300', lineHeight: 24,
   },
+
+  ascolto: {
+    marginTop: spacing.xl, backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg, borderWidth: 1, borderColor: colors.border,
+    padding: spacing.md,
+  },
+  ascoltoTitolo: {
+    color: colors.text, fontSize: fontSize.md, fontWeight: '600',
+    marginBottom: spacing.sm,
+  },
+  domanda: { marginBottom: spacing.md },
+  domandaLabel: { color: colors.textSecondary, fontSize: fontSize.sm, marginBottom: 6 },
+  scala: { flexDirection: 'row', gap: 8 },
+  pallino: {
+    flex: 1, height: 40, borderRadius: borderRadius.sm, borderWidth: 1,
+    borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surfaceLight,
+  },
+  pallinoOn: { borderColor: colors.accent, backgroundColor: colors.accent },
+  pallinoTxt: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '600' },
+  pallinoTxtOn: { color: colors.textOnAccent, fontWeight: '700' },
+  estremi: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  estremo: { color: colors.textLight, fontSize: fontSize.xs },
+  salva: {
+    backgroundColor: colors.accent, borderRadius: borderRadius.md,
+    paddingVertical: 13, alignItems: 'center', marginTop: spacing.xs,
+  },
+  salvaTxt: { color: colors.textOnAccent, fontWeight: '700', fontSize: fontSize.sm },
+
+  porte: {
+    marginTop: spacing.lg, flexDirection: 'row', gap: spacing.sm,
+  },
+  porta2: {
+    flex: 1, alignItems: 'center', gap: 6, paddingVertical: spacing.md,
+    borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  porta2Txt: { color: colors.textSecondary, fontSize: fontSize.xs, textAlign: 'center' },
 
   porta: {
     marginTop: spacing.xl * 1.4, flexDirection: 'row', alignItems: 'center',

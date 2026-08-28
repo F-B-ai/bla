@@ -26,16 +26,8 @@ import {
 } from '../../services/wellnessService';
 import { awardXp } from '../../services/gamificationService';
 import { crossAlert } from '../../utils/alert';
+import { WELLNESS_QUESTIONS as QUESTIONS } from '../../data/wellnessQuestions';
 
-// ------------------------------------------------------------
-// Domande del check-in (scala 1-5)
-// ------------------------------------------------------------
-const QUESTIONS: { key: 'sleep' | 'energy' | 'mood' | 'soreness'; icon: string; label: string; low: string; high: string }[] = [
-  { key: 'sleep', icon: 'moon', label: 'Come hai dormito?', low: 'Male', high: 'Benissimo' },
-  { key: 'energy', icon: 'flash', label: 'Quanta energia hai?', low: 'Scarico', high: 'Carico' },
-  { key: 'mood', icon: 'happy', label: 'Come ti senti?', low: 'Giù', high: 'Alla grande' },
-  { key: 'soreness', icon: 'bandage', label: 'Dolori muscolari?', low: 'Nessuno', high: 'Molti' },
-];
 
 // ------------------------------------------------------------
 const scoreColor = (score: number): string =>
