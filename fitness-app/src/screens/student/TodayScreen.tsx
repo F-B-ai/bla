@@ -13,6 +13,7 @@ import { getActiveWorkoutPlan } from '../../services/programService';
 import { getMyTwinState } from '../../services/twinStateService';
 import { getTodayBreathing } from '../../services/breathingService';
 import { computeOggi, Oggi, Tono } from '../../domain/oggi';
+import { TwinView } from '../../components/twin/TwinView';
 
 // ============================================================
 // OGGI — il gemello, non il login.
@@ -114,6 +115,11 @@ export function TodayScreen() {
         {GIORNI[d.getDay()]} {d.getDate()}
       </Text>
 
+      {/* ——— IL GEMELLO: respira col tuo stato ——— */}
+      <View style={s.twinBox}>
+        <TwinView size={268} tono={oggi.tono} />
+      </View>
+
       {/* ——— LO STATO ——— */}
       <View style={s.statoBlocco}>
         <View style={[s.polso, { backgroundColor: accent }]} />
@@ -170,7 +176,8 @@ const s = StyleSheet.create({
     letterSpacing: 2, textTransform: 'uppercase',
   },
 
-  statoBlocco: { marginTop: spacing.xl, flexDirection: 'row', alignItems: 'flex-start' },
+  twinBox: { alignItems: 'center', marginTop: spacing.md },
+  statoBlocco: { marginTop: spacing.lg, flexDirection: 'row', alignItems: 'flex-start' },
   polso: { width: 3, height: 44, borderRadius: 2, marginRight: spacing.md, marginTop: 6 },
   stato: {
     flex: 1, color: colors.text, fontSize: 34, lineHeight: 41,

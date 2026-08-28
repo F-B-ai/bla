@@ -6,6 +6,7 @@ import Animated, {
   withRepeat, withTiming, withSpring, Easing,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { colors } from '../../config/theme';
 
 // ============================================================
 // TWINVIEW — un solo organismo, tutte le schermate.
@@ -83,7 +84,7 @@ const bustaScintilla = (phase: number): number => {
 };
 
 /** L'oro della scintilla: nucleo → alone → bordo. */
-const ORO = { nucleo: '#FFFCF5', mezzo: '#FFDC96', bordo: '#C9943A' };
+const ORO = { nucleo: colors.twinOroNucleo, mezzo: colors.twinOroMezzo, bordo: colors.twinOroBordo };
 
 const perTono = (t: TwinTono) => {
   switch (t) {
@@ -201,15 +202,15 @@ export const TwinView: React.FC<TwinViewProps> = ({
             <Svg width={size} height={size} viewBox="0 0 160 160">
               <Defs>
                 <LinearGradient id="setaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor="#FF1A1A" />
-                  <Stop offset="50%" stopColor="#D40000" />
-                  <Stop offset="100%" stopColor="#8B0000" />
+                  <Stop offset="0%" stopColor={colors.twinSeta1} />
+                  <Stop offset="50%" stopColor={colors.twinSeta2} />
+                  <Stop offset="100%" stopColor={colors.twinSeta3} />
                 </LinearGradient>
                 <LinearGradient id="ondaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <Stop offset="0%" stopColor="#F2F2F7" stopOpacity="0.08" />
-                  <Stop offset="35%" stopColor="#F2F2F7" stopOpacity="1" />
-                  <Stop offset="70%" stopColor="#F2F2F7" stopOpacity="1" />
-                  <Stop offset="100%" stopColor="#F2F2F7" stopOpacity="0.15" />
+                  <Stop offset="0%" stopColor={colors.twinAvorio} stopOpacity="0.08" />
+                  <Stop offset="35%" stopColor={colors.twinAvorio} stopOpacity="1" />
+                  <Stop offset="70%" stopColor={colors.twinAvorio} stopOpacity="1" />
+                  <Stop offset="100%" stopColor={colors.twinAvorio} stopOpacity="0.15" />
                 </LinearGradient>
               </Defs>
 
@@ -224,7 +225,7 @@ export const TwinView: React.FC<TwinViewProps> = ({
                       d={`M ${42 + off * 0.4} ${82 + off}
                           C ${55 + off} ${72 + off}, ${68 + off} ${72 + off}, ${80 + off * 0.3} ${80 + off}
                           C ${92 - off * 0.2} ${88 + off}, ${105 - off} ${88 + off}, ${118 - off * 0.4} ${78 + off}`}
-                      stroke="#D40000"
+                      stroke={colors.twinSeta2}
                       strokeLinecap="round"
                       fill="none"
                     />
@@ -255,7 +256,7 @@ export const TwinView: React.FC<TwinViewProps> = ({
               />
               <Path
                 d="M 116 79 C 120 76, 124 74, 126 74"
-                stroke="#F2F2F7"
+                stroke={colors.twinAvorio}
                 strokeWidth={1.4}
                 strokeLinecap="round"
                 fill="none"
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
   scintillaBox: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   wordmarkBox: { position: 'absolute', bottom: -6 },
   wordmark: {
-    color: '#F2F2F7', fontSize: 15, letterSpacing: 7, fontWeight: '300',
+    color: colors.twinAvorio, fontSize: 15, letterSpacing: 7, fontWeight: '300',
   },
 });
 

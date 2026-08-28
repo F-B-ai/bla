@@ -32,6 +32,18 @@ export const colors = {
   textOnPrimary: '#F2F2F7',
   textOnAccent: '#FFFFFF',
 
+  // --- Il Twin: contratto visivo del gemello ---
+  // La seta cremisi e la scintilla d'oro. Non sono decorazione:
+  // sono il segno di ESSĒRE. Vivono qui perché siano UNA sola
+  // verità, e perché il cancello della palette li protegga.
+  twinSeta1: '#FF1A1A',
+  twinSeta2: '#D40000',
+  twinSeta3: '#8B0000',
+  twinOroNucleo: '#FFFCF5',
+  twinOroMezzo: '#FFDC96',
+  twinOroBordo: '#C9943A',
+  twinAvorio: '#F2F2F7',
+
   // --- Neutri e overlay (M2: centralizzati per il white-label) ---
   white: '#FFFFFF',
   black: '#000000',

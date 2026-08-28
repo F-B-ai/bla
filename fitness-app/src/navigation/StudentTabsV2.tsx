@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -191,10 +191,25 @@ export const StudentTabsV2 = () => (
   <Tab.Navigator
     screenOptions={{
       headerShown: false,
+      // I tab sono la spina dorsale dell'app: devono RISALTARE.
+      // Non sono un sussurro: da qui si raggiunge tutto il resto.
       tabBarActiveTintColor: colors.accent,
       tabBarInactiveTintColor: colors.textSecondary,
-      tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+      tabBarStyle: {
+        backgroundColor: colors.surface,
+        borderTopColor: colors.accent + '33',
+        borderTopWidth: 1,
+        height: Platform.OS === 'web' ? 66 : 88,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'web' ? 10 : 26,
+        elevation: 12,
+        shadowColor: colors.black,
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: -3 },
+      },
+      tabBarLabelStyle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+      tabBarItemStyle: { paddingVertical: 2 },
     }}
   >
     <Tab.Screen name="Oggi" component={OggiNavigator} options={{
