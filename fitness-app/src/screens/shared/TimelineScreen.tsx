@@ -99,6 +99,15 @@ const VISUALS: Record<string, EventVisual> = {
       return f.length > 0 ? `${f.length} distretti valutati · ${rilevanti} da lavorare` : '';
     },
   },
+  'person.onboarded': {
+    icon: 'flag-outline',
+    color: colors.accent,
+    title: () => 'Inizio del percorso',
+    subtitle: (p) => {
+      const o = Array.isArray(p.obiettivi) ? p.obiettivi.length : 0;
+      return o > 0 ? `${o} obiettivi dichiarati` : 'scheda di onboarding';
+    },
+  },
   'breathing.session_completed': {
     icon: 'leaf-outline',
     color: colors.success,

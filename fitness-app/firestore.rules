@@ -72,6 +72,7 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.schema_version == 1
         && request.resource.data.type in [
+          'person.onboarded',
           'wellness.checkin_submitted', 'breathing.session_completed',
           'gym.checkin',
           'workout.started', 'workout.completed', 'workout.abandoned',
@@ -106,6 +107,17 @@ service cloud.firestore {
       );
       allow create: if isStaff();
       allow update, delete: if false;
+    }
+
+    // Scheda di onboarding: primo atto del percorso. Contiene dati
+    // di salute — la scrive lo staff nel colloquio, la legge lo staff
+    // e l'interessato. Append-only: una scheda firmata non si riscrive.
+    match /onboardings/{docId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create, update: if isStaff();
+      allow delete: if false;
     }
 
     // Sessioni di respiro: atto di prima persona dell'allievo.

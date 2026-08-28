@@ -16,6 +16,7 @@ export const TWIN_SCHEMA_VERSION = 1;
  *  i client possono scrivere in Fase 1 (dual-write). La whitelist
  *  nelle security rules DEVE coincidere con questa lista. */
 export const H0_CLIENT_EVENT_TYPES = [
+  'person.onboarded',
   'wellness.checkin_submitted',
   'breathing.session_completed',
   'gym.checkin',
