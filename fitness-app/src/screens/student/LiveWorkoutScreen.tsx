@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
+import { hasCheckedInToday } from '../../services/checkinService';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { ModalHeader } from '../../components/common/ModalHeader';
@@ -135,6 +136,20 @@ export const LiveWorkoutScreen: React.FC = () => {
     if (dayExercises.length === 0) {
       crossAlert('Info', `${DAYS[selectedDayIndex]} e' giorno di riposo. Nessun esercizio programmato.`);
       return;
+    }
+
+    // La seduta si registra solo per chi è entrato dalla porta.
+    // Lo staff non è soggetto al vincolo (può assistere, dimostrare,
+    // registrare per conto di un allievo).
+    if (user.role === 'student') {
+      const entrato = await hasCheckedInToday(user.id);
+      if (!entrato) {
+        crossAlert(
+          'Prima il check-in',
+          'Passa il QR all\'ingresso della palestra: la seduta si registra solo quando sei dentro.'
+        );
+        return;
+      }
     }
 
     const logs: ExerciseLog[] = dayExercises.map((ex) => ({

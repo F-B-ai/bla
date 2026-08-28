@@ -66,6 +66,29 @@ export const registerCheckin = async (
   return { success: true };
 };
 
+/**
+ * Ha varcato la porta oggi? La seduta non parte senza.
+ * Regola del titolare: si entra dal QR, e l'allenamento si
+ * registra solo per chi è davvero in palestra.
+ */
+export const hasCheckedInToday = async (studentId: string): Promise<boolean> => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, CHECKIN_COLLECTION),
+        where('timestamp', '>=', Timestamp.fromDate(todayStart))
+      )
+    );
+    return snap.docs.some((d) => d.data().studentId === studentId);
+  } catch {
+    // In caso di errore NON si blocca l'allievo: si lascia passare.
+    // Meglio una seduta in più che una persona chiusa fuori.
+    return true;
+  }
+};
+
 export const getTodayCheckins = async (): Promise<CheckinRecord[]> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
