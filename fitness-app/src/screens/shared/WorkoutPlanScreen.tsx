@@ -151,7 +151,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const [librarySearch, setLibrarySearch] = useState('');
   const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
-  const [saveToLibrary, setSaveToLibrary] = useState(false);
+  // Ogni esercizio nuovo entra in libreria di default: la libreria è
+  // il patrimonio dello studio, non deve dipendere da una spunta.
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
 
   const loadStudents = useCallback(async () => {
     if (!user) return;
@@ -597,7 +599,9 @@ export const WorkoutPlanScreen: React.FC = () => {
       }));
     }
 
-    if (saveToLibrary && exVideoUrl) {
+    // Il video è un allegato, non la condizione: un esercizio senza
+    // filmato si registra lo stesso e il video si aggiunge dopo.
+    if (saveToLibrary) {
       try {
         await addExerciseToLibrary({
           name: exName,

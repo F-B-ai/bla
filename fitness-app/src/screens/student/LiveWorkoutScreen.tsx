@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -879,6 +880,24 @@ export const LiveWorkoutScreen: React.FC = () => {
             <Text style={styles.exerciseTarget}>
               Obiettivo: {currentExercise.targetSets} x {currentExercise.targetReps}
             </Text>
+            {/* Il filmato dell'esecuzione, dove serve davvero: davanti a
+                chi sta per eseguire, non sepolto nella scheda. */}
+            {(() => {
+              const giorno = activeWorkout?.dayOfWeek ?? selectedDayIndex;
+              const exPiano = activePlan?.weeklySchedule[giorno]?.exercises?.[currentExerciseIndex];
+              if (!exPiano?.videoUrl) return null;
+              return (
+                <TouchableOpacity
+                  style={styles.videoBtn}
+                  onPress={() => Linking.openURL(exPiano.videoUrl!).catch(() =>
+                    crossAlert('Errore', 'Non riesco ad aprire il video'))}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="play-circle" size={20} color={colors.accent} />
+                  <Text style={styles.videoBtnTxt}>Guarda come si esegue</Text>
+                </TouchableOpacity>
+              );
+            })()}
             {currentExercise.technique === 'rest_pause' && (
               <Text style={styles.restPauseTag}>
                 SERIE INTERROTTE · {currentExercise.targetMiniSets || 4} mini serie da {currentExercise.targetMiniReps || '6'} · rec {currentExercise.targetMiniRestSeconds || 20}s
@@ -1424,6 +1443,13 @@ const formatDateShort = (date: any): string => {
 };
 
 const styles = StyleSheet.create({
+  videoBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    borderWidth: 1, borderColor: colors.accent, borderRadius: borderRadius.md,
+    paddingVertical: 9, paddingHorizontal: 13, alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+  },
+  videoBtnTxt: { color: colors.accent, fontSize: fontSize.sm, fontWeight: '600' },
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: colors.primary,
