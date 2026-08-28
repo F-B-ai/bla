@@ -710,11 +710,18 @@ export const suggestWorkoutProgression = async (
     medicalNotes?: string;
   },
   weekNumber: number,
-  posturalNotes?: string
+  posturalNotes?: string,
+  /**
+   * Il briefing del motore di progressione (src/domain/progressione.ts):
+   * i fatti MISURATI dell'allievo e l'ASSE già deciso dalle formule.
+   * Quando c'è, l'AI non sceglie più che cosa aumentare: lo traduce
+   * in scheda. È la differenza fra un consiglio e una progressione.
+   */
+  briefingProgressione?: string
 ): Promise<AIProgressionSuggestion> => {
   const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
-  const systemPrompt = `Sei un preparatore atletico e personal trainer esperto italiano. Crea la progressione della scheda di allenamento.
+  const systemPrompt = `Sei il preparatore del Metodo Mind Movement™. Crea la progressione della scheda di allenamento.
 
 RISPONDI SEMPRE in formato JSON valido con questa struttura:
 {
@@ -738,13 +745,34 @@ RISPONDI SEMPRE in formato JSON valido con questa struttura:
   "generalNotes": "note generali sulla progressione e consigli"
 }
 
-Principi di progressione:
-- Sovraccarico progressivo (aumento volume o intensità ogni 2-3 settimane)
-- Periodizzazione (variare stimoli per evitare plateau)
-- Considerare eventuali problemi posturali
-- Inserire esercizi correttivi se necessario
-- Mantenere equilibrio muscolare (agonisti/antagonisti)
-- Rispettare i tempi di recupero`;
+LA GERARCHIA DELLA PROGRESSIONE (questo metodo, non il senso comune)
+La parola più potente NON è Overload: è Progressive Demand — la progressione della
+domanda complessiva imposta al sistema. Il sovraccarico è solo UNO degli undici modi
+di aumentarla, ed è quello che costa di più al tessuto.
+
+Il ciclo: ESPOSIZIONE → DOMANDA → ADATTAMENTO → CAPACITÀ → PROGRESSIONE → nuovo adattamento.
+
+Gli undici assi:
+1. Sovraccarico — più carico esterno
+2. Esposizione — più ROM, velocità, instabilità, durata
+3. Adattamento — stesso stimolo ripetuto finché diventa capacità
+4. Complessità — compito motorio più difficile a parità di peso
+5. Domanda meccanica — momento articolare, leve, profilo di resistenza
+6. Volume — serie × ripetizioni × carico
+7. Intensità — relativa al massimale, non solo assoluta
+8. Prossimità al cedimento — RIR che scende a parità di peso
+9. Densità — stesso lavoro in meno tempo
+10. Richiesta tecnica — stesso carico gestito meglio: traiettoria, ROM, meno compensi
+11. Capacità — ciò che la persona sa fare oggi e prima non faceva
+
+REGOLE NON NEGOZIABILI
+- Non aggiungere carico se l'asse indicato non è il carico.
+- Non aggiungere carico su uno schema che sta peggiorando: prima la qualità.
+- Se il sistema non ha ancora risposto, la progressione è RIPETERE lo stesso stimolo.
+- Muovi UN asse alla volta: tutto il resto resta identico, così si capisce che cosa ha funzionato.
+- Non inventare numeri che non ti sono stati dati. Nessuna diagnosi.
+- Mantieni equilibrio agonisti/antagonisti e i tempi di recupero.
+- In "reasoning" scrivi PRIMA quale asse hai mosso e perché, poi le modifiche.`;
 
   let currentPlanDescription = `Scheda attuale: "${currentPlan.title}" (settimana ${weekNumber})\n\n`;
   for (const day of currentPlan.weeklySchedule) {
@@ -772,7 +800,17 @@ Informazioni allievo:
   }
 
   prompt += `\n\n${currentPlanDescription}`;
-  prompt += `\nCrea la nuova scheda progressiva mantenendo la stessa struttura settimanale ma con progressioni appropriate.`;
+
+  if (briefingProgressione) {
+    prompt += `\n${briefingProgressione}\n`;
+    prompt += '\nCrea la nuova scheda muovendo SOLO l\'asse indicato qui sopra, '
+      + 'lasciando invariato tutto il resto della struttura settimanale.';
+  } else {
+    prompt += '\nNon ci sono ancora sedute registrate per questo allievo: '
+      + 'non puoi sapere se il sistema ha risposto. Mantieni la struttura, '
+      + 'lavora sull\'esposizione e sulla qualità dell\'esecuzione, e dichiara '
+      + 'in "reasoning" che senza dati registrati non si aumenta il carico.';
+  }
 
   const responseText = await callClaude(
     [{ role: 'user', content: prompt }],

@@ -37,6 +37,8 @@ import {
   AIGeneratedWorkoutPlan,
   ensureAIApiKey,
 } from '../../services/aiService';
+import { leggiProgressione } from '../../services/progressioneService';
+import { sintesiPerAI, asse } from '../../domain/progressione';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 import { getCustomTemplates, CustomWorkoutTemplate, createCustomTemplate } from '../../services/programService';
 import { Ionicons } from '@expo/vector-icons';
@@ -326,6 +328,29 @@ export const WorkoutPlanScreen: React.FC = () => {
       const student = students.find((s) => s.id === selectedStudentId);
       if (!student) return;
 
+      // Il motore legge le sedute davvero fatte e DECIDE l'asse da
+      // aumentare. L'AI non sceglie più: traduce in scheda.
+      // Se non ci sono ancora dati, si va avanti senza briefing e
+      // l'AI sa che non deve aggiungere carico.
+      let briefing: string | undefined;
+      let asseScelto = '';
+      try {
+        const lettura = await leggiProgressione(selectedStudentId);
+        if (lettura.sessioni.length > 0) {
+          briefing = sintesiPerAI(
+            {
+              storia: lettura.sessioni,
+              prontezza: lettura.prontezza,
+              qualita: lettura.qualita,
+            },
+            lettura.passo
+          );
+          asseScelto = asse(lettura.passo.asse).nome;
+        }
+      } catch {
+        /* senza motore l'AI resta prudente: nessun aumento al buio */
+      }
+
       const suggestion = await suggestWorkoutProgression(
         {
           title: activePlan.title,
@@ -336,8 +361,14 @@ export const WorkoutPlanScreen: React.FC = () => {
           goals: student.goals,
           medicalNotes: student.medicalNotes,
         },
-        4 // settimana corrente (semplificato)
+        4, // settimana corrente (semplificato)
+        undefined,
+        briefing
       );
+
+      if (asseScelto) {
+        suggestion.reasoning = `Asse di progressione: ${asseScelto}.\n\n${suggestion.reasoning || ''}`;
+      }
 
       setAiSuggestion(suggestion);
       setShowAiModal(true);

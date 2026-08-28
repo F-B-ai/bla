@@ -35,6 +35,7 @@ import PortraitScreen from '../screens/staff/PortraitScreen';
 import SquatAnalysisScreen from '../screens/staff/SquatAnalysisScreen';
 import MindMovementScreen from '../screens/staff/MindMovementScreen';
 import StellatoScreen from '../screens/staff/StellatoScreen';
+import ProgressioneScreen from '../screens/staff/ProgressioneScreen';
 import { OnboardingScreen } from '../screens/staff/OnboardingScreen';
 import { PattoScreen } from '../screens/staff/PattoScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -120,6 +121,7 @@ const trainingGroup: HubGroup = {
     { icon: 'fitness-outline', title: 'Programmi', route: 'Programmi' },
     { icon: 'copy-outline', title: 'Template', route: 'Template' },
     { icon: 'tv-outline', title: 'Monitor allenamenti', route: 'Monitor' },
+    { icon: 'trending-up-outline', title: 'Gerarchia della progressione', route: 'Progressione' },
     { icon: 'analytics-outline', title: 'Storico allenamenti', route: 'Storico' },
   ],
 };
@@ -234,6 +236,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Template" component={ManageTemplatesScreen} options={inner('Template')} />
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />
+      <StudioStack.Screen name="Progressione" component={ProgressioneScreen} options={inner('Gerarchia della progressione')} />
       {/* Valutazioni */}
       <StudioStack.Screen name="Onboarding" component={OnboardingScreen} options={inner('Scheda onboarding')} />
       <StudioStack.Screen name="Patto" component={PattoScreen} options={inner('Patto di percorso')} />

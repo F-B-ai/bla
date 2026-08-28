@@ -49,7 +49,10 @@ const FABLE = "claude-fable-5";
 const MODEL_BY_FEATURE: Record<string, string> = {
   assistant: "claude-sonnet-4-5",
   coach: "claude-sonnet-4-5",
-  progression: "claude-sonnet-4-5",
+  // La progressione ora riceve i fatti misurati e l'asse deciso dal
+  // motore (src/domain/progressione.ts): è ragionamento su dati veri,
+  // non più riscrittura di una scheda sulla carta.
+  progression: "claude-opus-4-8",
   workoutplan: "claude-sonnet-4-5",
   postural: FABLE,
   bodycomp: FABLE,
