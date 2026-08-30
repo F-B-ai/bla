@@ -1624,7 +1624,12 @@ export const CalendarScreen: React.FC = () => {
                 {ospiti
                   .filter((o) => o.giorno === selectedDate)
                   .map((o) => (
-                    <View key={o.id} style={styles.ospiteCard}>
+                    <TouchableOpacity
+                      key={o.id}
+                      style={styles.ospiteCard}
+                      onPress={() => navigation.navigate('Richieste')}
+                      activeOpacity={0.85}
+                    >
                       <Text style={styles.ospiteOra}>{o.ora}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.ospiteNome}>{o.persona}</Text>
@@ -1637,11 +1642,13 @@ export const CalendarScreen: React.FC = () => {
                       <View style={styles.ospiteBadge}>
                         <Text style={styles.ospiteBadgeTxt}>ospite</Text>
                       </View>
-                    </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
                   ))}
                 <Text style={styles.ospiteAiuto}>
-                  Occupano il posto ma non hanno ancora una scheda. Quando la persona
-                  entra in anagrafica, l'appuntamento diventa una sessione vera.
+                  Occupano il posto ma non hanno ancora una scheda. Se la persona è
+                  già registrata, toccala: da Richieste la colleghi e diventa un
+                  appuntamento vero.
                 </Text>
               </View>
             )}

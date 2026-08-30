@@ -17,7 +17,7 @@ import {
 } from '../../domain/agenda';
 import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
-  leggiImpegni, RichiestaSalvata,
+  leggiImpegni, getOspitiConfermati, RichiestaSalvata,
 } from '../../services/agendaRequestService';
 import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
 
@@ -84,6 +84,7 @@ export function RichiesteWhatsAppScreen() {
   const [students, setStudents] = useState<Student[]>([]);
   const [impegni, setImpegni] = useState<Impegno[]>([]);
   const [attesa, setAttesa] = useState<RichiestaSalvata[]>([]);
+  const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
   const [testo, setTesto] = useState('');
   const [loading, setLoading] = useState(true);
   const [lavoro, setLavoro] = useState(false);
@@ -96,9 +97,12 @@ export function RichiesteWhatsAppScreen() {
     try {
       const s = await getStudents();
       setStudents(s);
-      const [i, a] = await Promise.all([leggiImpegni(s), getRichiesteInAttesa()]);
+      const [i, a, o] = await Promise.all([
+        leggiImpegni(s), getRichiesteInAttesa(), getOspitiConfermati(),
+      ]);
       setImpegni(i);
       setAttesa(a);
+      setOspiti(o);
     } catch {
       crossAlert('Errore', 'Non riesco a leggere agenda e richieste');
     } finally {
@@ -180,6 +184,30 @@ export function RichiesteWhatsAppScreen() {
       );
     } catch {
       crossAlert('Errore', 'Non riesco a confermare');
+    } finally {
+      setLavoro(false);
+    }
+  };
+
+  /**
+   * L'ospite diventa un appuntamento vero. Il posto lo teneva già:
+   * qui non si aggiunge niente alla giornata, si dà un nome e una
+   * scheda a un impegno che esisteva.
+   */
+  const collega = async (r: RichiestaSalvata) => {
+    const studentId = scelte[r.id];
+    if (!user) return;
+    if (!studentId) {
+      crossAlert('Manca l\'allievo', 'Scegli la persona in anagrafica, poi collega.');
+      return;
+    }
+    setLavoro(true);
+    try {
+      await confermaRichiesta({ richiesta: r, coachId: user.id, studentId });
+      await carica();
+      crossAlert('In agenda', 'Adesso è un appuntamento vero, con la sua scheda.');
+    } catch {
+      crossAlert('Errore', 'Non riesco a collegarlo');
     } finally {
       setLavoro(false);
     }
@@ -491,6 +519,46 @@ export function RichiesteWhatsAppScreen() {
           </View>
         );
       })}
+
+      {/* --- ospiti confermati: hanno il posto, non hanno la scheda --- */}
+      {ospiti.length > 0 && (
+        <>
+          <Text style={s.sezione}>Ospiti da collegare ({ospiti.length})</Text>
+          <Text style={s.aiuto}>
+            Hanno già il loro posto in agenda. Appena la persona è in anagrafica,
+            collegala qui: l'appuntamento diventa una sessione vera, con scheda e
+            storico. Il posto non si conta due volte.
+          </Text>
+          {ospiti.map((r) => (
+            <View key={r.id} style={s.card}>
+              <Text style={s.persona}>{r.persona}</Text>
+              <Text style={s.quando}>
+                {dataBreve(r.giorno)} alle {r.ora} · {r.tipo}
+                {r.telefono ? ` · ${r.telefono}` : ''}
+              </Text>
+              {!!r.note && <Text style={s.note}>{r.note}</Text>}
+
+              <StudentSearchPicker
+                students={students}
+                selectedId={scelte[r.id]}
+                onSelect={(id) => setScelte((p) => ({ ...p, [r.id]: id }))}
+                label="Chi è, in anagrafica"
+                placeholder="Cerca l'allievo appena registrato…"
+              />
+
+              <TouchableOpacity
+                style={s.btnPrimario}
+                onPress={() => collega(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="link" size={17} color={colors.textOnAccent} />
+                <Text style={s.btnPrimarioTxt}>Collega e metti in agenda</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
 
       {/* --- il ponte: chi scrive le richieste al posto tuo --- */}
       <TouchableOpacity
