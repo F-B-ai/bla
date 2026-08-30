@@ -1,5 +1,6 @@
 import {
-  leggiCAL, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
+  leggiCAL, leggiTuttiCAL, valutaSequenza,
+  valutaRichiesta, rispostaWhatsApp, riepilogoDi,
   impegniDi, quantiIl, postiLiberi, quantiNellaSettimana, settimanaDi,
   giornoChiuso, dentroLeFinestre, nelBloccoAcademy,
   TETTO_GIORNALIERO, TETTO_SETTIMANALE, ORARI_CONSIGLIATI,
@@ -209,6 +210,81 @@ describe('IL QUINTO NON SI SCRIVE', () => {
     });
     expect(v.confermabile).toBe(true);
     expect(v.postiLiberi).toBe(4);
+  });
+});
+
+// ------------------------------------------------------------
+
+describe('più richieste in un incollo solo', () => {
+  const QUATTRO = `CAL prenota
+persona:  Uno
+giorno:   2026-09-02
+ora:      10:30
+tipo:     visita
+
+CAL prenota
+persona:  Due
+giorno:   2026-09-02
+ora:      11:30
+tipo:     visita
+
+CAL prenota
+persona:  Tre
+giorno:   2026-09-02
+ora:      15:00
+tipo:     visita
+
+CAL prenota
+persona:  Quattro
+giorno:   2026-09-02
+ora:      19:30
+tipo:     visita`;
+
+  it('legge tutti i blocchi, non solo l\'ultimo', () => {
+    const letti = leggiTuttiCAL(QUATTRO);
+    expect(letti).toHaveLength(4);
+    expect(letti.every((l) => l.ok)).toBe(true);
+    expect(letti.map((l) => l.richiesta!.persona)).toEqual(['Uno', 'Due', 'Tre', 'Quattro']);
+    expect(letti.map((l) => l.richiesta!.ora)).toEqual(['10:30', '11:30', '15:00', '19:30']);
+  });
+
+  it('un solo blocco continua a funzionare come prima', () => {
+    const letti = leggiTuttiCAL('CAL prenota\npersona: Solo\ngiorno: 2026-09-02\nora: 10:30');
+    expect(letti).toHaveLength(1);
+    expect(letti[0].richiesta!.persona).toBe('Solo');
+  });
+
+  it('testo senza CAL resta un errore, non quattro', () => {
+    const letti = leggiTuttiCAL('ciao mi prenoti Maria?');
+    expect(letti).toHaveLength(1);
+    expect(letti[0].ok).toBe(false);
+  });
+
+  it('LA SECONDA SA CHE COSA HA PRESO LA PRIMA', () => {
+    const richieste = leggiTuttiCAL(QUATTRO).map((l) => l.richiesta!);
+    const v = valutaSequenza(richieste, []);
+    expect(v.map((x) => x.postiLiberi)).toEqual([4, 3, 2, 1]);
+    expect(v.every((x) => x.confermabile)).toBe(true);
+  });
+
+  it('e la quinta dello stesso giorno viene rifiutata dentro lo stesso incollo', () => {
+    const richieste = [
+      ...leggiTuttiCAL(QUATTRO).map((l) => l.richiesta!),
+      { giorno: '2026-09-02', ora: '16:00', persona: 'Cinque' },
+    ];
+    const v = valutaSequenza(richieste as any, []);
+    expect(v[4].esito).toBe('giorno_pieno');
+    expect(v[4].confermabile).toBe(false);
+  });
+
+  it('due richieste alla stessa ora: la seconda trova occupato', () => {
+    const v = valutaSequenza([
+      { giorno: '2026-09-02', ora: '10:30', persona: 'Prima' },
+      { giorno: '2026-09-02', ora: '10:30', persona: 'Seconda' },
+    ], []);
+    expect(v[0].confermabile).toBe(true);
+    expect(v[1].esito).toBe('orario_occupato');
+    expect(v[1].conflittoCon).toBe('Prima');
   });
 });
 

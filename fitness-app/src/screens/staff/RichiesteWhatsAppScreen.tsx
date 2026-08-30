@@ -11,7 +11,7 @@ import { getStudents } from '../../services/authService';
 import { Student } from '../../types';
 import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import {
-  leggiCAL, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
+  leggiTuttiCAL, valutaSequenza, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
   RichiestaCAL, Impegno, Valutazione,
   TETTO_GIORNALIERO, TETTO_SETTIMANALE,
 } from '../../domain/agenda';
@@ -105,13 +105,32 @@ export function RichiesteWhatsAppScreen() {
 
   useEffect(() => { carica(); }, [carica]);
 
-  // --- lettura del pacchetto incollato ---
-  const letto = useMemo(() => (testo.trim() ? leggiCAL(testo) : null), [testo]);
-  const valutazioneNuova: Valutazione | null = useMemo(() => {
-    if (!letto?.ok || !letto.richiesta) return null;
-    if (letto.richiesta.comando === 'chiedi-liberi') return null;
-    return valutaRichiesta({ richiesta: letto.richiesta, impegni });
-  }, [letto, impegni]);
+  // --- lettura di ciò che è stato incollato ---
+  // Possono essere più pacchetti CAL insieme: è così che arriva la
+  // coda della giornata. Ognuno viene valutato sapendo che cosa ha
+  // già preso quello prima, altrimenti quattro richieste per lo
+  // stesso giorno direbbero tutte «restano 4 posti».
+  const letti = useMemo(() => (testo.trim() ? leggiTuttiCAL(testo) : []), [testo]);
+  const valide = useMemo(
+    () => letti.filter((l) => l.ok && l.richiesta).map((l) => l.richiesta!),
+    [letti]
+  );
+  const valutazioni = useMemo(
+    () => valutaSequenza(
+      valide.filter((r) => r.comando !== 'chiedi-liberi'),
+      impegni
+    ),
+    [valide, impegni]
+  );
+  const valutazioneDi = (r: RichiestaCAL): Valutazione | null => {
+    if (r.comando === 'chiedi-liberi') return null;
+    const i = valide.filter((x) => x.comando !== 'chiedi-liberi').indexOf(r);
+    return i >= 0 ? valutazioni[i] : null;
+  };
+  const letto = letti.length === 1 ? letti[0] : null;
+  const valutazioneNuova = letto?.ok && letto.richiesta
+    ? valutazioneDi(letto.richiesta)
+    : null;
 
   const rispostaDa = (r: RichiestaCAL, v: Valutazione | null): string =>
     rispostaWhatsApp({
@@ -121,14 +140,15 @@ export function RichiesteWhatsAppScreen() {
     });
 
   const registra = async () => {
-    if (!letto?.ok || !letto.richiesta || !user) return;
+    const daSalvare = valide.filter((r) => r.comando !== 'chiedi-liberi');
+    if (!daSalvare.length || !user) return;
     setLavoro(true);
     try {
-      await salvaRichiesta(letto.richiesta, user.id);
+      for (const r of daSalvare) await salvaRichiesta(r, user.id);
       setTesto('');
       await carica();
     } catch {
-      crossAlert('Errore', 'Non riesco a salvare la richiesta');
+      crossAlert('Errore', 'Non riesco a salvare le richieste');
     } finally {
       setLavoro(false);
     }
@@ -220,15 +240,73 @@ export function RichiesteWhatsAppScreen() {
           </View>
         )}
 
-        {letto && !letto.ok && (
+        {letti.some((l) => !l.ok) && (
           <View style={s.problemi}>
-            {letto.problemi.map((p, i) => (
-              <Text key={i} style={s.problema}>· {p}</Text>
-            ))}
+            {letti.map((l, n) => (l.ok ? null : l.problemi.map((p, i) => (
+              <Text key={`${n}-${i}`} style={s.problema}>
+                {letti.length > 1 ? `Blocco ${n + 1}: ` : '· '}{p}
+              </Text>
+            ))))}
           </View>
         )}
 
-        {letto?.ok && letto.richiesta && (
+        {/* più blocchi insieme: uno sguardo per ciascuno, in fila */}
+        {letti.length > 1 && (
+          <View style={{ marginTop: spacing.sm }}>
+            {letti.map((l, n) => {
+              if (!l.ok || !l.richiesta) return null;
+              const r = l.richiesta;
+              const v = valutazioneDi(r);
+              return (
+                <View key={n} style={s.bloccoRiga}>
+                  <Text style={s.riassuntoRiga}>
+                    <Text style={s.forte}>{r.persona || r.comando}</Text>
+                    {r.giorno ? ` · ${dataBreve(r.giorno)}` : ''}
+                    {r.ora ? ` ${r.ora}` : ''}
+                  </Text>
+                  {v && (
+                    <View style={[
+                      s.esito,
+                      { borderColor: v.confermabile ? colors.success : colors.warning },
+                    ]}>
+                      <Ionicons
+                        name={v.confermabile ? 'checkmark-circle' : 'alert-circle'}
+                        size={15}
+                        color={v.confermabile ? colors.success : colors.warning}
+                      />
+                      <Text style={s.esitoTxt}>{v.motivo}</Text>
+                    </View>
+                  )}
+                  {v && <Avvisi v={v} />}
+                  {v && (
+                    <TouchableOpacity
+                      style={s.btnSecondario}
+                      onPress={() => copia(rispostaDa(r, v))}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="logo-whatsapp" size={15} color={colors.accent} />
+                      <Text style={s.btnSecondarioTxt}>Copia la risposta per {r.persona.split(' ')[0]}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+
+            <TouchableOpacity
+              style={s.btnPrimario}
+              onPress={registra}
+              disabled={lavoro}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-circle-outline" size={17} color={colors.textOnAccent} />
+              <Text style={s.btnPrimarioTxt}>
+                {lavoro ? 'Salvo…' : `Metti tutte e ${valide.length} fra le richieste da confermare`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {letti.length === 1 && letto?.ok && letto.richiesta && (
           <>
             <View style={s.riassunto}>
               <Text style={s.riassuntoRiga}>
@@ -437,6 +515,10 @@ const s = StyleSheet.create({
   avvisi: { marginTop: spacing.sm, gap: 5 },
   avvisoRiga: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   avvisoTxt: { color: colors.warning, fontSize: fontSize.xs, lineHeight: 17, flex: 1 },
+  bloccoRiga: {
+    borderTopWidth: 1, borderTopColor: colors.divider,
+    paddingTop: spacing.sm, marginTop: spacing.sm,
+  },
   riassunto: { marginTop: spacing.sm },
   riassuntoRiga: { color: colors.text, fontSize: fontSize.sm, lineHeight: 20 },
   riassuntoNota: { color: colors.textLight, fontSize: fontSize.xs, marginTop: 2 },

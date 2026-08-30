@@ -209,6 +209,22 @@ export const leggiCAL = (testo: string): EsitoParse => {
   };
 };
 
+/**
+ * Più pacchetti CAL in un incollo solo: è così che arrivano quando
+ * qualcuno gira la coda della giornata tutta insieme. Ogni blocco
+ * comincia con una riga «CAL ...».
+ */
+export const leggiTuttiCAL = (testo: string): EsitoParse[] => {
+  const righe = (testo || '').split('\n');
+  const blocchi: string[][] = [];
+  for (const riga of righe) {
+    if (/^\s*CAL\s+/i.test(riga)) blocchi.push([riga]);
+    else if (blocchi.length) blocchi[blocchi.length - 1].push(riga);
+  }
+  if (!blocchi.length) return [leggiCAL(testo)];
+  return blocchi.map((b) => leggiCAL(b.join('\n')));
+};
+
 // ------------------------------------------------------------
 // Che cosa c'è già quel giorno
 // ------------------------------------------------------------
@@ -425,6 +441,29 @@ export const valutaRichiesta = (input: {
     quantiQuellaSettimana: nellaSettimana,
     conflittoCon: null, alternative, avvisi,
   };
+};
+
+/**
+ * Quando arrivano più richieste insieme, la seconda deve sapere
+ * che cosa ha preso la prima: altrimenti quattro richieste per lo
+ * stesso giorno direbbero tutte «restano 4 posti», e il tetto
+ * salterebbe proprio nel momento in cui serve.
+ */
+export const valutaSequenza = (
+  richieste: Array<Pick<RichiestaCAL, 'giorno' | 'ora' | 'persona'>>,
+  impegni: Impegno[]
+): Valutazione[] => {
+  const accumulati = [...impegni];
+  return richieste.map((r) => {
+    const v = valutaRichiesta({ richiesta: r, impegni: accumulati });
+    if (v.confermabile) {
+      accumulati.push({
+        giorno: r.giorno, ora: r.ora, chi: r.persona,
+        origine: 'richiesta', attivo: true,
+      });
+    }
+    return v;
+  });
 };
 
 // ------------------------------------------------------------
