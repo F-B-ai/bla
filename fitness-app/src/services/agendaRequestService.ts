@@ -200,6 +200,23 @@ export const leggiImpegni = async (studenti: Student[]): Promise<Impegno[]> => {
   return impegni;
 };
 
+/**
+ * Gli OSPITI confermati: persone che hanno il loro posto ma non
+ * sono ancora in anagrafica, quindi non hanno una sessione a cui
+ * agganciarsi. Occupano un posto vero, e devono vedersi in agenda:
+ * un impegno che non compare sul calendario è un impegno che salta.
+ */
+export const getOspitiConfermati = async (): Promise<RichiestaSalvata[]> => {
+  const snap = await getDocs(query(
+    collection(db, RICHIESTE),
+    where('stato', '==', 'confermata'),
+    limit(300)
+  ));
+  return snap.docs.map(daDoc)
+    .filter((r) => !r.sessionId)
+    .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora));
+};
+
 // ------------------------------------------------------------
 // La conferma: qui la richiesta diventa agenda
 // ------------------------------------------------------------

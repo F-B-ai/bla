@@ -63,6 +63,7 @@ import {
   decrementPlanConsultation,
 } from '../../services/paymentService';
 import { createNotification } from '../../services/notificationService';
+import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequestService';
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard } from './calendar/AppointmentCard';
@@ -153,6 +154,9 @@ export const CalendarScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  // Ospiti confermati: hanno il posto ma non sono ancora in anagrafica.
+  // Se occupano una fascia, devono vedersi qui dentro.
+  const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
   const canSeeAll = isOwner;
   const isStaff = isOwner || isManager || isCollaborator;
 
@@ -231,11 +235,15 @@ export const CalendarScreen: React.FC = () => {
         return;
       }
 
-      const [studs, collabs, mgrs] = await Promise.all([
+      const [studs, collabs, mgrs, osp] = await Promise.all([
         getStudents(),
         canSeeAll ? getCollaborators() : Promise.resolve([]),
         canSeeAll ? getManagers() : Promise.resolve([]),
+        // Solo il titolare può leggerli: per gli altri resta vuoto e
+        // l'agenda funziona esattamente come prima.
+        isOwner ? getOspitiConfermati().catch(() => []) : Promise.resolve([]),
       ]);
+      setOspiti(osp);
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
@@ -1608,6 +1616,36 @@ export const CalendarScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* Ospiti confermati del giorno: hanno il posto, non hanno
+                ancora una scheda. Compaiono qui perché occupano una
+                fascia vera, e chi guarda l'agenda deve saperlo. */}
+            {isOwner && ospiti.filter((o) => o.giorno === selectedDate).length > 0 && (
+              <View style={styles.ospitiSection}>
+                {ospiti
+                  .filter((o) => o.giorno === selectedDate)
+                  .map((o) => (
+                    <View key={o.id} style={styles.ospiteCard}>
+                      <Text style={styles.ospiteOra}>{o.ora}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.ospiteNome}>{o.persona}</Text>
+                        <Text style={styles.ospiteNota}>
+                          {o.tipo}
+                          {o.telefono ? ` · ${o.telefono}` : ''}
+                          {o.note ? ` · ${o.note}` : ''}
+                        </Text>
+                      </View>
+                      <View style={styles.ospiteBadge}>
+                        <Text style={styles.ospiteBadgeTxt}>ospite</Text>
+                      </View>
+                    </View>
+                  ))}
+                <Text style={styles.ospiteAiuto}>
+                  Occupano il posto ma non hanno ancora una scheda. Quando la persona
+                  entra in anagrafica, l'appuntamento diventa una sessione vera.
+                </Text>
+              </View>
+            )}
+
             {/* Tasks for selected day (owner only) */}
             {isOwner && (
               <View style={styles.dayTasksSection}>
@@ -2436,6 +2474,54 @@ const styles = StyleSheet.create({
   },
 
   // View tabs bar
+  ospitiSection: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  ospiteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.info,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  ospiteOra: {
+    color: colors.info,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  ospiteNome: {
+    color: colors.text,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+  },
+  ospiteNota: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    marginTop: 2,
+  },
+  ospiteBadge: {
+    borderWidth: 1,
+    borderColor: colors.info,
+    borderRadius: borderRadius.round,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  ospiteBadgeTxt: {
+    color: colors.info,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+  },
+  ospiteAiuto: {
+    color: colors.textLight,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginBottom: spacing.sm,
+  },
   richiesteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
