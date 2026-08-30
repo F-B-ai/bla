@@ -194,11 +194,31 @@ export function RichiesteWhatsAppScreen() {
           style={s.area}
           multiline
           numberOfLines={7}
-          placeholder={ESEMPIO}
+          placeholder={'Tocca qui e incolla il messaggio CAL…'}
           placeholderTextColor={colors.textLight}
           value={testo}
           onChangeText={setTesto}
         />
+
+        {/* L'esempio sta FUORI dal campo: dentro sembrava già scritto,
+            e chi guardava aspettava una risposta che non poteva arrivare. */}
+        {!testo.trim() && (
+          <View style={s.esempio}>
+            <View style={s.esempioTesta}>
+              <Ionicons name="document-text-outline" size={14} color={colors.textLight} />
+              <Text style={s.esempioLab}>Esempio — non è ancora scritto niente</Text>
+            </View>
+            <Text style={s.esempioTxt}>{ESEMPIO}</Text>
+            <TouchableOpacity
+              style={s.btnSecondario}
+              onPress={() => setTesto(ESEMPIO)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="download-outline" size={16} color={colors.accent} />
+              <Text style={s.btnSecondarioTxt}>Prova con questo esempio</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {letto && !letto.ok && (
           <View style={s.problemi}>
@@ -395,6 +415,20 @@ const s = StyleSheet.create({
     padding: spacing.sm, minHeight: 132, fontSize: fontSize.sm,
     textAlignVertical: 'top', lineHeight: 19,
   },
+  esempio: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  esempioTesta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  esempioLab: {
+    color: colors.textLight, fontSize: fontSize.xs, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.4,
+  },
+  esempioTxt: { color: colors.textLight, fontSize: fontSize.xs, lineHeight: 18 },
   problemi: {
     backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
     padding: spacing.sm, marginTop: spacing.sm,
