@@ -19,6 +19,7 @@ import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
   leggiImpegni, RichiestaSalvata,
 } from '../../services/agendaRequestService';
+import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
 
 // ============================================================
 // RICHIESTE DA WHATSAPP
@@ -87,6 +88,8 @@ export function RichiesteWhatsAppScreen() {
   const [loading, setLoading] = useState(true);
   const [lavoro, setLavoro] = useState(false);
   const [scelte, setScelte] = useState<Record<string, string | undefined>>({});
+  const [chiave, setChiave] = useState<string | null>(null);
+  const [apriPonte, setApriPonte] = useState(false);
 
   const carica = useCallback(async () => {
     setLoading(true);
@@ -177,6 +180,19 @@ export function RichiesteWhatsAppScreen() {
       );
     } catch {
       crossAlert('Errore', 'Non riesco a confermare');
+    } finally {
+      setLavoro(false);
+    }
+  };
+
+  const nuovaChiave = async () => {
+    setLavoro(true);
+    try {
+      const k = await generaChiaveCAL();
+      setChiave(k);
+      setApriPonte(true);
+    } catch (e) {
+      crossAlert('Errore', e instanceof Error ? e.message : 'Non riesco a generare la chiave');
     } finally {
       setLavoro(false);
     }
@@ -390,7 +406,15 @@ export function RichiesteWhatsAppScreen() {
             s.card,
             { borderColor: v.confermabile ? colors.border : colors.warning },
           ]}>
-            <Text style={s.persona}>{r.persona || 'Senza nome'}</Text>
+            <View style={s.personaRiga}>
+              <Text style={s.persona}>{r.persona || 'Senza nome'}</Text>
+              {r.creataDa === 'bot' && (
+                <View style={s.tagBot}>
+                  <Ionicons name="link" size={11} color={colors.info} />
+                  <Text style={s.tagBotTxt}>dal bot</Text>
+                </View>
+              )}
+            </View>
             <Text style={s.quando}>
               {dataBreve(r.giorno)} alle {r.ora} · {r.tipo}
               {r.telefono ? ` · ${r.telefono}` : ''}
@@ -468,6 +492,65 @@ export function RichiesteWhatsAppScreen() {
         );
       })}
 
+      {/* --- il ponte: chi scrive le richieste al posto tuo --- */}
+      <TouchableOpacity
+        style={s.catalogoBtn}
+        onPress={() => setApriPonte((v) => !v)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="link-outline" size={18} color={colors.accent} />
+        <Text style={s.catalogoTxt}>Il ponte: farsele scrivere qui dentro</Text>
+        <Ionicons
+          name={apriPonte ? 'chevron-up' : 'chevron-down'}
+          size={18} color={colors.textSecondary}
+        />
+      </TouchableOpacity>
+
+      {apriPonte && (
+        <View style={s.card}>
+          <Text style={s.muted}>
+            Con una chiave, chi riceve le richieste su WhatsApp — il bot o una persona —
+            le scrive direttamente in questa coda, e tu te le trovi già qui.{'\n\n'}
+            Chi ha la chiave <Text style={s.forte}>può solo scrivere richieste in attesa</Text>:
+            non legge l'agenda, non conferma niente, non cancella niente. Gli appuntamenti
+            nascono solo quando li confermi tu.
+          </Text>
+
+          {chiave && (
+            <View style={s.chiaveBox}>
+              <Text style={s.chiaveLab}>La chiave — si vede una volta sola</Text>
+              <Text style={s.chiaveTxt} selectable>{chiave}</Text>
+              <TouchableOpacity
+                style={s.btnSecondario}
+                onPress={() => copia(istruzioniPonte(chiave))}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="copy-outline" size={16} color={colors.accent} />
+                <Text style={s.btnSecondarioTxt}>Copia chiave e istruzioni</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={s.btnPrimario}
+            onPress={nuovaChiave}
+            disabled={lavoro}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="key-outline" size={17} color={colors.textOnAccent} />
+            <Text style={s.btnPrimarioTxt}>
+              {lavoro ? 'Genero…' : chiave ? 'Genera una chiave nuova' : 'Genera la chiave'}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={s.aiuto}>
+            Chi non sa fare chiamate tecniche usa la pagina {CAL_ENDPOINT.replace('/v1/cal', '/cal.html')}:
+            si incolla la chiave una volta e poi solo i pacchetti CAL.{'\n'}
+            Generare una chiave nuova spegne all'istante la precedente.
+          </Text>
+        </View>
+      )}
+
       <Text style={s.chiusura}>
         Le richieste restano scritte anche quando si chiudono: così si sa quante
         persone hanno bussato, e quante sono rimaste fuori.
@@ -515,6 +598,30 @@ const s = StyleSheet.create({
   avvisi: { marginTop: spacing.sm, gap: 5 },
   avvisoRiga: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   avvisoTxt: { color: colors.warning, fontSize: fontSize.xs, lineHeight: 17, flex: 1 },
+  catalogoBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.surface, borderRadius: borderRadius.md,
+    borderWidth: 1, borderColor: colors.border,
+    padding: spacing.md, marginTop: spacing.xl,
+  },
+  catalogoTxt: { color: colors.text, fontSize: fontSize.md, fontWeight: '700', flex: 1 },
+  chiaveBox: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    borderWidth: 1, borderColor: colors.accent,
+    padding: spacing.sm, marginTop: spacing.md,
+  },
+  chiaveLab: {
+    color: colors.accent, fontSize: fontSize.xs, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5,
+  },
+  chiaveTxt: { color: colors.text, fontSize: fontSize.sm, lineHeight: 20 },
+  personaRiga: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  tagBot: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderWidth: 1, borderColor: colors.info, borderRadius: borderRadius.round,
+    paddingHorizontal: 7, paddingVertical: 1,
+  },
+  tagBotTxt: { color: colors.info, fontSize: fontSize.xs, fontWeight: '700' },
   bloccoRiga: {
     borderTopWidth: 1, borderTopColor: colors.divider,
     paddingTop: spacing.sm, marginTop: spacing.sm,

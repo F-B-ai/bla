@@ -239,6 +239,14 @@ service cloud.firestore {
     }
 
     // Sessions
+    // Configurazione del ponte CAL: qui vive SOLO l'impronta della
+    // chiave, e nessun client la legge — nemmeno il titolare, che la
+    // rigenera da una Function. Le Functions usano l'Admin SDK e non
+    // passano da queste regole.
+    match /config/{docId} {
+      allow read, write: if false;
+    }
+
     // Richieste di appuntamento arrivate da WhatsApp.
     // Non sono appuntamenti: lo diventano quando il titolare conferma
     // e nasce una sessione. Le vede e le scrive SOLO il titolare —
