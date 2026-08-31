@@ -61,6 +61,8 @@ interface HubRow {
   title: string;
   subtitle: string;
   route: string;
+  /** quando la destinazione vive in un altro tab (es. il check-in) */
+  tab?: string;
 }
 
 const HubScreen: React.FC<{ title: string; subtitle: string; rows: HubRow[] }> = ({ title, subtitle, rows }) => {
@@ -76,7 +78,9 @@ const HubScreen: React.FC<{ title: string; subtitle: string; rows: HubRow[] }> =
           <TouchableOpacity
             key={row.route}
             style={hubStyles.row}
-            onPress={() => navigation.navigate(row.route)}
+            onPress={() => (row.tab
+              ? navigation.navigate(row.tab, { screen: row.route })
+              : navigation.navigate(row.route))}
             activeOpacity={0.85}
           >
             <View style={hubStyles.rowIcon}>
@@ -112,6 +116,9 @@ const AllenatiHub = () => (
     title="Allenati"
     subtitle="Il tuo percorso in palestra"
     rows={[
+      // Senza check-in l'allenamento non parte: la porta sta PRIMA
+      // della scheda, dove serve. Era sparita col nuovo menù.
+      { icon: 'qr-code-outline', title: 'Check-in in palestra', subtitle: 'Inquadra il QR all\'ingresso', route: 'CheckinPalestra', tab: 'Oggi' },
       { icon: 'fitness-outline', title: 'La mia scheda', subtitle: 'Il programma assegnato dal coach', route: 'Scheda' },
       { icon: 'barbell-outline', title: 'Inizia seduta', subtitle: 'Registra l\'allenamento dal vivo', route: 'SedutaLive' },
       { icon: 'analytics-outline', title: 'Storico', subtitle: 'Gli allenamenti completati', route: 'Storico' },

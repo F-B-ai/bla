@@ -219,7 +219,10 @@ export function TodayScreen() {
       {/* ——— LE PORTE: poche, quelle di ogni giorno ——— */}
       <View style={s.porte}>
         {[
-          { icona: 'fitness-outline' as const, testo: 'La mia scheda', vai: () => navigation.navigate('Allenati', { screen: 'Scheda' }) },
+          // Il check-in apre la giornata in palestra: senza, l'allenamento
+          // non parte. Sta per primo perché è il primo gesto.
+          { icona: 'qr-code-outline' as const, testo: 'Check-in', vai: () => navigation.navigate('CheckinPalestra') },
+          { icona: 'fitness-outline' as const, testo: 'Scheda', vai: () => navigation.navigate('Allenati', { screen: 'Scheda' }) },
           { icona: 'calendar-outline' as const, testo: 'Agenda', vai: () => navigation.navigate('Agenda') },
           { icona: 'analytics-outline' as const, testo: 'Storico', vai: () => navigation.navigate('Allenati', { screen: 'Storico' }) },
         ].map((p) => (

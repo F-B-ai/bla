@@ -10,6 +10,7 @@ import {
   Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
 import { hasCheckedInToday } from '../../services/checkinService';
@@ -33,6 +34,7 @@ import { getStudentCoachIds } from '../../utils/helpers';
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
 export const LiveWorkoutScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const student = user as Student | null;
@@ -145,9 +147,17 @@ export const LiveWorkoutScreen: React.FC = () => {
     if (user.role === 'student') {
       const entrato = await hasCheckedInToday(user.id);
       if (!entrato) {
+        // Il blocco deve avere una chiave: si va al QR da qui.
         crossAlert(
           'Prima il check-in',
-          'Passa il QR all\'ingresso della palestra: la seduta si registra solo quando sei dentro.'
+          'Passa il QR all\'ingresso della palestra: la seduta si registra solo quando sei dentro.',
+          [
+            { text: 'Non ora', style: 'cancel' },
+            {
+              text: 'Vai al check-in',
+              onPress: () => navigation.navigate('Oggi', { screen: 'CheckinPalestra' }),
+            },
+          ]
         );
         return;
       }
