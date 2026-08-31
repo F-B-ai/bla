@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -30,6 +30,9 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import {
   createSession,
+  subscribeToSessions,
+  subscribeToStudentSessions,
+  subscribeToCollaboratorSessions,
   getAllSessions,
   getCollaboratorSessions,
   getStudentSessions,
@@ -40,6 +43,7 @@ import {
 } from '../../services/sessionService';
 import {
   createAppointment,
+  subscribeToAppointments,
   getAllAppointments,
   getNutritionistAppointmentsByStaff,
   getStudentAppointments,
@@ -61,7 +65,9 @@ import {
   getActiveStudentPlan,
   decrementPlanLesson,
   decrementPlanConsultation,
+  scalaDalPercorso,
 } from '../../services/paymentService';
+import { giaScalata } from '../../domain/piani';
 import { createNotification } from '../../services/notificationService';
 import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequestService';
 import { addTransaction } from '../../services/financialService';
@@ -98,6 +104,8 @@ type AppointmentItem = {
   notes: string;
   sessionCost?: number;
   isCountedAsCompleted: boolean;
+  /** la seduta ha già scalato dal percorso */
+  planDecremented?: boolean;
 };
 
 const toSafeDate = (d: unknown): Date => {
@@ -277,6 +285,36 @@ export const CalendarScreen: React.FC = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Tornando sulla schermata si riallinea tutto il resto (ospiti,
+  // allievi, task): le sedute arrivano già da sole, qui si copre
+  // ciò che il tempo reale non segue.
+  useFocusEffect(
+    useCallback(() => { loadData(); }, [loadData])
+  );
+
+  // TEMPO REALE. Prima l'agenda si leggeva una volta all'apertura:
+  // chi fissava un appuntamento — o lo segnava completato — doveva
+  // chiudere e riaprire l'app per vederlo. Adesso il cambiamento
+  // arriva da solo, su questo dispositivo e su quelli degli altri.
+  useEffect(() => {
+    if (!user) return;
+    const stop: Array<() => void> = [];
+    try {
+      if (isStudent) {
+        stop.push(subscribeToStudentSessions(user.id, setSessions));
+      } else if (canSeeAll) {
+        stop.push(subscribeToSessions(setSessions));
+        stop.push(subscribeToAppointments(setNutritionAppts));
+      } else {
+        // Stesso perimetro di prima: il collaboratore vede le sue.
+        stop.push(subscribeToCollaboratorSessions(user.id, setSessions));
+      }
+    } catch {
+      /* niente tempo reale (offline o permessi): resta il caricamento normale */
+    }
+    return () => stop.forEach((f) => { try { f(); } catch { /* già chiuso */ } });
+  }, [user, isStudent, canSeeAll]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
@@ -293,6 +331,7 @@ export const CalendarScreen: React.FC = () => {
         date: d, dateStr: toDateStr(d), startTime: s.startTime, endTime: s.endTime,
         status: s.status, notes: s.notes, sessionCost: s.sessionCost,
         isCountedAsCompleted: s.isCountedAsCompleted,
+        planDecremented: s.planDecremented,
       });
     });
     nutritionAppts.forEach((a) => {
@@ -303,6 +342,7 @@ export const CalendarScreen: React.FC = () => {
         date: d, dateStr: toDateStr(d), startTime: a.startTime, endTime: a.endTime,
         status: a.status, notes: a.notes, sessionCost: a.sessionCost,
         isCountedAsCompleted: a.isCountedAsCompleted,
+        planDecremented: a.planDecremented,
       });
     });
     items.sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -648,7 +688,24 @@ export const CalendarScreen: React.FC = () => {
           try {
             if (item.kind === 'training') await updateSessionStatus(item.id, 'completed');
             else await updateAppointmentStatus(item.id, 'completed');
-            await decrementStudentPlan(item.studentId, item.kind);
+
+            // Si scala dal percorso, e si DICE che cosa è successo:
+            // prima, se il percorso non copriva oggi, non scalava
+            // niente e nessuno lo sapeva.
+            const tipoPiano = item.kind === 'training' ? 'lezione' : 'consulenza';
+            const gia = giaScalata(!!item.planDecremented, tipoPiano);
+            const esito = gia || await scalaDalPercorso(item.studentId, tipoPiano);
+            if (esito.esito === 'scalata') {
+              if (item.kind === 'training') {
+                await updateSession(item.id, { planDecremented: true });
+              } else {
+                await updateAppointment(item.id, { planDecremented: true });
+              }
+            }
+            crossAlert(
+              esito.esito === 'scalata' ? 'Seduta completata' : 'Seduta completata — attenzione',
+              esito.messaggio
+            );
             const studentName = getStudentName(item.studentId);
             const dateLabel = item.date.toLocaleDateString('it-IT');
             createNotification(

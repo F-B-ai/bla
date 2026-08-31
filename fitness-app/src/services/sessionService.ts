@@ -1,6 +1,8 @@
 import {
   collection,
   doc,
+  onSnapshot,
+  Unsubscribe,
   addDoc,
   updateDoc,
   getDocs,
@@ -128,4 +130,59 @@ export const updateSession = async (
 
 export const deleteSession = async (sessionId: string): Promise<void> => {
   await deleteDoc(doc(db, SESSIONS_COLLECTION, sessionId));
+};
+
+/**
+ * Tutte le sedute, in tempo reale. Prima l'agenda si leggeva una
+ * volta sola all'apertura: chi fissava un appuntamento doveva
+ * chiudere e riaprire l'app per vederlo. Adesso arriva da solo.
+ */
+export const subscribeToSessions = (
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    orderBy('date', 'desc'),
+    limit(500)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
+};
+
+/** Le sedute di un singolo allievo, in tempo reale. */
+export const subscribeToStudentSessions = (
+  studentId: string,
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('studentId', '==', studentId)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
+};
+
+/** Le sedute di un collaboratore, in tempo reale (stesso perimetro di prima). */
+export const subscribeToCollaboratorSessions = (
+  collaboratorId: string,
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('collaboratorId', '==', collaboratorId)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
 };

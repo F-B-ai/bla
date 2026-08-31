@@ -10,6 +10,8 @@ import {
   orderBy,
   limit,
   Timestamp,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
@@ -207,4 +209,21 @@ export const getStudentBiaDocuments = async (
 
 export const deleteBiaDocument = async (biaDocId: string): Promise<void> => {
   await deleteDoc(doc(db, BIA_COLLECTION, biaDocId));
+};
+
+/** Le visite nutrizionista, in tempo reale. */
+export const subscribeToAppointments = (
+  callback: (appts: NutritionistAppointment[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, APPOINTMENTS_COLLECTION),
+    orderBy('date', 'desc'),
+    limit(500)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))),
+    () => { if (onError) onError(); }
+  );
 };

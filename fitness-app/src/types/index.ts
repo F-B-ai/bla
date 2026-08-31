@@ -93,6 +93,9 @@ export interface TrainingSession {
   sessionCost?: number;
   // Se cancellato < 10 ore prima => considerato eseguito
   isCountedAsCompleted: boolean;
+  /** true quando la seduta ha già scalato una lezione dal percorso:
+   *  impedisce di toglierne una seconda se si rimarca «completata». */
+  planDecremented?: boolean;
 }
 
 // --- Programma di allenamento ---
@@ -412,6 +415,8 @@ export interface NutritionistAppointment {
   cancelledAt?: Date;
   isCountedAsCompleted: boolean; // Se cancellato < 10 ore prima
   createdAt: Date;
+  /** true quando la visita ha già scalato una consulenza dal percorso */
+  planDecremented?: boolean;
 }
 
 export interface BodyMeasurement {

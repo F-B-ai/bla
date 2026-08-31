@@ -12,6 +12,7 @@ import {
 import { db } from '../config/firebase';
 import { messaggioPromemoria } from '../domain/patto';
 import { PaymentPlan, Installment, CollaboratorEarning, PaymentStatus } from '../types';
+import { scegliPiano, Scelta, TipoImpegnoPiano } from '../domain/piani';
 
 const PAYMENTS_COLLECTION = 'paymentPlans';
 const EARNINGS_COLLECTION = 'collaboratorEarnings';
@@ -166,6 +167,43 @@ const toSafeDate = (d: unknown): Date => {
 };
 
 // Get active plan for student (the one within date range and not fully used)
+/**
+ * Scala una lezione (o una consulenza) dal percorso e DICE che cosa
+ * è successo. Prima falliva in silenzio quando il percorso non
+ * copriva la data di oggi — creato dopo la lezione, o in partenza
+ * domani: la lezione non veniva scalata e nessuno lo sapeva.
+ *
+ * La scelta del percorso vive in src/domain/piani.ts e si testa lì.
+ */
+export const scalaDalPercorso = async (
+  studentId: string,
+  tipo: TipoImpegnoPiano,
+  oggi: Date = new Date()
+): Promise<Scelta> => {
+  const piani = await getStudentPaymentPlans(studentId);
+  const scelta = scegliPiano(piani.map((p) => ({
+    id: p.id,
+    inizio: toSafeDate(p.startDate),
+    fine: toSafeDate(p.endDate),
+    lezioniIncluse: p.includedLessons || 0,
+    lezioniUsate: p.usedLessons || 0,
+    consulenzeIncluse: p.includedConsultations || 0,
+    consulenzeUsate: p.usedConsultations || 0,
+    creatoIl: p.createdAt ? toSafeDate(p.createdAt) : undefined,
+  })), tipo, oggi);
+
+  if (scelta.esito !== 'scalata' || !scelta.piano) return scelta;
+
+  const usate = tipo === 'lezione'
+    ? scelta.piano.lezioniUsate
+    : scelta.piano.consulenzeUsate;
+
+  if (tipo === 'lezione') await decrementPlanLesson(scelta.piano.id, usate);
+  else await decrementPlanConsultation(scelta.piano.id, usate);
+
+  return scelta;
+};
+
 export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPlan | null> => {
   const plans = await getStudentPaymentPlans(studentId);
   const now = new Date();
