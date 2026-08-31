@@ -38,6 +38,7 @@ import StellatoScreen from '../screens/staff/StellatoScreen';
 import ProgressioneScreen from '../screens/staff/ProgressioneScreen';
 import RichiesteWhatsAppScreen from '../screens/staff/RichiesteWhatsAppScreen';
 import ProtocolloScreen from '../screens/staff/ProtocolloScreen';
+import FilmatiScreen from '../screens/staff/FilmatiScreen';
 import { OnboardingScreen } from '../screens/staff/OnboardingScreen';
 import { PattoScreen } from '../screens/staff/PattoScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -121,6 +122,7 @@ const trainingGroup: HubGroup = {
   title: 'Allenamento',
   rows: [
     { icon: 'fitness-outline', title: 'Programmi', route: 'Programmi' },
+    { icon: 'play-circle-outline', title: 'Filmati degli esercizi', route: 'Filmati' },
     { icon: 'copy-outline', title: 'Template', route: 'Template' },
     { icon: 'tv-outline', title: 'Monitor allenamenti', route: 'Monitor' },
     { icon: 'trending-up-outline', title: 'Gerarchia della progressione', route: 'Progressione' },
@@ -246,6 +248,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="StudioHome" component={Hub} />
       {/* Allenamento */}
       <StudioStack.Screen name="Programmi" component={WorkoutPlanScreen} options={inner('Programmi')} />
+      <StudioStack.Screen name="Filmati" component={FilmatiScreen} options={inner('Filmati degli esercizi')} />
       <StudioStack.Screen name="Template" component={ManageTemplatesScreen} options={inner('Template')} />
       <StudioStack.Screen name="Monitor" component={WorkoutMonitorScreen} options={inner('Monitor allenamenti')} />
       <StudioStack.Screen name="Storico" component={WorkoutHistoryScreen} options={inner('Storico allenamenti')} />

@@ -24,6 +24,9 @@ import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
 import { getStudentPaymentPlans } from '../../services/paymentService';
 import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
+import { VideoEsercizio } from '../../components/common/VideoEsercizio';
+import { trovaFilm } from '../../domain/filmEsercizio';
+import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -41,6 +44,15 @@ export const MyProgramScreen: React.FC = () => {
   const [historySelectedDay, setHistorySelectedDay] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  // La libreria serve a coprire i programmi che non portano il link
+  // del filmato: si carica una volta, e non blocca niente se manca.
+  const [libreria, setLibreria] = useState<LibraryExercise[]>([]);
+
+  useEffect(() => {
+    getFullExerciseLibrary()
+      .then(setLibreria)
+      .catch(() => setLibreria([]));
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -115,18 +127,16 @@ export const MyProgramScreen: React.FC = () => {
         <Text style={styles.exerciseDescription}>{exercise.description}</Text>
       )}
 
-      {exercise.videoUrl && (
-        <TouchableOpacity
-          style={styles.videoButton}
-          onPress={() => {
-            Linking.openURL(exercise.videoUrl!).catch(() =>
-              crossAlert('Errore', 'Impossibile aprire il video')
-            );
-          }}
-        >
-          <Text style={styles.videoButtonText}>Guarda Video</Text>
-        </TouchableOpacity>
-      )}
+      {/* Il filmato si guarda QUI DENTRO. E se il programma non porta
+          il link, si prende quello della libreria: il film esiste,
+          non c'è ragione di non mostrarlo. */}
+      <VideoEsercizio
+        film={trovaFilm({
+          nome: exercise.name,
+          videoUrlProgramma: exercise.videoUrl,
+          libreria,
+        })}
+      />
 
       {exercise.notes && (
         <Text style={styles.exerciseNotes}>{exercise.notes}</Text>

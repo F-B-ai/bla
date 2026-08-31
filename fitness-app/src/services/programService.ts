@@ -14,6 +14,7 @@ import {
 import { db } from '../config/firebase';
 import { TrainingProgram, WorkoutPlan, Exercise, ExerciseCategory } from '../types';
 import { allDefaultExercises, DefaultExercise } from '../data/defaultExercises';
+import { fondiConCanone } from '../domain/filmEsercizio';
 
 const PROGRAMS_COLLECTION = 'trainingPrograms';
 const PLANS_COLLECTION = 'workoutPlans';
@@ -282,7 +283,22 @@ export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
 
   const result: LibraryExercise[] = [];
 
+  // Il canone per nome: serve a non farlo coprire da una voce salvata
+  // senza film. Un campo VUOTO non può cancellare un filmato che esiste.
+  const canonePerNome = new Map(
+    allDefaultExercises.map((d) => [d.name.toLowerCase().trim(), d])
+  );
+
   for (const ex of firestoreExercises) {
+    const canone = canonePerNome.get(ex.name.toLowerCase().trim());
+    const conFilm = fondiConCanone({
+      name: ex.name,
+      videoUrl: ex.videoUrl,
+      videoLabel: (ex as any).videoLabel,
+      videoUrlAlt: (ex as any).videoUrlAlt,
+      videoAltLabel: (ex as any).videoAltLabel,
+    }, canone);
+
     result.push({
       id: ex.id,
       name: ex.name,
@@ -292,7 +308,10 @@ export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
       restSeconds: ex.restSeconds,
       category: ex.category,
       notes: ex.notes || '',
-      videoUrl: ex.videoUrl,
+      videoUrl: conFilm.videoUrl,
+      videoLabel: conFilm.videoLabel,
+      videoUrlAlt: conFilm.videoUrlAlt,
+      videoAltLabel: conFilm.videoAltLabel,
       imageUrl: ex.imageUrl,
       gender: (ex as any).gender || 'unisex',
       fromFirestore: true,

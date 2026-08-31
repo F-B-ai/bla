@@ -19,7 +19,7 @@ import { Card } from '../../components/common/Card';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { WorkoutPlan, Exercise, WorkoutLog, ExerciseLog, SetLog, MiniSetLog, DropSetLog, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { getActiveWorkoutPlan } from '../../services/programService';
+import { getActiveWorkoutPlan, getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 import {
   startWorkoutLog,
   updateExerciseLogs,
@@ -30,11 +30,19 @@ import {
   subscribeToWorkoutLog,
 } from '../../services/workoutLogService';
 import { getStudentCoachIds } from '../../utils/helpers';
+import { VideoEsercizio } from '../../components/common/VideoEsercizio';
+import { trovaFilm } from '../../domain/filmEsercizio';
 
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
 export const LiveWorkoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  // Il filmato dell'esercizio: se il programma non porta il link,
+  // si prende dalla libreria per nome.
+  const [libreria, setLibreria] = useState<LibraryExercise[]>([]);
+  useEffect(() => {
+    getFullExerciseLibrary().then(setLibreria).catch(() => setLibreria([]));
+  }, []);
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const student = user as Student | null;
@@ -895,17 +903,14 @@ export const LiveWorkoutScreen: React.FC = () => {
             {(() => {
               const giorno = activeWorkout?.dayOfWeek ?? selectedDayIndex;
               const exPiano = activePlan?.weeklySchedule[giorno]?.exercises?.[currentExerciseIndex];
-              if (!exPiano?.videoUrl) return null;
               return (
-                <TouchableOpacity
-                  style={styles.videoBtn}
-                  onPress={() => Linking.openURL(exPiano.videoUrl!).catch(() =>
-                    crossAlert('Errore', 'Non riesco ad aprire il video'))}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="play-circle" size={20} color={colors.accent} />
-                  <Text style={styles.videoBtnTxt}>Guarda come si esegue</Text>
-                </TouchableOpacity>
+                <VideoEsercizio
+                  film={trovaFilm({
+                    nome: exPiano?.name || currentExercise.exerciseName,
+                    videoUrlProgramma: exPiano?.videoUrl,
+                    libreria,
+                  })}
+                />
               );
             })()}
             {currentExercise.technique === 'rest_pause' && (
