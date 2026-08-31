@@ -37,6 +37,7 @@ import MindMovementScreen from '../screens/staff/MindMovementScreen';
 import StellatoScreen from '../screens/staff/StellatoScreen';
 import ProgressioneScreen from '../screens/staff/ProgressioneScreen';
 import RichiesteWhatsAppScreen from '../screens/staff/RichiesteWhatsAppScreen';
+import ProtocolloScreen from '../screens/staff/ProtocolloScreen';
 import { OnboardingScreen } from '../screens/staff/OnboardingScreen';
 import { PattoScreen } from '../screens/staff/PattoScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -136,6 +137,7 @@ const assessGroup: HubGroup = {
   title: 'Valutazioni',
   rows: [
     { icon: 'person-add-outline', title: 'Scheda onboarding — nuovo allievo', route: 'Onboarding' },
+    { icon: 'clipboard-outline', title: 'Protocollo di lavoro — dopo i test', route: 'Protocollo' },
     { icon: 'document-text-outline', title: 'Patto di percorso — da firmare', route: 'Patto' },
     { icon: 'finger-print-outline', title: 'Valutazione Mind Movement™', route: 'MindMovement' },
     { icon: 'star-outline', title: 'Esame del Sistema Stellato', route: 'Stellato' },
@@ -250,6 +252,7 @@ const buildNavigators = (role: StaffRole) => {
       <StudioStack.Screen name="Progressione" component={ProgressioneScreen} options={inner('Gerarchia della progressione')} />
       {/* Valutazioni */}
       <StudioStack.Screen name="Onboarding" component={OnboardingScreen} options={inner('Scheda onboarding')} />
+      <StudioStack.Screen name="Protocollo" component={ProtocolloScreen} options={inner('Protocollo di lavoro')} />
       <StudioStack.Screen name="Patto" component={PattoScreen} options={inner('Patto di percorso')} />
       <StudioStack.Screen name="MindMovement" component={MindMovementScreen} options={inner('Mind Movement™')} />
       <StudioStack.Screen name="Stellato" component={StellatoScreen} options={inner('Sistema Stellato')} />
