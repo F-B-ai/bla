@@ -942,6 +942,28 @@ export const CalendarScreen: React.FC = () => {
 
   // Today's agenda for quick view
   const todayAppointments = appointmentsByDate[todayStr] || [];
+
+  // I PROSSIMI. Prima la schermata Agenda mostrava soltanto OGGI:
+  // chi fissava un appuntamento per domani non lo vedeva da nessuna
+  // parte e pensava che non fosse stato salvato. Adesso compare qui,
+  // subito, con la sua data.
+  const prossimiAppuntamenti = useMemo(() => filteredAppointments
+    .filter((a) => a.dateStr > todayStr && a.status === 'scheduled')
+    .sort((a, b) => (a.dateStr + a.startTime).localeCompare(b.dateStr + b.startTime))
+    .slice(0, 12), [filteredAppointments, todayStr]);
+
+  // Gli ospiti confermati (persone non ancora in anagrafica) valgono
+  // come impegni: si vedono anche qui, non solo nel calendario.
+  const ospitiOggi = useMemo(
+    () => ospiti.filter((o) => o.giorno === todayStr),
+    [ospiti, todayStr]
+  );
+  const ospitiProssimi = useMemo(
+    () => ospiti.filter((o) => o.giorno > todayStr)
+      .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora))
+      .slice(0, 12),
+    [ospiti, todayStr]
+  );
   const todayTasks = tasksByDate[todayStr] || [];
 
   // Render calendar cell
@@ -1015,6 +1037,70 @@ export const CalendarScreen: React.FC = () => {
   );
 
   // Render compact appointment row for agenda
+  /** Un ospite confermato: ha il posto, non ha ancora la scheda. */
+  const renderOspiteRow = (o: RichiestaSalvata, conData = false) => (
+    <TouchableOpacity
+      key={o.id}
+      style={styles.agendaRow}
+      onPress={() => navigation.navigate('Richieste')}
+      activeOpacity={0.85}
+    >
+      <View style={{ ...styles.agendaTimeCol, borderLeftColor: colors.info }}>
+        <Text style={styles.agendaTime}>{o.ora}</Text>
+        {conData ? (
+          <Text style={styles.agendaTimeSep}>
+            {new Date(o.giorno + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.agendaInfo}>
+        <Text style={styles.agendaStudentName}>{o.persona}</Text>
+        <View style={styles.agendaMetaRow}>
+          <Ionicons name="link" size={12} color={colors.info} />
+          <Text style={{ ...styles.agendaKind, color: colors.info }}>
+            ospite · {o.tipo}{o.telefono ? ` · ${o.telefono}` : ''}
+          </Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+    </TouchableOpacity>
+  );
+
+  /** Un appuntamento futuro: come quello di oggi, ma con la data. */
+  const renderProssimoRow = (item: AppointmentItem) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.agendaRow}
+      onPress={() => { setSelectedDate(item.dateStr); setViewMode('calendar'); }}
+      activeOpacity={0.85}
+    >
+      <View style={{
+        ...styles.agendaTimeCol,
+        borderLeftColor: item.kind === 'training' ? colors.accent : colors.success,
+      }}>
+        <Text style={styles.agendaTime}>{item.startTime}</Text>
+        <Text style={styles.agendaTimeSep}>
+          {item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+        </Text>
+      </View>
+      <View style={styles.agendaInfo}>
+        <Text style={styles.agendaStudentName}>{getStudentName(item.studentId)}</Text>
+        <View style={styles.agendaMetaRow}>
+          <Ionicons
+            name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+            size={12}
+            color={item.kind === 'training' ? colors.accent : colors.success}
+          />
+          <Text style={styles.agendaKind}>
+            {item.date.toLocaleDateString('it-IT', { weekday: 'long' })}
+            {getStaffName(item.staffId) ? ` · ${getStaffName(item.staffId)}` : ''}
+          </Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+    </TouchableOpacity>
+  );
+
   const renderAgendaRow = (item: AppointmentItem) => {
     const staffName = getStaffName(item.staffId);
     return (
@@ -1242,12 +1328,30 @@ export const CalendarScreen: React.FC = () => {
               <Text style={styles.agendaSectionTitle}>Appuntamenti di Oggi</Text>
               <Text style={styles.agendaSectionCount}>{scheduledToday.length}</Text>
             </View>
-            {scheduledToday.length === 0 ? (
+            {scheduledToday.length === 0 && ospitiOggi.length === 0 ? (
               <Text style={styles.agendaEmpty}>Nessun appuntamento programmato per oggi</Text>
             ) : (
-              scheduledToday.map(renderAgendaRow)
+              <>
+                {scheduledToday.map(renderAgendaRow)}
+                {ospitiOggi.map((o) => renderOspiteRow(o))}
+              </>
             )}
           </View>
+
+          {/* I PROSSIMI: qui compare subito ciò che hai appena fissato. */}
+          {(prossimiAppuntamenti.length > 0 || ospitiProssimi.length > 0) && (
+            <View style={styles.agendaSection}>
+              <View style={styles.agendaSectionHeader}>
+                <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+                <Text style={styles.agendaSectionTitle}>Prossimi appuntamenti</Text>
+                <Text style={styles.agendaSectionCount}>
+                  {prossimiAppuntamenti.length + ospitiProssimi.length}
+                </Text>
+              </View>
+              {prossimiAppuntamenti.map(renderProssimoRow)}
+              {ospitiProssimi.map((o) => renderOspiteRow(o, true))}
+            </View>
+          )}
 
           {/* Owner tasks section */}
           {isOwner && (

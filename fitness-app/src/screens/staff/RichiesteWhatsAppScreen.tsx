@@ -176,11 +176,15 @@ export function RichiesteWhatsAppScreen() {
         studentId: scelte[r.id],
       });
       await carica();
+      // Dire DOVE è finito: «è in agenda» non basta se poi non lo trovi.
+      const quando = `${dataBreve(r.giorno)} alle ${r.ora}`;
       crossAlert(
         'Confermato',
         esito.ospite
-          ? 'Il posto è tenuto come ospite: occupa uno dei quattro. Quando la persona diventa allieva, l\'appuntamento entra in agenda.'
-          : 'L\'appuntamento è in agenda.'
+          ? `${r.persona} — ${quando}. Il posto è tenuto come OSPITE: occupa uno dei quattro `
+            + 'e lo trovi in Agenda fra i prossimi appuntamenti. Quando la persona entra in '
+            + 'anagrafica, collegala qui sotto e diventa una seduta vera.'
+          : `${r.persona} — ${quando}. È in agenda: lo trovi in Agenda, sezione «Prossimi appuntamenti».`
       );
     } catch {
       crossAlert('Errore', 'Non riesco a confermare');
