@@ -155,8 +155,13 @@ service cloud.firestore {
 
     // Config di istanza (licenza white-label): sola lettura dai client,
     // scrittura solo dal fornitore via service account (Admin SDK).
+    // ECCEZIONE calIngest: lì vive l'impronta della chiave del ponte
+    // CAL e non la legge nessun client — la scrive e la verifica solo
+    // una Function con l'Admin SDK, che non passa da queste regole.
+    // (Le regole si sommano: per chiudere un documento va escluso QUI,
+    // un secondo blocco «if false» non toglierebbe niente.)
     match /config/{docId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && docId != 'calIngest';
       allow write: if false;
     }
 
@@ -239,14 +244,6 @@ service cloud.firestore {
     }
 
     // Sessions
-    // Configurazione del ponte CAL: qui vive SOLO l'impronta della
-    // chiave, e nessun client la legge — nemmeno il titolare, che la
-    // rigenera da una Function. Le Functions usano l'Admin SDK e non
-    // passano da queste regole.
-    match /config/{docId} {
-      allow read, write: if false;
-    }
-
     // Richieste di appuntamento arrivate da WhatsApp.
     // Non sono appuntamenti: lo diventano quando il titolare conferma
     // e nasce una sessione. Le vede e le scrive SOLO il titolare —

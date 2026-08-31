@@ -106,6 +106,15 @@ export const callClaude = async (
         if (!gwText) throw new Error('AI_FATAL: Il servizio AI ha restituito una risposta vuota. Riprova.');
         return prefill ? prefill + gwText : gwText;
       }
+      if (gwRes.status === 401) {
+        // Login scaduto. Ripiegare sulla chiamata diretta non lo
+        // risolve e produce il messaggio sbagliato («chiave scaduta»):
+        // qui si dice la verità, e che cosa fare.
+        throw new Error(
+          'AI_FATAL: La tua sessione è scaduta. Esci e rientra nell\'app '
+          + '(Profilo → Esci), poi riprova. Non c\'è nessuna chiave da cambiare.'
+        );
+      }
       if (gwRes.status === 403 || gwRes.status === 429) {
         // Consenso mancante o quota esaurita: errori definitivi, niente fallback
         const err = await gwRes.json().catch(() => ({}));
@@ -171,7 +180,19 @@ export const callClaude = async (
     }
 
     if (response.status === 401) {
-      throw new Error('Chiave API non valida o scaduta. Aggiorna la chiave nelle impostazioni AI.');
+      // Il 401 arriva da DUE cause diverse, e confonderle costa tempo:
+      //  · il token di accesso (login) scaduto — succede dopo ore di app
+      //    aperta, e si risolve uscendo e rientrando;
+      //  · la chiave AI vera e propria non valida.
+      // Il gateway le distingue nel corpo della risposta: qui si legge.
+      const corpo = errorBody.toLowerCase();
+      if (corpo.includes('token') || corpo.includes('autenticazione')) {
+        throw new Error(
+          'La tua sessione è scaduta. Esci e rientra nell\'app (Profilo → Esci), '
+          + 'poi riprova: non c\'è nessuna chiave da cambiare.'
+        );
+      }
+      throw new Error('Chiave AI non valida o scaduta. Aggiornala in Impostazioni AI.');
     }
     if (response.status === 429) {
       throw new Error('Troppe richieste. Attendi qualche secondo e riprova.');
