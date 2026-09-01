@@ -99,37 +99,55 @@ export const TIERS: PricingTier[] = [
   {
     id: 'personal_training',
     title: 'Personal Training 1-to-1',
-    amount: 35,
+    amount: 40,
     registrationFee: 0,
     durationMonths: 1,
     icon: '🏋️',
     category: 'personal',
-    priceLabel: '€35',
-    priceNote: 'a seduta',
+    priceLabel: '€40',
+    priceNote: 'a seduta, con il direttore tecnico',
     courseType: 'Personal Training 1-to-1',
     features: [
       "Scheda d'allenamento personalizzata",
       'Sessione individuale con il coach',
       'Programmazione su misura',
+      'Conducibile anche dagli istruttori dello studio, col programma unico',
     ],
   },
   {
-    id: 'postural_standalone',
-    title: 'Analisi Posturale Singola',
-    amount: 49,
+    // Sostituisce l'«Analisi Posturale Singola» a €49: un esame isolato
+    // senza lettura né protocollo svaluta il lavoro che lo circonda.
+    // Qui si vende ciò che si consegna davvero — i test, la loro lettura
+    // insieme, e un protocollo scritto e firmato.
+    id: 'valutazione_mind_movement',
+    title: 'Valutazione completa Mind Movement™',
+    amount: 150,
     registrationFee: 0,
     durationMonths: 1,
-    icon: '🧍',
+    icon: '🧭',
     category: 'postural',
-    priceLabel: '€49',
-    priceNote: 'invece di €100',
-    courseType: 'Analisi Posturale',
-    features: ['Esame posturale completo', 'Senza programmazione'],
+    priceLabel: '€150',
+    priceNote: 'due sessioni, protocollo incluso',
+    courseType: 'Valutazione Mind Movement',
+    features: [
+      'Valutazione posturale, del movimento, del cammino e dello squat',
+      'Composizione corporea',
+      'Lettura integrata: i test letti insieme, non uno per uno',
+      'Protocollo di lavoro scritto, consegnato e firmato',
+      'Scadenze di rivalutazione per misurare che cosa è cambiato',
+    ],
   },
 ];
 
 // Note commerciali extra usate da Listino e Assistente
 export const PRICING_NOTES = [
+  'Personal training: €40 a seduta con il direttore tecnico, €35 con Giuseppe, '
+  + '€25 con Fabio. Il metodo è lo stesso e il programma resta unico, seguito dal '
+  + 'direttore tecnico: cambia chi conduce la seduta.',
+  'La valutazione completa Mind Movement™ (€150) comprende i test, la loro lettura '
+  + 'integrata e il protocollo di lavoro scritto: è il documento che si firma insieme '
+  + "prima di iniziare un percorso. Le valutazioni sono di screening e non sostituiscono "
+  + 'il parere di un professionista sanitario.',
   'Quota di iscrizione palestra: €35 una tantum (solo piani Mensile/Trimestrale/Semestrale).',
   "Bonus pagamento annuale in un'unica soluzione: 1 mese in regalo + T-shirt Mind Movement Lab.",
   'Pagamento semestrale dei piani annuali tramite contratto: possibile ma senza bonus.',
