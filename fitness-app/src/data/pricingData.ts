@@ -60,21 +60,25 @@ export const TIERS: PricingTier[] = [
     features: ['Accesso alla palestra', 'Risparmio di €60 rispetto al mensile', 'Durata 6 mesi'],
   },
   {
+    // Listino aggiornato: i 480 €/anno erano l'offerta di lancio, chiusa
+    // a giugno. Restavano a listino e creavano un'inversione — il piano
+    // che include di più costava meno del semestrale: chi faceva due
+    // conti non aveva ragione di comprare nient'altro.
     id: 'premium_full',
     title: 'ESSĒRE PREMIUM Full Access',
-    amount: 480,
+    amount: 600,
     registrationFee: 0,
     durationMonths: 12,
     icon: '⭐',
     category: 'premium',
-    priceLabel: '€480/anno',
-    priceNote: '€40/mese',
+    priceLabel: '€600/anno',
+    priceNote: '€50/mese · valutazione completa inclusa',
     highlight: 'Più Popolare',
     highlightColor: GOLD,
     courseType: 'ESSĒRE PREMIUM Full Access',
     features: [
       'Accesso full alla palestra',
-      'Esame posturale incluso',
+      'Valutazione completa Mind Movement™ inclusa (valore 150 €)',
       'Prima programmazione inclusa',
       'App ESSĒRE PREMIUM',
     ],
@@ -82,17 +86,17 @@ export const TIERS: PricingTier[] = [
   {
     id: 'premium_biweekly',
     title: 'ESSĒRE PREMIUM Mar/Gio',
-    amount: 360,
+    amount: 480,
     registrationFee: 0,
     durationMonths: 12,
     icon: '📌',
     category: 'premium',
-    priceLabel: '€360/anno',
-    priceNote: '€30/mese',
+    priceLabel: '€480/anno',
+    priceNote: '€40/mese · due giorni a settimana',
     courseType: 'ESSĒRE PREMIUM Martedì e Giovedì',
     features: [
       'Accesso Martedì e Giovedì',
-      'Esame posturale incluso',
+      'Valutazione completa Mind Movement™ inclusa (valore 150 €)',
       'App ESSĒRE PREMIUM',
     ],
   },
@@ -141,6 +145,11 @@ export const TIERS: PricingTier[] = [
 
 // Note commerciali extra usate da Listino e Assistente
 export const PRICING_NOTES = [
+  'I piani annuali PREMIUM comprendono la valutazione completa Mind Movement™ '
+  + '(valore 150 €) e la prima programmazione: è questo il vantaggio dell\'anno, '
+  + 'non un prezzo al mese più basso.',
+  'Chi ha sottoscritto un piano prima di questo listino lo mantiene alle condizioni '
+  + 'pattuite fino alla scadenza: il prezzo si scrive prima, e prima vale.',
   'Personal training: €40 a seduta con il direttore tecnico, €35 con l\'istruttore. '
   + 'Il metodo è lo stesso e il programma resta unico, seguito dal direttore tecnico: '
   + 'cambia chi conduce la seduta.',
