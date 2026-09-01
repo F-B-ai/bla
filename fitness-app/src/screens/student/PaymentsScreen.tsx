@@ -14,7 +14,7 @@ import { Badge } from '../../components/common/Badge';
 import { BankTransferModal } from '../../components/common/BankTransferModal';
 import { PaymentPlan, Installment, AppNotification, Student, WorkoutPlan, WorkoutLog, BankDetails } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { getStudentPaymentPlans } from '../../services/paymentService';
+import { getStudentPaymentPlans, subscribeToStudentPaymentPlans } from '../../services/paymentService';
 import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
 import { getActiveWorkoutPlan } from '../../services/programService';
 import { getStudentWorkoutLogs } from '../../services/workoutLogService';
@@ -91,6 +91,18 @@ export const PaymentsScreen: React.FC = () => {
   useEffect(() => {
     loadPayments();
   }, [loadPayments]);
+
+  // Le lezioni scalate si vedono subito, senza riaprire l'app.
+  useEffect(() => {
+    if (!user) return;
+    let stop: (() => void) | null = null;
+    try {
+      stop = subscribeToStudentPaymentPlans(user.id, setPaymentPlans);
+    } catch {
+      /* niente tempo reale: resta il caricamento normale */
+    }
+    return () => { try { stop?.(); } catch { /* già chiuso */ } };
+  }, [user]);
 
   // Fetch owner's bank details
   useEffect(() => {

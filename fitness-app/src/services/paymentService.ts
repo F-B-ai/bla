@@ -8,6 +8,8 @@ import {
   query,
   where,
   Timestamp,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { messaggioPromemoria } from '../domain/patto';
@@ -215,3 +217,32 @@ export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPl
     return start <= now && endOfDay >= now;
   }) || null;
 };
+
+// ------------------------------------------------------------
+// TEMPO REALE
+// Il difetto: si segnava la lezione, il software la scalava davvero,
+// ma la schermata del percorso continuava a mostrare il numero
+// vecchio finché non si chiudeva e riapriva l'app. Il conto era
+// giusto e sembrava sbagliato: peggio di un conto sbagliato.
+// ------------------------------------------------------------
+
+/** Tutti i percorsi, in tempo reale (staff). */
+export const subscribeToPaymentPlans = (
+  callback: (plans: PaymentPlan[]) => void,
+  onError?: () => void
+): Unsubscribe => onSnapshot(
+  collection(db, PAYMENTS_COLLECTION),
+  (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as PaymentPlan))),
+  () => { if (onError) onError(); }
+);
+
+/** I percorsi di un allievo, in tempo reale. */
+export const subscribeToStudentPaymentPlans = (
+  studentId: string,
+  callback: (plans: PaymentPlan[]) => void,
+  onError?: () => void
+): Unsubscribe => onSnapshot(
+  query(collection(db, PAYMENTS_COLLECTION), where('studentId', '==', studentId)),
+  (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as PaymentPlan))),
+  () => { if (onError) onError(); }
+);

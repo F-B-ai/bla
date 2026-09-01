@@ -21,6 +21,7 @@ import { getStudents, getCollaborators } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   getAllPaymentPlans,
+  subscribeToPaymentPlans,
   createPaymentPlan,
   updatePaymentPlan,
   deletePaymentPlan,
@@ -153,6 +154,30 @@ export const PaymentPlanScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // TEMPO REALE: quando una lezione viene scalata, il numero qui
+  // cambia da solo. Prima restava quello vecchio finché non si
+  // chiudeva l'app, e il conto giusto sembrava sbagliato.
+  useEffect(() => {
+    if (!user) return;
+    let stop: (() => void) | null = null;
+    try {
+      stop = subscribeToPaymentPlans((tutti) => {
+        // Stesso perimetro del caricamento normale: il titolare vede
+        // tutto, il manager solo i percorsi dei propri allievi — che
+        // sono esattamente quelli già filtrati in `students`.
+        if (isOwner) {
+          setPlans(tutti);
+          return;
+        }
+        const miei = new Set(students.map((s) => s.id));
+        setPlans(miei.size ? tutti.filter((p) => miei.has(p.studentId)) : tutti);
+      });
+    } catch {
+      /* niente tempo reale: resta il caricamento normale */
+    }
+    return () => { try { stop?.(); } catch { /* già chiuso */ } };
+  }, [user, isOwner, students]);
 
   // -----------------------------------------------------------------------
   // Helpers
