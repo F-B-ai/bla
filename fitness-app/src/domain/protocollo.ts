@@ -32,7 +32,7 @@ export const PROTOCOLLO_VERSION = 1;
 // Quanto costa, e chi conduce
 // ------------------------------------------------------------
 
-export type Conduttore = 'francesco' | 'giuseppe' | 'fabio';
+export type Conduttore = 'francesco' | 'giuseppe';
 
 export interface Listino {
   id: Conduttore;
@@ -44,7 +44,6 @@ export interface Listino {
 export const CONDUTTORI: Listino[] = [
   { id: 'francesco', nome: 'Francesco', ruolo: 'Direttore tecnico', prezzo: 40 },
   { id: 'giuseppe', nome: 'Giuseppe', ruolo: 'Istruttore', prezzo: 35 },
-  { id: 'fabio', nome: 'Fabio', ruolo: 'Istruttore in formazione', prezzo: 25 },
 ];
 
 /** La valutazione completa: test, lettura integrata, protocollo scritto. */

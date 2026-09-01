@@ -145,15 +145,14 @@ describe('il piano: i conti devono tornare', () => {
       voci: [
         { conduttore: 'francesco', quante: 10 },
         { conduttore: 'giuseppe', quante: 10 },
-        { conduttore: 'fabio', quante: 5 },
       ],
       seduteASettimana: 2,
     });
-    expect(p.totaleSedute).toBe(25);
-    expect(p.totaleSeduteEuro).toBe(10 * 40 + 10 * 35 + 5 * 25); // 875
+    expect(p.totaleSedute).toBe(20);
+    expect(p.totaleSeduteEuro).toBe(10 * 40 + 10 * 35); // 750
     expect(p.valutazioneEuro).toBe(PREZZO_VALUTAZIONE);
-    expect(p.totaleEuro).toBe(875 + 150);
-    expect(p.settimane).toBe(13); // 25 sedute a 2 a settimana
+    expect(p.totaleEuro).toBe(750 + 150);
+    expect(p.settimane).toBe(10); // 20 sedute a 2 a settimana
   });
 
   it('la valutazione già pagata non si conta due volte', () => {
@@ -178,7 +177,7 @@ describe('il piano: i conti devono tornare', () => {
     const p = componiPiano({
       voci: [
         { conduttore: 'francesco', quante: 4 },
-        { conduttore: 'fabio', quante: 0 },
+        { conduttore: 'giuseppe', quante: 0 },
       ],
     });
     expect(p.righe).toHaveLength(1);
@@ -194,9 +193,13 @@ describe('il piano: i conti devono tornare', () => {
   it('i prezzi dello staff sono quelli decisi', () => {
     expect(conduttore('francesco').prezzo).toBe(40);
     expect(conduttore('giuseppe').prezzo).toBe(35);
-    expect(conduttore('fabio').prezzo).toBe(25);
-    expect(CONDUTTORI).toHaveLength(3);
+    expect(CONDUTTORI).toHaveLength(2);
     expect(PREZZO_VALUTAZIONE).toBe(150);
+  });
+
+  it('chi non è più nello staff non compare fra i conduttori', () => {
+    expect(CONDUTTORI.map((c) => c.id)).not.toContain('fabio');
+    expect(JSON.stringify(CONDUTTORI).toLowerCase()).not.toContain('fabio');
   });
 });
 

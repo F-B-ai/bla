@@ -53,7 +53,7 @@ export function ProtocolloScreen() {
 
   // --- composizione del percorso ---
   const [sedute, setSedute] = useState<Record<Conduttore, string>>({
-    francesco: '10', giuseppe: '0', fabio: '0',
+    francesco: '10', giuseppe: '0',
   });
   const [aSettimana, setASettimana] = useState('2');
   const [rate, setRate] = useState('');

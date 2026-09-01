@@ -73,6 +73,19 @@ export const signIn = async (email: string, password: string): Promise<User> => 
   if (!userDoc.exists()) {
     throw new Error('Profilo utente non trovato. Contatta l\'amministratore per ripristinare il tuo account.');
   }
+
+  // ACCESSO REVOCATO. Prima «Disattiva» toglieva l'utente dagli
+  // elenchi ma NON gli impediva di entrare: bastava la vecchia
+  // password. Chi è disattivato ora non entra, e viene disconnesso
+  // subito — non basta togliere il nome da una lista.
+  const dati = userDoc.data() as { isActive?: boolean };
+  if (dati.isActive === false) {
+    await firebaseSignOut(auth).catch(() => { /* si esce comunque */ });
+    throw new Error(
+      'Questo accesso è stato disattivato. Se pensi sia un errore, parlane con il titolare.'
+    );
+  }
+
   return { ...userDoc.data(), id: userDoc.id } as User;
 };
 

@@ -141,9 +141,9 @@ export const TIERS: PricingTier[] = [
 
 // Note commerciali extra usate da Listino e Assistente
 export const PRICING_NOTES = [
-  'Personal training: €40 a seduta con il direttore tecnico, €35 con Giuseppe, '
-  + '€25 con Fabio. Il metodo è lo stesso e il programma resta unico, seguito dal '
-  + 'direttore tecnico: cambia chi conduce la seduta.',
+  'Personal training: €40 a seduta con il direttore tecnico, €35 con l\'istruttore. '
+  + 'Il metodo è lo stesso e il programma resta unico, seguito dal direttore tecnico: '
+  + 'cambia chi conduce la seduta.',
   'La valutazione completa Mind Movement™ (€150) comprende i test, la loro lettura '
   + 'integrata e il protocollo di lavoro scritto: è il documento che si firma insieme '
   + "prima di iniziare un percorso. Le valutazioni sono di screening e non sostituiscono "

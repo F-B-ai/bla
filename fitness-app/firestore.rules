@@ -9,16 +9,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
+    // ACCESSO REVOCATO: un account disattivato non conta più come
+    // staff, nemmeno con una sessione già aperta sul telefono. La
+    // regola si rivaluta a ogni richiesta, quindi il taglio è
+    // immediato — non si aspetta la scadenza del token.
+    function isAttivo() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive != false;
+    }
+
     function isOwner() {
-      return isAuthenticated() && getUserRole() == 'owner';
+      return isAttivo() && getUserRole() == 'owner';
     }
 
     function isOwnerOrManager() {
-      return isAuthenticated() && getUserRole() in ['owner', 'manager'];
+      return isAttivo() && getUserRole() in ['owner', 'manager'];
     }
 
     function isStaff() {
-      return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
+      return isAttivo() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
     // Check-in accessi palestra (QR/codice alla reception)
