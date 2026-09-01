@@ -115,6 +115,22 @@ export const callClaude = async (
           + '(Profilo → Esci), poi riprova. Non c\'è nessuna chiave da cambiare.'
         );
       }
+      if (gwRes.status === 502) {
+        // Il gateway ha parlato con Anthropic e Anthropic ha rifiutato.
+        // Il caso che capita davvero — e che non deve mai cogliere di
+        // sorpresa davanti a un cliente — è il credito esaurito.
+        const err = await gwRes.json().catch(() => ({} as any));
+        const dettaglio = `${err?.detail || ''} ${err?.message || ''}`.toLowerCase();
+        if (dettaglio.includes('credit') || dettaglio.includes('billing')
+          || dettaglio.includes('quota') || dettaglio.includes('payment')) {
+          throw new Error(
+            'AI_FATAL: Il credito del servizio AI è esaurito (o l\'ultimo pagamento '
+            + 'non è andato a buon fine). Ricarica l\'account Anthropic: appena il '
+            + 'credito rientra, tutto riparte da solo. Non c\'è nulla da cambiare nell\'app.'
+          );
+        }
+        // altri 502: si tenta comunque il ramo legacy
+      }
       if (gwRes.status === 403 || gwRes.status === 429) {
         // Consenso mancante o quota esaurita: errori definitivi, niente fallback
         const err = await gwRes.json().catch(() => ({}));
