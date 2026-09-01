@@ -20,6 +20,7 @@ confrontare, e non si perdono.
 |---|---|---|
 | Specifica clinica e tecnica — Valutazione in due sessioni e Sistema Stellato | `valutazione-due-sessioni-e-sistema-stellato.pdf` | **Originale, integro** (14 pagine). Già implementato in `src/data/stellatoProtocol.ts` |
 | Percorso formatori, Sessione 01 — Docimologia | `docimologia.html` | **Ricostruito a norma di copertina.** Non è la scansione dell'originale: vedi l'avvertenza dentro il documento |
+| Livello 1, modulo A-01 — Perché un corpo cambia | `modulo-a01-perche-un-corpo-cambia.html` | **Completo**, due strade + kit d'aula. Codice A-01 proposto, da confermare col Documento operativo 03 |
 | Documento strategico 01/02 — Mind Movement Academy | — | **Mancante.** Esiste solo su carta |
 | Documento operativo 03 — I 22 moduli | — | **Mancante.** È il più urgente: contiene l'elenco dei 22 moduli con codice e area |
 | Documento strategico 02/02 — ESSĒRE | — | **Mancante.** Esiste solo su carta |
@@ -42,6 +43,16 @@ come canone finché non rientrano i testi completi:
 L'artifact «ESSĒRE Academy» contiene una bozza a 13 moduli scritta prima che
 queste copertine fossero disponibili: **non è il canone** e va sostituita quando
 il Documento operativo 03 rientra.
+
+## Il vincolo di coerenza fra documento e codice
+
+Il modulo A-01 e `src/domain/progressione.ts` dicono le stesse cose: le cinque
+caselle della catena, gli undici assi con la loro fonte, le soglie numeriche
+(2 sedute, prontezza 40, compenso 3, angolo 100°) e l'ordine dei cinque cancelli.
+
+Se un giorno divergono, **ha ragione il documento e si corregge il codice** — mai
+il contrario. Un corsista che ritrova in app parole diverse da quelle dell'aula
+smette di fidarsi di entrambi.
 
 ## Come si aggiunge un documento
 
