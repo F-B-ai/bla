@@ -227,6 +227,8 @@ export const CalendarScreen: React.FC = () => {
   // Task time fields
   const [taskStartTime, setTaskStartTime] = useState('');
   const [taskEndTime, setTaskEndTime] = useState('');
+  // Il giorno del task: prima non esisteva e si scriveva sempre «oggi».
+  const [taskDate, setTaskDate] = useState(toDateStr(new Date()));
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -828,6 +830,7 @@ export const CalendarScreen: React.FC = () => {
 
   // Task handlers
   const resetTaskForm = () => {
+    setTaskDate(selectedDate || toDateStr(new Date()));
     setTaskTitle('');
     setTaskDescription('');
     setTaskPriority('medium');
@@ -843,6 +846,7 @@ export const CalendarScreen: React.FC = () => {
 
   const openEditTask = (task: DailyTask) => {
     setEditingTask(task);
+    setTaskDate(toDateStr(toSafeDate(task.date)));
     setTaskTitle(task.title);
     setTaskDescription(task.description);
     setTaskPriority(task.priority);
@@ -860,6 +864,8 @@ export const CalendarScreen: React.FC = () => {
     try {
       if (editingTask) {
         await updateTask(editingTask.id, {
+          // il giorno si può correggere: un task spostato non si ricrea
+          date: new Date(`${taskDate}T12:00:00`),
           title: taskTitle.trim(),
           description: taskDescription.trim(),
           priority: taskPriority,
@@ -869,7 +875,8 @@ export const CalendarScreen: React.FC = () => {
       } else {
         await createTask({
           ownerId: user.id,
-          date: new Date(),
+          // Mezzogiorno: così il fuso non sposta il task al giorno prima.
+          date: new Date(`${taskDate}T12:00:00`),
           title: taskTitle.trim(),
           description: taskDescription.trim(),
           priority: taskPriority,
@@ -1874,6 +1881,8 @@ export const CalendarScreen: React.FC = () => {
         setTaskStartTime={setTaskStartTime}
         taskEndTime={taskEndTime}
         setTaskEndTime={setTaskEndTime}
+        taskDate={taskDate}
+        setTaskDate={setTaskDate}
         savingTask={savingTask}
         onSave={handleSaveTask}
         onClose={() => { setShowTaskModal(false); resetTaskForm(); }}

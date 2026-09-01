@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import {
+  View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Platform, TextInput,
+} from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../../../config/theme';
 import { TaskPriority, DailyTask } from '../../../types';
 import { InputField } from '../../../components/common/InputField';
@@ -38,6 +40,10 @@ export interface TaskModalProps {
   setTaskStartTime: (v: string) => void;
   taskEndTime: string;
   setTaskEndTime: (v: string) => void;
+  /** giorno del task, AAAA-MM-GG: prima era sempre «oggi», comunque
+   *  fosse il giorno scelto nel calendario. */
+  taskDate: string;
+  setTaskDate: (v: string) => void;
   savingTask: boolean;
   onSave: () => void;
   onClose: () => void;
@@ -56,6 +62,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   setTaskStartTime,
   taskEndTime,
   setTaskEndTime,
+  taskDate,
+  setTaskDate,
   savingTask,
   onSave,
   onClose,
@@ -83,6 +91,37 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               multiline
               numberOfLines={3}
             />
+            {/* IL GIORNO. Prima non c'era: il task finiva sempre su oggi,
+                qualunque giorno fosse aperto nel calendario. */}
+            <Text style={styles.fieldLabel}>Giorno</Text>
+            {Platform.OS === 'web' ? (
+              <input
+                type="date"
+                value={taskDate}
+                onChange={(e: any) => { if (e.target.value) setTaskDate(e.target.value); }}
+                style={{
+                  width: '100%',
+                  backgroundColor: colors.surfaceLight,
+                  color: colors.white,
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  fontSize: 16,
+                  marginBottom: 12,
+                  WebkitAppearance: 'none' as any,
+                  colorScheme: 'dark',
+                } as any}
+              />
+            ) : (
+              <TextInput
+                style={styles.dataInput}
+                placeholder="AAAA-MM-GG"
+                placeholderTextColor={colors.textLight}
+                value={taskDate}
+                onChangeText={setTaskDate}
+              />
+            )}
+
             <Text style={styles.fieldLabel}>Orario (opzionale)</Text>
             <View style={styles.timePickerRow}>
               <View style={styles.timePickerCol}>
@@ -194,6 +233,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl,
     padding: spacing.lg,
     maxHeight: '90%',
+  },
+  dataInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surfaceLight,
+    color: colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: fontSize.md,
+    marginBottom: spacing.md,
   },
   fieldLabel: {
     fontSize: fontSize.md,
