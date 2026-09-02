@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { DailyTask } from '../types';
+import { dataDelTask, dataScelta } from '../domain/task';
 
 const TASKS_COLLECTION = 'dailyTasks';
 
@@ -24,7 +25,10 @@ export const createTask = async (
     priority: task.priority || 'medium',
     isCompleted: false,
     completedAt: null,
-    date: Timestamp.now(),
+    // Il giorno scelto da chi scrive il task, non il giorno in cui
+    // lo scrive: erano la stessa cosa per un errore, e un task per
+    // giovedì finiva su oggi.
+    date: Timestamp.fromDate(dataDelTask(task.date)),
     createdAt: Timestamp.now(),
     startTime: task.startTime || null,
     endTime: task.endTime || null,
@@ -54,8 +58,11 @@ export const updateTask = async (
   if (updates.endTime !== undefined) data.endTime = updates.endTime || null;
   if (updates.completedAt) data.completedAt = Timestamp.fromDate(updates.completedAt);
   if (updates.date) {
-    const d = updates.date instanceof Date ? updates.date : new Date(updates.date as unknown as string);
-    data.date = Timestamp.fromDate(d);
+    // Se il giorno arrivato non è leggibile la data resta com'è:
+    // in una modifica, ripiegare su «adesso» sposterebbe il task a
+    // oggi — cioè il difetto che stiamo chiudendo.
+    const d = dataScelta(updates.date as Date | string);
+    if (d) data.date = Timestamp.fromDate(d);
   }
   await updateDoc(doc(db, TASKS_COLLECTION, taskId), data);
 };
