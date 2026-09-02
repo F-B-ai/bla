@@ -21,6 +21,7 @@ confrontare, e non si perdono.
 | Specifica clinica e tecnica — Valutazione in due sessioni e Sistema Stellato | `valutazione-due-sessioni-e-sistema-stellato.pdf` | **Originale, integro** (14 pagine). Già implementato in `src/data/stellatoProtocol.ts` |
 | Percorso formatori, Sessione 01 — Docimologia | `docimologia.html` | **Ricostruito a norma di copertina.** Non è la scansione dell'originale: vedi l'avvertenza dentro il documento |
 | Livello 1, modulo A-01 — Perché un corpo cambia | `modulo-a01-perche-un-corpo-cambia.html` | **Completo**, due strade + kit d'aula. Codice A-01 proposto, da confermare col Documento operativo 03 |
+| Livello 1, modulo A-01 — Materiali d'aula (K-2, K-3, K-4, K-7) | `modulo-a01-materiali-aula.html` | **Completo e stampabile.** Undici carte, nove casi con soluzioni, foglio dell'allievo |
 | Documento strategico 01/02 — Mind Movement Academy | — | **Mancante.** Esiste solo su carta |
 | Documento operativo 03 — I 22 moduli | — | **Mancante.** È il più urgente: contiene l'elenco dei 22 moduli con codice e area |
 | Documento strategico 02/02 — ESSĒRE | — | **Mancante.** Esiste solo su carta |
