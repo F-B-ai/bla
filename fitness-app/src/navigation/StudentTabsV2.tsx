@@ -26,6 +26,8 @@ import { ProfileScreen } from '../screens/shared/ProfileScreen';
 import { PaymentsScreen } from '../screens/student/PaymentsScreen';
 import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
 import { ContentScreen } from '../screens/student/ContentScreen';
+import { AssistenzaScreen } from '../screens/student/AssistenzaScreen';
+import { ArticoloAssistenzaScreen } from '../screens/student/ArticoloAssistenzaScreen';
 
 // ============================================================
 // NAVIGAZIONE ALLIEVO v2 — 5 tab (M2, doc 04 §2)
@@ -178,6 +180,7 @@ const ProfiloHub = () => (
       { icon: 'card-outline', title: 'Pagamenti', subtitle: 'Piani, rate e ricevute', route: 'Pagamenti' },
       { icon: 'nutrition-outline', title: 'Nutrizionista', subtitle: 'Consulenze e appuntamenti', route: 'NutrizionistaProfilo' },
       { icon: 'grid-outline', title: 'Contenuti extra', subtitle: 'Video, guide e materiali della palestra', route: 'Contenuti' },
+      { icon: 'help-buoy-outline', title: 'Assistenza', subtitle: 'Come funziona l\'app, e come parlare con il tuo coach', route: 'Assistenza' },
     ]}
   />
 );
@@ -188,6 +191,8 @@ const ProfiloNavigator = () => (
     <ProfiloStack.Screen name="Pagamenti" component={PaymentsScreen} options={innerScreenOptions('Pagamenti')} />
     <ProfiloStack.Screen name="NutrizionistaProfilo" component={NutritionistScreen} options={innerScreenOptions('Nutrizionista')} />
     <ProfiloStack.Screen name="Contenuti" component={ContentScreen} options={innerScreenOptions('Contenuti')} />
+    <ProfiloStack.Screen name="Assistenza" component={AssistenzaScreen} options={innerScreenOptions('Assistenza')} />
+    <ProfiloStack.Screen name="ArticoloAssistenza" component={ArticoloAssistenzaScreen} options={innerScreenOptions('Assistenza')} />
   </ProfiloStack.Navigator>
 );
 
