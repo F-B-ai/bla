@@ -2,10 +2,14 @@
 # DEPLOY ESSĒRE — pubblica app + regole su Firebase Hosting.
 #
 # QUANDO SCATTA (mai per sbaglio):
-#  - push il cui messaggio di commit contiene "[deploy]"
+#  - push il cui messaggio di commit ha "[deploy]" NELLA PRIMA RIGA
 #  - oppure avvio manuale dalla tab Actions (workflow_dispatch)
 #
-# EXTRA: se il messaggio contiene anche "[deploy-functions]"
+# La prima riga, e non tutto il messaggio: il corpo deve poter
+# parlare della pubblicazione senza provocarla. Vedi il commento
+# sul job "guardia".
+#
+# EXTRA: se la prima riga contiene anche "[deploy-functions]"
 # vengono pubblicate pure le Cloud Functions (gateway AI, brain).
 # Tenuto opt-in perché è lo step più lento e tocca il backend.
 #
@@ -29,13 +33,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ------------------------------------------------------------
+  # GUARDIA — legge SOLO LA PRIMA RIGA del messaggio di commit.
+  #
+  # Prima si guardava tutto il messaggio con contains(): bastava
+  # che il marcatore comparisse ovunque, corpo compreso, perché la
+  # pubblicazione partisse. È già successo: una commit che nel
+  # corpo spiegava di NON voler pubblicare ha pubblicato, perché
+  # per spiegarlo aveva dovuto scrivere il marcatore.
+  #
+  # La prima riga non si scrive per sbaglio: è il titolo, e chi lo
+  # scrive sa che cosa sta chiedendo. Il corpo resta libero di
+  # parlare della pubblicazione senza provocarla.
+  #
+  # Il messaggio arriva come variabile d'ambiente e non interpolato
+  # dentro lo script: un messaggio di commit è testo che arriva da
+  # fuori, e non deve poter diventare comando.
+  # ------------------------------------------------------------
+  guardia:
+    runs-on: ubuntu-latest
+    outputs:
+      pubblica: ${{ steps.leggi.outputs.pubblica }}
+      funzioni: ${{ steps.leggi.outputs.funzioni }}
+    steps:
+      - name: Leggi la prima riga del messaggio
+        id: leggi
+        env:
+          MESSAGGIO: ${{ github.event.head_commit.message }}
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            echo "Avvio manuale: si pubblica."
+            echo "pubblica=true"  >> "$GITHUB_OUTPUT"
+            echo "funzioni=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          PRIMA=$(printf '%s' "${MESSAGGIO:-}" | tr -d '\r' | head -n 1)
+          echo "Prima riga: $PRIMA"
+          case "$PRIMA" in
+            *'[deploy]'*) P=true ;;
+            *)            P=false ;;
+          esac
+          case "$PRIMA" in
+            *'[deploy-functions]'*) F=true ;;
+            *)                      F=false ;;
+          esac
+          echo "pubblica=$P" >> "$GITHUB_OUTPUT"
+          echo "funzioni=$F" >> "$GITHUB_OUTPUT"
+          echo "Pubblica hosting: $P · Cloud Functions: $F"
+
   deploy:
     runs-on: ubuntu-latest
-    # push: solo se il commit dice esplicitamente [deploy];
-    # l'avvio manuale da Actions passa sempre.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '[deploy]')
+    needs: guardia
+    # Si pubblica solo se il marcatore sta nella PRIMA RIGA del
+    # messaggio; l'avvio manuale da Actions passa sempre.
+    if: needs.guardia.outputs.pubblica == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -80,8 +133,8 @@ jobs:
         run: npx firebase-tools deploy --only hosting --project essere-3fe6f --non-interactive
         working-directory: fitness-app
 
-      - name: Deploy Cloud Functions (solo con [deploy-functions])
-        if: contains(github.event.head_commit.message, '[deploy-functions]')
+      - name: Deploy Cloud Functions (solo col marcatore nella prima riga)
+        if: needs.guardia.outputs.funzioni == 'true'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
         run: |
