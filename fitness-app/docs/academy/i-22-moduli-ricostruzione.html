@@ -1,0 +1,439 @@
+<title>I 22 moduli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#FCFBF8; --paper-box:#F4EEE2; --paper-sunk:#F2F1ED;
+    --ink:#1A1A1A; --ink-soft:#3E3C39; --ink-faint:#6B6862;
+    --rule:#D8D4CB; --rule-soft:#E7E4DC;
+    --red:#9B1B30; --red-deep:#6E1322; --red-wash:#F6E7E7;
+    --certo:#1F5E43; --certo-wash:#E3EFE8;
+    --bar:#1C1C1C; --bar-ink:#FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+      --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+      --rule:#33302A; --rule-soft:#262420;
+      --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+      --certo:#79BE9C; --certo-wash:#152520;
+      --bar:#E4E0D6; --bar-ink:#14130F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --certo:#79BE9C; --certo-wash:#152520;
+    --bar:#E4E0D6; --bar-ink:#14130F;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:Tinos,"Times New Roman",Times,serif; font-size:17px; line-height:1.6; }
+  .sheet { max-width:820px; margin:0 auto; padding:clamp(30px,6vw,72px) clamp(18px,5vw,52px) 100px; }
+
+  .ente { text-align:center; color:var(--red); font-weight:700; font-size:0.84rem;
+    letter-spacing:0.09em; line-height:2; text-transform:uppercase; }
+  .short-rule { width:116px; height:1px; background:var(--red); border:0; margin:18px auto; }
+  h1 { font-size:clamp(2rem,6vw,3rem); font-weight:700; text-align:center;
+    margin:8px 0 18px; line-height:1.08; }
+  .sottotitolo { font-style:italic; text-align:center; color:var(--ink-soft);
+    font-size:1.04rem; margin:0 auto 6px; max-width:33em; text-wrap:balance; }
+
+  h2 { font-size:1.34rem; font-weight:700; color:var(--red); margin:56px 0 4px; line-height:1.25; }
+  .cap-rule { width:100%; height:2px; background:var(--red); border:0; margin:0 0 20px; }
+  h3 { font-size:1.04rem; font-weight:700; margin:28px 0 8px; }
+  p { margin:0 0 14px; }
+  ul,ol { margin:0 0 16px; padding-left:1.25em; }
+  li { margin-bottom:7px; }
+
+  .riquadro { border:1px solid var(--red); background:var(--paper-box);
+    padding:clamp(16px,3vw,26px); margin:30px 0; }
+  .riquadro h3 { margin:0 0 12px; }
+  .riquadro p:last-child { margin:0; }
+  .riquadro ul { margin:0; padding-left:1.1em; }
+  .riquadro li:last-child { margin-bottom:0; }
+
+  /* legenda certezza */
+  .legenda { display:flex; gap:18px; flex-wrap:wrap; margin:20px 0 26px;
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.8rem; }
+  .lg { display:flex; align-items:center; gap:7px; }
+  .bollo { width:11px; height:11px; border-radius:50%; flex:none; }
+  .b-certo { background:var(--certo); }
+  .b-prop  { background:transparent; border:1.5px solid var(--red); }
+
+  /* tabella moduli */
+  .liv { margin:34px 0 0; }
+  .liv-t { display:flex; justify-content:space-between; align-items:baseline;
+    gap:14px; flex-wrap:wrap; border-bottom:2px solid var(--ink); padding-bottom:7px; }
+  .liv-t h3 { margin:0; font-size:1.12rem; }
+  .liv-t .conta { font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:0.78rem; color:var(--ink-faint); }
+
+  .mod { display:grid; grid-template-columns:14px 5.6em 1fr; gap:10px 12px;
+    padding:13px 0; border-bottom:1px solid var(--rule-soft); align-items:start; }
+  .mod .b { width:11px; height:11px; border-radius:50%; margin-top:7px; }
+  .mod .cod { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.76rem;
+    color:var(--red); letter-spacing:0.04em; padding-top:3px; white-space:nowrap; }
+  .mod .cod.vago { color:var(--ink-faint); }
+  .mod .tit { font-weight:700; margin:0 0 3px; }
+  .mod .desc { margin:0; font-size:0.94rem; color:var(--ink-soft); line-height:1.5; }
+  .mod .nota { display:block; margin-top:5px; font-size:0.86rem; color:var(--certo); font-style:italic; }
+
+  .tab-wrap { overflow-x:auto; margin:20px 0 24px; }
+  table { border-collapse:collapse; width:100%; font-size:0.92rem; }
+  thead th { background:var(--bar); color:var(--bar-ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-weight:500; font-size:0.76rem;
+    letter-spacing:0.05em; text-align:left; padding:9px 12px; }
+  td, tbody th { border-bottom:1px solid var(--rule); padding:9px 12px; vertical-align:top; text-align:left; }
+  tbody th { font-weight:700; white-space:nowrap; }
+
+  .cantiere { display:grid; grid-template-columns:2em 1fr; gap:4px 14px;
+    padding:13px 0; border-bottom:1px solid var(--rule-soft); }
+  .cantiere:first-of-type { border-top:1px solid var(--rule); }
+  .cantiere .c-n { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:1.05rem;
+    color:var(--red); font-weight:600; }
+  .cantiere h3 { margin:0 0 3px; font-size:1rem; }
+  .cantiere p { margin:0; font-size:0.94rem; color:var(--ink-soft); }
+
+  .azione { border-left:4px solid var(--red); background:var(--red-wash);
+    padding:16px 20px; margin:26px 0; }
+  .azione p:last-child { margin:0; }
+  .azione b { color:var(--red-deep); }
+
+  .colophon { margin-top:60px; padding-top:18px; border-top:2px solid var(--red);
+    font-size:0.85rem; color:var(--ink-faint); line-height:1.7; }
+
+  @media print {
+    body { background:#fff; font-size:11pt; }
+    .sheet { padding:0; max-width:none; }
+    h2 { break-after:avoid; }
+    .mod,.cantiere,.riquadro,table { break-inside:avoid; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport · Mind Movement Lab — Gragnano (NA)<br>
+    Ricostruzione dell'architettura formativa
+  </p>
+  <hr class="short-rule">
+  <h1>I 22 moduli</h1>
+  <p class="sottotitolo">Non il tuo documento ritrovato: una proposta su cui mettere la penna
+    rossa, con separato ciò che è certo da ciò che è mio</p>
+
+  <div class="riquadro">
+    <h3>Che cos'è questo foglio, e che cosa non è</h3>
+    <p>Il <strong>Documento operativo 03</strong> non è reperibile in forma digitale. Della sua
+      copertina però conosco l'indice, e da lì so esattamente che cosa contiene: il capitolo 1
+      è l'elenco dei 22 moduli con <em>codice, area, livello e stato di produzione</em>; il
+      capitolo 2 corregge la ripartizione in <strong>8 / 8 / 6</strong>; i capitoli 4, 5 e 6
+      dicono modulo per modulo che cosa manca; il capitolo 7 raccoglie i sette cantieri
+      trasversali; i capitoli 8 e 9 danno l'ordine di produzione.</p>
+    <p>Quell'elenco non lo posso indovinare. Ma posso fare due cose utili, e sono qui sotto:
+      <strong>fissare quello che è certo</strong> — quattro moduli lo sono, per prove
+      indipendenti — e <strong>proporre il resto</strong> ricavandolo dal metodo che è già
+      dentro ESSĒRE, che è lo stesso metodo da cui il documento è nato.</p>
+    <p>Se ritrovi l'originale, questo foglio si butta. Se non lo ritrovi, questo foglio si
+      corregge e diventa lui l'originale.</p>
+  </div>
+
+  <div class="legenda">
+    <span class="lg"><span class="bollo b-certo"></span> certo — provato da un documento o dal codice</span>
+    <span class="lg"><span class="bollo b-prop"></span> proposta mia — da confermare, correggere o cestinare</span>
+  </div>
+
+  <!-- ============ perché non invento i codici ============ -->
+  <h2>Perché non invento i codici</h2>
+  <hr class="cap-rule">
+  <p>Il modulo sull'ipertrofia porta scritto in testa <em>«Moduli C-23 e C-24»</em>. Se i codici
+    andassero da 1 a 22, un C-24 non potrebbe esistere. Quindi <strong>la numerazione non è la
+    conta dei moduli del corso</strong>: è la numerazione di una biblioteca di contenuti più
+    grande, dentro la quale i 22 moduli erogati sono una selezione.</p>
+  <p>È coerente con la frase in fondo alla tua copertina: le due strade — lo studio che fai tu e
+    la produzione dei moduli — «procedono in parallelo e si alimentano: ogni sessione di studio
+    produce un pezzo di modulo». La biblioteca è più grande del corso, e il corso ne pesca.</p>
+  <p>Per questo qui sotto trovi i <strong>titoli</strong> proposti ma i codici solo dove sono
+    certi. Inventare un «A-04» darebbe una precisione falsa, e una precisione falsa in un
+    catalogo è peggio di una casella vuota.</p>
+
+  <!-- ============ LIVELLO 1 ============ -->
+  <h2>Livello 1 — Operatore ESSĒRE</h2>
+  <hr class="cap-rule">
+  <p>Otto moduli. Qui c'è la prova più forte che questa ricostruzione tiene: le sei aree del
+    <em>blueprint d'esame</em> che ho scritto nel modulo A-01 — perimetro e sicurezza, lettura
+    delle catene, batteria test, interpretazione e referto, costruzione della scheda, uso di
+    ESSĒRE — <strong>presuppongono esattamente questi moduli</strong>. Un esame non può misurare
+    ciò che nessun modulo insegna: l'elenco qui sotto è, in buona parte, l'esame letto al
+    contrario.</p>
+
+  <div class="liv">
+    <div class="liv-t"><h3>Fondamenta</h3><span class="conta">8 moduli · area A</span></div>
+
+    <div class="mod">
+      <span class="b b-certo"></span>
+      <span class="cod">A-01</span>
+      <div>
+        <p class="tit">Perché un corpo cambia</p>
+        <p class="desc">Esposizione, domanda, adattamento, capacità, progressione. Gli undici
+          assi e la gerarchia dei cinque cancelli.
+          <span class="nota">Certo: scritto e consegnato, con materiali d'aula e otto item d'esame.</span></p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-certo"></span>
+      <span class="cod">A-02</span>
+      <div>
+        <p class="tit">Volume, frequenza, intensità: che cosa dicono gli studi</p>
+        <p class="desc">Le evidenze sui parametri dell'allenamento, e come si leggono senza
+          farsene dettare la scheda.
+          <span class="nota">Certo: il modulo C-23 rimanda ad A-02 «per gli studi sulla frequenza di allenamento».</span></p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">Il perimetro: screening, non diagnosi</p>
+        <p class="desc">Che cosa siamo autorizzati a fare, che cosa no, e come si dice a un
+          allievo. I segnali di rinvio a un professionista sanitario. È il modulo che nell'esame
+          diventa <em>criterio eliminatorio</em>, quindi non può che stare al Livello 1.</p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">Le cinque catene</p>
+        <p class="desc">I-E, A, F, C, E: leggere il corpo come sistema invece che come somma di
+          muscoli. Contenuto già formalizzato nella Specifica clinica e implementato nel Sistema
+          Stellato.</p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">La valutazione in due sessioni: condurre</p>
+        <p class="desc">La batteria completa, test per test: che cosa misura, come si esegue, come
+          si registra. Perché due sessioni e non una.</p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">Dal test al referto: la lettura integrata</p>
+        <p class="desc">Dai punteggi grezzi al profilo stellato, e dal profilo al trattamento
+          prescritto. Il livello di validazione dichiarato per ogni test — la colonna che nessuna
+          altra scuola mette.</p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">Costruire la scheda</p>
+        <p class="desc">Dall'esito della valutazione alla seduta scritta: selezione degli
+          esercizi, parametri, progressione dello stimolo applicata a una persona vera.</p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-prop"></span>
+      <span class="cod vago">A-0?</span>
+      <div>
+        <p class="tit">Condurre la seduta e usare ESSĒRE</p>
+        <p class="desc">La conduzione, la comunicazione, il consenso prima del contatto. E lo
+          strumento: che dati si registrano, perché, e chi li vede.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LIVELLO 2 ============ -->
+  <h2>Livello 2 — la pratica</h2>
+  <hr class="cap-rule">
+  <p>Otto moduli. È il livello dove l'operatore smette di applicare e comincia a decidere:
+    i casi che non stanno nelle regole.</p>
+
+  <div class="liv">
+    <div class="liv-t"><h3>Pratica</h3><span class="conta">8 moduli · tutti proposta mia</span></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Il colloquio</p>
+      <p class="desc">Far dire alla persona ciò che nessun test misura: la storia, la paura, la
+        vita che ha intorno. È l'informazione che decide metà del programma.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">La progressione su casi veri</p>
+      <p class="desc">Gli undici assi applicati a storici reali: scegliere l'asse e giustificarlo
+        con i numeri. È il seguito diretto di A-01, con la difficoltà alzata.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Il dolore: linguaggio e limiti</p>
+      <p class="desc">Come si parla del dolore senza formulare ipotesi diagnostiche, che cosa si
+        può fare, quando si smette. Il modulo più delicato del percorso.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Le persone che entrano davvero</p>
+      <p class="desc">Il sedentario, il principiante, l'over 60, chi torna da un infortunio, chi
+        ha paura del carico. Non «popolazioni speciali»: la maggioranza dei tuoi allievi.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Respiro e sistema nervoso</p>
+      <p class="desc">Dallo stato del giorno al gesto: prontezza, recupero, e che cosa si cambia
+        nella seduta quando la persona non è pronta.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Rivalutare</p>
+      <p class="desc">Che cosa si misura di nuovo, ogni quanto, e come si racconta un cambiamento
+        — anche quando il cambiamento non c'è stato.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Quando i test si contraddicono</p>
+      <p class="desc">Il caso difficile: due dati che dicono il contrario. Come si decide, e come
+        si scrive la decisione perché resti difendibile.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">B-??</span><div>
+      <p class="tit">Dieci casi con supervisione</p>
+      <p class="desc">Il portfolio: dieci persone seguite dall'inizio, discusse una per una. È
+        questo che rende il Livello 2 non replicabile da un corso online.</p></div></div>
+  </div>
+
+  <!-- ============ LIVELLO 3 ============ -->
+  <h2>Livello 3 — maestria</h2>
+  <hr class="cap-rule">
+  <p>Sei moduli, e <strong>due li conosciamo con certezza</strong>: il documento sull'ipertrofia
+    porta i codici C-23 e C-24, e copre due argomenti distinti — i meccanismi e la scheda
+    sartoriale. Quindi un terzo dei moduli di questo livello è già scritto.</p>
+
+  <div class="liv">
+    <div class="liv-t"><h3>Maestria</h3><span class="conta">6 moduli · area C</span></div>
+
+    <div class="mod">
+      <span class="b b-certo"></span><span class="cod">C-23</span>
+      <div>
+        <p class="tit">I meccanismi dell'ipertrofia</p>
+        <p class="desc">Tensione meccanica, stress metabolico, danno muscolare — e come quel
+          modello del 2010 è stato ridimensionato dal suo stesso autore.
+          <span class="nota">Certo: documento in tuo possesso, prima pagina fotografata.</span></p>
+      </div>
+    </div>
+
+    <div class="mod">
+      <span class="b b-certo"></span><span class="cod">C-24</span>
+      <div>
+        <p class="tit">La scheda sartoriale</p>
+        <p class="desc">Dalla teoria dell'ipertrofia alla scheda cucita su una persona sola.
+          <span class="nota">Certo: nominato nell'intestazione dello stesso documento.</span></p>
+      </div>
+    </div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">C-??</span><div>
+      <p class="tit">La forza: espressioni e mezzi</p>
+      <p class="desc">Massimale, veloce, resistente: che cosa serve a chi non gareggia, e perché
+        la forza è un mezzo di salute prima che una prestazione.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">C-??</span><div>
+      <p class="tit">Ricomposizione, dentro il perimetro</p>
+      <p class="desc">Energia, proteine, aderenza — e il confine oltre il quale si passa la palla
+        al nutrizionista. Il modulo dove si impara a non sconfinare.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">C-??</span><div>
+      <p class="tit">Insegnare il metodo</p>
+      <p class="desc">Il ponte verso il percorso formatori: come si conduce un'aula, come si
+        corregge un allievo-operatore, come si valuta. Qui si innesta la Docimologia.</p></div></div>
+
+    <div class="mod"><span class="b b-prop"></span><span class="cod vago">C-??</span><div>
+      <p class="tit">La tesi</p>
+      <p class="desc">Un caso condotto dall'inizio alla fine e difeso davanti alla commissione.
+        È il momento in cui il diplomato dimostra di possedere il metodo, non di ricordarlo.</p></div></div>
+  </div>
+
+  <!-- ============ CANTIERI ============ -->
+  <h2>I sette cantieri trasversali</h2>
+  <hr class="cap-rule">
+  <p>Il capitolo 7 del tuo documento li elenca: «lavori che servono a tutti i moduli e vanno
+    fatti una volta sola». Non so quali siano i tuoi. Questi sono i sette che, guardando il
+    Modulo A-01 già prodotto, si sono resi necessari <em>di fatto</em> — e questa è
+    un'informazione forte, perché non li ho immaginati: li ho incontrati.</p>
+
+  <div class="cantiere"><span class="c-n">1</span><div>
+    <h3>Il modello del modulo</h3>
+    <p>Due strade — quello che studia il formatore e quello che si eroga — più il kit d'aula.
+      Fatto: A-01 è il modello, e ogni modulo successivo esce in quella forma.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">2</span><div>
+    <h3>Il blueprint d'esame e la banca item</h3>
+    <p>Le aree, i pesi, i tre livelli cognitivi. Ogni modulo versa i suoi item in una banca
+      comune, con difficoltà e discriminazione annotate.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">3</span><div>
+    <h3>La rubrica della prova pratica</h3>
+    <p>Quattro livelli ancorati a comportamenti osservabili, con la sicurezza eliminatoria. Una
+      sola per tutto il percorso, non una per modulo.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">4</span><div>
+    <h3>La banca dei casi</h3>
+    <p>Storici veri e anonimizzati della tua sala, riusabili in più moduli. Un caso costruito
+      bene serve ad A-01, al Livello 2 e all'esame.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">5</span><div>
+    <h3>La libreria dei film e delle schede esercizio</h3>
+    <p>Già avviata e protetta: i testi entrano come li detti tu, e dei test impediscono a
+      chiunque di riscriverli.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">6</span><div>
+    <h3>Il glossario del metodo</h3>
+    <p>Una parola, un significato, in tutti i moduli e dentro l'app. È il cantiere che impedisce
+      all'aula di sentire parole diverse da quelle che poi legge in ESSĒRE.</p></div></div>
+
+  <div class="cantiere"><span class="c-n">7</span><div>
+    <h3>Perimetro, consensi, modulistica</h3>
+    <p>La riga sul perimetro, i consensi, il protocollo firmabile e l'eventuale approvazione di
+      un ortopedico o fisiatra. Si scrive una volta e si richiama da ogni modulo.</p></div></div>
+
+  <!-- ============ AZIONE ============ -->
+  <h2>Che cosa serve da te, e quanto costa</h2>
+  <hr class="cap-rule">
+
+  <div class="azione">
+    <p><b>Trenta secondi, se il documento ce l'hai in mano.</b> Apri il Documento operativo 03 al
+      <b>capitolo 1</b> e fotografa quelle pagine — sono l'elenco con codice, area, livello e
+      stato. Con quelle, questo foglio diventa il tuo, esatto, in dieci minuti. Se ci stanno,
+      fotografa anche il capitolo 7: i sette cantieri veri.</p>
+  </div>
+
+  <div class="azione">
+    <p><b>Venti minuti, se il documento non lo ritrovi più.</b> Non serve che io indovini: la
+      fonte sei tu, il documento è stato scritto da quello che sai. Rispondi a tre domande per
+      ciascuno dei livelli — <em>che cosa deve saper fare uno che finisce questo livello; che
+      cosa non deve ancora saper fare; quali sono le due cose che sbagliano tutti</em> — e i
+      titoli escono da soli, nelle tue parole. Poi li mettiamo in questa forma.</p>
+  </div>
+
+  <p>La seconda strada non è un ripiego. Il documento perduto era la trascrizione di quello che
+    hai in testa: rifarla è meno grave di quanto sembri, e questa volta nasce con un indirizzo.</p>
+
+  <div class="colophon">
+    <p><b>Certo, e da dove.</b> A-01 — prodotto e consegnato. A-02 — citato dal modulo C-23 come
+      sede degli studi sulla frequenza. C-23 e C-24 — intestazione del documento sull'ipertrofia
+      in tuo possesso. Ripartizione 8/8/6 e struttura dei capitoli — copertina del Documento
+      operativo 03. Le cinque catene, la batteria in due sessioni e il livello di validazione
+      dichiarato — Specifica clinica, PDF integro in <code>docs/academy/</code>. Gli undici assi,
+      le soglie e i cinque cancelli — <code>src/domain/progressione.ts</code>.</p>
+    <p><b>Tutto il resto è mio</b>, e va corretto o cestinato. A.S.D. Evolution Sport — Mind
+      Movement Lab, Gragnano (NA).</p>
+  </div>
+
+</div>

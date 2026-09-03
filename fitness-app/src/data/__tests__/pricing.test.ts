@@ -61,6 +61,34 @@ describe('la valutazione completa', () => {
   });
 });
 
+describe('la quota di iscrizione', () => {
+  // Confermata dal direttore tecnico il 3 settembre 2026: vale ancora,
+  // 35 € una tantum, e solo sui piani sala. Sta qui perché una
+  // risposta data a voce non basta: va tenuta.
+  const CON_ISCRIZIONE = ['gym_monthly', 'gym_quarterly', 'gym_semester'];
+
+  it('vale 35 € una tantum sui piani sala', () => {
+    CON_ISCRIZIONE.forEach((id) => {
+      const t = tier(id)!;
+      expect(t.registrationFee).toBe(35);
+      expect(t.priceNote).toContain('35');
+      expect(t.priceNote?.toLowerCase()).toContain('iscrizione');
+    });
+  });
+
+  it('non si applica a ciò che non è un piano sala', () => {
+    TIERS.filter((t) => !CON_ISCRIZIONE.includes(t.id)).forEach((t) => {
+      expect(t.registrationFee ?? 0).toBe(0);
+    });
+  });
+
+  it('il listino dichiara che è una tantum e su quali piani', () => {
+    const note = PRICING_NOTES.join(' ');
+    expect(note).toContain('€35 una tantum');
+    expect(note.toLowerCase()).toContain('mensile');
+  });
+});
+
 describe('nessun prezzo resta a zero per distrazione', () => {
   it('ogni voce del listino ha un importo e un\'etichetta coerenti', () => {
     TIERS.forEach((t) => {
