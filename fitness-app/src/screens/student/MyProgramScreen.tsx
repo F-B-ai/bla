@@ -17,9 +17,16 @@ import { StatCard } from '../../components/common/StatCard';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { WorkoutPlan, Exercise, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
 import { getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
 import { getCompletedSessionsCount } from '../../services/sessionService';
 import { getStudentNutritionalConsultations } from '../../services/contentService';
+import { getStudentPaymentPlans } from '../../services/paymentService';
+import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
+import { VideoEsercizio } from '../../components/common/VideoEsercizio';
+import { trovaFilm } from '../../domain/filmEsercizio';
+import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -37,6 +44,15 @@ export const MyProgramScreen: React.FC = () => {
   const [historySelectedDay, setHistorySelectedDay] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  // La libreria serve a coprire i programmi che non portano il link
+  // del filmato: si carica una volta, e non blocca niente se manca.
+  const [libreria, setLibreria] = useState<LibraryExercise[]>([]);
+
+  useEffect(() => {
+    getFullExerciseLibrary()
+      .then(setLibreria)
+      .catch(() => setLibreria([]));
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -51,6 +67,14 @@ export const MyProgramScreen: React.FC = () => {
       setAllPlans(plans);
       setCompletedSessions(sessionsCount);
       setNutritionalConsultations(student?.nutritionalConsultations ?? consultations.length);
+
+      getStudentPaymentPlans(user.id).then(async (payPlans) => {
+        const reminders = await generatePaymentReminders(user.id, user.name, payPlans);
+        for (const r of reminders) {
+          const { id, ...data } = r;
+          await sendPaymentReminder(data);
+        }
+      }).catch(() => {});
     } catch (err) {
       console.error('Errore caricamento programma:', err);
       crossAlert('Errore', 'Impossibile caricare il programma. Riprova più tardi.');
@@ -81,6 +105,21 @@ export const MyProgramScreen: React.FC = () => {
             {exercise.sets} serie x {exercise.reps} reps
             {exercise.restSeconds > 0 && ` | Recupero: ${exercise.restSeconds}s`}
           </Text>
+          {exercise.technique && exercise.technique !== 'standard' && (
+            <Text style={styles.restPauseTag}>
+              {exercise.technique === 'rest_pause' && `SERIE INTERROTTE: ${exercise.miniSets || 4} mini serie da ${exercise.miniReps || '6'} reps, rec ${exercise.miniRestSeconds || 20}s`}
+              {exercise.technique === 'stripping' && `STRIPPING: ${exercise.stripDrops || 3} scarichi da ${exercise.stripRepsPerDrop || '8'} reps, max -${exercise.stripMaxDropPct || 50}%`}
+              {exercise.technique === 'pyramid' && `PIRAMIDALI: ${exercise.pyramidType === 'ascending' ? 'ascendente ↑' : exercise.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+              {exercise.technique === 'tempo' && `TEMPO: ${exercise.tempoNotation || '4-1-2-0'}`}
+              {exercise.technique === 'myo_reps' && `MYO-REPS: attivazione ${exercise.myoActivationReps || '12'} + ${exercise.myoMiniSets || 4}x${exercise.myoMiniReps || '3'} reps, rec ${exercise.myoRestSeconds || 5}s`}
+              {exercise.technique === 'isometric' && `ISOMETRIA: tenuta ${exercise.isometricHoldSeconds || 30}s`}
+              {exercise.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
+              {exercise.technique === 'cluster' && `CLUSTER: ${exercise.clusterSets || 5}x${exercise.clusterReps || 2} reps, pausa ${exercise.clusterRestSeconds || 15}s`}
+              {exercise.technique === 'cumulative' && `CUMULATIVA: scala 1→${exercise.cumulativeTargetReps || 10} rip, attesa ${exercise.cumulativeRestSeconds || 15}s tra i gradini`}
+              {exercise.technique === 'negative' && `NEGATIVA: ${exercise.negativeSeconds || 5}s eccentrica`}
+              {exercise.technique === 'emom' && `EMOM: ${exercise.emomRepsPerMinute || '5'} reps ogni minuto x ${exercise.emomMinutes || 10} min`}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -88,18 +127,16 @@ export const MyProgramScreen: React.FC = () => {
         <Text style={styles.exerciseDescription}>{exercise.description}</Text>
       )}
 
-      {exercise.videoUrl && (
-        <TouchableOpacity
-          style={styles.videoButton}
-          onPress={() => {
-            Linking.openURL(exercise.videoUrl!).catch(() =>
-              crossAlert('Errore', 'Impossibile aprire il video')
-            );
-          }}
-        >
-          <Text style={styles.videoButtonText}>Guarda Video</Text>
-        </TouchableOpacity>
-      )}
+      {/* Il filmato si guarda QUI DENTRO. E se il programma non porta
+          il link, si prende quello della libreria: il film esiste,
+          non c'è ragione di non mostrarlo. */}
+      <VideoEsercizio
+        film={trovaFilm({
+          nome: exercise.name,
+          videoUrlProgramma: exercise.videoUrl,
+          libreria,
+        })}
+      />
 
       {exercise.notes && (
         <Text style={styles.exerciseNotes}>{exercise.notes}</Text>
@@ -124,7 +161,10 @@ export const MyProgramScreen: React.FC = () => {
     >
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Il Mio Programma</Text>
+          <View>
+            <Text style={styles.greeting}>Ciao{user?.name ? `, ${user.name}` : ''}!</Text>
+            <Text style={styles.title}>Il Mio Programma</Text>
+          </View>
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Text style={styles.logoutText}>Esci</Text>
           </TouchableOpacity>
@@ -133,6 +173,9 @@ export const MyProgramScreen: React.FC = () => {
           <Text style={styles.planTitle}>{activePlan.title}</Text>
         )}
       </View>
+
+      <InstallPrompt />
+      <NotificationPrompt />
 
       {/* Statistiche */}
       <View style={styles.statsRow}>
@@ -331,6 +374,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
   },
+  greeting: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   title: {
     fontSize: fontSize.xxl,
     fontWeight: '700',
@@ -413,6 +462,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  restPauseTag: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+    marginTop: 4,
+  },
   exerciseDescription: {
     fontSize: fontSize.md,
     color: colors.textSecondary,
@@ -465,7 +520,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -500,7 +555,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   activeBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '800',
   },

@@ -3,9 +3,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
+import { OfflineIndicator } from '../components/common/OfflineIndicator';
+import { OnboardingOverlay, hasCompletedOnboarding, markOnboardingComplete } from '../components/common/OnboardingOverlay';
 
 // --- Persist loginMode so Academy mode survives refresh ---
 const LOGIN_MODE_KEY = 'essere_login_mode';
@@ -47,10 +50,12 @@ const loadLoginMode = async (): Promise<'app' | 'academy' | null> => {
   }
 };
 
-// Screens
+// Auth screens — loaded immediately (small, needed first)
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { LoginSelectorScreen } from '../screens/auth/LoginSelectorScreen';
 import { AcademyLoginScreen } from '../screens/auth/AcademyLoginScreen';
+
+// Screen imports
 import { DashboardScreen } from '../screens/owner/DashboardScreen';
 import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { ManageUsersScreen } from '../screens/owner/ManageUsersScreen';
@@ -65,7 +70,6 @@ import { ContentScreen } from '../screens/student/ContentScreen';
 import { PosturalAssessmentScreen } from '../screens/shared/PosturalAssessmentScreen';
 import { WorkoutPlanScreen } from '../screens/shared/WorkoutPlanScreen';
 import { ScheduleSessionScreen } from '../screens/shared/ScheduleSessionScreen';
-
 import { ChatListScreen } from '../screens/shared/ChatListScreen';
 import { AISettingsScreen } from '../screens/shared/AISettingsScreen';
 import { NutritionistScreen } from '../screens/shared/NutritionistScreen';
@@ -73,12 +77,40 @@ import { NutritionTeamScreen } from '../screens/shared/NutritionTeamScreen';
 import { AnalyticsScreen } from '../screens/owner/AnalyticsScreen';
 import { ManagerDashboardScreen } from '../screens/manager/ManagerDashboardScreen';
 import { ManageTemplatesScreen } from '../screens/shared/ManageTemplatesScreen';
+import { CalendarScreen } from '../screens/shared/CalendarScreen';
 import { AcademyScreen } from '../screens/shared/AcademyScreen';
 import { AcademyManagementScreen } from '../screens/owner/AcademyManagementScreen';
 import { AcademyStudentsScreen } from '../screens/owner/AcademyStudentsScreen';
 import { AcademyAnalyticsScreen } from '../screens/owner/AcademyAnalyticsScreen';
 import { LiveWorkoutScreen } from '../screens/student/LiveWorkoutScreen';
 import { WorkoutMonitorScreen } from '../screens/shared/WorkoutMonitorScreen';
+import { ProfileScreen } from '../screens/shared/ProfileScreen';
+import { TeamChatScreen } from '../screens/shared/TeamChatScreen';
+import { NotificationsScreen } from '../screens/shared/NotificationsScreen';
+import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
+import { PricingScreen } from '../screens/owner/PricingScreen';
+import { QRAccessScreen } from '../screens/owner/QRAccessScreen';
+import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
+import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
+import { GamificationScreen } from '../screens/student/GamificationScreen';
+import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
+import { AICoachScreen } from '../screens/shared/AICoachScreen';
+import { subscribeToUnreadCount, setCurrentUserId } from '../services/notificationService';
+import { registerPushToken } from '../services/pushNotificationService';
+import { CheckinScreen } from '../screens/student/CheckinScreen';
+import { EssereScreen } from '../screens/student/EssereScreen';
+import { AssistantScreen } from '../screens/shared/AssistantScreen';
+import { LicenseLockedScreen } from '../screens/shared/LicenseLockedScreen';
+import { checkLicense } from '../services/licenseService';
+import { ConsentScreen } from '../screens/shared/ConsentScreen';
+import { StudentTabsV2 } from './StudentTabsV2';
+import { makeStaffTabs } from './StaffTabsV2';
+
+const OwnerTabsV2 = makeStaffTabs('owner');
+const ManagerTabsV2 = makeStaffTabs('manager');
+const CollaboratorTabsV2 = makeStaffTabs('collaborator');
+import { needsConsentDecision, clearConsentCache } from '../services/consentService';
+import { brand } from '../config/brand';
 
 const RootStack = createStackNavigator();
 const OwnerTab = createBottomTabNavigator();
@@ -108,6 +140,58 @@ const AcademyTabIcon = ({ name, focused }: { name: IoniconsName; focused: boolea
     color={focused ? GOLD : colors.textLight}
   />
 );
+
+const NotificationBellIcon = ({ focused }: { focused: boolean }) => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUnreadCount(user.id, setUnreadCount);
+  }, [user]);
+
+  return (
+    <View style={notifBadgeStyles.iconContainer}>
+      <Ionicons
+        name={focused ? 'notifications' : 'notifications-outline'}
+        size={TAB_ICON_SIZE}
+        color={focused ? colors.accent : colors.textLight}
+        style={notifBadgeStyles.icon}
+      />
+      {unreadCount > 0 && (
+        <View style={notifBadgeStyles.badge}>
+          <Text style={notifBadgeStyles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const HomeIconWithBadge = ({ focused }: { focused: boolean }) => {
+  const { user } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeToUnreadCount(user.id, setUnreadCount);
+  }, [user]);
+
+  return (
+    <View style={notifBadgeStyles.iconContainer}>
+      <Ionicons
+        name={focused ? 'home' : 'home-outline'}
+        size={TAB_ICON_SIZE}
+        color={focused ? colors.accent : colors.textLight}
+        style={notifBadgeStyles.icon}
+      />
+      {unreadCount > 0 && (
+        <View style={notifBadgeStyles.badge}>
+          <Text style={notifBadgeStyles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 // Custom scrollable tab bar for navigators with many tabs
 const ScrollableTabBar = ({ state, descriptors, navigation }: any) => (
@@ -202,7 +286,7 @@ const OwnerTabs = () => (
       component={DashboardScreen}
       options={{
         tabBarLabel: 'Home',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+        tabBarIcon: ({ focused }) => <HomeIconWithBadge focused={focused} />,
       }}
     />
     <OwnerTab.Screen
@@ -223,9 +307,9 @@ const OwnerTabs = () => (
     />
     <OwnerTab.Screen
       name="Sessions"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -270,6 +354,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -283,6 +375,22 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
@@ -310,11 +418,75 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Assistente"
+      component={AssistantScreen}
+      options={{
+        tabBarLabel: 'Assistente',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="QRAccesso"
+      component={QRAccessScreen}
+      options={{
+        tabBarLabel: 'QR Accesso',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'qr-code' : 'qr-code-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Listino"
+      component={PricingScreen}
+      options={{
+        tabBarLabel: 'Listino',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'pricetags' : 'pricetags-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Pagamenti"
+      component={PaymentPlanScreen}
+      options={{
+        tabBarLabel: 'Pagamenti',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'card' : 'card-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Spazio"
+      component={StorageManagementScreen}
+      options={{
+        tabBarLabel: 'Spazio',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'server' : 'server-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
       }}
     />
   </OwnerTab.Navigator>
@@ -335,7 +507,7 @@ const ManagerTabs = () => (
       component={ManagerDashboardScreen}
       options={{
         tabBarLabel: 'Home',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />,
+        tabBarIcon: ({ focused }) => <HomeIconWithBadge focused={focused} />,
       }}
     />
     <ManagerTab.Screen
@@ -344,14 +516,6 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Allievi',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />,
-      }}
-    />
-    <ManagerTab.Screen
-      name="Team"
-      component={ManageUsersScreen}
-      options={{
-        tabBarLabel: 'Team',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
@@ -364,9 +528,9 @@ const ManagerTabs = () => (
     />
     <ManagerTab.Screen
       name="Sessions"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -376,6 +540,14 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Monitor',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'barbell' : 'barbell-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
@@ -392,6 +564,30 @@ const ManagerTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Analytics"
+      component={AnalyticsScreen}
+      options={{
+        tabBarLabel: 'KPI',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
       }}
     />
     <ManagerTab.Screen
@@ -427,11 +623,35 @@ const ManagerTabs = () => (
       }}
     />
     <ManagerTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <ManagerTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
       }}
     />
   </ManagerTab.Navigator>
@@ -457,9 +677,9 @@ const CollaboratorTabs = () => (
     />
     <CollaboratorTab.Screen
       name="Schedule"
-      component={ScheduleSessionScreen}
+      component={CalendarScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -480,6 +700,14 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
+      options={{
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="Template"
       component={ManageTemplatesScreen}
       options={{
@@ -493,6 +721,30 @@ const CollaboratorTabs = () => (
       options={{
         tabBarLabel: 'Postura',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="BodyComp"
+      component={BodyCompositionScreen}
+      options={{
+        tabBarLabel: 'Fisico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'scan' : 'scan-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Analytics"
+      component={AnalyticsScreen}
+      options={{
+        tabBarLabel: 'KPI',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />,
       }}
     />
     <CollaboratorTab.Screen
@@ -528,11 +780,43 @@ const CollaboratorTabs = () => (
       }}
     />
     <CollaboratorTab.Screen
+      name="Content"
+      component={ContentManagementScreen}
+      options={{
+        tabBarLabel: 'Contenuti',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'folder' : 'folder-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="TeamChat"
+      component={TeamChatScreen}
+      options={{
+        tabBarLabel: 'Chat Team',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people-circle' : 'people-circle-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <CollaboratorTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
       }}
     />
   </CollaboratorTab.Navigator>
@@ -549,11 +833,35 @@ const StudentTabs = () => (
     }}
   >
     <StudentTab.Screen
+      name="Essere"
+      component={EssereScreen}
+      options={{
+        tabBarLabel: brand.appName,
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'pulse' : 'pulse-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
       name="MyProgram"
       component={MyProgramScreen}
       options={{
         tabBarLabel: 'Scheda',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'fitness' : 'fitness-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Checkin"
+      component={CheckinScreen}
+      options={{
+        tabBarLabel: 'Check-in',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'qr-code' : 'qr-code-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Assistente"
+      component={AssistantScreen}
+      options={{
+        tabBarLabel: 'Assistente',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} focused={focused} />,
       }}
     />
     <StudentTab.Screen
@@ -565,10 +873,18 @@ const StudentTabs = () => (
       }}
     />
     <StudentTab.Screen
-      name="Sessions"
-      component={SessionsScreen}
+      name="WorkoutHistory"
+      component={WorkoutHistoryScreen}
       options={{
-        tabBarLabel: 'Sessioni',
+        tabBarLabel: 'Storico',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'analytics' : 'analytics-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Sessions"
+      component={CalendarScreen}
+      options={{
+        tabBarLabel: 'Calendario',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />,
       }}
     />
@@ -589,14 +905,6 @@ const StudentTabs = () => (
       }}
     />
     <StudentTab.Screen
-      name="Postura"
-      component={PosturalAssessmentScreen}
-      options={{
-        tabBarLabel: 'Postura',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'body' : 'body-outline'} focused={focused} />,
-      }}
-    />
-    <StudentTab.Screen
       name="Nutrizionista"
       component={NutritionistScreen}
       options={{
@@ -613,11 +921,43 @@ const StudentTabs = () => (
       }}
     />
     <StudentTab.Screen
+      name="Notifiche"
+      component={NotificationsScreen}
+      options={{
+        tabBarLabel: 'Notifiche',
+        tabBarIcon: ({ focused }) => <NotificationBellIcon focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
       name="Chat"
       component={ChatListScreen}
       options={{
         tabBarLabel: 'Chat',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Traguardi"
+      component={GamificationScreen}
+      options={{
+        tabBarLabel: 'Traguardi',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'trophy' : 'trophy-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="AICoach"
+      component={AICoachScreen}
+      options={{
+        tabBarLabel: 'AI Coach',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'sparkles' : 'sparkles-outline'} focused={focused} />,
+      }}
+    />
+    <StudentTab.Screen
+      name="Profilo"
+      component={ProfileScreen}
+      options={{
+        tabBarLabel: 'Profilo',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'person-circle' : 'person-circle-outline'} focused={focused} />,
       }}
     />
   </StudentTab.Navigator>
@@ -707,17 +1047,109 @@ const AcademyOnlyAdminTabs = () => (
 );
 
 // Logout header for Academy mode
-const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => (
-  <View style={styles.academyLogoutHeader}>
-    <View style={styles.academyLogoutBrand}>
-      <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+const AcademyLogoutHeader = ({ onLogout }: { onLogout: () => void }) => {
+  // Rispetta la "safe area" in alto (notch / Dynamic Island / barra di
+  // stato): senza questo, su PWA iPhone titolo e "Esci" finivano SOTTO
+  // l'orologio. Floor prudente così è sempre raggiungibile.
+  const insets = useSafeAreaInsets();
+  const topPad = Math.max(insets.top, Platform.OS === 'web' ? 12 : 0) + 10;
+  return (
+    <View style={[styles.academyLogoutHeader, { paddingTop: topPad }]}>
+      <View style={styles.academyLogoutBrand}>
+        <Text style={styles.academyLogoutTitle}>Mind Movement Academy</Text>
+      </View>
+      <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+        <Ionicons name="log-out-outline" size={20} color={GOLD} />
+        <Text style={styles.logoutBtnText}>Esci</Text>
+      </TouchableOpacity>
     </View>
-    <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-      <Ionicons name="log-out-outline" size={20} color={GOLD} />
-      <Text style={styles.logoutBtnText}>Esci</Text>
-    </TouchableOpacity>
-  </View>
-);
+  );
+};
+
+// ============================================================
+// ROUTE VERE (web + deep link)
+// ------------------------------------------------------------
+// Fino a qui non esisteva alcuna configurazione `linking`: ogni
+// URL cadeva su index.html e riportava al gate. Un indirizzo non
+// era condivisibile, il tasto "indietro" del browser non tornava
+// dove eri stato, e nessuna schermata era raggiungibile da fuori.
+// Le rotte qui sotto sono l'indirizzo pubblico del sistema.
+// ============================================================
+// NB: a runtime è montato UN SOLO stack staff (dipende dal ruolo), ma la
+// configurazione dei link viene validata tutta insieme: tre schermate con
+// lo stesso path 'studio' fanno rifiutare l'avvio all'intero navigatore.
+// Quindi lo staff entra nella mappa in base al ruolo corrente.
+const staffLink = (role?: string | null) => {
+  if (role === 'owner') return { OwnerTabs: { path: 'studio' } };
+  if (role === 'manager') return { ManagerTabs: { path: 'studio' } };
+  if (role === 'collaborator') return { CollaboratorTabs: { path: 'studio' } };
+  return {};
+};
+
+const buildLinking = (role?: string | null) => ({
+  prefixes: [
+    'https://essere-3fe6f.web.app',
+    'https://essere-3fe6f.firebaseapp.com',
+    'essere://',
+  ],
+  config: {
+    screens: {
+      // --- ingresso ---
+      LoginSelector: 'entra',
+      Login: 'accedi',
+      AcademyLogin: 'academy/accedi',
+
+      // --- allievo ---
+      StudentTabs: {
+        path: '',
+        screens: {
+          Oggi: {
+            path: 'oggi',
+            screens: {
+              OggiHome: '',
+              StatoEssere: 'stato',
+              Respiro: 'respiro',
+              CheckinPalestra: 'checkin',
+              Agenda: 'agenda',
+              Notifiche: 'notifiche',
+            },
+          },
+          Allenati: {
+            path: 'allenati',
+            screens: {
+              AllenatiHome: '',
+              Scheda: 'scheda',
+              SedutaLive: 'seduta',
+              Storico: 'storico',
+            },
+          },
+          Progressi: {
+            path: 'progressi',
+            screens: {
+              ProgressiHome: '',
+              Quadro: 'quadro',
+              Storia: 'storia',
+              Traguardi: 'traguardi',
+              Diario: 'diario',
+              AICoach: 'ai-coach',
+            },
+          },
+          Chat: { path: 'messaggi', screens: { ChatHome: '', Assistente: 'assistente' } },
+          Profilo: {
+            path: 'profilo',
+            screens: { ProfiloHome: '', MieiDati: 'dati', Pagamenti: 'pagamenti' },
+          },
+        },
+      },
+
+      // --- academy ---
+      AcademyTabs: { path: 'academy' },
+
+      // --- staff: 'studio' per tutti, ma una sola voce alla volta ---
+      ...staffLink(role),
+    },
+  },
+});
 
 // --- Loading screen ---
 const LoadingScreen = () => (
@@ -730,9 +1162,24 @@ const LoadingScreen = () => (
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
   const { isAuthenticated, loading, role, user, logout } = useAuth();
+  // Le route dipendono dal ruolo: 'studio' deve risolvere a UNA sola schermata.
+  const linking = React.useMemo(() => buildLinking(role), [role]);
   // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [license, setLicense] = useState<{ active: boolean; message?: string }>({ active: true });
+  const [consentNeeded, setConsentNeeded] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user && (role === 'student' || role === 'collaborator')) {
+      if (!hasCompletedOnboarding(user.id)) {
+        setShowOnboarding(true);
+      }
+    } else {
+      setShowOnboarding(false);
+    }
+  }, [isAuthenticated, user, role]);
 
   // Load persisted loginMode on mount
   useEffect(() => {
@@ -758,6 +1205,34 @@ export const AppNavigator: React.FC = () => {
     }
   }, [isAuthenticated]);
 
+  // Initialize push notifications and set current user ID for badge/push
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      setCurrentUserId(user.id);
+      registerPushToken(user.id).catch(() => {});
+    } else {
+      setCurrentUserId(null);
+    }
+  }, [isAuthenticated, user]);
+
+  // Verifica licenza white-label (kill-switch) dopo l'autenticazione
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      checkLicense().then(setLicense).catch(() => {});
+    }
+  }, [isAuthenticated, user]);
+
+  // Consensi privacy (GDPR art. 9): al primo accesso, o quando cambia
+  // la versione del testo, l'utente decide voce per voce
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      clearConsentCache();
+      needsConsentDecision(user.id).then(setConsentNeeded).catch(() => {});
+    } else {
+      setConsentNeeded(false);
+    }
+  }, [isAuthenticated, user]);
+
   // Clean up stale loginMode from storage when not authenticated
   useEffect(() => {
     if (loginModeLoaded && !loading && !isAuthenticated && loginMode !== null && !loginModeSetByUser.current) {
@@ -780,6 +1255,21 @@ export const AppNavigator: React.FC = () => {
     return <LoadingScreen />;
   }
 
+  // Licenza sospesa: blocca l'intera app (kill-switch white-label)
+  if (isAuthenticated && !license.active) {
+    return <LicenseLockedScreen message={license.message} />;
+  }
+
+  // Consensi privacy da raccogliere prima di usare l'app
+  if (isAuthenticated && user && consentNeeded) {
+    return (
+      <ConsentScreen
+        userId={user.id}
+        onDone={() => setConsentNeeded(false)}
+      />
+    );
+  }
+
   // If not authenticated and loginMode came from storage (not user action), force selector
   const effectiveLoginMode = (!isAuthenticated && !loginModeSetByUser.current) ? null : loginMode;
 
@@ -798,53 +1288,60 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <NavigationContainer
+      linking={linking}
       documentTitle={{
-        formatter: () => effectiveLoginMode === 'academy' ? 'FB Mind Movement Academy' : 'ESSĒRE',
+        formatter: () => effectiveLoginMode === 'academy' ? brand.academyName : brand.appName,
       }}
     >
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          // Not authenticated: show login selector or specific login
-          effectiveLoginMode === null ? (
-            <RootStack.Screen name="LoginSelector">
-              {() => (
-                <LoginSelectorScreen
-                  onSelectApp={() => setLoginModeAndPersist('app')}
-                  onSelectAcademy={() => setLoginModeAndPersist('academy')}
-                />
-              )}
-            </RootStack.Screen>
-          ) : effectiveLoginMode === 'app' ? (
-            <RootStack.Screen name="Login">
-              {() => (
-                <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
-              )}
-            </RootStack.Screen>
+      <View style={{ flex: 1 }}>
+        <OfflineIndicator />
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {!isAuthenticated ? (
+            effectiveLoginMode === null ? (
+              <RootStack.Screen name="LoginSelector">
+                {() => (
+                  <LoginSelectorScreen
+                    onSelectApp={() => setLoginModeAndPersist('app')}
+                    onSelectAcademy={() => setLoginModeAndPersist('academy')}
+                  />
+                )}
+              </RootStack.Screen>
+            ) : effectiveLoginMode === 'app' ? (
+              <RootStack.Screen name="Login">
+                {() => (
+                  <LoginScreen onBack={() => setLoginModeAndPersist(null)} />
+                )}
+              </RootStack.Screen>
+            ) : (
+              <RootStack.Screen name="AcademyLogin">
+                {() => (
+                  <AcademyLoginScreen
+                    onBack={() => setLoginModeAndPersist(null)}
+                  />
+                )}
+              </RootStack.Screen>
+            )
+          ) : effectiveLoginMode === 'academy' ? (
+            <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
+          ) : role === 'owner' ? (
+            <RootStack.Screen name="OwnerTabs" component={OwnerTabsV2} />
+          ) : role === 'manager' ? (
+            <RootStack.Screen name="ManagerTabs" component={ManagerTabsV2} />
+          ) : role === 'collaborator' ? (
+            <RootStack.Screen name="CollaboratorTabs" component={CollaboratorTabsV2} />
           ) : (
-            <RootStack.Screen name="AcademyLogin">
-              {() => (
-                <AcademyLoginScreen
-                  onBack={() => setLoginModeAndPersist(null)}
-                />
-              )}
-            </RootStack.Screen>
-          )
-        ) : effectiveLoginMode === 'academy' ? (
-          // Authenticated via Academy login: show only Academy tabs with logout
-          <RootStack.Screen name="AcademyTabs" component={AcademyTabsWithLogout} />
-        ) : role === 'owner' ? (
-          <RootStack.Screen name="OwnerTabs" component={OwnerTabs} />
-        ) : role === 'manager' ? (
-          <RootStack.Screen name="ManagerTabs" component={ManagerTabs} />
-        ) : role === 'collaborator' ? (
-          <RootStack.Screen
-            name="CollaboratorTabs"
-            component={CollaboratorTabs}
+            <RootStack.Screen name="StudentTabs" component={StudentTabsV2} />
+          )}
+        </RootStack.Navigator>
+        {showOnboarding && user && role && (
+          <OnboardingOverlay
+            role={role}
+            userName={user.name}
+            userId={user.id}
+            onComplete={() => setShowOnboarding(false)}
           />
-        ) : (
-          <RootStack.Screen name="StudentTabs" component={StudentTabs} />
         )}
-      </RootStack.Navigator>
+      </View>
     </NavigationContainer>
   );
 };
@@ -867,13 +1364,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopColor: colors.divider,
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'web' ? 0 : 20,
+    paddingBottom: Platform.OS === 'web' ? 12 : 28,
+    paddingTop: 6,
   },
   academyTabBarContainer: {
     backgroundColor: '#0D0D0D',
     borderTopColor: GOLD_DARK + '40',
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'web' ? 0 : 20,
+    paddingBottom: Platform.OS === 'web' ? 12 : 28,
+    paddingTop: 6,
   },
   scrollableTabBarContent: {
     paddingHorizontal: 4,
@@ -881,10 +1380,11 @@ const styles = StyleSheet.create({
   scrollableTab: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    minWidth: 64,
-    minHeight: 48,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    minWidth: 72,
+    minHeight: 68,
+    overflow: 'visible' as any,
     ...(Platform.OS === 'web' ? { cursor: 'pointer' as any } : {}),
   },
   scrollableTabLabel: {
@@ -909,8 +1409,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0D0D0D',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'web' ? 12 : 48,
-    paddingBottom: 8,
+    // paddingTop impostato a runtime da AcademyLogoutHeader (safe-area).
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: GOLD_DARK + '30',
   },
@@ -938,5 +1438,34 @@ const styles = StyleSheet.create({
     color: GOLD,
     fontSize: fontSize.sm,
     fontWeight: '600',
+  },
+});
+
+const notifBadgeStyles = StyleSheet.create({
+  iconContainer: {
+    width: TAB_ICON_SIZE + 14,
+    height: TAB_ICON_SIZE + 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: {
+    marginTop: 0,
+  },
+  badge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: '700',
   },
 });

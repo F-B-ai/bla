@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { registerRootComponent } from 'expo';
@@ -99,9 +100,13 @@ function App() {
   useEffect(() => {
     const load = Platform.OS === 'web' ? loadIcoFontsWeb : () => Font.loadAsync({ ...Ionicons.font });
     load()
-      .then(() => setFontsLoaded(true))
+      .then(() => {
+        setFontsLoaded(true);
+        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
+      })
       .catch(() => {
         setFontsLoaded(true);
+        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
       });
   }, []);
 
@@ -114,6 +119,7 @@ function App() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ErrorBoundary>
       <AuthProvider>
         <SafeAreaProvider>
@@ -122,6 +128,7 @@ function App() {
         </SafeAreaProvider>
       </AuthProvider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 

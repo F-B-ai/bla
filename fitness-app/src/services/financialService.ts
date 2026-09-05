@@ -5,6 +5,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
   deleteDoc,
   doc,
@@ -46,7 +47,8 @@ export const getTransactions = async (
 ): Promise<FinancialTransaction[]> => {
   let q = query(
     collection(db, TRANSACTIONS_COLLECTION),
-    orderBy('date', 'desc')
+    orderBy('date', 'desc'),
+    limit(500)
   );
 
   if (filters?.type) {

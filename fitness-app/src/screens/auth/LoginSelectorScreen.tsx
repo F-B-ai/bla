@@ -9,6 +9,7 @@ import {
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { EnsoLogo } from '../../components/common/EnsōLogo';
 import { AcademyLogo } from '../../components/common/AcademyLogo';
+import { brand } from '../../config/brand';
 
 const GOLD = '#C5A55A';
 const GOLD_DARK = '#8B7335';
@@ -36,9 +37,9 @@ export const LoginSelectorScreen: React.FC<LoginSelectorScreenProps> = ({
         >
           <View style={styles.cardContent}>
             <EnsoLogo size={70} />
-            <Text style={styles.cardTitle}>ESSĒRE</Text>
+            <Text style={styles.cardTitle}>{brand.appName}</Text>
             <Text style={styles.cardDescription}>
-              Fitness, Coaching{'\n'}& Benessere
+              Comprendi chi sei{'\n'}attraverso il movimento
             </Text>
           </View>
           <View style={styles.cardFooter}>
@@ -159,13 +160,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   cardFooterText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   cardArrow: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -173,13 +174,13 @@ const styles = StyleSheet.create({
     backgroundColor: GOLD_DARK,
   },
   academyFooterText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.sm,
     fontWeight: '600',
     letterSpacing: 1,
   },
   academyArrow: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },

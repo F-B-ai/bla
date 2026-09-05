@@ -1,0 +1,728 @@
+<title>Modulo A-01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#FCFBF8; --paper-box:#F4EEE2; --paper-sunk:#F2F1ED;
+    --ink:#1A1A1A; --ink-soft:#3E3C39; --ink-faint:#6B6862;
+    --rule:#D8D4CB; --rule-soft:#E7E4DC;
+    --red:#9B1B30; --red-deep:#6E1322; --red-wash:#F6E7E7;
+    --aula:#2C5A63; --aula-wash:#E4EEEF;   /* la seconda strada: l'aula */
+    --bar:#1C1C1C; --bar-ink:#FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+      --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+      --rule:#33302A; --rule-soft:#262420;
+      --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+      --aula:#7FBAC4; --aula-wash:#16262A;
+      --bar:#E4E0D6; --bar-ink:#14130F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --aula:#7FBAC4; --aula-wash:#16262A;
+    --bar:#E4E0D6; --bar-ink:#14130F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:Tinos,"Times New Roman",Times,serif; font-size:17px; line-height:1.62;
+  }
+  .sheet { max-width:800px; margin:0 auto; padding:clamp(30px,6vw,76px) clamp(20px,5vw,56px) 96px; }
+
+  .ente { text-align:center; color:var(--red); font-weight:700; font-size:0.86rem;
+    letter-spacing:0.09em; line-height:2; text-transform:uppercase; }
+  .ente .doc { display:block; margin-top:12px; }
+  .short-rule { width:116px; height:1px; background:var(--red); border:0; margin:18px auto; }
+  h1.titolo { font-size:clamp(2.1rem,6.4vw,3.2rem); font-weight:700; text-align:center;
+    margin:10px 0 20px; line-height:1.08; text-wrap:balance; }
+  .cod-grande {
+    display:block; font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.9rem;
+    letter-spacing:0.14em; color:var(--red); font-weight:600; margin-bottom:14px;
+  }
+  .sottotitolo { font-style:italic; text-align:center; color:var(--ink-soft);
+    font-size:1.06rem; margin:0 auto; max-width:31em; text-wrap:balance; }
+  .ink-rule { width:96px; height:1px; background:var(--rule); border:0; margin:26px auto; }
+  .firma { text-align:center; font-style:italic; line-height:1.9; }
+  .firma b { font-style:normal; font-weight:700; }
+
+  .riquadro { border:1px solid var(--red); background:var(--paper-box);
+    padding:clamp(18px,3.4vw,30px); margin:36px 0; }
+  .riquadro > h3 { margin:0 0 14px; font-size:1.1rem; }
+  .riquadro ul { margin:0; padding-left:1.15em; }
+  .riquadro li { margin-bottom:9px; }
+  .riquadro li:last-child { margin-bottom:0; }
+  .riquadro p { margin:0 0 12px; }
+  .riquadro p:last-child { margin-bottom:0; }
+
+  h2 { font-size:1.4rem; font-weight:700; color:var(--red); margin:58px 0 4px;
+    line-height:1.24; text-wrap:balance; }
+  h2 + .cap-rule { width:100%; height:2px; background:var(--red); border:0; margin:0 0 22px; }
+  h2.aula { color:var(--aula); }
+  h2.aula + .cap-rule { background:var(--aula); }
+  h3 { font-size:1.06rem; font-weight:700; margin:30px 0 8px; }
+  h4 { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.77rem; font-weight:600;
+    letter-spacing:0.07em; text-transform:uppercase; color:var(--red); margin:26px 0 6px; }
+  p { margin:0 0 14px; }
+  ul, ol { margin:0 0 16px; padding-left:1.25em; }
+  li { margin-bottom:7px; }
+
+  /* ---- le due strade ---- */
+  .strade { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:18px; margin:30px 0; }
+  .strada { border:1px solid var(--rule); padding:20px 22px; }
+  .strada.uno { border-top:4px solid var(--red); }
+  .strada.due { border-top:4px solid var(--aula); }
+  .strada .et { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.72rem;
+    letter-spacing:0.08em; text-transform:uppercase; font-weight:600; margin-bottom:6px; }
+  .strada.uno .et { color:var(--red); }
+  .strada.due .et { color:var(--aula); }
+  .strada h3 { margin:0 0 8px; font-size:1.06rem; }
+  .strada p { font-size:0.95rem; color:var(--ink-soft); margin:0 0 10px; }
+  .strada p:last-child { margin:0; }
+
+  /* ---- il ciclo in cinque caselle ---- */
+  .ciclo { display:grid; gap:0; margin:26px 0 30px; border:1px solid var(--rule); }
+  .casella { display:grid; grid-template-columns:2.4em 1fr; gap:16px;
+    padding:16px 18px; border-bottom:1px solid var(--rule-soft); }
+  .casella:last-child { border-bottom:0; }
+  .casella.finale { background:var(--red-wash); }
+  .casella .c-n { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:1.5rem;
+    font-weight:600; color:var(--red); line-height:1; font-variant-numeric:tabular-nums; }
+  .casella h3 { margin:0 0 4px; font-size:1.04rem; }
+  .casella .dom { font-style:italic; color:var(--ink-soft); margin:0 0 8px; }
+  .casella p { margin:0; font-size:0.95rem; }
+
+  .tab-wrap { overflow-x:auto; margin:22px 0 26px; }
+  table { border-collapse:collapse; width:100%; font-size:0.92rem; }
+  thead th { background:var(--bar); color:var(--bar-ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-weight:500; font-size:0.77rem;
+    letter-spacing:0.05em; text-align:left; padding:9px 12px; vertical-align:bottom; }
+  td, tbody th { border-bottom:1px solid var(--rule); padding:9px 12px; vertical-align:top; text-align:left; }
+  tbody th { font-weight:700; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .fonte { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.68rem;
+    letter-spacing:0.05em; text-transform:uppercase; padding:1px 6px; white-space:nowrap;
+    border:1px solid currentColor; }
+  .f-dati { color:var(--aula); }
+  .f-mista { color:var(--ink-faint); }
+  .f-occhio { color:var(--red); }
+
+  /* ---- la gerarchia dello stop ---- */
+  .gradino { display:grid; grid-template-columns:2.6em 1fr; gap:6px 16px;
+    padding:16px 0; border-bottom:1px solid var(--rule-soft); }
+  .gradino:first-of-type { border-top:1px solid var(--rule); }
+  .gradino .g-n { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:1.3rem;
+    font-weight:600; color:var(--red); line-height:1.1; }
+  .gradino h3 { margin:0 0 6px; }
+  .gradino .cond { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.82rem;
+    color:var(--aula); margin:0 0 8px; }
+  .gradino p { margin:0 0 8px; font-size:0.96rem; }
+  .gradino p:last-child { margin:0; }
+
+  .regola { border-left:4px solid var(--red); background:var(--red-wash); padding:14px 18px; margin:22px 0; }
+  .regola p { margin:0; }
+  .regola b { color:var(--red-deep); }
+
+  /* ---- piano d'aula ---- */
+  .blocco { display:grid; grid-template-columns:6.6em 1fr; gap:0 18px;
+    border-bottom:1px solid var(--rule-soft); padding:16px 0; }
+  .blocco:first-of-type { border-top:2px solid var(--aula); }
+  .blocco .tempo { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.8rem;
+    color:var(--aula); font-weight:600; font-variant-numeric:tabular-nums; padding-top:3px; }
+  .blocco .tempo span { display:block; color:var(--ink-faint); font-weight:400; font-size:0.72rem; }
+  .blocco h3 { margin:0 0 6px; font-size:1.02rem; }
+  .blocco p { margin:0 0 8px; font-size:0.96rem; }
+  .blocco p:last-child { margin:0; }
+  .dire { border-left:3px solid var(--aula); padding:2px 0 2px 14px; margin:10px 0;
+    font-style:italic; color:var(--ink-soft); }
+
+  .kit-item { border-top:1px solid var(--rule); padding:18px 0 4px; }
+  .kit-item h3 { margin-top:0; display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  .kit-cod { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.7rem;
+    letter-spacing:0.06em; color:var(--aula); border:1px solid var(--aula); padding:2px 7px; white-space:nowrap; }
+
+  .item-esame { border-top:1px solid var(--rule-soft); padding:14px 0; }
+  .item-esame .meta { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.7rem;
+    letter-spacing:0.05em; color:var(--ink-faint); margin-bottom:6px; }
+  .item-esame .stem { margin:0 0 8px; }
+  .item-esame ol { margin:0; padding-left:1.6em; }
+  .item-esame ol li { margin-bottom:3px; }
+  .chiave { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.76rem;
+    color:var(--red); margin-top:8px; }
+
+  .lavagna {
+    border:2px solid var(--ink); background:var(--paper-sunk);
+    padding:20px 22px; margin:20px 0; font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:0.9rem; line-height:1.9;
+  }
+  .lavagna .lv-t { font-weight:600; letter-spacing:0.05em; text-transform:uppercase;
+    font-size:0.72rem; color:var(--ink-faint); margin-bottom:10px; }
+
+  .nota-piede { font-style:italic; color:var(--ink-faint); font-size:0.93rem;
+    line-height:1.6; margin:24px 0 0; }
+  .colophon { margin-top:66px; padding-top:20px; border-top:2px solid var(--red);
+    font-size:0.85rem; color:var(--ink-faint); line-height:1.7; }
+
+  @media print {
+    body { background:#fff; font-size:11.5pt; }
+    .sheet { padding:0; max-width:none; }
+    h2 { break-after:avoid; }
+    .casella,.gradino,.blocco,.kit-item,.item-esame,.riquadro,table { break-inside:avoid; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport<br>
+    Mind Movement Lab — Gragnano (NA)
+    <span class="doc">Accademia · Livello 1 · Operatore ESSĒRE</span>
+  </p>
+  <hr class="short-rule">
+
+  <span class="cod-grande">Modulo A-01</span>
+  <h1 class="titolo">Perché un corpo cambia</h1>
+  <p class="sottotitolo">Esposizione, domanda, adattamento, capacità, progressione —
+    il vocabolario su cui poggia tutto il resto del metodo</p>
+
+  <hr class="ink-rule">
+  <p class="firma">
+    Materiale del formatore — <b>Francesco Busanca</b><br>
+    Fondatore e Direttore Tecnico — Metodo Mind Movement
+  </p>
+
+  <div class="riquadro">
+    <h3>Che cosa sa fare il corsista alla fine di questo modulo</h3>
+    <ul>
+      <li>Distinguere <b>esposizione, domanda, adattamento e capacità</b>, e dire a quale dei quattro
+        appartiene una qualunque scelta scritta su una scheda.</li>
+      <li>Nominare gli <b>undici assi</b> della progressione e riconoscere che il carico è uno di essi,
+        non il loro insieme.</li>
+      <li>Dichiarare per ogni asse la sua <b>fonte</b> — dato, mista, occhio — e sapere che cosa
+        significa quando la fonte è l'occhio.</li>
+      <li>Applicare la <b>gerarchia dello stop</b>: riconoscere le cinque condizioni in cui non si
+        aumenta nulla, prima ancora di chiedersi che cosa aumentare.</li>
+      <li>Scegliere l'asse del passo successivo e <b>giustificarlo con i numeri della seduta</b>,
+        non con una sensazione.</li>
+      <li>Spiegare a un allievo, in due frasi e senza gergo, perché questa settimana non si è
+        aggiunto peso.</li>
+    </ul>
+  </div>
+
+  <p class="nota-piede">Sul codice: il documento operativo che contiene l'elenco ufficiale dei 22
+    moduli non è al momento reperibile in forma digitale. Il codice <b>A-01</b> e il titolo di questo
+    modulo sono quindi una proposta, ricavata da due indizi certi: il modulo C-23 rimanda ad A-02
+    per gli studi sulla frequenza di allenamento — quindi l'area A è quella delle fondamenta
+    scientifiche dell'adattamento — e nulla di ciò che segue nel percorso è comprensibile senza il
+    vocabolario che questo modulo installa. Correggi il codice quando il documento rientra: il
+    contenuto non cambia.</p>
+
+  <!-- ================= LE DUE STRADE ================= -->
+  <h2>Le due strade di questo modulo</h2>
+  <hr class="cap-rule">
+  <p>Ogni modulo dell'Accademia vive su due binari, e confonderli è l'errore che rovina i corsi:
+    quello che <em>tu</em> devi possedere non coincide con quello che <em>eroghi</em>. Il primo è
+    più profondo e ti serve per reggere le domande difficili; il secondo è più stretto e ti serve
+    per far arrivare la cosa giusta in tre ore.</p>
+
+  <div class="strade">
+    <div class="strada uno">
+      <p class="et">Strada 1 · il formatore</p>
+      <h3>Quello che sai tu</h3>
+      <p>La catena completa, le soglie numeriche esatte, il perché di ogni regola e le obiezioni
+        a cui rispondere. È il capitolo che studi, non che proietti.</p>
+      <p><b>≈ 90 minuti di studio</b>, più la rilettura del codice del motore in ESSĒRE.</p>
+    </div>
+    <div class="strada due">
+      <p class="et">Strada 2 · l'aula</p>
+      <h3>Quello che eroghi</h3>
+      <p>Tre ore con lavagna, carte degli assi e due esercitazioni su casi veri. Il corsista esce
+        sapendo <em>decidere</em>, non elencare.</p>
+      <p><b>180 minuti</b>, di cui almeno 50 di esercitazione attiva.</p>
+    </div>
+  </div>
+
+  <!-- ================= STRADA 1 ================= -->
+  <h2>Strada 1 — Quello che sai tu</h2>
+  <hr class="cap-rule">
+
+  <h3>1. Il problema da cui nasce il modulo</h3>
+  <p>«Sovraccarico progressivo» è la frase più ripetuta e meno capita del settore. È diventata uno
+    slogan che significa una cosa sola: <em>metti più peso</em>. Il risultato è un'intera categoria
+    professionale che sa aumentare un numero e non sa fare nient'altro — e che, quando quel numero
+    non può salire, si ferma o insiste, e nei due casi fa danno.</p>
+
+  <p>La correzione che porta il metodo è di vocabolario, e per questo è profonda: <strong>la parola
+    potente non è <em>overload</em>, è <em>progressive demand</em></strong>. Il carico esterno è
+    solo uno dei modi di aumentare la richiesta. Chi possiede il vocabolario intero ha undici modi;
+    chi possiede solo lo slogan ne ha uno, e quando quello si blocca è disarmato.</p>
+
+  <h3>2. La catena in cinque caselle</h3>
+  <p>Sono i cinque livelli del ragionamento, in ordine. Ogni casella ha una domanda propria, e non
+    si passa alla successiva senza aver risposto alla precedente.</p>
+
+  <div class="ciclo">
+    <div class="casella">
+      <div class="c-n">1</div>
+      <div>
+        <h3>Esposizione</h3>
+        <p class="dom">A che cosa, e quanto, sto esponendo il sistema?</p>
+        <p>Il corpo incontra lo stimolo. Non è ancora richiesta: è contatto. Un movimento nuovo,
+          un'ampiezza mai visitata, una posizione mai tenuta. Esporre viene <em>prima</em> di
+          chiedere, ed è la casella che quasi tutti saltano.</p>
+      </div>
+    </div>
+    <div class="casella">
+      <div class="c-n">2</div>
+      <div>
+        <h3>Domanda</h3>
+        <p class="dom">Quanta richiesta meccanica, metabolica e neuromotoria sto creando?</p>
+        <p>Qui si crea la richiesta — e le vie sono tre, non una. È la casella dove vivono otto
+          degli undici assi, ed è la ragione per cui un programma può progredire per mesi senza
+          che il bilanciere cambi mai.</p>
+      </div>
+    </div>
+    <div class="casella">
+      <div class="c-n">3</div>
+      <div>
+        <h3>Adattamento</h3>
+        <p class="dom">Come sta rispondendo il sistema?</p>
+        <p>La risposta biologica, che ha tempi propri e non chiede il permesso al calendario.
+          <strong>L'adattamento avviene nel recupero, non nello stimolo.</strong> Se non è
+          avvenuto, aumentare non costruisce capacità: costruisce fatica.</p>
+      </div>
+    </div>
+    <div class="casella">
+      <div class="c-n">4</div>
+      <div>
+        <h3>Capacità</h3>
+        <p class="dom">Che cosa è capace di fare oggi, che prima non faceva?</p>
+        <p>È il risultato, e si misura. Forza, lavoro sostenibile, carico tollerato, movimento,
+          controllo, recupero. Senza misura non è capacità: è un'opinione sul proprio allievo.</p>
+      </div>
+    </div>
+    <div class="casella finale">
+      <div class="c-n">5</div>
+      <div>
+        <h3>Progressione</h3>
+        <p class="dom">Che cosa aumento adesso — e perché proprio quello?</p>
+        <p>La decisione. Arriva <em>ultima</em>, ed è legittima solo se le quattro caselle
+          precedenti hanno una risposta. La seconda metà della domanda — «perché proprio quello» —
+          è ciò che separa un professionista da chi tira a indovinare con metodo.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>3. Gli undici assi, e la loro fonte</h3>
+  <p>Ogni asse è un modo diverso di aumentare la richiesta. La colonna <em>fonte</em> è la parte
+    che rende il metodo onesto: dice se il dato lo produce il software, se lo produce a metà, o se
+    lo deve dichiarare il coach perché <strong>uno smartphone non lo può vedere</strong>.</p>
+
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Asse</th><th>Che cosa aumenta</th><th>Casella</th><th>Fonte</th></tr></thead>
+      <tbody>
+        <tr><th>Esposizione progressiva</th><td>l'esposizione alla richiesta</td><td>esposizione</td><td><span class="fonte f-occhio">occhio</span></td></tr>
+        <tr><th>Sovraccarico progressivo</th><td>il carico esterno</td><td>domanda</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Volume progressivo</th><td>la quantità di lavoro</td><td>domanda</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Intensità progressiva</th><td>l'intensità relativa</td><td>domanda</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Prossimità al cedimento</th><td>la fatica dentro la serie</td><td>domanda</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Densità progressiva</th><td>il lavoro per unità di tempo</td><td>domanda</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Complessità progressiva</th><td>la complessità del compito motorio</td><td>domanda</td><td><span class="fonte f-mista">mista</span></td></tr>
+        <tr><th>Domanda meccanica progressiva</th><td>la richiesta meccanica reale</td><td>domanda</td><td><span class="fonte f-occhio">occhio</span></td></tr>
+        <tr><th>Richiesta tecnica progressiva</th><td>la qualità con cui il carico è gestito</td><td>domanda</td><td><span class="fonte f-mista">mista</span></td></tr>
+        <tr><th>Adattamento progressivo</th><td>la capacità di tollerare lo stimolo</td><td>adattamento</td><td><span class="fonte f-dati">dati</span></td></tr>
+        <tr><th>Capacità progressiva</th><td>ciò che il soggetto sa fare oggi</td><td>capacità</td><td><span class="fonte f-mista">mista</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>I tre esempi che in aula fanno cadere la moneta, e che devi saper dire a memoria:</p>
+  <ul>
+    <li><strong>Volume</strong> — 3 × 8 × 70 kg fa 1.680 kg; 3 × 10 × 70 kg fa 2.100 kg. Stesso peso,
+      più lavoro.</li>
+    <li><strong>Adattamento</strong> — 50 kg × 10 con enorme fatica; sei settimane dopo, 50 kg × 10
+      facili. <em>Il carico non è cambiato: è cambiata la persona.</em></li>
+    <li><strong>Meccanica</strong> — 20 kg in due esercizi diversi non sono 20 kg di stimolo
+      meccanico. Ed è la ragione per cui su questo asse l'app tace di proposito.</li>
+  </ul>
+
+  <div class="regola">
+    <p><b>Dichiarare la fonte è ciò che rende il metodo difendibile.</b> Tre assi su undici non sono
+      misurabili da un telefono: esposizione e meccanica per intero, complessità e tecnica a metà.
+      Un software che fingesse di misurarli venderebbe meglio e sarebbe una truffa. Il nostro dice
+      «qui serve il tuo occhio» — e per questo l'operatore certificato non è sostituibile dall'app
+      che usa.</p>
+  </div>
+
+  <h3>4. La gerarchia dello stop</h3>
+  <p>Prima di chiedersi <em>che cosa</em> aumentare, si passa da cinque cancelli. Se uno solo è
+    chiuso, la risposta è: non si aumenta niente, e si sa perché. Questa è la parte del modulo che
+    cambia davvero il comportamento in sala — ed è l'ordine esatto in cui ragiona il motore di
+    ESSĒRE.</p>
+
+  <div class="gradino">
+    <div class="g-n">1</div>
+    <div>
+      <h3>Prima esporre, poi aumentare</h3>
+      <p class="cond">meno di 2 sedute confrontabili</p>
+      <p>Con una sola seduta non esiste una tendenza. Un aumento deciso su un punto solo è un tiro
+        a indovinare. Si ripete la seduta con gli stessi numeri.</p>
+      <p><em>Che cosa si osserva poi:</em> come cambia la fatica a parità di numeri. È il primo
+        segnale di adattamento che esista.</p>
+    </div>
+  </div>
+
+  <div class="gradino">
+    <div class="g-n">2</div>
+    <div>
+      <h3>Questa settimana non si aumenta niente</h3>
+      <p class="cond">prontezza sotto 40 / 100</p>
+      <p>Non si aggiunge domanda a un sistema che non sta recuperando. Stessi carichi, stesse
+        ripetizioni, e ogni serie chiusa con almeno 2 ripetizioni in riserva.</p>
+      <p><em>La frase da dire all'allievo:</em> l'adattamento avviene nel recupero, non nello
+        stimolo. Aumentare adesso costruisce fatica, non capacità.</p>
+    </div>
+  </div>
+
+  <div class="gradino">
+    <div class="g-n">3</div>
+    <div>
+      <h3>Sale la qualità, non il carico</h3>
+      <p class="cond">il compenso è peggiorato di almeno 3 punti o gradi</p>
+      <p>Valgo del ginocchio, shift dell'anca, inclinazione del tronco: se il compenso cresce,
+        aggiungere carico aumenta la domanda <em>nel posto sbagliato</em>. Stesso peso, esecuzione
+        più pulita, e una serie in meno se serve a tenere la traiettoria.</p>
+    </div>
+  </div>
+
+  <div class="gradino">
+    <div class="g-n">4</div>
+    <div>
+      <h3>Prima il ROM, poi i chili</h3>
+      <p class="cond">angolo del ginocchio al fondo oltre 100°</p>
+      <p>Il movimento è ancora parziale. <strong>Caricare un ROM parziale allena la parte già
+        facile</strong> — è lavoro che sembra progresso e non lo è. Si scende di peso quanto serve
+        per arrivare in fondo senza compensare.</p>
+    </div>
+  </div>
+
+  <div class="gradino">
+    <div class="g-n">5</div>
+    <div>
+      <h3>Ripeti lo stesso stimolo</h3>
+      <p class="cond">nessun adattamento visibile</p>
+      <p>Il sistema non ha ancora risposto. Identico alla scorsa volta: nessun chilo in più, nessuna
+        serie in più. <em>Ripetere lo stimolo è ciò che lo trasforma in capacità.</em></p>
+      <p><em>Il momento in cui si riprende ad aumentare:</em> le stesse ripetizioni con più riserva
+        a fine serie.</p>
+    </div>
+  </div>
+
+  <h3>5. E quando invece si aumenta: la rotazione degli assi</h3>
+  <p>Superati i cinque cancelli, si sceglie l'asse — e non si sceglie a caso. L'ordine dipende
+    dall'obiettivo, e <strong>non si ripete un asse usato nelle ultime due volte</strong>: è la
+    rotazione che tiene vivo lo stimolo e impedisce la monotonia che spegne l'adattamento.</p>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Obiettivo</th><th>Ordine di preferenza degli assi</th></tr></thead>
+      <tbody>
+        <tr><th>Ipertrofia</th><td>volume → carico → cedimento → densità → complessità</td></tr>
+        <tr><th>Forza</th><td>carico → intensità → volume → cedimento → complessità</td></tr>
+        <tr><th>Ricomposizione</th><td>densità → volume → carico → cedimento → complessità</td></tr>
+        <tr><th>Salute</th><td>esposizione → tecnica → volume → densità → carico</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Guarda la riga «salute»: il carico è <em>ultimo</em>. Non per prudenza generica, ma perché per
+    quell'obiettivo l'esposizione e la qualità producono più capacità del peso — ed è esattamente
+    la persona che entra più spesso dalla nostra porta.</p>
+
+  <h3>6. Le tre obiezioni che riceverai, e le risposte</h3>
+  <p><em>«Ma allora il sovraccarico progressivo non vale più?»</em> — Vale, ed è nella lista. Non è
+    stato tolto: è stato messo al suo posto, che è uno su undici. Chi lo usa come sinonimo di
+    progressione sta usando la parte per il tutto.</p>
+  <p><em>«Se l'app non misura tre assi, a che serve?»</em> — Serve a misurare gli otto che può
+    misurare, con precisione e senza dimenticarsene nessuno, e a dirti in faccia dove finisce la
+    sua competenza. Un attrezzo che dichiara il proprio limite si può usare per decidere; uno che
+    lo nasconde, no.</p>
+  <p><em>«E se l'allievo vuole vedere il peso salire ogni settimana?»</em> — È una domanda
+    legittima e va risposta, non elusa: gli si mostra che cosa <em>è</em> salito. Il volume, la
+    densità, la riserva a fine serie, la pulizia dello schema. La sesta competenza di questo modulo
+    è saperlo dire in due frasi senza gergo, e non è la più facile.</p>
+
+  <!-- ================= STRADA 2 ================= -->
+  <h2 class="aula">Strada 2 — L'aula, minuto per minuto</h2>
+  <hr class="cap-rule">
+  <p>Tre ore. La regola di conduzione è una sola: <strong>nessuna delle cinque caselle si spiega
+    prima che l'aula abbia provato a decidere senza di essa.</strong> Prima l'errore, poi lo
+    strumento. Chi riceve lo strumento per primo non lo usa: lo ricorda male.</p>
+
+  <div class="blocco">
+    <div class="tempo">0 – 15'<span>apertura</span></div>
+    <div>
+      <h3>La domanda scomoda</h3>
+      <p>Si apre senza slide, con un caso reale scritto alla lavagna: allievo che da tre settimane
+        fa 60 kg × 8 allo stesso modo, con la stessa fatica. <em>Che cosa gli scrivete sulla scheda
+        la prossima seduta?</em></p>
+      <p>Si raccolgono le risposte in silenzio, su un foglio, senza discussione. Si mettono da
+        parte: si riprendono al minuto 170. Quasi tutte diranno «aumento il peso».</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">15 – 45'<span>lavagna</span></div>
+    <div>
+      <h3>Le cinque caselle</h3>
+      <p>Si costruisce la catena alla lavagna, una casella alla volta, chiedendo all'aula la
+        domanda di ciascuna <em>prima</em> di scriverla. Non si passa oltre finché una casella non
+        è chiara.</p>
+      <p class="dire">«La progressione è l'ultima casella, non la prima. Chi comincia da lì sta
+        rispondendo a una domanda che non si è ancora fatto.»</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">45 – 75'<span>carte</span></div>
+    <div>
+      <h3>Gli undici assi</h3>
+      <p>Si distribuiscono le undici carte (kit K-2). A gruppi di tre: collocare ogni carta nella
+        casella giusta della catena. Poi il giro di tavolo, e la correzione solo sulle carte
+        collocate male — che saranno, quasi sempre, esposizione, meccanica e adattamento.</p>
+      <p>Si chiude introducendo la <b>fonte</b>: si girano le carte, sul retro c'è. Il momento in
+        cui l'aula scopre che tre assi l'app non li vede è il momento più importante delle tre ore.</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">75 – 90'<span>pausa</span></div>
+    <div><h3>Pausa</h3><p>Quindici minuti veri. La densità di questo modulo è alta e la seconda
+      metà richiede attenzione piena.</p></div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">90 – 120'<span>esercitazione</span></div>
+    <div>
+      <h3>Esercitazione 1 — Scegli l'asse, e giustificalo</h3>
+      <p>Sei casi con i numeri di due sedute reali (kit K-3). Per ciascuno: quale asse, e le due
+        righe di motivazione con i numeri dentro. Si corregge a voce, un caso per gruppo.</p>
+      <p class="dire">Criterio di correzione: <b>una risposta senza numeri è sbagliata anche se
+        l'asse è giusto.</b> È la regola che va detta esplicitamente, prima di iniziare.</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">120 – 150'<span>lavagna</span></div>
+    <div>
+      <h3>La gerarchia dello stop</h3>
+      <p>I cinque cancelli, in ordine, con le soglie numeriche. Si insiste sul fatto che l'ordine
+        conta: la prontezza si controlla <em>prima</em> della qualità, la qualità <em>prima</em>
+        del ROM.</p>
+      <p class="dire">«Il vostro mestiere non è far salire un numero. È sapere, ogni settimana,
+        se quel numero si può far salire.»</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">150 – 170'<span>esercitazione</span></div>
+    <div>
+      <h3>Esercitazione 2 — I casi che dicono no</h3>
+      <p>Tre casi (kit K-4) in cui la risposta corretta è <em>non aumentare</em>. Consegna: dire
+        quale cancello si è chiuso, e scrivere le due frasi da dire all'allievo — senza gergo,
+        senza scusarsi.</p>
+      <p>È l'esercitazione che il corsista ricorderà a sei mesi, perché contraddice tutto quello
+        che ha imparato altrove.</p>
+    </div>
+  </div>
+
+  <div class="blocco">
+    <div class="tempo">170 – 180'<span>chiusura</span></div>
+    <div>
+      <h3>Il foglio del minuto zero</h3>
+      <p>Si riprendono le risposte raccolte all'apertura e si rileggono ad alta voce, senza
+        ironia. L'aula misura da sé la distanza percorsa.</p>
+      <p><b>Compito per il modulo successivo:</b> tre schede di allievi propri, con l'asse dell'ultimo
+        passo dichiarato e i numeri che lo giustificano. Chi non ha allievi usa i casi del kit K-3.</p>
+    </div>
+  </div>
+
+  <!-- ================= IL KIT ================= -->
+  <h2 class="aula">Il kit — tutto quello che ti serve per insegnarlo</h2>
+  <hr class="cap-rule">
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-1</span> La lavagna, nell'ordine in cui si scrive</h3>
+    <div class="lavagna">
+      <p class="lv-t">Non proiettare — costruire davanti a loro</p>
+      1. ESPOSIZIONE &nbsp;→&nbsp; <i>a che cosa lo espongo?</i><br>
+      2. DOMANDA &nbsp;→&nbsp; <i>quanta richiesta creo?</i> &nbsp;· meccanica · metabolica · neuromotoria<br>
+      3. ADATTAMENTO &nbsp;→&nbsp; <i>come risponde?</i> &nbsp;· <b>avviene nel recupero</b><br>
+      4. CAPACITÀ &nbsp;→&nbsp; <i>che cosa sa fare oggi che prima non faceva?</i><br>
+      5. PROGRESSIONE &nbsp;→&nbsp; <i>che cosa aumento — <b>e perché proprio quello</b></i>
+      <br><br>
+      ┈┈┈ poi, a lato, in rosso ┈┈┈<br>
+      <b>OVERLOAD ≠ PROGRESSIONE</b> &nbsp;— è 1 di 11
+    </div>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-2</span> Le undici carte degli assi</h3>
+    <p>Undici cartoncini. <b>Fronte:</b> nome dell'asse e che cosa aumenta. <b>Retro:</b> la casella
+      della catena, la fonte, e l'esempio numerico. Si stampano dalla tabella della Strada 1: i testi
+      sono già quelli definitivi, e sono gli stessi che ESSĒRE mostra nella schermata Progressione —
+      il corsista ritrova in app le stesse parole dell'aula, ed è metà del lavoro di ancoraggio.</p>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-3</span> I sei casi dell'esercitazione 1</h3>
+    <p>Ogni caso: due sedute con serie, ripetizioni, carico, RPE dove c'è, durata, obiettivo
+      dichiarato, e prontezza. Da costruire sui dati veri della tua sala — anonimizzati.
+      La copertura minima è questa, un caso per riga:</p>
+    <div class="tab-wrap">
+      <table>
+        <thead><tr><th class="num">#</th><th>Che cosa deve emergere</th><th>Asse atteso</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Adattamento chiaro, obiettivo ipertrofia, nessun asse recente</td><td>volume</td></tr>
+          <tr><td class="num">2</td><td>Adattamento chiaro, ma volume e carico usati nelle ultime due volte</td><td>cedimento (rotazione)</td></tr>
+          <tr><td class="num">3</td><td>Obiettivo forza, massimale stimato in salita</td><td>carico o intensità</td></tr>
+          <tr><td class="num">4</td><td>Obiettivo salute, movimento ancora incerto</td><td>esposizione</td></tr>
+          <tr><td class="num">5</td><td>Nessun RPE registrato in tutta la storia</td><td>cieco sul cedimento: si sceglie altro, e lo si dice</td></tr>
+          <tr><td class="num">6</td><td>Stesso lavoro in meno tempo, seduta cronometrata</td><td>densità</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-4</span> I tre casi che dicono no</h3>
+    <ul>
+      <li><b>Prontezza 31/100</b> dopo due notti da quattro ore — cancello 2. La difficoltà
+        dell'esercitazione non è capirlo: è dirlo a un allievo che si è presentato apposta.</li>
+      <li><b>Valgo passato dal 9% al 13%</b> a parità di carico — cancello 3. Quattro punti: sopra
+        la soglia dei 3.</li>
+      <li><b>Angolo al fondo 112°</b>, in miglioramento ma ancora parziale — cancello 4. Il caso
+        cattivo: sta migliorando, e la tentazione di premiare col peso è forte.</li>
+    </ul>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-5</span> I cinque errori tipici del corsista, e come si correggono</h3>
+    <ol>
+      <li><b>Salta l'esposizione.</b> Va dritto alla domanda perché l'esposizione «non è
+        allenamento». <em>Correzione:</em> chiedigli come fa a chiedere a un corpo una cosa che non
+        ha mai incontrato.</li>
+      <li><b>Confonde volume e carico.</b> <em>Correzione:</em> i numeri, sempre — 1.680 contro
+        2.100 kg a parità di peso. Un conto chiude la discussione, una spiegazione no.</li>
+      <li><b>Sceglie l'asse e non lo giustifica.</b> È l'errore più frequente e il più grave, perché
+        somiglia a una risposta giusta. <em>Correzione:</em> risposta non valida senza numeri, detto
+        prima dell'esercitazione e applicato senza eccezioni.</li>
+      <li><b>Tratta la fonte «occhio» come un difetto dell'app.</b> <em>Correzione:</em> è il
+        contrario — è la parte del lavoro che lo rende non sostituibile.</li>
+      <li><b>Usa i cancelli come alibi.</b> Scopre che si può non aumentare, e non aumenta più
+        niente. <em>Correzione:</em> i cancelli hanno soglie numeriche; se nessuna è superata, si
+        aumenta, e non aumentare diventa a sua volta un errore da giustificare.</li>
+    </ol>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-6</span> Gli otto item d'esame di questo modulo</h3>
+    <p>Coprono le celle del blueprint per l'area «lettura e progressione»: due di ricordare, tre di
+      applicare, tre di decidere. Sono scritti secondo le regole del capitolo 3 della Docimologia —
+      distrattori plausibili, lunghezze pari, nessun «tutte le precedenti», nessuna negazione.</p>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 01 · ricordare</p>
+      <p class="stem">Nella catena del metodo, la casella che precede immediatamente la progressione è:</p>
+      <ol type="a"><li>la capacità</li><li>l'esposizione</li><li>la domanda</li><li>l'adattamento</li></ol>
+      <p class="chiave">Chiave: a</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 02 · ricordare</p>
+      <p class="stem">Gli assi la cui lettura l'applicazione non produce, e che vanno dichiarati dal coach, sono:</p>
+      <ol type="a"><li>volume e densità</li><li>esposizione e domanda meccanica</li><li>carico e intensità</li><li>adattamento e capacità</li></ol>
+      <p class="chiave">Chiave: b</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 03 · applicare</p>
+      <p class="stem">Un allievo esegue 3 × 8 × 70 kg. La settimana dopo esegue 3 × 10 × 70 kg. L'asse aumentato è:</p>
+      <ol type="a"><li>il sovraccarico progressivo</li><li>l'intensità progressiva</li><li>il volume progressivo</li><li>la densità progressiva</li></ol>
+      <p class="chiave">Chiave: c</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 04 · applicare</p>
+      <p class="stem">Sei settimane fa 50 kg × 10 richiedevano il massimo sforzo; oggi le stesse 50 kg × 10 si chiudono con due ripetizioni in riserva. Questo dato descrive:</p>
+      <ol type="a"><li>un aumento del carico esterno</li><li>un adattamento avvenuto</li><li>un aumento della densità</li><li>un errore di registrazione</li></ol>
+      <p class="chiave">Chiave: b</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 05 · applicare</p>
+      <p class="stem">La prontezza dell'allievo è 34 su 100. La condotta prevista dal metodo è:</p>
+      <ol type="a"><li>ridurre il carico del venti per cento e aggiungere una serie</li><li>mantenere carichi e ripetizioni, chiudendo con almeno due ripetizioni in riserva</li><li>sospendere la seduta e rinviare l'allievo</li><li>aumentare la densità mantenendo il volume</li></ol>
+      <p class="chiave">Chiave: b</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 06 · decidere</p>
+      <p class="stem">L'analisi dello squat mostra il valgo del ginocchio passato dal 9% al 13% a parità di carico. L'allievo ha buona prontezza e chiede di salire di peso. Che cosa scrivi sulla scheda?</p>
+      <ol type="a"><li>Stesso peso e stesse ripetizioni, esecuzione più pulita, una serie in meno se serve</li><li>Peso aumentato di 2,5 kg, con controllo più attento della traiettoria</li><li>Peso ridotto della metà per due settimane, poi ripresa graduale</li><li>Stesso peso, ripetizioni aumentate per compensare il mancato aumento</li></ol>
+      <p class="chiave">Chiave: a</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 07 · decidere</p>
+      <p class="stem">Un allievo è alla sua prima seduta registrata su un esercizio nuovo, con prontezza alta e nessun compenso. Il passo successivo corretto è:</p>
+      <ol type="a"><li>Aumentare il carico, perché nulla lo impedisce</li><li>Ripetere la seduta con gli stessi numeri</li><li>Aumentare il volume, che è l'asse più sicuro</li><li>Cambiare esercizio per aumentare la complessità</li></ol>
+      <p class="chiave">Chiave: b</p>
+    </div>
+
+    <div class="item-esame">
+      <p class="meta">A-01 · 08 · decidere</p>
+      <p class="stem">L'allievo ha adattato bene, obiettivo ipertrofia, e nelle ultime due progressioni sono stati usati il volume e il carico. Su quale asse si interviene, e con quale motivazione?</p>
+      <ol type="a"><li>Ancora sul volume, perché è l'asse preferenziale per l'ipertrofia</li><li>Sulla prossimità al cedimento, ruotando l'asse per non ripetere gli ultimi due</li><li>Sulla domanda meccanica, che l'applicazione non misura</li><li>Sulla capacità, che è la casella finale della catena</li></ol>
+      <p class="chiave">Chiave: b</p>
+    </div>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-7</span> Il foglio dell'allievo, una pagina</h3>
+    <p>Da consegnare a fine modulo, e da riusare in sala. Contiene solo tre cose, e nessun'altra:
+      le cinque caselle con la loro domanda; i cinque cancelli con la soglia numerica; e lo spazio
+      per scrivere, ogni settimana, <em>quale asse ho aumentato e perché</em>. Se occupa più di una
+      pagina, è stato scritto male.</p>
+  </div>
+
+  <div class="kit-item">
+    <h3><span class="kit-cod">K-8</span> Materiali e sala</h3>
+    <ul>
+      <li>Lavagna a fogli mobili, non proiettore. Le cinque caselle vanno <em>costruite</em>.</li>
+      <li>Undici carte per gruppo (K-2), stampate fronte-retro su cartoncino.</li>
+      <li>Fotocopie dei casi K-3 e K-4, una per corsista.</li>
+      <li>Un dispositivo con ESSĒRE aperto sulla schermata Progressione, per l'ultima mezz'ora.</li>
+      <li>Aula con tavoli mobili: si lavora a gruppi di tre per metà del tempo.</li>
+    </ul>
+  </div>
+
+  <div class="colophon">
+    <p><b>Dipendenze.</b> Questo modulo non ne ha: è il primo. Da esso dipendono la costruzione della
+      scheda, la lettura del referto e i moduli C-23/C-24 sull'ipertrofia, che usano lo stesso
+      vocabolario per correggere il modello dei tre meccanismi.</p>
+    <p><b>Coerenza con lo strumento.</b> Le cinque caselle, gli undici assi, le fonti, le soglie
+      numeriche e l'ordine dei cancelli sono gli stessi implementati in
+      <code>src/domain/progressione.ts</code>. Se un giorno divergono, è il documento che ha
+      ragione e il codice va corretto — mai il contrario.</p>
+    <p>A.S.D. Evolution Sport — Mind Movement Lab, Gragnano (NA). Materiale del formatore:
+      la Strada 1 e il kit non si consegnano ai corsisti; il foglio K-7 sì.</p>
+  </div>
+
+</div>

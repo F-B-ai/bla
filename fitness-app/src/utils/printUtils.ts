@@ -1,0 +1,710 @@
+import { Platform } from 'react-native';
+import { brand } from '../config/brand';
+
+const LOGO_CHAR = brand.appName;
+
+const BASE_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 24px; font-size: 13px; line-height: 1.5; }
+  .header { text-align: center; margin-bottom: 24px; border-bottom: 2px solid #D40000; padding-bottom: 16px; }
+  .header h1 { font-size: 22px; color: #D40000; letter-spacing: 2px; margin-bottom: 4px; }
+  .header .subtitle { font-size: 14px; color: #666; }
+  .header .period { font-size: 12px; color: #999; margin-top: 4px; }
+  h2 { font-size: 16px; color: #D40000; margin: 20px 0 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  h3 { font-size: 14px; color: #333; margin: 14px 0 8px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+  th { background: #f5f5f5; text-align: left; padding: 8px 10px; border: 1px solid #ddd; font-weight: 700; }
+  td { padding: 6px 10px; border: 1px solid #ddd; }
+  tr:nth-child(even) { background: #fafafa; }
+  .summary-row { background: #f0f0f0 !important; font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge-success { background: #d4edda; color: #155724; }
+  .badge-warning { background: #fff3cd; color: #856404; }
+  .badge-danger { background: #f8d7da; color: #721c24; }
+  .badge-info { background: #cce5ff; color: #004085; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat-card { background: #f8f8f8; border: 1px solid #eee; border-radius: 8px; padding: 12px; text-align: center; }
+  .stat-value { font-size: 20px; font-weight: 700; color: #1a1a1a; }
+  .stat-label { font-size: 11px; color: #888; margin-top: 4px; }
+  .progress-bar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin: 4px 0 8px; }
+  .progress-fill { height: 100%; border-radius: 4px; }
+  .text-success { color: #28a745; }
+  .text-danger { color: #dc3545; }
+  .text-right { text-align: right; }
+  .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 12px; }
+  .exercise-card { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .exercise-num { display: inline-block; width: 24px; height: 24px; background: #D40000; color: #fff; text-align: center; line-height: 24px; border-radius: 50%; font-size: 12px; font-weight: 700; margin-right: 8px; }
+  .exercise-name { font-weight: 700; font-size: 13px; }
+  .exercise-details { font-size: 12px; color: #666; margin-top: 4px; }
+  .day-section { margin-bottom: 16px; page-break-inside: avoid; }
+  .day-title { font-size: 14px; font-weight: 700; background: #f0f0f0; padding: 6px 10px; border-radius: 4px; margin-bottom: 8px; }
+  @media print { body { padding: 12px; } .no-print { display: none; } }
+`;
+
+function openPrintWindow(title: string, bodyHtml: string, subtitle?: string, period?: string) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  const periodHtml = period ? `<div class="period">${period}</div>` : '';
+  const subtitleHtml = subtitle ? `<div class="subtitle">${subtitle}</div>` : '';
+  const content = `
+    <div class="header"><h1>${LOGO_CHAR}</h1>${subtitleHtml}${periodHtml}</div>
+    ${bodyHtml}
+    <div class="footer">Generato da ${LOGO_CHAR} il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>`;
+  showPrintOverlay(content, BASE_CSS);
+}
+
+function showPrintOverlay(content: string, css: string) {
+  try {
+    const doc = window.document;
+    const root = doc.getElementById('root');
+    if (root) root.style.display = 'none';
+
+    const existing = doc.getElementById('print-overlay');
+    if (existing) existing.remove();
+    const existingStyle = doc.getElementById('print-overlay-style');
+    if (existingStyle) existingStyle.remove();
+
+    const style = doc.createElement('style');
+    style.id = 'print-overlay-style';
+    style.textContent = css + `
+      #print-overlay-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; padding-top: max(14px, env(safe-area-inset-top, 14px)); background: #0D0D0D; position: sticky; top: 0; z-index: 10; }
+      #print-overlay-toolbar button { border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+      @media print { #print-overlay-toolbar { display: none !important; } }
+    `;
+    doc.head.appendChild(style);
+
+    const overlay = doc.createElement('div');
+    overlay.id = 'print-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;';
+
+    const toolbar = doc.createElement('div');
+    toolbar.id = 'print-overlay-toolbar';
+
+    const printBtn = doc.createElement('button');
+    printBtn.textContent = 'Condividi / Stampa';
+    printBtn.style.cssText = 'background:#D40000;color:#fff;';
+    printBtn.addEventListener('click', async () => {
+      const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body style="padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#1a1a1a;font-size:13px;line-height:1.5;">${content}</body></html>`;
+      try {
+        if (navigator.share) {
+          const blob = new Blob([fullHtml], { type: 'text/html' });
+          const file = new File([blob], 'ricevuta-essere.html', { type: 'text/html' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Ricevuta ' + brand.appName });
+            return;
+          }
+          await navigator.share({ title: 'Ricevuta ' + brand.appName, text: body.innerText });
+          return;
+        }
+        window.print();
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          window.print();
+        }
+      }
+    });
+
+    const closeBtn = doc.createElement('button');
+    closeBtn.textContent = 'Chiudi';
+    closeBtn.style.cssText = 'background:#333;color:#fff;';
+    closeBtn.addEventListener('click', () => {
+      overlay.remove();
+      style.remove();
+      if (root) root.style.display = '';
+    });
+
+    toolbar.appendChild(printBtn);
+    toolbar.appendChild(closeBtn);
+
+    const body = doc.createElement('div');
+    body.style.cssText = 'padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#1a1a1a;font-size:13px;line-height:1.5;';
+    body.innerHTML = content;
+
+    overlay.appendChild(toolbar);
+    overlay.appendChild(body);
+    doc.body.appendChild(overlay);
+  } catch (e) {
+    (window as any).alert('Errore apertura stampa: ' + String(e));
+  }
+}
+
+const fmtDate = (d: unknown): string => {
+  if (!d) return '-';
+  let date: Date;
+  if (d instanceof Date) date = d;
+  else if (d && typeof d === 'object' && 'toDate' in d) date = (d as any).toDate();
+  else if (d && typeof d === 'object' && 'seconds' in d) date = new Date((d as any).seconds * 1000);
+  else date = new Date(d as string);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('it-IT');
+};
+
+const fmtCurrency = (n: number) => `€${n.toFixed(2)}`;
+
+const statusBadge = (status: string) => {
+  const map: Record<string, [string, string]> = {
+    paid: ['badge-success', 'Pagato'],
+    pending: ['badge-warning', 'In attesa'],
+    overdue: ['badge-danger', 'Scaduta'],
+    completed: ['badge-success', 'Completata'],
+    cancelled_late: ['badge-danger', 'Cancellazione tardiva'],
+    cancelled_by_student: ['badge-warning', 'Cancellata'],
+    scheduled: ['badge-info', 'Programmata'],
+    no_show: ['badge-danger', 'No-show'],
+  };
+  const [cls, label] = map[status] || ['badge-info', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+};
+
+// ─── 0. Student progress report ────────────────────────────────────────
+
+export const printStudentProgressReport = (data: {
+  student: { name: string; surname: string; startDate: any; goals: string; phone: string };
+  sessions: { date: any; startTime: string; status: string; notes?: string }[];
+  measurements: { date: any; weight?: number; bodyFat?: number; muscleMass?: number; notes?: string }[];
+  workoutPlan: { title: string; startDate: any; endDate?: any } | null;
+  paymentPlans: { totalAmount: number; paidAmount: number; startDate: any; endDate: any }[];
+}) => {
+  const { student, sessions, measurements, workoutPlan, paymentPlans } = data;
+  const studentFullName = `${student.name} ${student.surname}`;
+
+  let html = '';
+
+  // Section 1: Student Info
+  html += `<h2>Informazioni Allievo</h2>`;
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${studentFullName}</div><div class="stat-label">Nome</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(student.startDate)}</div><div class="stat-label">Data inizio</div></div>
+    <div class="stat-card"><div class="stat-value">${student.phone || '-'}</div><div class="stat-label">Telefono</div></div>
+  </div>`;
+  if (student.goals) {
+    html += `<p style="margin:8px 0;color:#555;"><strong>Obiettivi:</strong> ${student.goals}</p>`;
+  }
+
+  // Section 2: Current Workout Plan
+  html += `<h2>Programma Attuale</h2>`;
+  if (workoutPlan) {
+    html += `<div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${workoutPlan.title}</div><div class="stat-label">Titolo programma</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtDate(workoutPlan.startDate)}</div><div class="stat-label">Inizio</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtDate(workoutPlan.endDate)}</div><div class="stat-label">Fine</div></div>
+    </div>`;
+  } else {
+    html += `<p style="color:#999;">Nessun programma attivo al momento.</p>`;
+  }
+
+  // Section 3: Session Summary
+  html += `<h2>Riepilogo Sessioni</h2>`;
+  const totalSessions = sessions.length;
+  const completedSessions = sessions.filter(s => s.status === 'completed').length;
+  const cancelledSessions = sessions.filter(s => s.status.startsWith('cancelled')).length;
+  const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${totalSessions}</div><div class="stat-label">Sessioni totali</div></div>
+    <div class="stat-card"><div class="stat-value">${completedSessions}</div><div class="stat-label">Completate</div></div>
+    <div class="stat-card"><div class="stat-value">${cancelledSessions}</div><div class="stat-label">Cancellate</div></div>
+    <div class="stat-card"><div class="stat-value">${completionRate}%</div><div class="stat-label">Tasso completamento</div></div>
+  </div>`;
+
+  if (sessions.length > 0) {
+    html += `<table><tr><th>Data</th><th>Orario</th><th>Stato</th><th>Note</th></tr>`;
+    for (const s of sessions) {
+      html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || '-'}</td><td>${statusBadge(s.status)}</td><td>${s.notes || ''}</td></tr>`;
+    }
+    html += `</table>`;
+  } else {
+    html += `<p style="color:#999;">Nessuna sessione registrata.</p>`;
+  }
+
+  // Section 4: Body Measurements
+  if (measurements.length > 0) {
+    html += `<h2>Misure Corporee</h2>`;
+    html += `<table><tr><th>Data</th><th>Peso (kg)</th><th>Massa grassa (%)</th><th>Massa muscolare (kg)</th><th>Note</th></tr>`;
+    for (let i = 0; i < measurements.length; i++) {
+      const m = measurements[i];
+      const prev = i < measurements.length - 1 ? measurements[i + 1] : null;
+
+      const weightTrend = prev && m.weight != null && prev.weight != null
+        ? (m.weight > prev.weight ? ' ↑' : m.weight < prev.weight ? ' ↓' : ' →') : '';
+      const fatTrend = prev && m.bodyFat != null && prev.bodyFat != null
+        ? (m.bodyFat > prev.bodyFat ? ' ↑' : m.bodyFat < prev.bodyFat ? ' ↓' : ' →') : '';
+      const muscleTrend = prev && m.muscleMass != null && prev.muscleMass != null
+        ? (m.muscleMass > prev.muscleMass ? ' ↑' : m.muscleMass < prev.muscleMass ? ' ↓' : ' →') : '';
+
+      html += `<tr>
+        <td>${fmtDate(m.date)}</td>
+        <td>${m.weight != null ? m.weight + weightTrend : '-'}</td>
+        <td>${m.bodyFat != null ? m.bodyFat + '%' + fatTrend : '-'}</td>
+        <td>${m.muscleMass != null ? m.muscleMass + muscleTrend : '-'}</td>
+        <td>${m.notes || ''}</td>
+      </tr>`;
+    }
+    html += `</table>`;
+  }
+
+  // Section 5: Payment Status
+  if (paymentPlans.length > 0) {
+    html += `<h2>Situazione Pagamenti</h2>`;
+    for (const plan of paymentPlans) {
+      const remaining = plan.totalAmount - plan.paidAmount;
+      const pct = plan.totalAmount > 0 ? Math.min(Math.round((plan.paidAmount / plan.totalAmount) * 100), 100) : 0;
+      const barColor = pct >= 100 ? '#28a745' : pct >= 50 ? '#007bff' : '#ffc107';
+
+      html += `<div style="margin-bottom:16px;padding:12px;background:#f8f8f8;border:1px solid #eee;border-radius:8px;">
+        <p style="margin-bottom:4px;"><strong>Periodo:</strong> ${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}</p>
+        <p style="margin-bottom:4px;"><strong>Totale:</strong> ${fmtCurrency(plan.totalAmount)} | <strong>Pagato:</strong> ${fmtCurrency(plan.paidAmount)} | <strong>Rimanente:</strong> ${fmtCurrency(remaining)}</p>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        <p style="font-size:11px;color:#888;text-align:center;">${pct}% completato</p>
+      </div>`;
+    }
+  }
+
+  openPrintWindow(
+    'Report Progressi',
+    html,
+    `Report Progressi – ${studentFullName}`,
+    `Generato il ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`
+  );
+};
+
+// ─── 1. Student payment plan detail ────────────────────────────────────
+
+interface PrintPlanDetailParams {
+  studentName: string;
+  plan: any;
+  sessions: any[];
+  transactions: any[];
+}
+
+export function printPlanDetail({ studentName, plan, sessions, transactions }: PrintPlanDetailParams) {
+  const usedL = plan.usedLessons ?? 0;
+  const inclL = plan.includedLessons ?? 0;
+  const usedC = plan.usedConsultations ?? 0;
+  const inclC = plan.includedConsultations ?? 0;
+  const pctL = inclL > 0 ? Math.min((usedL / inclL) * 100, 100) : 0;
+  const pctC = inclC > 0 ? Math.min((usedC / inclC) * 100, 100) : 0;
+
+  let html = `<h2>Percorso di ${studentName}</h2>`;
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${fmtCurrency(plan.totalAmount)}</div><div class="stat-label">Importo totale</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(plan.startDate)}</div><div class="stat-label">Inizio</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(plan.endDate)}</div><div class="stat-label">Fine</div></div>
+  </div>`;
+
+  if (inclL > 0) {
+    html += `<h3>Lezioni: ${usedL} / ${inclL}</h3>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pctL}%;background:#007bff"></div></div>`;
+  }
+  if (inclC > 0) {
+    html += `<h3>Consulenze: ${usedC} / ${inclC}</h3>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pctC}%;background:#ffc107"></div></div>`;
+  }
+
+  // Sessions
+  html += `<h2>Lezioni completate (${sessions.length})</h2>`;
+  if (sessions.length > 0) {
+    html += `<table><tr><th>Data</th><th>Orario</th><th>Stato</th><th>Costo</th><th>Note</th></tr>`;
+    for (const s of sessions) {
+      html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || ''} - ${s.endTime || ''}</td><td>${statusBadge(s.status)}</td><td>${s.sessionCost ? fmtCurrency(s.sessionCost) : '-'}</td><td>${s.notes || ''}</td></tr>`;
+    }
+    html += `</table>`;
+  } else {
+    html += `<p>Nessuna lezione completata nel periodo.</p>`;
+  }
+
+  // Installments
+  html += `<h2>Rate (${plan.installments?.length || 0})</h2>`;
+  if (plan.installments?.length > 0) {
+    html += `<table><tr><th>N°</th><th>Importo</th><th>Scadenza</th><th>Stato</th><th>Data pagamento</th></tr>`;
+    plan.installments.forEach((inst: any, i: number) => {
+      html += `<tr><td>${i + 1}</td><td>${fmtCurrency(inst.amount)}</td><td>${fmtDate(inst.dueDate)}</td><td>${statusBadge(inst.status)}</td><td>${inst.paidDate ? fmtDate(inst.paidDate) : '-'}</td></tr>`;
+    });
+    html += `</table>`;
+  }
+
+  // Transactions
+  html += `<h2>Movimenti economici (${transactions.length})</h2>`;
+  if (transactions.length > 0) {
+    html += `<table><tr><th>Data</th><th>Tipo</th><th>Importo</th><th>Descrizione</th></tr>`;
+    let total = 0;
+    for (const t of transactions) {
+      const sign = t.type === 'income' ? '+' : '-';
+      total += t.type === 'income' ? t.amount : -t.amount;
+      html += `<tr><td>${fmtDate(t.date)}</td><td>${t.type === 'income' ? 'Ricavo' : 'Spesa'}</td><td class="${t.type === 'income' ? 'text-success' : 'text-danger'}">${sign}${fmtCurrency(t.amount)}</td><td>${t.description || t.category || ''}</td></tr>`;
+    }
+    html += `<tr class="summary-row"><td colspan="2">Totale netto</td><td class="${total >= 0 ? 'text-success' : 'text-danger'}" colspan="2">${total >= 0 ? '+' : ''}${fmtCurrency(total)}</td></tr></table>`;
+  } else {
+    html += `<p>Nessun movimento registrato nel periodo.</p>`;
+  }
+
+  openPrintWindow(`Percorso ${studentName}`, html, `Percorso di ${studentName}`, `${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}`);
+}
+
+// ─── 2. Financial report for accountant ────────────────────────────────
+
+interface PrintFinancialReportParams {
+  transactions: any[];
+  startDate: string;
+  endDate: string;
+  totalIncome: number;
+  totalExpenses: number;
+}
+
+export function printFinancialReport({ transactions, startDate, endDate, totalIncome, totalExpenses }: PrintFinancialReportParams) {
+  const profit = totalIncome - totalExpenses;
+  let html = `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value text-success">${fmtCurrency(totalIncome)}</div><div class="stat-label">Ricavi totali</div></div>
+    <div class="stat-card"><div class="stat-value text-danger">${fmtCurrency(totalExpenses)}</div><div class="stat-label">Spese totali</div></div>
+    <div class="stat-card"><div class="stat-value ${profit >= 0 ? 'text-success' : 'text-danger'}">${fmtCurrency(profit)}</div><div class="stat-label">Profitto netto</div></div>
+  </div>`;
+
+  // Group by category
+  const byCategory: Record<string, { income: number; expense: number }> = {};
+  for (const t of transactions) {
+    const cat = t.category || 'other';
+    if (!byCategory[cat]) byCategory[cat] = { income: 0, expense: 0 };
+    if (t.type === 'income') byCategory[cat].income += t.amount;
+    else byCategory[cat].expense += t.amount;
+  }
+
+  const catLabels: Record<string, string> = {
+    student_payment: 'Pagamento allievi', collaborator_payment: 'Pagamento collaboratori',
+    rent: 'Affitto', equipment: 'Attrezzatura', marketing: 'Marketing',
+    insurance: 'Assicurazione', utilities: 'Utenze', other: 'Altro',
+  };
+
+  html += `<h2>Riepilogo per categoria</h2>
+  <table><tr><th>Categoria</th><th>Ricavi</th><th>Spese</th><th>Netto</th></tr>`;
+  for (const [cat, val] of Object.entries(byCategory)) {
+    const net = val.income - val.expense;
+    html += `<tr><td>${catLabels[cat] || cat}</td><td class="text-success">${fmtCurrency(val.income)}</td><td class="text-danger">${fmtCurrency(val.expense)}</td><td class="${net >= 0 ? 'text-success' : 'text-danger'}">${fmtCurrency(net)}</td></tr>`;
+  }
+  html += `<tr class="summary-row"><td>TOTALE</td><td class="text-success">${fmtCurrency(totalIncome)}</td><td class="text-danger">${fmtCurrency(totalExpenses)}</td><td class="${profit >= 0 ? 'text-success' : 'text-danger'}">${fmtCurrency(profit)}</td></tr></table>`;
+
+  // All transactions detail
+  html += `<h2>Dettaglio transazioni (${transactions.length})</h2>`;
+  if (transactions.length > 0) {
+    html += `<table><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrizione</th><th class="text-right">Importo</th></tr>`;
+    for (const t of transactions) {
+      const sign = t.type === 'income' ? '+' : '-';
+      html += `<tr><td>${fmtDate(t.date)}</td><td>${t.type === 'income' ? 'Ricavo' : 'Spesa'}</td><td>${catLabels[t.category] || t.category || ''}</td><td>${t.description || ''}</td><td class="text-right ${t.type === 'income' ? 'text-success' : 'text-danger'}">${sign}${fmtCurrency(t.amount)}</td></tr>`;
+    }
+    html += `</table>`;
+  }
+
+  openPrintWindow('Report Economico', html, 'Report Economico', `${startDate} – ${endDate}`);
+}
+
+// ─── 3. Staff sessions + economics ─────────────────────────────────────
+
+interface StaffMember {
+  id: string;
+  name: string;
+  surname: string;
+  role: string;
+  commissionPercentage?: number;
+  collaboratorType?: string;
+}
+
+interface PrintStaffReportParams {
+  staff: StaffMember[];
+  sessions: any[];
+  transactions: any[];
+  startDate: string;
+  endDate: string;
+  students: any[];
+}
+
+export function printStaffReport({ staff, sessions, transactions, startDate, endDate, students }: PrintStaffReportParams) {
+  const studentMap: Record<string, string> = {};
+  for (const s of students) studentMap[s.id] = `${s.name} ${s.surname}`;
+
+  let html = '';
+
+  for (const member of staff) {
+    const fullName = `${member.name} ${member.surname}`;
+    const roleLabel = member.role === 'manager' ? 'Manager' : member.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    const memberSessions = sessions.filter((s: any) => s.collaboratorId === member.id);
+    const completedSessions = memberSessions.filter((s: any) => s.isCountedAsCompleted || s.status === 'completed');
+    const memberTx = transactions.filter((t: any) => t.collaboratorId === member.id);
+    const commission = member.commissionPercentage ?? 0;
+
+    html += `<h2>${fullName} <span class="badge badge-info">${roleLabel}</span></h2>`;
+    html += `<div class="stat-grid">
+      <div class="stat-card"><div class="stat-value">${completedSessions.length}</div><div class="stat-label">Lezioni completate</div></div>
+      <div class="stat-card"><div class="stat-value">${commission}%</div><div class="stat-label">Commissione</div></div>`;
+
+    let totalSessionCost = 0;
+    for (const s of completedSessions) totalSessionCost += s.sessionCost || 0;
+    const staffEarnings = totalSessionCost * (commission / 100);
+    const studioEarnings = totalSessionCost - staffEarnings;
+
+    html += `<div class="stat-card"><div class="stat-value">${fmtCurrency(staffEarnings)}</div><div class="stat-label">Guadagno ${roleLabel}</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtCurrency(studioEarnings)}</div><div class="stat-label">Versato allo studio</div></div>
+    </div>`;
+
+    if (completedSessions.length > 0) {
+      html += `<h3>Lezioni</h3><table><tr><th>Data</th><th>Orario</th><th>Allievo</th><th>Stato</th><th>Costo</th><th>Guadagno</th><th>Studio</th></tr>`;
+      for (const s of completedSessions) {
+        const cost = s.sessionCost || 0;
+        const earn = cost * (commission / 100);
+        const studio = cost - earn;
+        html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || ''} - ${s.endTime || ''}</td><td>${studentMap[s.studentId] || s.studentId}</td><td>${statusBadge(s.status)}</td><td>${fmtCurrency(cost)}</td><td>${fmtCurrency(earn)}</td><td>${fmtCurrency(studio)}</td></tr>`;
+      }
+      html += `<tr class="summary-row"><td colspan="4">TOTALE</td><td>${fmtCurrency(totalSessionCost)}</td><td>${fmtCurrency(staffEarnings)}</td><td>${fmtCurrency(studioEarnings)}</td></tr></table>`;
+    }
+
+    if (memberTx.length > 0) {
+      html += `<h3>Movimenti economici</h3><table><tr><th>Data</th><th>Tipo</th><th>Importo</th><th>Descrizione</th></tr>`;
+      for (const t of memberTx) {
+        const sign = t.type === 'income' ? '+' : '-';
+        html += `<tr><td>${fmtDate(t.date)}</td><td>${t.type === 'income' ? 'Ricavo' : 'Spesa'}</td><td class="${t.type === 'income' ? 'text-success' : 'text-danger'}">${sign}${fmtCurrency(t.amount)}</td><td>${t.description || ''}</td></tr>`;
+      }
+      html += `</table>`;
+    }
+  }
+
+  openPrintWindow('Report Staff', html, 'Report Lezioni e Economica Staff', `${startDate} – ${endDate}`);
+}
+
+// ─── 4. Owner's own sessions + economics ───────────────────────────────
+
+interface PrintOwnerReportParams {
+  ownerName: string;
+  ownerId: string;
+  sessions: any[];
+  transactions: any[];
+  staff: StaffMember[];
+  students: any[];
+  startDate: string;
+  endDate: string;
+}
+
+export function printOwnerReport({ ownerName, ownerId, sessions, transactions, staff, students, startDate, endDate }: PrintOwnerReportParams) {
+  const studentMap: Record<string, string> = {};
+  for (const s of students) studentMap[s.id] = `${s.name} ${s.surname}`;
+
+  let html = '';
+
+  // Owner's own sessions
+  const ownerSessions = sessions.filter((s: any) => s.collaboratorId === ownerId);
+  const ownerCompleted = ownerSessions.filter((s: any) => s.isCountedAsCompleted || s.status === 'completed');
+  let ownerTotal = 0;
+  for (const s of ownerCompleted) ownerTotal += s.sessionCost || 0;
+
+  html += `<h2>Le mie lezioni – ${ownerName}</h2>`;
+  html += `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${ownerCompleted.length}</div><div class="stat-label">Lezioni completate</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtCurrency(ownerTotal)}</div><div class="stat-label">Fatturato lezioni</div></div>
+  </div>`;
+
+  if (ownerCompleted.length > 0) {
+    html += `<table><tr><th>Data</th><th>Orario</th><th>Allievo</th><th>Costo</th><th>Note</th></tr>`;
+    for (const s of ownerCompleted) {
+      html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || ''} - ${s.endTime || ''}</td><td>${studentMap[s.studentId] || s.studentId}</td><td>${fmtCurrency(s.sessionCost || 0)}</td><td>${s.notes || ''}</td></tr>`;
+    }
+    html += `<tr class="summary-row"><td colspan="3">TOTALE</td><td>${fmtCurrency(ownerTotal)}</td><td></td></tr></table>`;
+  }
+
+  // Staff summary
+  html += `<h2>Riepilogo Staff</h2>`;
+  let grandTotalCost = 0, grandStaffEarnings = 0, grandStudioEarnings = 0;
+
+  for (const member of staff) {
+    const fullName = `${member.name} ${member.surname}`;
+    const roleLabel = member.role === 'manager' ? 'Manager' : member.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    const memberCompleted = sessions.filter((s: any) => (s.collaboratorId === member.id) && (s.isCountedAsCompleted || s.status === 'completed'));
+    const commission = member.commissionPercentage ?? 0;
+    let memberCost = 0;
+    for (const s of memberCompleted) memberCost += s.sessionCost || 0;
+    const staffEarn = memberCost * (commission / 100);
+    const studioEarn = memberCost - staffEarn;
+    grandTotalCost += memberCost;
+    grandStaffEarnings += staffEarn;
+    grandStudioEarnings += studioEarn;
+
+    html += `<h3>${fullName} <span class="badge badge-info">${roleLabel} · ${commission}%</span></h3>`;
+    if (memberCompleted.length > 0) {
+      html += `<table><tr><th>Data</th><th>Orario</th><th>Allievo</th><th>Costo</th><th>Guadagno ${roleLabel}</th><th>Versato studio</th></tr>`;
+      for (const s of memberCompleted) {
+        const cost = s.sessionCost || 0;
+        html += `<tr><td>${fmtDate(s.date)}</td><td>${s.startTime || ''} - ${s.endTime || ''}</td><td>${studentMap[s.studentId] || s.studentId}</td><td>${fmtCurrency(cost)}</td><td>${fmtCurrency(cost * (commission / 100))}</td><td>${fmtCurrency(cost - cost * (commission / 100))}</td></tr>`;
+      }
+      html += `<tr class="summary-row"><td colspan="3">TOTALE</td><td>${fmtCurrency(memberCost)}</td><td>${fmtCurrency(staffEarn)}</td><td>${fmtCurrency(studioEarn)}</td></tr></table>`;
+    } else {
+      html += `<p>Nessuna lezione nel periodo.</p>`;
+    }
+  }
+
+  html += `<h2>Riepilogo Generale Staff</h2>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${fmtCurrency(grandTotalCost)}</div><div class="stat-label">Fatturato staff totale</div></div>
+    <div class="stat-card"><div class="stat-value text-danger">${fmtCurrency(grandStaffEarnings)}</div><div class="stat-label">Pagato allo staff</div></div>
+    <div class="stat-card"><div class="stat-value text-success">${fmtCurrency(grandStudioEarnings)}</div><div class="stat-label">Incasso studio</div></div>
+  </div>`;
+
+  openPrintWindow('Report Titolare', html, `Report Completo – ${ownerName}`, `${startDate} – ${endDate}`);
+}
+
+// ─── 5. Workout program print ──────────────────────────────────────────
+
+const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+
+interface PrintWorkoutPlanParams {
+  studentName: string;
+  plan: any;
+}
+
+export function printWorkoutPlan({ studentName, plan }: PrintWorkoutPlanParams) {
+  let html = `<div class="stat-grid">
+    <div class="stat-card"><div class="stat-value">${plan.title || 'Programma'}</div><div class="stat-label">Titolo</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(plan.startDate)}</div><div class="stat-label">Inizio</div></div>
+    <div class="stat-card"><div class="stat-value">${fmtDate(plan.endDate)}</div><div class="stat-label">Fine</div></div>
+  </div>`;
+
+  for (let day = 0; day < 7; day++) {
+    const dayData = plan.weeklySchedule?.[day];
+    const exercises = dayData?.exercises || [];
+    html += `<div class="day-section"><div class="day-title">${DAYS[day]}</div>`;
+    if (exercises.length === 0) {
+      html += `<p style="padding:6px 10px;color:#999">Giorno di riposo</p>`;
+    } else {
+      for (let i = 0; i < exercises.length; i++) {
+        const ex = exercises[i];
+        html += `<div class="exercise-card"><span class="exercise-num">${i + 1}</span><span class="exercise-name">${ex.name}</span>
+          <div class="exercise-details">${ex.sets} serie x ${ex.reps} reps${ex.restSeconds > 0 ? ` · Recupero: ${ex.restSeconds}s` : ''}</div>`;
+        if (ex.description) html += `<div class="exercise-details">${ex.description}</div>`;
+        if (ex.notes) html += `<div class="exercise-details" style="color:#856404;font-style:italic">Note: ${ex.notes}</div>`;
+        html += `</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+
+  openPrintWindow(`Programma ${studentName}`, html, `Programma di allenamento – ${studentName}`, `${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}`);
+}
+
+// ─── 6. Payment receipt ────────────────────────────────────────────────
+
+const RECEIPT_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; padding: 32px; font-size: 14px; line-height: 1.6; max-width: 600px; margin: 0 auto; }
+  .receipt { border: 2px solid #D40000; border-radius: 12px; padding: 32px; }
+  .receipt-header { text-align: center; border-bottom: 2px solid #D40000; padding-bottom: 20px; margin-bottom: 24px; }
+  .receipt-header h1 { font-size: 28px; color: #D40000; letter-spacing: 3px; margin-bottom: 4px; }
+  .receipt-header .doc-type { font-size: 16px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  .receipt-header .doc-number { font-size: 12px; color: #999; margin-top: 4px; }
+  .receipt-body { margin-bottom: 24px; }
+  .receipt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .receipt-row:last-child { border-bottom: none; }
+  .receipt-label { font-weight: 600; color: #555; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .receipt-value { font-weight: 700; color: #1a1a1a; font-size: 15px; text-align: right; }
+  .receipt-amount { text-align: center; margin: 24px 0; padding: 20px; background: #f8f8f8; border-radius: 8px; border: 1px solid #eee; }
+  .receipt-amount .amount { font-size: 36px; font-weight: 800; color: #D40000; }
+  .receipt-amount .amount-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .receipt-status { text-align: center; margin: 16px 0; }
+  .receipt-status .paid-badge { display: inline-block; background: #d4edda; color: #155724; padding: 8px 24px; border-radius: 20px; font-weight: 700; font-size: 14px; letter-spacing: 1px; }
+  .receipt-note { text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px dashed #ddd; }
+  .receipt-note p { font-size: 11px; color: #999; line-height: 1.6; }
+  .receipt-note .important { font-size: 12px; color: #666; font-weight: 600; margin-bottom: 4px; }
+  .receipt-footer { text-align: center; margin-top: 16px; font-size: 11px; color: #bbb; }
+  @media print { body { padding: 16px; } }
+`;
+
+interface PrintPaymentReceiptParams {
+  studentName: string;
+  amount: number;
+  dueDate: any;
+  paidDate: any;
+  installmentNumber: number;
+  totalInstallments: number;
+  planTotal: number;
+  paymentType: string;
+  planStartDate?: any;
+  planEndDate?: any;
+}
+
+export function printPaymentReceipt({
+  studentName, amount, dueDate, paidDate, installmentNumber, totalInstallments,
+  planTotal, paymentType, planStartDate, planEndDate,
+}: PrintPaymentReceiptParams) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  try {
+    let safeDate: Date;
+    if (paidDate instanceof Date) safeDate = paidDate;
+    else if (paidDate && typeof paidDate === 'object' && 'toDate' in paidDate) safeDate = paidDate.toDate();
+    else if (paidDate && typeof paidDate === 'object' && 'seconds' in paidDate) safeDate = new Date(paidDate.seconds * 1000);
+    else safeDate = new Date(paidDate);
+    if (isNaN(safeDate.getTime())) safeDate = new Date();
+
+    const receiptNumber = `ESS-${safeDate.getFullYear()}${String(safeDate.getMonth() + 1).padStart(2, '0')}${String(safeDate.getDate()).padStart(2, '0')}-${Date.now().toString(36).toUpperCase().slice(-5)}`;
+
+    const typeLabels: Record<string, string> = {
+      full: 'Pagamento unica soluzione',
+      installment: `Rata ${installmentNumber} di ${totalInstallments}`,
+      monthly_course: 'Pagamento corso mensile',
+    };
+
+    const bodyHtml = `
+      <div class="receipt">
+        <div class="receipt-header">
+          <h1>${LOGO_CHAR}</h1>
+          <div class="doc-type">Promemoria di Pagamento</div>
+          <div class="doc-number">Rif. ${receiptNumber}</div>
+        </div>
+
+        <div class="receipt-amount">
+          <div class="amount-label">Importo pagato</div>
+          <div class="amount">${fmtCurrency(amount)}</div>
+        </div>
+
+        <div class="receipt-status">
+          <span class="paid-badge">PAGATO</span>
+        </div>
+
+        <div class="receipt-body">
+          <div class="receipt-row">
+            <span class="receipt-label">Allievo</span>
+            <span class="receipt-value">${studentName}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Tipo</span>
+            <span class="receipt-value">${typeLabels[paymentType] || paymentType}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Data scadenza</span>
+            <span class="receipt-value">${fmtDate(dueDate)}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Data pagamento</span>
+            <span class="receipt-value">${fmtDate(safeDate)}</span>
+          </div>
+          <div class="receipt-row">
+            <span class="receipt-label">Importo totale piano</span>
+            <span class="receipt-value">${fmtCurrency(planTotal)}</span>
+          </div>
+          ${planStartDate && planEndDate ? `
+          <div class="receipt-row">
+            <span class="receipt-label">Periodo percorso</span>
+            <span class="receipt-value">${fmtDate(planStartDate)} – ${fmtDate(planEndDate)}</span>
+          </div>` : ''}
+        </div>
+
+        <div class="receipt-note">
+          <p class="important">Questo documento è un promemoria di pagamento.</p>
+          <p>Non costituisce ricevuta fiscale né documento contabile ufficiale.<br>
+          La ricevuta/fattura ufficiale verrà emessa separatamente.</p>
+        </div>
+
+        <div class="receipt-footer">
+          Generato il ${fmtDate(new Date())} alle ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+      </div>
+    `;
+
+    showPrintOverlay(bodyHtml, RECEIPT_CSS);
+  } catch (e) {
+    (window as any).alert('Errore ricevuta: ' + String(e));
+  }
+}

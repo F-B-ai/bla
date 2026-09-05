@@ -19,10 +19,17 @@ export interface User {
 }
 
 // --- Titolare (Owner) ---
+export interface BankDetails {
+  iban: string;
+  accountHolder: string;
+  bankName: string;
+}
+
 export interface Owner extends User {
   role: 'owner';
   assignedStudents: string[]; // allievi diretti seguiti dall'owner come Personal
   specializations: string[];
+  bankDetails?: BankDetails;
 }
 
 // --- Manager ---
@@ -50,7 +57,9 @@ export interface Collaborator extends User {
 // --- Allievo ---
 export interface Student extends User {
   role: 'student';
-  assignedCollaboratorId: string; // coach o manager che lo segue direttamente
+  assignedCollaboratorIds: string[]; // coach che lo seguono (può avere più coach)
+  /** @deprecated usa assignedCollaboratorIds - campo legacy per retrocompatibilità Firestore */
+  assignedCollaboratorId?: string;
   assignedManagerId?: string; // manager responsabile (se assegnato a un coach sotto un manager)
   assignedNutritionistId?: string; // nutrizionista coach assegnato
   assignedNutritionManagerId?: string; // manager nutrizionista responsabile
@@ -81,8 +90,12 @@ export interface TrainingSession {
   program?: TrainingProgram;
   notes: string;
   cancelledAt?: Date;
+  sessionCost?: number;
   // Se cancellato < 10 ore prima => considerato eseguito
   isCountedAsCompleted: boolean;
+  /** true quando la seduta ha già scalato una lezione dal percorso:
+   *  impedisce di toglierne una seconda se si rimarca «completata». */
+  planDecremented?: boolean;
 }
 
 // --- Programma di allenamento ---
@@ -99,6 +112,30 @@ export interface TrainingProgram {
 }
 
 // --- Esercizio ---
+export type ExerciseTechnique =
+  | 'standard'
+  | 'rest_pause'
+  | 'rest_pause_failure'
+  | 'stripping'
+  | 'pyramid'
+  | 'tempo'
+  | 'myo_reps'
+  | 'isometric'
+  | 'twentyone'
+  | 'cluster'
+  | 'negative'
+  | 'emom'
+  | 'cumulative'
+  | 'superset'
+  | 'compound_set'
+  | 'giant_set';
+
+// Esercizio concatenato dentro una Serie Gigante
+export interface GiantSetExercise {
+  name: string;
+  reps: string;
+}
+
 export interface Exercise {
   id: string;
   name: string;
@@ -110,6 +147,51 @@ export interface Exercise {
   imageUrl?: string;
   notes: string;
   category: ExerciseCategory;
+  technique?: ExerciseTechnique;
+  // Serie Interrotte (rest-pause)
+  miniSets?: number;
+  miniReps?: string;
+  miniRestSeconds?: number;
+  // Rest-Pause a cedimento: solo la prima serie ha un target,
+  // le mini-serie dopo ogni pausa sono a cedimento (reps libere)
+  rpPauses?: number;
+  rpRestSeconds?: number;
+  // Super Set (antagonista) / Superflusso (stesso muscolo):
+  // secondo esercizio eseguito SUBITO dopo, senza pausa
+  pairedExerciseName?: string;
+  pairedReps?: string;
+  // Serie Gigante: N esercizi concatenati senza pausa;
+  // la pausa tra un giro e l'altro è restSeconds dell'esercizio
+  giantExercises?: GiantSetExercise[];
+  // Stripping (drop sets)
+  stripDrops?: number;
+  stripRepsPerDrop?: string;
+  stripMaxDropPct?: number;
+  // Piramidali
+  pyramidType?: 'ascending' | 'descending' | 'triangular';
+  // Tempo controllato (es. "4-1-2-0" = 4s ecc, 1s pausa bassa, 2s conc, 0s pausa alta)
+  tempoNotation?: string;
+  // Myo-reps
+  myoActivationReps?: string;
+  myoMiniReps?: string;
+  myoMiniSets?: number;
+  myoRestSeconds?: number;
+  // Isometria
+  isometricHoldSeconds?: number;
+  // Cluster set
+  clusterReps?: number;
+  clusterSets?: number;
+  clusterRestSeconds?: number;
+  // Negativa enfatizzata
+  negativeSeconds?: number;
+  // EMOM
+  emomMinutes?: number;
+  emomRepsPerMinute?: string;
+  // Serie cumulative "a scala" (1 rip → attesa → 2 rip → attesa → ... → obiettivo)
+  cumulativeTargetReps?: number;   // gradino più alto (es. 10)
+  cumulativeRestSeconds?: number;  // attesa tra un gradino e l'altro
+  // Superset/Giant set grouping
+  supersetGroupId?: string;
 }
 
 export type ExerciseCategory =
@@ -141,7 +223,7 @@ export interface WeeklyDay {
 }
 
 // --- Pagamenti e rate ---
-export type PaymentType = 'full' | 'installment';
+export type PaymentType = 'full' | 'installment' | 'monthly_course';
 export type PaymentStatus = 'pending' | 'paid' | 'overdue';
 
 export interface PaymentPlan {
@@ -152,6 +234,16 @@ export interface PaymentPlan {
   paymentType: PaymentType;
   installments: Installment[];
   createdAt: Date;
+  // Percorso: lezioni e consulenze incluse
+  includedLessons: number;
+  usedLessons: number;
+  includedConsultations: number;
+  usedConsultations: number;
+  startDate: Date;
+  endDate: Date;
+  // Corso mensile (only for paymentType === 'monthly_course')
+  courseType?: string;
+  subscriptionType?: string;
 }
 
 export interface Installment {
@@ -160,6 +252,9 @@ export interface Installment {
   dueDate: Date;
   paidDate?: Date;
   status: PaymentStatus;
+  receiptUrl?: string;
+  transferPending?: boolean;
+  transferMarkedAt?: Date;
 }
 
 // --- Calcolo commissione collaboratore ---
@@ -200,9 +295,10 @@ export interface FinancialTransaction {
 // --- Chat ---
 export interface ChatRoom {
   id: string;
-  participants: string[]; // user IDs
+  participants: string[];
   type: 'direct' | 'group';
-  chatType?: 'training' | 'nutrition'; // tipo di chat: allenamento o nutrizione
+  chatType?: 'training' | 'nutrition' | 'team';
+  name?: string;
   createdAt: Date;
   lastMessage?: ChatMessage;
   studentId: string;
@@ -222,7 +318,7 @@ export interface ChatMessage {
 }
 
 // --- Contenuti speciali ---
-export type ContentType = 'podcast' | 'video' | 'article' | 'resource';
+export type ContentType = 'podcast' | 'video' | 'article' | 'resource' | 'pdf' | 'audio';
 
 export interface SpecialContent {
   id: string;
@@ -255,11 +351,16 @@ export interface PosturalAssessment {
   assessorId: string; // chi fa la valutazione
   date: Date;
   frontImageUrl: string;
-  sideImageUrl: string;
+  sideLeftImageUrl: string;
+  sideRightImageUrl: string;
   backImageUrl: string;
   findings: PosturalFinding[];
   overallNotes: string;
   recommendations: string;
+  aiAnalysis?: string;
+  aiRecommendations?: string[];
+  aiExerciseProgram?: string[];
+  comparisonNotes?: string;
 }
 
 export interface PosturalFinding {
@@ -310,9 +411,12 @@ export interface NutritionistAppointment {
   endTime: string;   // "10:00"
   status: NutritionistAppointmentStatus;
   notes: string;
+  sessionCost?: number;
   cancelledAt?: Date;
   isCountedAsCompleted: boolean; // Se cancellato < 10 ore prima
   createdAt: Date;
+  /** true quando la visita ha già scalato una consulenza dal percorso */
+  planDecremented?: boolean;
 }
 
 export interface BodyMeasurement {
@@ -359,9 +463,48 @@ export interface NutritionTeamNote {
   updatedAt: Date;
 }
 
+// --- Richieste modifica credenziali ---
+export type CredentialRequestStatus = 'pending' | 'approved' | 'denied';
+export type CredentialRequestType = 'email' | 'password' | 'info';
+
+export interface CredentialChangeRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userSurname: string;
+  requestType: CredentialRequestType;
+  currentEmail: string;
+  newEmail?: string;
+  newPassword?: string;
+  newInfo?: string;
+  status: CredentialRequestStatus;
+  createdAt: Date;
+  reviewedAt?: Date;
+  reviewedBy?: string;
+  denialReason?: string;
+}
+
+// --- Task giornalieri (solo owner) ---
+export type TaskPriority = 'low' | 'medium' | 'high';
+
+export interface DailyTask {
+  id: string;
+  ownerId: string;
+  date: Date;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  isCompleted: boolean;
+  completedAt?: Date;
+  createdAt: Date;
+  startTime?: string;
+  endTime?: string;
+}
+
 // --- Notifiche ---
 export type NotificationType =
   | 'payment_due'
+  | 'payment_reminder_15days'
   | 'payment_reminder_week'
   | 'payment_reminder_3days'
   | 'payment_reminder_1day'
@@ -369,7 +512,10 @@ export type NotificationType =
   | 'new_program'
   | 'new_message'
   | 'session_cancelled'
-  | 'new_content';
+  | 'new_content'
+  | 'workout_renewal'
+  | 'custom_alert'
+  | 'badge_milestone';
 
 export interface AppNotification {
   id: string;
@@ -523,6 +669,63 @@ export interface ExerciseLog {
   targetSets: number;
   targetReps: string;
   sets: SetLog[];
+  technique?: ExerciseTechnique;
+  // Serie Interrotte (rest-pause)
+  targetMiniSets?: number;
+  targetMiniReps?: string;
+  targetMiniRestSeconds?: number;
+  // Rest-Pause a cedimento
+  targetRpPauses?: number;
+  targetRpRestSeconds?: number;
+  // Super Set / Superflusso
+  targetPairedExerciseName?: string;
+  targetPairedReps?: string;
+  // Serie Gigante
+  targetGiantExercises?: GiantSetExercise[];
+  // Stripping (drop sets)
+  targetStripDrops?: number;
+  targetStripRepsPerDrop?: string;
+  targetStripMaxDropPct?: number;
+  // Piramidali
+  targetPyramidType?: 'ascending' | 'descending' | 'triangular';
+  // Tempo controllato
+  targetTempoNotation?: string;
+  // Myo-reps
+  targetMyoActivationReps?: string;
+  targetMyoMiniReps?: string;
+  targetMyoMiniSets?: number;
+  targetMyoRestSeconds?: number;
+  // Isometria
+  targetIsometricHoldSeconds?: number;
+  // Cluster set
+  targetClusterReps?: number;
+  targetClusterSets?: number;
+  targetClusterRestSeconds?: number;
+  // Serie cumulative
+  targetCumulativeReps?: number;
+  targetCumulativeRestSeconds?: number;
+  // Negativa enfatizzata
+  targetNegativeSeconds?: number;
+  // EMOM
+  targetEmomMinutes?: number;
+  targetEmomRepsPerMinute?: string;
+  // Superset
+  supersetGroupId?: string;
+}
+
+// Dettaglio singola mini serie (per Serie Interrotte) o parte di una
+// serie concatenata (Super Set / Superflusso / Serie Gigante)
+export interface MiniSetLog {
+  reps: number;
+  restSeconds: number; // recupero preso dopo questa mini serie (0 per l'ultima)
+  weight?: number; // peso della singola parte (tecniche con esercizi diversi)
+  label?: string; // nome dell'esercizio della parte (tecniche concatenate)
+}
+
+// Dettaglio singolo drop (per Stripping)
+export interface DropSetLog {
+  weight: number; // peso usato in questo drop (kg)
+  reps: number; // ripetizioni eseguite
 }
 
 export interface SetLog {
@@ -533,6 +736,77 @@ export interface SetLog {
   rpe?: number; // Rate of Perceived Exertion 1-10
   notes?: string;
   completedAt: Date;
+  // Serie Interrotte: dettaglio mini serie completate
+  miniSetsCompleted?: number;
+  miniSetDetails?: MiniSetLog[];
+  // Stripping: dettaglio drop completati
+  dropSetsCompleted?: number;
+  dropSetDetails?: DropSetLog[];
+  // Isometria: tempo di tenuta effettivo
+  holdSeconds?: number;
+}
+
+// --- Gamification ---
+export type BadgeId =
+  // Allenamenti (10)
+  | 'first_workout' | 'five_workouts' | 'ten_workouts' | 'twenty_five_workouts'
+  | 'fifty_workouts' | 'seventy_five_workouts' | 'hundred_workouts'
+  | 'hundred_fifty_workouts' | 'two_hundred_workouts' | 'five_hundred_workouts'
+  // Costanza / Streak (10)
+  | 'streak_3' | 'streak_7' | 'streak_14' | 'streak_21' | 'streak_30'
+  | 'streak_60' | 'streak_90' | 'streak_180' | 'streak_270' | 'streak_365'
+  // Diario (8)
+  | 'diary_writer' | 'diary_seven' | 'diary_fifteen' | 'diary_faithful'
+  | 'diary_fifty' | 'diary_hundred' | 'diary_two_hundred' | 'diary_365'
+  // Orari (4)
+  | 'early_bird' | 'night_owl' | 'lunch_trainer' | 'dawn_warrior'
+  // Programmi (5)
+  | 'first_program' | 'three_programs' | 'five_programs' | 'ten_programs' | 'twenty_programs'
+  // Livelli (5)
+  | 'level_5' | 'level_10' | 'level_15' | 'level_20' | 'level_25'
+  // XP (5)
+  | 'xp_500' | 'xp_1000' | 'xp_2500' | 'xp_5000' | 'xp_10000'
+  // Speciali (3)
+  | 'payment_punctual' | 'heavy_lifter' | 'consistency_king';
+
+export interface Badge {
+  id: BadgeId;
+  name: string;
+  description: string;
+  icon: string; // emoji
+  unlockedAt?: Date;
+}
+
+export interface StudentGamification {
+  id: string;
+  studentId: string;
+  currentStreak: number;
+  longestStreak: number;
+  lastWorkoutDate?: Date;
+  totalWorkouts: number;
+  totalDiaryEntries: number;
+  badges: Badge[];
+  level: number;
+  xp: number;
+  updatedAt: Date;
+}
+
+// --- Stima composizione corporea ---
+export interface BodyCompositionEstimate {
+  id: string;
+  studentId: string;
+  assessorId: string;
+  date: Date;
+  frontImageUrl: string;
+  sideLeftImageUrl: string;
+  sideRightImageUrl: string;
+  backImageUrl: string;
+  estimatedBodyFat?: number;
+  estimatedMuscleMass?: string;
+  muscleDistribution?: string;
+  aiAnalysis: string;
+  recommendations: string[];
+  createdAt: Date;
 }
 
 // --- Navigation types ---
@@ -550,6 +824,7 @@ export type OwnerTabParamList = {
   Team: undefined;
   Sessions: undefined;
   Financial: undefined;
+  Pagamenti: undefined;
   Content: undefined;
   Chat: undefined;
 };
@@ -558,6 +833,7 @@ export type ManagerTabParamList = {
   Dashboard: undefined;
   Team: undefined;
   Sessions: undefined;
+  Pagamenti: undefined;
   Content: undefined;
   Chat: undefined;
 };

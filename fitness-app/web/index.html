@@ -79,6 +79,28 @@
 <body>
   <div id="root"></div>
   <script>
+    // Auto-recovery: if app doesn't load within 8s, clear caches and reload
+    var _appLoaded = false;
+    window.__markAppLoaded = function() { _appLoaded = true; };
+    setTimeout(function() {
+      if (!_appLoaded && 'caches' in window) {
+        caches.keys().then(function(keys) {
+          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+        }).then(function() {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+              if (!sessionStorage.getItem('_recovery')) {
+                sessionStorage.setItem('_recovery', '1');
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }
+    }, 8000);
+  </script>
+  <script>
     // Register service worker with auto-update
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {

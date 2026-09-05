@@ -12,7 +12,9 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { TrainingProgram, WorkoutPlan, Exercise } from '../types';
+import { TrainingProgram, WorkoutPlan, Exercise, ExerciseCategory } from '../types';
+import { allDefaultExercises, DefaultExercise } from '../data/defaultExercises';
+import { fondiConCanone } from '../domain/filmEsercizio';
 
 const PROGRAMS_COLLECTION = 'trainingPrograms';
 const PLANS_COLLECTION = 'workoutPlans';
@@ -175,6 +177,22 @@ export const deleteWorkoutPlan = async (planId: string): Promise<void> => {
   await deleteDoc(doc(db, PLANS_COLLECTION, planId));
 };
 
+export const updateWorkoutPlan = async (
+  planId: string,
+  data: Partial<Omit<WorkoutPlan, 'id'>>
+): Promise<void> => {
+  const update: Record<string, unknown> = { ...data };
+  if (data.startDate) {
+    const sd = data.startDate instanceof Date ? data.startDate : new Date(data.startDate as any);
+    update.startDate = Timestamp.fromDate(sd);
+  }
+  if (data.endDate) {
+    const ed = data.endDate instanceof Date ? data.endDate : new Date(data.endDate as any);
+    update.endDate = Timestamp.fromDate(ed);
+  }
+  await updateDoc(doc(db, PLANS_COLLECTION, planId), update);
+};
+
 export const deleteProgram = async (programId: string): Promise<void> => {
   await deleteDoc(doc(db, PROGRAMS_COLLECTION, programId));
 };
@@ -232,4 +250,95 @@ export const updateCustomTemplate = async (
 
 export const deleteCustomTemplate = async (templateId: string): Promise<void> => {
   await deleteDoc(doc(db, CUSTOM_TEMPLATES_COLLECTION, templateId));
+};
+
+// --- Libreria esercizi con defaults ---
+
+export interface LibraryExercise {
+  id: string;
+  name: string;
+  description: string;
+  sets: number;
+  reps: string;
+  restSeconds: number;
+  category: ExerciseCategory;
+  notes: string;
+  videoUrl?: string;
+  videoLabel?: string;
+  /** secondo filmato (es. versione uomo), quando esiste */
+  videoUrlAlt?: string;
+  videoAltLabel?: string;
+  imageUrl?: string;
+  gender: 'male' | 'female' | 'unisex';
+  fromFirestore: boolean;
+}
+
+export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
+  const firestoreExercises = await getExerciseLibrary();
+
+  const firestoreMap = new Map<string, Exercise>();
+  for (const ex of firestoreExercises) {
+    firestoreMap.set(ex.name.toLowerCase().trim(), ex);
+  }
+
+  const result: LibraryExercise[] = [];
+
+  // Il canone per nome: serve a non farlo coprire da una voce salvata
+  // senza film. Un campo VUOTO non può cancellare un filmato che esiste.
+  const canonePerNome = new Map(
+    allDefaultExercises.map((d) => [d.name.toLowerCase().trim(), d])
+  );
+
+  for (const ex of firestoreExercises) {
+    const canone = canonePerNome.get(ex.name.toLowerCase().trim());
+    const conFilm = fondiConCanone({
+      name: ex.name,
+      videoUrl: ex.videoUrl,
+      videoLabel: (ex as any).videoLabel,
+      videoUrlAlt: (ex as any).videoUrlAlt,
+      videoAltLabel: (ex as any).videoAltLabel,
+    }, canone);
+
+    result.push({
+      id: ex.id,
+      name: ex.name,
+      description: ex.description || '',
+      sets: ex.sets,
+      reps: ex.reps,
+      restSeconds: ex.restSeconds,
+      category: ex.category,
+      notes: ex.notes || '',
+      videoUrl: conFilm.videoUrl,
+      videoLabel: conFilm.videoLabel,
+      videoUrlAlt: conFilm.videoUrlAlt,
+      videoAltLabel: conFilm.videoAltLabel,
+      imageUrl: ex.imageUrl,
+      gender: (ex as any).gender || 'unisex',
+      fromFirestore: true,
+    });
+  }
+
+  for (const def of allDefaultExercises) {
+    const key = def.name.toLowerCase().trim();
+    if (firestoreMap.has(key)) continue;
+    result.push({
+      id: `default_${key.replace(/\s+/g, '_')}`,
+      name: def.name,
+      description: def.description,
+      sets: def.sets,
+      reps: def.reps,
+      restSeconds: def.restSeconds,
+      category: def.category,
+      notes: def.notes,
+      // gli esercizi del canone arrivano col filmato già attaccato
+      videoUrl: def.videoUrl,
+      videoLabel: def.videoLabel,
+      videoUrlAlt: def.videoUrlAlt,
+      videoAltLabel: def.videoAltLabel,
+      gender: def.gender,
+      fromFirestore: false,
+    });
+  }
+
+  return result;
 };

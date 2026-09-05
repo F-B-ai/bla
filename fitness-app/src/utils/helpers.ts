@@ -1,3 +1,23 @@
+import { Student } from '../types';
+
+/**
+ * Restituisce la lista dei coach assegnati, gestendo retrocompatibilità
+ * con il vecchio campo singolo assignedCollaboratorId
+ */
+export const getStudentCoachIds = (student: Student): string[] => {
+  if (student.assignedCollaboratorIds?.length > 0) {
+    return student.assignedCollaboratorIds;
+  }
+  if ((student as any).assignedCollaboratorId) {
+    return [(student as any).assignedCollaboratorId];
+  }
+  return [];
+};
+
+export const isStudentAssignedTo = (student: Student, userId: string): boolean => {
+  return getStudentCoachIds(student).includes(userId);
+};
+
 /**
  * Formatta un importo in euro
  */
@@ -53,6 +73,10 @@ export const canCancelSession = (sessionDate: Date | string): boolean => {
  */
 export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
+export const isValidEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 };
 
 /**

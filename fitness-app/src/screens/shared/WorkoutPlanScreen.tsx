@@ -7,7 +7,11 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  FlatList,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -18,17 +22,27 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Exercise, ExerciseCategory, WeeklyDay, Student, WorkoutPlan } from '../../types';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { useAuth } from '../../hooks/useAuth';
-import { createWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans } from '../../services/programService';
+import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans, addExerciseToLibrary } from '../../services/programService';
+import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 import { getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
+import { createNotification } from '../../services/notificationService';
 import {
   suggestWorkoutProgression,
   suggestExercises,
+  generateWorkoutPlan,
   AIProgressionSuggestion,
+  AIGeneratedWorkoutPlan,
   ensureAIApiKey,
 } from '../../services/aiService';
+import { leggiProgressione } from '../../services/progressioneService';
+import { sintesiPerAI, asse } from '../../domain/progressione';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
-import { getCustomTemplates, CustomWorkoutTemplate } from '../../services/programService';
+import { getCustomTemplates, CustomWorkoutTemplate, createCustomTemplate } from '../../services/programService';
+import { Ionicons } from '@expo/vector-icons';
+import { printWorkoutPlan } from '../../utils/printUtils';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -44,6 +58,7 @@ const CATEGORIES: { value: ExerciseCategory; label: string }[] = [
 
 export const WorkoutPlanScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator } = useAuth();
+  const route = useRoute<any>();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [planTitle, setPlanTitle] = useState('');
@@ -51,6 +66,10 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exercises, setExercises] = useState<Record<number, Exercise[]>>({});
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Editing state
+  const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
+  const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null);
 
   // Form esercizio
   const [exName, setExName] = useState('');
@@ -62,6 +81,45 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exVideoUrl, setExVideoUrl] = useState('');
   const [exNotes, setExNotes] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
+
+  // Tecnica
+  const [exTechnique, setExTechnique] = useState<Exercise['technique']>('standard');
+  const [exMiniSets, setExMiniSets] = useState('4');
+  const [exRpPauses, setExRpPauses] = useState('2');
+  const [exRpRest, setExRpRest] = useState('15');
+  const [exPairedName, setExPairedName] = useState('');
+  const [exPairedReps, setExPairedReps] = useState('');
+  const [exGiantList, setExGiantList] = useState<Array<{ name: string; reps: string }>>([
+    { name: '', reps: '' },
+    { name: '', reps: '' },
+  ]);
+  const [exMiniReps, setExMiniReps] = useState('6');
+  const [exMiniRest, setExMiniRest] = useState('20');
+  const [exStripDrops, setExStripDrops] = useState('3');
+  const [exStripRepsPerDrop, setExStripRepsPerDrop] = useState('8');
+  const [exStripMaxDropPct, setExStripMaxDropPct] = useState('50');
+  // Piramidali
+  const [exPyramidType, setExPyramidType] = useState<'ascending' | 'descending' | 'triangular'>('ascending');
+  // Tempo controllato
+  const [exTempo, setExTempo] = useState('4-1-2-0');
+  // Myo-reps
+  const [exMyoActivationReps, setExMyoActivationReps] = useState('12');
+  const [exMyoMiniReps, setExMyoMiniReps] = useState('3');
+  const [exMyoMiniSets, setExMyoMiniSets] = useState('4');
+  const [exMyoRest, setExMyoRest] = useState('5');
+  // Isometria
+  const [exIsometricHold, setExIsometricHold] = useState('30');
+  // Cluster
+  const [exClusterReps, setExClusterReps] = useState('2');
+  const [exClusterSets, setExClusterSets] = useState('5');
+  const [exClusterRest, setExClusterRest] = useState('15');
+  const [exCumulativeTarget, setExCumulativeTarget] = useState('10');
+  const [exCumulativeRest, setExCumulativeRest] = useState('15');
+  // Negativa enfatizzata
+  const [exNegativeSeconds, setExNegativeSeconds] = useState('5');
+  // EMOM
+  const [exEmomMinutes, setExEmomMinutes] = useState('10');
+  const [exEmomReps, setExEmomReps] = useState('5');
 
   // Template State
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -82,6 +140,23 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiExercisesLoading, setAiExercisesLoading] = useState(false);
 
+  // AI Generate Plan State
+  const [showAiGenerateModal, setShowAiGenerateModal] = useState(false);
+  const [aiGenGoals, setAiGenGoals] = useState('');
+  const [aiGenLevel, setAiGenLevel] = useState<'principiante' | 'intermedio' | 'avanzato'>('intermedio');
+  const [aiGenDays, setAiGenDays] = useState(3);
+  const [aiGenEquipment, setAiGenEquipment] = useState('Palestra completa');
+  const [aiGenLoading, setAiGenLoading] = useState(false);
+
+  // Exercise Library State
+  const [exerciseLibrary, setExerciseLibrary] = useState<LibraryExercise[]>([]);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+  // Ogni esercizio nuovo entra in libreria di default: la libreria è
+  // il patrimonio dello studio, non deve dipendere da una spunta.
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
+
   const loadStudents = useCallback(async () => {
     if (!user) return;
     try {
@@ -90,9 +165,9 @@ export const WorkoutPlanScreen: React.FC = () => {
         setStudents(allStudents);
       } else if (isManager) {
         // Manager vede allievi assegnati direttamente o tramite assignedManagerId
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else if (isCollaborator) {
-        setStudents(allStudents.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(allStudents.filter((s) => isStudentAssignedTo(s, user.id)));
       }
     } catch {
       // Silently handle
@@ -108,10 +183,38 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   }, []);
 
+  const loadExerciseLibrary = useCallback(async () => {
+    try {
+      const library = await getFullExerciseLibrary();
+      setExerciseLibrary(library);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   useEffect(() => {
     loadStudents();
     loadCustomTemplates();
-  }, [loadStudents, loadCustomTemplates]);
+    loadExerciseLibrary();
+  }, [loadStudents, loadCustomTemplates, loadExerciseLibrary]);
+
+  useEffect(() => {
+    const tpl = route.params?.template;
+    if (!tpl?.weeklySchedule) return;
+    const newExercises: Record<number, Exercise[]> = {};
+    for (const day of tpl.weeklySchedule) {
+      if (day.exercises?.length > 0) {
+        newExercises[day.dayOfWeek] = day.exercises.map((ex: any, i: number) => ({
+          ...ex,
+          id: ex.id || `${Date.now()}_${day.dayOfWeek}_${i}`,
+        }));
+      }
+    }
+    setExercises(newExercises);
+    setPlanTitle(tpl.name || '');
+    setSelectedDay(0);
+    crossAlert('Template Caricato', `"${tpl.name}" pronto. Seleziona un allievo e modifica gli esercizi.`);
+  }, [route.params?.template]);
 
   const formatDate = (date: any) => {
     if (!date) return '';
@@ -225,6 +328,29 @@ export const WorkoutPlanScreen: React.FC = () => {
       const student = students.find((s) => s.id === selectedStudentId);
       if (!student) return;
 
+      // Il motore legge le sedute davvero fatte e DECIDE l'asse da
+      // aumentare. L'AI non sceglie più: traduce in scheda.
+      // Se non ci sono ancora dati, si va avanti senza briefing e
+      // l'AI sa che non deve aggiungere carico.
+      let briefing: string | undefined;
+      let asseScelto = '';
+      try {
+        const lettura = await leggiProgressione(selectedStudentId);
+        if (lettura.sessioni.length > 0) {
+          briefing = sintesiPerAI(
+            {
+              storia: lettura.sessioni,
+              prontezza: lettura.prontezza,
+              qualita: lettura.qualita,
+            },
+            lettura.passo
+          );
+          asseScelto = asse(lettura.passo.asse).nome;
+        }
+      } catch {
+        /* senza motore l'AI resta prudente: nessun aumento al buio */
+      }
+
       const suggestion = await suggestWorkoutProgression(
         {
           title: activePlan.title,
@@ -235,8 +361,14 @@ export const WorkoutPlanScreen: React.FC = () => {
           goals: student.goals,
           medicalNotes: student.medicalNotes,
         },
-        4 // settimana corrente (semplificato)
+        4, // settimana corrente (semplificato)
+        undefined,
+        briefing
       );
+
+      if (asseScelto) {
+        suggestion.reasoning = `Asse di progressione: ${asseScelto}.\n\n${suggestion.reasoning || ''}`;
+      }
 
       setAiSuggestion(suggestion);
       setShowAiModal(true);
@@ -322,28 +454,203 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
   };
 
-  const addExercise = () => {
+  // AI: genera scheda completa
+  const handleAIGeneratePlan = async () => {
+    if (!selectedStudentId) {
+      crossAlert('Errore', 'Seleziona prima un allievo');
+      return;
+    }
+    if (!aiGenGoals.trim()) {
+      crossAlert('Errore', 'Inserisci gli obiettivi dell\'allievo');
+      return;
+    }
+    if (!(await ensureAIApiKey())) {
+      crossAlert('API Key mancante', 'Inserisci la chiave API Anthropic nelle impostazioni.');
+      return;
+    }
+
+    const student = students.find((s) => s.id === selectedStudentId);
+    if (!student) return;
+
+    setAiGenLoading(true);
+    try {
+      const result = await generateWorkoutPlan({
+        studentName: `${student.name} ${student.surname}`,
+        goals: aiGenGoals,
+        level: aiGenLevel,
+        daysPerWeek: aiGenDays,
+        equipment: aiGenEquipment,
+        medicalNotes: student.medicalNotes,
+      });
+
+      if (!result.weeklySchedule || result.weeklySchedule.length === 0) {
+        crossAlert('Errore', 'L\'AI non ha generato una scheda valida. Riprova.');
+        return;
+      }
+
+      // Populate the form with AI-generated exercises
+      const newExercises: Record<number, Exercise[]> = {};
+      for (const day of result.weeklySchedule) {
+        newExercises[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+          id: `${Date.now()}_${day.dayOfWeek}_${i}`,
+          name: ex.name,
+          description: ex.description || '',
+          sets: ex.sets,
+          reps: ex.reps,
+          restSeconds: ex.restSeconds,
+          notes: ex.notes || '',
+          category: (ex.category as ExerciseCategory) || 'forza',
+        }));
+      }
+
+      setExercises(newExercises);
+      if (result.title) {
+        setPlanTitle(result.title);
+      }
+      setShowAiGenerateModal(false);
+      crossAlert('Scheda Generata!', 'La scheda AI è stata creata. Puoi modificarla prima di salvare.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Errore nella generazione AI';
+      crossAlert('Errore', msg);
+    } finally {
+      setAiGenLoading(false);
+    }
+  };
+
+  // Alcuni esercizi hanno due filmati (donna e uomo): si sceglie
+  // quello giusto per l'allievo mentre lo si inserisce in scheda.
+  const selectFromLibrary = (libEx: LibraryExercise, quale: 'principale' | 'alt' = 'principale') => {
+    setExName(libEx.name);
+    setExDescription(libEx.description);
+    setExSets(String(libEx.sets));
+    setExReps(libEx.reps);
+    setExRest(String(libEx.restSeconds));
+    setExCategory(libEx.category);
+    setExVideoUrl((quale === 'alt' ? libEx.videoUrlAlt : libEx.videoUrl) || '');
+    setExNotes(libEx.notes);
+    setShowLibraryPicker(false);
+    setLibrarySearch('');
+  };
+
+  const filteredLibrary = exerciseLibrary.filter((ex) => {
+    if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
+      return false;
+    }
+    if (librarySearch) {
+      const search = librarySearch.toLowerCase();
+      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+    }
+    return true;
+  });
+
+  const addExercise = async () => {
     if (!exName || !exSets || !exReps) {
       crossAlert('Errore', 'Compila nome, serie e ripetizioni');
       return;
     }
 
-    const newExercise: Exercise = {
-      id: Date.now().toString(),
+    const exerciseData: Exercise = {
+      id: editingExerciseIndex !== null
+        ? (exercises[selectedDay]?.[editingExerciseIndex]?.id || Date.now().toString())
+        : Date.now().toString(),
       name: exName,
       description: exDescription,
       sets: parseInt(exSets, 10),
       reps: exReps,
       restSeconds: parseInt(exRest, 10) || 60,
-      videoUrl: exVideoUrl || undefined,
       notes: exNotes,
       category: exCategory,
+      ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
+      technique: exTechnique || 'standard',
+      ...(exTechnique === 'rest_pause' ? {
+        miniSets: parseInt(exMiniSets, 10) || 4,
+        miniReps: exMiniReps || '6',
+        miniRestSeconds: parseInt(exMiniRest, 10) || 20,
+      } : {}),
+      ...(exTechnique === 'rest_pause_failure' ? {
+        rpPauses: parseInt(exRpPauses, 10) || 2,
+        rpRestSeconds: parseInt(exRpRest, 10) || 15,
+      } : {}),
+      ...(exTechnique === 'superset' || exTechnique === 'compound_set' ? {
+        pairedExerciseName: exPairedName.trim(),
+        pairedReps: exPairedReps || exReps,
+      } : {}),
+      ...(exTechnique === 'giant_set' ? {
+        giantExercises: exGiantList
+          .filter((g) => g.name.trim())
+          .map((g) => ({ name: g.name.trim(), reps: g.reps || '10' })),
+      } : {}),
+      ...(exTechnique === 'stripping' ? {
+        stripDrops: parseInt(exStripDrops, 10) || 3,
+        stripRepsPerDrop: exStripRepsPerDrop || '8',
+        stripMaxDropPct: parseInt(exStripMaxDropPct, 10) || 50,
+      } : {}),
+      ...(exTechnique === 'pyramid' ? {
+        pyramidType: exPyramidType,
+      } : {}),
+      ...(exTechnique === 'tempo' ? {
+        tempoNotation: exTempo || '4-1-2-0',
+      } : {}),
+      ...(exTechnique === 'myo_reps' ? {
+        myoActivationReps: exMyoActivationReps || '12',
+        myoMiniReps: exMyoMiniReps || '3',
+        myoMiniSets: parseInt(exMyoMiniSets, 10) || 4,
+        myoRestSeconds: parseInt(exMyoRest, 10) || 5,
+      } : {}),
+      ...(exTechnique === 'isometric' ? {
+        isometricHoldSeconds: parseInt(exIsometricHold, 10) || 30,
+      } : {}),
+      ...(exTechnique === 'cluster' ? {
+        clusterReps: parseInt(exClusterReps, 10) || 2,
+        clusterSets: parseInt(exClusterSets, 10) || 5,
+        clusterRestSeconds: parseInt(exClusterRest, 10) || 15,
+      } : {}),
+      ...(exTechnique === 'negative' ? {
+        negativeSeconds: parseInt(exNegativeSeconds, 10) || 5,
+      } : {}),
+      ...(exTechnique === 'cumulative' ? {
+        cumulativeTargetReps: parseInt(exCumulativeTarget, 10) || 10,
+        cumulativeRestSeconds: parseInt(exCumulativeRest, 10) || 15,
+      } : {}),
+      ...(exTechnique === 'emom' ? {
+        emomMinutes: parseInt(exEmomMinutes, 10) || 10,
+        emomRepsPerMinute: exEmomReps || '5',
+      } : {}),
     };
 
-    setExercises((prev) => ({
-      ...prev,
-      [selectedDay]: [...(prev[selectedDay] || []), newExercise],
-    }));
+    if (editingExerciseIndex !== null) {
+      setExercises((prev) => ({
+        ...prev,
+        [selectedDay]: (prev[selectedDay] || []).map((ex, i) =>
+          i === editingExerciseIndex ? exerciseData : ex
+        ),
+      }));
+    } else {
+      setExercises((prev) => ({
+        ...prev,
+        [selectedDay]: [...(prev[selectedDay] || []), exerciseData],
+      }));
+    }
+
+    // Il video è un allegato, non la condizione: un esercizio senza
+    // filmato si registra lo stesso e il video si aggiunge dopo.
+    if (saveToLibrary) {
+      try {
+        await addExerciseToLibrary({
+          name: exName,
+          description: exDescription,
+          sets: parseInt(exSets, 10),
+          reps: exReps,
+          restSeconds: parseInt(exRest, 10) || 60,
+          ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
+          notes: exNotes,
+          category: exCategory,
+        });
+        loadExerciseLibrary();
+      } catch {
+        // silently handle
+      }
+    }
 
     setExName('');
     setExDescription('');
@@ -352,7 +659,77 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExRest('');
     setExVideoUrl('');
     setExNotes('');
+    setExTechnique('standard');
+    setExMiniSets('4');
+    setExMiniReps('6');
+    setExMiniRest('20');
+    setExStripDrops('3');
+    setExStripRepsPerDrop('8');
+    setExStripMaxDropPct('50');
+    setExPyramidType('ascending');
+    setExTempo('4-1-2-0');
+    setExMyoActivationReps('12');
+    setExMyoMiniReps('3');
+    setExMyoMiniSets('4');
+    setExMyoRest('5');
+    setExIsometricHold('30');
+    setExClusterReps('2');
+    setExClusterSets('5');
+    setExClusterRest('15');
+    setExCumulativeTarget('10');
+    setExCumulativeRest('15');
+    setExNegativeSeconds('5');
+    setExEmomMinutes('10');
+    setExEmomReps('5');
+    setSaveToLibrary(false);
+    setEditingExerciseIndex(null);
     setShowExerciseModal(false);
+  };
+
+  const editExercise = (dayIndex: number, exerciseIndex: number) => {
+    const ex = exercises[dayIndex]?.[exerciseIndex];
+    if (!ex) return;
+    setExName(ex.name);
+    setExDescription(ex.description || '');
+    setExSets(String(ex.sets));
+    setExReps(ex.reps);
+    setExRest(String(ex.restSeconds));
+    setExCategory(ex.category || 'forza');
+    setExVideoUrl(ex.videoUrl || '');
+    setExNotes(ex.notes || '');
+    setExTechnique(ex.technique || 'standard');
+    setExMiniSets(String(ex.miniSets || 4));
+    setExMiniReps(ex.miniReps || '6');
+    setExMiniRest(String(ex.miniRestSeconds || 20));
+    setExRpPauses(String(ex.rpPauses || 2));
+    setExRpRest(String(ex.rpRestSeconds || 15));
+    setExPairedName(ex.pairedExerciseName || '');
+    setExPairedReps(ex.pairedReps || '');
+    setExGiantList(
+      ex.giantExercises && ex.giantExercises.length > 0
+        ? ex.giantExercises.map((g) => ({ name: g.name, reps: g.reps }))
+        : [{ name: '', reps: '' }, { name: '', reps: '' }]
+    );
+    setExStripDrops(String(ex.stripDrops || 3));
+    setExStripRepsPerDrop(ex.stripRepsPerDrop || '8');
+    setExStripMaxDropPct(String(ex.stripMaxDropPct || 50));
+    setExPyramidType(ex.pyramidType || 'ascending');
+    setExTempo(ex.tempoNotation || '4-1-2-0');
+    setExMyoActivationReps(ex.myoActivationReps || '12');
+    setExMyoMiniReps(ex.myoMiniReps || '3');
+    setExMyoMiniSets(String(ex.myoMiniSets || 4));
+    setExMyoRest(String(ex.myoRestSeconds || 5));
+    setExIsometricHold(String(ex.isometricHoldSeconds || 30));
+    setExClusterReps(String(ex.clusterReps || 2));
+    setExClusterSets(String(ex.clusterSets || 5));
+    setExClusterRest(String(ex.clusterRestSeconds || 15));
+    setExCumulativeTarget(String(ex.cumulativeTargetReps || 10));
+    setExCumulativeRest(String(ex.cumulativeRestSeconds || 15));
+    setExNegativeSeconds(String(ex.negativeSeconds || 5));
+    setExEmomMinutes(String(ex.emomMinutes || 10));
+    setExEmomReps(ex.emomRepsPerMinute || '5');
+    setEditingExerciseIndex(exerciseIndex);
+    setShowExerciseModal(true);
   };
 
   const removeExercise = (dayIndex: number, exerciseIndex: number) => {
@@ -360,6 +737,86 @@ export const WorkoutPlanScreen: React.FC = () => {
       ...prev,
       [dayIndex]: prev[dayIndex]?.filter((_, i) => i !== exerciseIndex) || [],
     }));
+  };
+
+  const moveExercise = (dayIndex: number, fromIndex: number, toIndex: number) => {
+    setExercises((prev) => {
+      const list = [...(prev[dayIndex] || [])];
+      if (toIndex < 0 || toIndex >= list.length) return prev;
+      const [moved] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, moved);
+      return { ...prev, [dayIndex]: list };
+    });
+  };
+
+  const loadPlanForEditing = (plan: WorkoutPlan) => {
+    setEditingPlan(plan);
+    setSelectedStudentId(plan.studentId);
+    setPlanTitle(plan.title);
+    const loaded: Record<number, Exercise[]> = {};
+    for (const day of plan.weeklySchedule) {
+      if (day.exercises.length > 0) {
+        loaded[day.dayOfWeek] = day.exercises.map((ex, i) => ({
+          ...ex,
+          id: ex.id || `${Date.now()}_${day.dayOfWeek}_${i}`,
+        }));
+      }
+    }
+    setExercises(loaded);
+    setSelectedDay(0);
+    setShowHistoryModal(false);
+    setViewingPlan(null);
+  };
+
+  const saveAsTemplate = (plan: { title: string; studentId?: string; weeklySchedule: { dayOfWeek: number; exercises: (Exercise | Omit<Exercise, 'id'>)[]; notes?: string }[] }) => {
+    crossAlert('Salva come Template', `Vuoi salvare "${plan.title}" come template riutilizzabile?`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Salva',
+        onPress: async () => {
+          try {
+            const weeklySchedule = plan.weeklySchedule.map((day) => ({
+              dayOfWeek: day.dayOfWeek,
+              dayName: DAYS[day.dayOfWeek] || '',
+              exercises: day.exercises.map((ex) => {
+                const { id: _id, ...rest } = ex as Exercise;
+                return rest;
+              }),
+              notes: day.notes || '',
+            }));
+            const desc = plan.studentId
+              ? `Template creato dalla programmazione di ${getStudentName(plan.studentId)}`
+              : 'Template personalizzato';
+            await createCustomTemplate({
+              name: plan.title,
+              description: desc,
+              gender: 'male',
+              category: 'personalizzato',
+              weeklySchedule,
+              createdBy: user?.id || '',
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            crossAlert('Successo', 'Template salvato! Lo trovi nella sezione Template e in "Carica da Template".');
+          } catch {
+            crossAlert('Errore', 'Impossibile salvare il template.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const getStudentName = (studentId: string) => {
+    const s = students.find((st) => st.id === studentId);
+    return s ? `${s.name} ${s.surname}` : 'Allievo';
+  };
+
+  const resetForm = () => {
+    setEditingPlan(null);
+    setPlanTitle('');
+    setExercises({});
+    setSelectedStudentId('');
+    setSelectedDay(0);
   };
 
   const savePlan = async () => {
@@ -380,31 +837,50 @@ export const WorkoutPlanScreen: React.FC = () => {
 
     setSaving(true);
     try {
+      const cleanExercise = (ex: Exercise) => {
+        const clean: Record<string, any> = {};
+        for (const [key, value] of Object.entries(ex)) {
+          if (value !== undefined) clean[key] = value;
+        }
+        return clean as Exercise;
+      };
       const weeklySchedule: WeeklyDay[] = Array.from({ length: 7 }, (_, i) => ({
         dayOfWeek: i,
-        exercises: exercises[i] || [],
+        exercises: (exercises[i] || []).map(cleanExercise),
         notes: '',
       }));
 
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 28);
+      if (editingPlan) {
+        await updateWorkoutPlan(editingPlan.id, {
+          title: planTitle,
+          weeklySchedule,
+        });
+        crossAlert('Successo', 'Programmazione aggiornata!');
+      } else {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 28);
 
-      await createWorkoutPlan({
-        studentId: selectedStudentId,
-        collaboratorId: user.id,
-        title: planTitle,
-        startDate,
-        endDate,
-        weeklySchedule,
-        createdAt: new Date(),
-        isActive: true,
-      });
+        await createWorkoutPlan({
+          studentId: selectedStudentId,
+          collaboratorId: user.id,
+          title: planTitle,
+          startDate,
+          endDate,
+          weeklySchedule,
+          createdAt: new Date(),
+          isActive: true,
+        });
+        createNotification(
+          selectedStudentId,
+          'new_program',
+          'Nuova scheda disponibile',
+          `La tua nuova programmazione "${planTitle}" è pronta! Apri l\'app per visualizzarla.`
+        ).catch(() => {});
+        crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
+      }
 
-      crossAlert('Successo', 'Programmazione salvata e inviata all\'allievo!');
-      setPlanTitle('');
-      setExercises({});
-      setSelectedStudentId('');
+      resetForm();
     } catch {
       crossAlert('Errore', 'Impossibile salvare la programmazione');
     } finally {
@@ -415,42 +891,24 @@ export const WorkoutPlanScreen: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Crea Programmazione</Text>
+        <Text style={styles.title}>{editingPlan ? 'Modifica Programmazione' : 'Crea Programmazione'}</Text>
         <Text style={styles.subtitle}>
-          Crea il piano settimanale con video e descrizioni
+          {editingPlan ? `Stai modificando: ${editingPlan.title}` : 'Crea il piano settimanale con video e descrizioni'}
         </Text>
+        {editingPlan && (
+          <TouchableOpacity style={styles.newPlanBtn} onPress={resetForm}>
+            <Text style={styles.newPlanBtnText}>+ Nuova Programmazione</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.content}>
         {/* Selezione allievo */}
-        <Text style={styles.sectionTitle}>Seleziona Allievo</Text>
-        {students.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyText}>Nessun allievo disponibile</Text>
-          </Card>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
-            {students.map((s) => (
-              <TouchableOpacity
-                key={s.id}
-                style={[
-                  styles.studentChip,
-                  selectedStudentId === s.id && styles.studentChipActive,
-                ]}
-                onPress={() => setSelectedStudentId(s.id)}
-              >
-                <Text
-                  style={[
-                    styles.studentChipText,
-                    selectedStudentId === s.id && styles.studentChipTextActive,
-                  ]}
-                >
-                  {s.name} {s.surname}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+        <StudentSearchPicker
+          students={students}
+          selectedId={selectedStudentId}
+          onSelect={(id) => setSelectedStudentId(id)}
+        />
 
         {/* Vedi storico programmazioni allievo */}
         {selectedStudentId && (
@@ -484,8 +942,23 @@ export const WorkoutPlanScreen: React.FC = () => {
             onPress={handleAIProgression}
             variant="outline"
             loading={aiLoading}
-            style={{ marginBottom: spacing.md }}
+            style={{ marginBottom: spacing.sm }}
           />
+        )}
+
+        {/* AI Generate Plan Button */}
+        {selectedStudentId && (
+          <TouchableOpacity
+            style={styles.aiGenerateBtn}
+            onPress={() => {
+              const student = students.find((s) => s.id === selectedStudentId);
+              if (student?.goals) setAiGenGoals(student.goals);
+              setShowAiGenerateModal(true);
+            }}
+          >
+            <Ionicons name="sparkles" size={20} color={colors.textOnAccent} />
+            <Text style={styles.aiGenerateBtnText}>AI Genera Scheda</Text>
+          </TouchableOpacity>
         )}
 
         {/* Selettore giorno */}
@@ -532,7 +1005,7 @@ export const WorkoutPlanScreen: React.FC = () => {
             </Text>
             <Button
               title="+ Esercizio"
-              onPress={() => setShowExerciseModal(true)}
+              onPress={() => { setEditingExerciseIndex(null); setShowExerciseModal(true); }}
               variant="primary"
             />
           </View>
@@ -546,52 +1019,124 @@ export const WorkoutPlanScreen: React.FC = () => {
             </Card>
           ) : (
             exercises[selectedDay].map((ex, index) => (
-              <Card key={ex.id} variant="outlined">
-                <View style={styles.exerciseRow}>
-                  <View style={styles.exerciseNumber}>
-                    <Text style={styles.exerciseNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseName}>{ex.name}</Text>
-                    <Text style={styles.exerciseDetails}>
-                      {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
-                    </Text>
-                    {ex.description && (
-                      <Text style={styles.exerciseDesc}>{ex.description}</Text>
-                    )}
-                    {ex.videoUrl && (
-                      <Text style={styles.videoLink}>Video allegato</Text>
-                    )}
-                    {ex.notes && (
-                      <Text style={styles.exerciseNotes}>
-                        Note: {ex.notes}
+              <TouchableOpacity key={ex.id} onPress={() => editExercise(selectedDay, index)} activeOpacity={0.7}>
+                <Card variant="outlined">
+                  <View style={styles.exerciseRow}>
+                    <View style={styles.exerciseOrderCol}>
+                      <TouchableOpacity
+                        onPress={() => moveExercise(selectedDay, index, index - 1)}
+                        disabled={index === 0}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={[styles.moveBtn, index === 0 && styles.moveBtnDisabled]}
+                      >
+                        <Ionicons name="chevron-up" size={18} color={index === 0 ? colors.border : colors.accent} />
+                      </TouchableOpacity>
+                      <View style={styles.exerciseNumber}>
+                        <Text style={styles.exerciseNumberText}>{index + 1}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => moveExercise(selectedDay, index, index + 1)}
+                        disabled={index === exercises[selectedDay].length - 1}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={[styles.moveBtn, index === exercises[selectedDay].length - 1 && styles.moveBtnDisabled]}
+                      >
+                        <Ionicons name="chevron-down" size={18} color={index === exercises[selectedDay].length - 1 ? colors.border : colors.accent} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.exerciseInfo}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <Text style={styles.exerciseDetails}>
+                        {ex.sets}x{ex.reps} | Rec: {ex.restSeconds}s
                       </Text>
-                    )}
+                      {ex.technique && ex.technique !== 'standard' && (
+                        <Text style={styles.restPauseBadge}>
+                          {ex.technique === 'rest_pause' && `Serie Interrotte: ${ex.miniSets || 4} mini serie da ${ex.miniReps || '6'} (rec ${ex.miniRestSeconds || 20}s)`}
+                          {ex.technique === 'rest_pause_failure' && `Rest-Pause: serie a cedimento + ${ex.rpPauses || 2} paus${(ex.rpPauses || 2) === 1 ? 'a' : 'e'} da ${ex.rpRestSeconds || 15}s, mini-serie a cedimento`}
+                          {ex.technique === 'superset' && `Super Set con ${ex.pairedExerciseName || 'antagonista'} (${ex.pairedReps || ex.reps} reps) — senza pausa`}
+                          {ex.technique === 'compound_set' && `Superflusso con ${ex.pairedExerciseName || 'secondo esercizio'} (${ex.pairedReps || ex.reps} reps) — senza pausa`}
+                          {ex.technique === 'giant_set' && `Serie Gigante: ${ex.name} + ${(ex.giantExercises || []).map((g) => `${g.name} (${g.reps})`).join(' + ')} · pausa tra giri ${ex.restSeconds}s`}
+                          {ex.technique === 'stripping' && `Stripping: ${ex.stripDrops || 3} scarichi da ${ex.stripRepsPerDrop || '8'} reps (max -${ex.stripMaxDropPct || 50}%)`}
+                          {ex.technique === 'pyramid' && `Piramidali: ${ex.pyramidType === 'ascending' ? 'ascendente ↑' : ex.pyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+                          {ex.technique === 'tempo' && `Tempo: ${ex.tempoNotation || '4-1-2-0'}`}
+                          {ex.technique === 'myo_reps' && `Myo-reps: attivazione ${ex.myoActivationReps || '12'} + ${ex.myoMiniSets || 4}x${ex.myoMiniReps || '3'} (rec ${ex.myoRestSeconds || 5}s)`}
+                          {ex.technique === 'isometric' && `Isometria: tenuta ${ex.isometricHoldSeconds || 30}s`}
+                          {ex.technique === 'twentyone' && '21s: 7 parziali basse + 7 alte + 7 complete'}
+                          {ex.technique === 'cluster' && `Cluster: ${ex.clusterSets || 5}x${ex.clusterReps || 2} (pausa ${ex.clusterRestSeconds || 15}s)`}
+                          {ex.technique === 'cumulative' && `Cumulative: scala 1→${ex.cumulativeTargetReps || 10} rip (attesa ${ex.cumulativeRestSeconds || 15}s)`}
+                          {ex.technique === 'negative' && `Negativa: ${ex.negativeSeconds || 5}s eccentrica`}
+                          {ex.technique === 'emom' && `EMOM: ${ex.emomRepsPerMinute || '5'} reps ogni minuto x ${ex.emomMinutes || 10} min`}
+                        </Text>
+                      )}
+                      {ex.description ? (
+                        <Text style={styles.exerciseDesc}>{ex.description}</Text>
+                      ) : null}
+                      {ex.videoUrl ? (
+                        <Text style={styles.videoLink}>Video allegato</Text>
+                      ) : null}
+                      {ex.notes ? (
+                        <Text style={styles.exerciseNotes}>
+                          Note: {ex.notes}
+                        </Text>
+                      ) : null}
+                      <Text style={styles.editHint}>Tocca per modificare</Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeExercise(selectedDay, index)}
+                    >
+                      <Text style={styles.removeBtn}>X</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => removeExercise(selectedDay, index)}
-                  >
-                    <Text style={styles.removeBtn}>X</Text>
-                  </TouchableOpacity>
-                </View>
-              </Card>
+                </Card>
+              </TouchableOpacity>
             ))
           )}
         </View>
 
         <Button
-          title={saving ? 'Salvataggio...' : 'Salva e Invia Programmazione'}
+          title={saving ? 'Salvataggio...' : editingPlan ? 'Aggiorna Programmazione' : 'Salva e Invia Programmazione'}
           onPress={savePlan}
           style={styles.saveButton}
           loading={saving}
         />
+
+        {planTitle.trim() && Object.values(exercises).some((exs) => exs.length > 0) && (
+          <TouchableOpacity
+            style={styles.saveAsTemplateBtnMain}
+            onPress={() => {
+              const weeklySchedule = DAYS.map((_, i) => ({
+                dayOfWeek: i,
+                dayName: DAYS[i],
+                exercises: (exercises[i] || []).map(({ id, ...rest }) => rest),
+                notes: '',
+              }));
+              saveAsTemplate({
+                title: planTitle,
+                studentId: selectedStudentId || undefined,
+                weeklySchedule,
+              });
+            }}
+          >
+            <Ionicons name="copy-outline" size={18} color={colors.accent} />
+            <Text style={styles.saveAsTemplateMainText}>Salva come Template</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Modale Aggiungi Esercizio */}
       <Modal visible={showExerciseModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
-            <ModalHeader title="Nuovo Esercizio" onClose={() => setShowExerciseModal(false)} />
+            <ModalHeader title={editingExerciseIndex !== null ? 'Modifica Esercizio' : 'Nuovo Esercizio'} onClose={() => { setEditingExerciseIndex(null); setShowExerciseModal(false); }} />
+
+            {/* Library Picker Button */}
+            <TouchableOpacity
+              style={styles.libraryPickerToggle}
+              onPress={() => { setShowLibraryPicker(true); setLibrarySearch(''); }}
+            >
+              <Ionicons name="library-outline" size={20} color={colors.accent} />
+              <Text style={styles.libraryPickerToggleText}>Scegli dalla Libreria Esercizi</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+            </TouchableOpacity>
 
             <InputField
               label="Nome esercizio"
@@ -637,6 +1182,326 @@ export const WorkoutPlanScreen: React.FC = () => {
               placeholder="90"
             />
 
+            {/* Tecnica */}
+            <Text style={styles.fieldLabel}>Tecnica</Text>
+            <View style={styles.categoryRow}>
+              {([
+                { key: 'standard', label: 'Normale' },
+                { key: 'rest_pause', label: 'Serie Interrotte' },
+                { key: 'rest_pause_failure', label: 'Rest-Pause' },
+                { key: 'superset', label: 'Super Set' },
+                { key: 'compound_set', label: 'Superflusso' },
+                { key: 'giant_set', label: 'Serie Gigante' },
+                { key: 'stripping', label: 'Stripping' },
+                { key: 'pyramid', label: 'Piramidali' },
+                { key: 'tempo', label: 'Tempo' },
+                { key: 'myo_reps', label: 'Myo-reps' },
+                { key: 'isometric', label: 'Isometria' },
+                { key: 'twentyone', label: '21s' },
+                { key: 'cluster', label: 'Cluster' },
+                { key: 'cumulative', label: 'Cumulative' },
+                { key: 'negative', label: 'Negativa' },
+                { key: 'emom', label: 'EMOM' },
+              ] as const).map((t) => (
+                <TouchableOpacity
+                  key={t.key}
+                  style={[styles.categoryChip, exTechnique === t.key && styles.categoryChipActive]}
+                  onPress={() => setExTechnique(t.key)}
+                >
+                  <Text style={[styles.categoryChipText, exTechnique === t.key && styles.categoryChipTextActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {exTechnique === 'rest_pause' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Ogni serie è composta da mini serie con recupero breve tra loro.
+                  Es: carico da 9-10 reps al limite, 4 mini serie da 6 reps con 15-25s di recupero.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Mini serie"
+                      value={exMiniSets}
+                      onChangeText={setExMiniSets}
+                      keyboardType="number-pad"
+                      placeholder="4"
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Reps per mini serie"
+                      value={exMiniReps}
+                      onChangeText={setExMiniReps}
+                      placeholder="6"
+                    />
+                  </View>
+                </View>
+                <InputField
+                  label="Recupero tra mini serie (secondi)"
+                  value={exMiniRest}
+                  onChangeText={setExMiniRest}
+                  keyboardType="number-pad"
+                  placeholder="20"
+                />
+              </View>
+            )}
+
+            {exTechnique === 'rest_pause_failure' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Rest-Pause a cedimento: peso da 6-10 reps, serie principale
+                  vicino al cedimento, poi 1 o più pause brevi (10-20s) con
+                  mini-serie A CEDIMENTO — le ripetizioni dopo le pause non
+                  sono prestabilite: l'allievo registra quelle che escono.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Pause (1-3)"
+                      value={exRpPauses}
+                      onChangeText={setExRpPauses}
+                      keyboardType="number-pad"
+                      placeholder="2"
+                    />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField
+                      label="Durata pausa (secondi)"
+                      value={exRpRest}
+                      onChangeText={setExRpRest}
+                      keyboardType="number-pad"
+                      placeholder="15"
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {(exTechnique === 'superset' || exTechnique === 'compound_set') && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  {exTechnique === 'superset'
+                    ? "Super Set: l'esercizio qui sopra è l'AGONISTA; subito dopo, SENZA pausa, si esegue l'esercizio ANTAGONISTA (es. bicipiti + tricipiti). La pausa dopo la coppia è il Recupero dell'esercizio."
+                    : 'Superflusso: STESSO muscolo con due esercizi diversi, uno di seguito all\'altro senza pausa (es. panca piana + croci). La pausa dopo la coppia è il Recupero dell\'esercizio.'}
+                </Text>
+                <InputField
+                  label={exTechnique === 'superset' ? 'Esercizio antagonista' : 'Secondo esercizio (stesso muscolo)'}
+                  value={exPairedName}
+                  onChangeText={setExPairedName}
+                  placeholder={exTechnique === 'superset' ? 'Es. Pushdown ai cavi' : 'Es. Croci con manubri'}
+                />
+                <InputField
+                  label="Ripetizioni del secondo esercizio"
+                  value={exPairedReps}
+                  onChangeText={setExPairedReps}
+                  placeholder="Es. 12"
+                />
+              </View>
+            )}
+
+            {exTechnique === 'giant_set' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie Gigante: più esercizi concatenati SENZA pausa (l'esercizio
+                  qui sopra è il primo). Le Serie sono i giri completi; la pausa
+                  tra un giro e l'altro è il Recupero dell'esercizio.
+                </Text>
+                {exGiantList.map((g, i) => (
+                  <View key={i} style={styles.row}>
+                    <View style={{ flex: 2, marginRight: 8 }}>
+                      <InputField
+                        label={`Esercizio ${i + 2}`}
+                        value={g.name}
+                        onChangeText={(v: string) =>
+                          setExGiantList((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)))
+                        }
+                        placeholder="Nome esercizio"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <InputField
+                        label="Reps"
+                        value={g.reps}
+                        onChangeText={(v: string) =>
+                          setExGiantList((prev) => prev.map((x, j) => (j === i ? { ...x, reps: v } : x)))
+                        }
+                        placeholder="10"
+                      />
+                    </View>
+                    {exGiantList.length > 1 && (
+                      <TouchableOpacity
+                        style={{ justifyContent: 'flex-end', paddingBottom: 18, paddingLeft: 6 }}
+                        onPress={() => setExGiantList((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <Ionicons name="close-circle" size={22} color={colors.error} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {exGiantList.length < 5 && (
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                    onPress={() => setExGiantList((prev) => [...prev, { name: '', reps: '' }])}
+                  >
+                    <Ionicons name="add-circle-outline" size={20} color={colors.accent} />
+                    <Text style={{ color: colors.accent, fontWeight: '600' }}>Aggiungi esercizio al giro</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {exTechnique === 'stripping' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Esegui le ripetizioni, poi senza pausa scala il peso e ripeti.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="N. scarichi" value={exStripDrops} onChangeText={setExStripDrops} keyboardType="number-pad" placeholder="3" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps per livello" value={exStripRepsPerDrop} onChangeText={setExStripRepsPerDrop} placeholder="8" />
+                  </View>
+                </View>
+                <InputField label="Scarico massimo (%)" value={exStripMaxDropPct} onChangeText={setExStripMaxDropPct} keyboardType="number-pad" placeholder="50" />
+              </View>
+            )}
+
+            {exTechnique === 'pyramid' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Aumenta o diminuisci il carico ad ogni serie. Ascendente: peso sale, reps scendono. Discendente: peso scende, reps salgono. Triangolare: sale e poi scende.
+                </Text>
+                <View style={styles.categoryRow}>
+                  {([
+                    { key: 'ascending', label: 'Ascendente ↑' },
+                    { key: 'descending', label: 'Discendente ↓' },
+                    { key: 'triangular', label: 'Triangolare ↑↓' },
+                  ] as const).map((p) => (
+                    <TouchableOpacity
+                      key={p.key}
+                      style={[styles.categoryChip, exPyramidType === p.key && styles.categoryChipActive]}
+                      onPress={() => setExPyramidType(p.key)}
+                    >
+                      <Text style={[styles.categoryChipText, exPyramidType === p.key && styles.categoryChipTextActive]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {exTechnique === 'tempo' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Formato: Eccentrica-Pausa bassa-Concentrica-Pausa alta (es. 4-1-2-0 = 4s giù, 1s pausa, 2s su, 0s pausa).
+                </Text>
+                <InputField label="Tempo (es. 4-1-2-0)" value={exTempo} onChangeText={setExTempo} placeholder="4-1-2-0" />
+              </View>
+            )}
+
+            {exTechnique === 'myo_reps' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie attivante ad alto numero di reps, poi mini serie brevi con recupero minimo (3-5 respiri).
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps attivazione" value={exMyoActivationReps} onChangeText={setExMyoActivationReps} placeholder="12" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps mini serie" value={exMyoMiniReps} onChangeText={setExMyoMiniReps} placeholder="3" />
+                  </View>
+                </View>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="N. mini serie" value={exMyoMiniSets} onChangeText={setExMyoMiniSets} keyboardType="number-pad" placeholder="4" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Pausa (secondi)" value={exMyoRest} onChangeText={setExMyoRest} keyboardType="number-pad" placeholder="5" />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {exTechnique === 'isometric' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Tenuta statica nella posizione target. L'allievo vedrà un timer per la tenuta.
+                </Text>
+                <InputField label="Durata tenuta (secondi)" value={exIsometricHold} onChangeText={setExIsometricHold} keyboardType="number-pad" placeholder="30" />
+              </View>
+            )}
+
+            {exTechnique === 'twentyone' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  7 ripetizioni parziali basse + 7 parziali alte + 7 complete = 21 totali. Non serve configurazione, lo schema è fisso.
+                </Text>
+              </View>
+            )}
+
+            {exTechnique === 'cluster' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie spezzata in mini-gruppi (cluster) con micro-pause. Es: 5 cluster da 2 reps con 15s di pausa.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps per cluster" value={exClusterReps} onChangeText={setExClusterReps} keyboardType="number-pad" placeholder="2" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="N. cluster" value={exClusterSets} onChangeText={setExClusterSets} keyboardType="number-pad" placeholder="5" />
+                  </View>
+                </View>
+                <InputField label="Pausa tra cluster (sec)" value={exClusterRest} onChangeText={setExClusterRest} keyboardType="number-pad" placeholder="15" />
+              </View>
+            )}
+
+            {exTechnique === 'cumulative' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Serie cumulativa "a scala": carico fisso, 1 rip → attesa → 2 rip → attesa → ... fino all'obiettivo. Es: fino a 10 con 15s di attesa. Il n. di serie è impostato in "Serie" sopra.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Obiettivo ripetizioni" value={exCumulativeTarget} onChangeText={setExCumulativeTarget} keyboardType="number-pad" placeholder="10" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Attesa tra gradini (sec)" value={exCumulativeRest} onChangeText={setExCumulativeRest} keyboardType="number-pad" placeholder="15" />
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {exTechnique === 'negative' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Fase eccentrica (discesa) lenta e controllata con carico più pesante del normale. L'allievo vedrà il timer per la negativa.
+                </Text>
+                <InputField label="Durata eccentrica (secondi)" value={exNegativeSeconds} onChangeText={setExNegativeSeconds} keyboardType="number-pad" placeholder="5" />
+              </View>
+            )}
+
+            {exTechnique === 'emom' && (
+              <View style={styles.restPauseBox}>
+                <Text style={styles.restPauseInfo}>
+                  Every Minute On the Minute: esegui le reps ogni minuto per la durata totale. Il resto del minuto è recupero.
+                </Text>
+                <View style={styles.row}>
+                  <View style={styles.halfField}>
+                    <InputField label="Durata (minuti)" value={exEmomMinutes} onChangeText={setExEmomMinutes} keyboardType="number-pad" placeholder="10" />
+                  </View>
+                  <View style={styles.halfField}>
+                    <InputField label="Reps per minuto" value={exEmomReps} onChangeText={setExEmomReps} placeholder="5" />
+                  </View>
+                </View>
+              </View>
+            )}
+
             <Text style={styles.fieldLabel}>Categoria</Text>
             <View style={styles.categoryRow}>
               {CATEGORIES.map((cat) => (
@@ -678,6 +1543,23 @@ export const WorkoutPlanScreen: React.FC = () => {
               />
             )}
 
+            {/* Save to library toggle */}
+            {exVideoUrl ? (
+              <TouchableOpacity
+                style={styles.saveToLibraryRow}
+                onPress={() => setSaveToLibrary(!saveToLibrary)}
+              >
+                <Ionicons
+                  name={saveToLibrary ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={saveToLibrary ? colors.accent : colors.textSecondary}
+                />
+                <Text style={styles.saveToLibraryText}>
+                  Salva nella libreria esercizi (per riuso futuro)
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
             {/* AI Exercise Suggestion */}
             <Button
               title={aiExercisesLoading ? 'AI...' : 'Suggerisci con AI'}
@@ -703,7 +1585,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                 style={styles.modalButton}
               />
               <Button
-                title="Aggiungi"
+                title={editingExerciseIndex !== null ? 'Salva Modifiche' : 'Aggiungi'}
                 onPress={addExercise}
                 style={styles.modalButton}
               />
@@ -881,11 +1763,8 @@ export const WorkoutPlanScreen: React.FC = () => {
                   </Card>
                 ) : (
                   studentPlans.map((plan) => (
-                    <TouchableOpacity
-                      key={plan.id}
-                      onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}
-                    >
-                      <Card variant={plan.isActive ? 'elevated' : 'outlined'}>
+                    <Card key={plan.id} variant={plan.isActive ? 'elevated' : 'outlined'}>
+                      <TouchableOpacity onPress={() => { setViewingPlan(plan); setHistorySelectedDay(0); }}>
                         <View style={styles.historyRow}>
                           <View style={styles.historyInfo}>
                             <Text style={styles.historyName}>{plan.title}</Text>
@@ -899,8 +1778,23 @@ export const WorkoutPlanScreen: React.FC = () => {
                             </View>
                           )}
                         </View>
-                      </Card>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                      <View style={styles.historyActions}>
+                        <TouchableOpacity
+                          style={styles.historyEditBtn}
+                          onPress={() => saveAsTemplate(plan)}
+                        >
+                          <Ionicons name="copy-outline" size={14} color={colors.accent} />
+                          <Text style={{ ...styles.historyEditText, color: colors.accent, marginLeft: 4 }}>Template</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.historyEditBtn}
+                          onPress={() => loadPlanForEditing(plan)}
+                        >
+                          <Text style={styles.historyEditText}>Modifica</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </Card>
                   ))
                 )}
               </>
@@ -918,12 +1812,30 @@ export const WorkoutPlanScreen: React.FC = () => {
                   )}
                 </Card>
 
-                <TouchableOpacity
-                  style={styles.historyBackBtn}
-                  onPress={() => setViewingPlan(null)}
-                >
-                  <Text style={styles.historyBackText}>Torna alla lista</Text>
-                </TouchableOpacity>
+                <View style={styles.historyDetailActions}>
+                  <TouchableOpacity
+                    style={styles.historyBackBtn}
+                    onPress={() => setViewingPlan(null)}
+                  >
+                    <Text style={styles.historyBackText}>Torna alla lista</Text>
+                  </TouchableOpacity>
+                  {Platform.OS === 'web' && isOwner && (
+                    <TouchableOpacity
+                      style={[styles.saveAsTemplateBtn, { backgroundColor: colors.info }]}
+                      onPress={() => printWorkoutPlan({ studentName: getStudentName(viewingPlan.studentId), plan: viewingPlan })}
+                    >
+                      <Ionicons name="print-outline" size={16} color={colors.white} />
+                      <Text style={styles.saveAsTemplateText}>Stampa</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.saveAsTemplateBtn}
+                    onPress={() => saveAsTemplate(viewingPlan)}
+                  >
+                    <Ionicons name="copy-outline" size={16} color={colors.textOnAccent} />
+                    <Text style={styles.saveAsTemplateText}>Salva come Template</Text>
+                  </TouchableOpacity>
+                </View>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayScroll}>
                   {DAYS.map((day, index) => (
@@ -973,6 +1885,206 @@ export const WorkoutPlanScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modale AI Genera Scheda */}
+      <Modal visible={showAiGenerateModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader title="AI Genera Scheda" onClose={() => setShowAiGenerateModal(false)} />
+
+            <Card variant="elevated">
+              <View style={styles.aiGenHeaderRow}>
+                <Ionicons name="sparkles" size={22} color={colors.accent} />
+                <Text style={styles.aiGenHeaderText}>
+                  L'AI creerà una scheda personalizzata basata sui parametri indicati.
+                </Text>
+              </View>
+            </Card>
+
+            <InputField
+              label="Obiettivi"
+              value={aiGenGoals}
+              onChangeText={setAiGenGoals}
+              placeholder="Es: Ipertrofia, dimagrimento, forza..."
+              multiline
+              numberOfLines={2}
+            />
+
+            <Text style={styles.fieldLabel}>Livello</Text>
+            <View style={styles.categoryRow}>
+              {(['principiante', 'intermedio', 'avanzato'] as const).map((lvl) => (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[
+                    styles.categoryChip,
+                    aiGenLevel === lvl && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setAiGenLevel(lvl)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      aiGenLevel === lvl && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.fieldLabel}>Giorni a settimana</Text>
+            <View style={styles.categoryRow}>
+              {[2, 3, 4, 5, 6].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  style={[
+                    styles.categoryChip,
+                    aiGenDays === d && styles.categoryChipActive,
+                  ]}
+                  onPress={() => setAiGenDays(d)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      aiGenDays === d && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {d}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <InputField
+              label="Attrezzatura disponibile"
+              value={aiGenEquipment}
+              onChangeText={setAiGenEquipment}
+              placeholder="Es: Palestra completa, manubri, corpo libero..."
+            />
+
+            {aiGenLoading ? (
+              <View style={styles.aiGenLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.accent} />
+                <Text style={styles.aiGenLoadingText}>Generazione in corso...</Text>
+                <Text style={styles.aiGenLoadingSubtext}>L'AI sta creando la scheda personalizzata</Text>
+              </View>
+            ) : (
+              <View style={styles.modalButtons}>
+                <Button
+                  title="Annulla"
+                  onPress={() => setShowAiGenerateModal(false)}
+                  variant="outline"
+                  style={styles.modalButton}
+                />
+                <Button
+                  title="Genera"
+                  onPress={handleAIGeneratePlan}
+                  style={styles.modalButton}
+                />
+              </View>
+            )}
+
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale Libreria Esercizi */}
+      <Modal visible={showLibraryPicker} animationType="slide" transparent={false}>
+        <SafeAreaView style={styles.libraryModalContainer}>
+          <View style={styles.libraryModalHeader}>
+            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalBack}>
+              <Ionicons name="arrow-back" size={22} color={colors.accent} />
+              <Text style={styles.libraryModalBackText}>Indietro</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
+
+          <View style={styles.libraryModalSearch}>
+            <InputField
+              label=""
+              value={librarySearch}
+              onChangeText={setLibrarySearch}
+              placeholder="Cerca esercizio..."
+            />
+          </View>
+
+          <View style={styles.libraryFilterRow}>
+            {(['all', 'male', 'female'] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
+                onPress={() => setLibraryGenderFilter(f)}
+              >
+                <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
+                  {f === 'all' ? `Tutti (${exerciseLibrary.length})` : f === 'male' ? 'Uomo' : 'Donna'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <FlatList
+            data={filteredLibrary}
+            keyExtractor={(item) => item.id}
+            style={styles.libraryFlatList}
+            renderItem={({ item: libEx }) => (
+              <TouchableOpacity
+                style={styles.libraryItem}
+                onPress={() => selectFromLibrary(libEx)}
+              >
+                <View style={styles.libraryItemLeft}>
+                  <Text style={styles.libraryItemName}>{libEx.name}</Text>
+                  <Text style={styles.libraryItemDesc} numberOfLines={2}>{libEx.description}</Text>
+                  <View style={styles.libraryItemMeta}>
+                    <Text style={styles.libraryItemBadge}>{libEx.sets}x{libEx.reps}</Text>
+                    <Text style={styles.libraryItemBadge}>Rec: {libEx.restSeconds}s</Text>
+                    <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
+                    {libEx.videoUrl && !libEx.videoUrlAlt && (
+                      <View style={styles.libraryVideoBadge}>
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoLabel || 'Video'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  {libEx.videoUrl && libEx.videoUrlAlt && (
+                    <View style={styles.libraryVideoChoice}>
+                      <TouchableOpacity
+                        style={styles.libraryVideoBadge}
+                        onPress={() => selectFromLibrary(libEx, 'principale')}
+                      >
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoLabel || 'Film 1'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.libraryVideoBadge}
+                        onPress={() => selectFromLibrary(libEx, 'alt')}
+                      >
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>
+                          {libEx.videoAltLabel || 'Film 2'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+                <Ionicons name="add-circle" size={26} color={colors.accent} />
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.libraryEmptyContainer}>
+                <Ionicons name="barbell-outline" size={48} color={colors.textLight} />
+                <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
+              </View>
+            }
+            ItemSeparatorComponent={() => <View style={styles.libraryItemSeparator} />}
+          />
+        </SafeAreaView>
+      </Modal>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -1007,31 +2119,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.sm,
   },
-  studentScroll: {
-    marginBottom: spacing.md,
-  },
-  studentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
-    backgroundColor: colors.surface,
-    marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-  },
-  studentChipActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  studentChipText: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  studentChipTextActive: {
-    color: colors.textOnAccent,
-  },
   dayScroll: {
     marginBottom: spacing.md,
   },
@@ -1065,7 +2152,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   dayBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '700',
   },
@@ -1083,6 +2170,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.md,
   },
+  exerciseOrderCol: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  moveBtn: {
+    padding: 2,
+  },
+  moveBtnDisabled: {
+    opacity: 0.3,
+  },
   exerciseNumber: {
     width: 28,
     height: 28,
@@ -1092,7 +2189,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   exerciseNumberText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
     fontSize: fontSize.sm,
   },
@@ -1114,6 +2211,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  restPauseBadge: {
+    fontSize: fontSize.xs,
+    color: colors.accent,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  restPauseBox: {
+    backgroundColor: colors.accent + '10',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+    marginBottom: spacing.sm,
+  },
+  restPauseInfo: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    lineHeight: 17,
+  },
   videoLink: {
     fontSize: fontSize.sm,
     color: colors.info,
@@ -1132,6 +2249,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: spacing.xs,
   },
+  editHint: {
+    fontSize: 11,
+    color: colors.accent,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   emptyText: {
     color: colors.textSecondary,
     textAlign: 'center',
@@ -1143,7 +2266,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1285,7 +2408,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   templateGenderText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
     fontSize: fontSize.md,
   },
@@ -1361,8 +2484,285 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   activeBadgeText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.xs,
     fontWeight: '800',
+  },
+  newPlanBtn: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  newPlanBtnText: {
+    color: colors.accent,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  historyActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    gap: spacing.sm,
+  },
+  historyEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  historyEditText: {
+    color: colors.info,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  historyDetailActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: spacing.sm,
+  },
+  saveAsTemplateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  saveAsTemplateBtnMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.md,
+  },
+  saveAsTemplateText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+  },
+  saveAsTemplateMainText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  libraryPickerToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent + '10',
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent + '30',
+    marginBottom: spacing.md,
+  },
+  libraryPickerToggleText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  libraryModalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  libraryModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  libraryModalBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.md,
+    gap: spacing.xs,
+  },
+  libraryModalBackText: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  libraryModalTitle: {
+    fontSize: fontSize.xxl,
+    fontWeight: '700',
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  libraryModalSearch: {
+    paddingHorizontal: spacing.md,
+  },
+  libraryFilterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  libraryFilterChip: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  libraryFilterChipActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  libraryFilterText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  libraryFilterTextActive: {
+    color: colors.textOnAccent,
+  },
+  libraryFlatList: {
+    flex: 1,
+  },
+  libraryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  libraryItemLeft: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  libraryItemName: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  libraryItemDesc: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  libraryItemMeta: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+    flexWrap: 'wrap',
+  },
+  libraryItemBadge: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    overflow: 'hidden',
+  },
+  libraryVideoChoice: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  libraryVideoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.success,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  libraryVideoBadgeText: {
+    fontSize: fontSize.xs,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  libraryItemSeparator: {
+    height: 1,
+    backgroundColor: colors.divider,
+    marginHorizontal: spacing.md,
+  },
+  libraryEmptyContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.md,
+  },
+  libraryEmptyText: {
+    color: colors.textSecondary,
+    textAlign: 'center',
+    fontSize: fontSize.md,
+  },
+  saveToLibraryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  saveToLibraryText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  aiGenerateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.md,
+    ...shadows.small,
+  },
+  aiGenerateBtnText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+  },
+  aiGenHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  aiGenHeaderText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  aiGenLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  aiGenLoadingText: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.accent,
+    marginTop: spacing.sm,
+  },
+  aiGenLoadingSubtext: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
   },
 });

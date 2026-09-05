@@ -8,7 +8,10 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -22,13 +25,16 @@ import {
   subscribeToUserChatRooms,
   subscribeToAllChatRooms,
   subscribeToPresence,
+  deleteChatRoom,
 } from '../../services/chatService';
-import { getUserProfile, getStudents, getCollaborators } from '../../services/authService';
+import { getUserProfile, getStudents, getCollaborators, getManagers } from '../../services/authService';
+import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { ChatConversationScreen } from './ChatConversationScreen';
 import { crossAlert } from '../../utils/alert';
 
 export const ChatListScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
+  const navigation = useNavigation<any>();
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [participants, setParticipants] = useState<Record<string, User>>({});
   const [selectedRoom, setSelectedRoom] = useState<ChatRoom | null>(null);
@@ -38,22 +44,42 @@ export const ChatListScreen: React.FC = () => {
   const [availableContacts, setAvailableContacts] = useState<User[]>([]);
   const [creatingChat, setCreatingChat] = useState(false);
   const [presence, setPresence] = useState<Record<string, { isOnline: boolean; lastSeen: Date | null }>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const loadParticipantProfiles = useCallback(async (chatRooms: ChatRoom[]) => {
-    const userIds = new Set<string>();
-    chatRooms.forEach((room) => {
-      room.participants.forEach((id) => userIds.add(id));
-    });
-
-    const profiles: Record<string, User> = {};
-    await Promise.all(
-      Array.from(userIds).map(async (id) => {
-        const profile = await getUserProfile(id);
-        if (profile) profiles[id] = profile;
-      })
-    );
-    setParticipants((prev) => ({ ...prev, ...profiles }));
-  }, []);
+  const loadParticipantProfiles = useCallback(async (_chatRooms: ChatRoom[]) => {
+    try {
+      const [students, collaborators, managers] = await Promise.allSettled([
+        getStudents(),
+        getCollaborators(),
+        getManagers(),
+      ]);
+      const profiles: Record<string, User> = {};
+      const addAll = (list: User[]) => list.forEach((u) => { profiles[u.id] = u; });
+      if (students.status === 'fulfilled') addAll(students.value);
+      if (collaborators.status === 'fulfilled') addAll(collaborators.value);
+      if (managers.status === 'fulfilled') addAll(managers.value);
+      if (user) profiles[user.id] = user;
+      setParticipants(profiles);
+    } catch {
+      // fallback: load individually
+      const userIds = new Set<string>();
+      _chatRooms.forEach((room) => {
+        if (room.participants) room.participants.forEach((id) => { if (id) userIds.add(id); });
+        if (room.studentId) userIds.add(room.studentId);
+        if (room.collaboratorId) userIds.add(room.collaboratorId);
+      });
+      const profiles: Record<string, User> = {};
+      await Promise.allSettled(
+        Array.from(userIds).map(async (id) => {
+          try {
+            const profile = await getUserProfile(id);
+            if (profile) profiles[id] = profile;
+          } catch { /* skip */ }
+        })
+      );
+      setParticipants((prev) => ({ ...prev, ...profiles }));
+    }
+  }, [user]);
 
   const loadRooms = useCallback(async () => {
     if (!user) return;
@@ -114,25 +140,28 @@ export const ChatListScreen: React.FC = () => {
         // Collaboratore/Manager: mostra i propri allievi
         const allStudents = await getStudents();
         const myStudents = allStudents.filter(
-          (s) => (s.assignedCollaboratorId === user.id || (isManager && s.assignedManagerId === user.id)) && s.isActive
+          (s) => (isStudentAssignedTo(s, user.id) || (isManager && s.assignedManagerId === user.id)) && s.isActive
         );
         setAvailableContacts(myStudents);
       } else if (isStudent) {
         // Allievo: mostra il suo collaboratore assegnato
         const studentProfile = user as unknown as Student;
-        if (studentProfile.assignedCollaboratorId) {
-          const collab = await getUserProfile(studentProfile.assignedCollaboratorId);
-          setAvailableContacts(collab ? [collab] : []);
+        const coachIds = getStudentCoachIds(studentProfile);
+        if (coachIds.length > 0) {
+          const coaches = await Promise.all(coachIds.map((id) => getUserProfile(id)));
+          setAvailableContacts(coaches.filter(Boolean) as any[]);
         } else {
           setAvailableContacts([]);
         }
       } else if (isOwner) {
-        // Owner: mostra tutti collaboratori e allievi
-        const [allStudents, allCollaborators] = await Promise.all([
+        // Owner: mostra tutti collaboratori, manager e allievi
+        const [allStudents, allCollaborators, allManagers] = await Promise.all([
           getStudents(),
           getCollaborators(),
+          getManagers(),
         ]);
         setAvailableContacts([
+          ...allManagers.filter((m) => m.isActive && m.id !== user.id),
           ...allCollaborators.filter((c) => c.isActive),
           ...allStudents.filter((s) => s.isActive),
         ]);
@@ -153,19 +182,17 @@ export const ChatListScreen: React.FC = () => {
       if (isStudent) {
         studentId = user.id;
         collaboratorId = contact.id;
-      } else if (isCollaborator) {
+      } else if (isCollaborator || isManager) {
         studentId = contact.id;
         collaboratorId = user.id;
       } else {
-        // Owner: determina ruoli in base al contatto
+        // Owner: chat diretta con il contatto selezionato
         if (contact.role === 'student') {
-          const student = contact as unknown as Student;
           studentId = contact.id;
-          collaboratorId = student.assignedCollaboratorId || user.id;
+          collaboratorId = user.id;
         } else {
-          crossAlert('Info', 'Seleziona un allievo per avviare la chat con il suo collaboratore');
-          setCreatingChat(false);
-          return;
+          studentId = user.id;
+          collaboratorId = contact.id;
         }
       }
 
@@ -188,38 +215,112 @@ export const ChatListScreen: React.FC = () => {
     }
   };
 
+  const handleDeleteChat = (room: ChatRoom) => {
+    const name = getOtherParticipantName(room);
+    crossAlert('Elimina Chat', `Eliminare la conversazione con ${name}? Tutti i messaggi saranno cancellati.`, [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Elimina',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteChatRoom(room.id);
+            crossAlert('Successo', 'Chat eliminata');
+          } catch {
+            crossAlert('Errore', 'Impossibile eliminare la chat');
+          }
+        },
+      },
+    ]);
+  };
+
   const getOtherParticipantName = (room: ChatRoom): string => {
     if (!user) return '';
-    const otherId = room.participants.find((id) => id !== user.id);
+
+    // Chat di gruppo/team: usa il nome della room
+    if (room.chatType === 'team' || room.type === 'group') {
+      if (room.name) return room.name;
+      const names = (room.participants || [])
+        .filter((id) => id && id !== user.id && participants[id])
+        .map((id) => { const p = participants[id]; return `${p.name}`; });
+      return names.length > 0 ? names.join(', ') : 'Chat di Gruppo';
+    }
+
+    // Owner: mostra entrambi i nomi (allievo ↔ collaboratore)
+    if (isOwner) {
+      const student = room.studentId ? participants[room.studentId] : null;
+      const collab = room.collaboratorId ? participants[room.collaboratorId] : null;
+      if (student || collab) {
+        const studentName = student ? `${student.name} ${student.surname}` : 'Allievo';
+        const collabName = collab ? `${collab.name} ${collab.surname}` : 'Collaboratore';
+        return `${studentName} ↔ ${collabName}`;
+      }
+      // Fallback: prova dall'array participants
+      const names = (room.participants || [])
+        .filter((id) => id && participants[id])
+        .map((id) => { const p = participants[id]; return `${p.name} ${p.surname}`; });
+      return names.length > 0 ? names.join(' ↔ ') : 'Chat';
+    }
+
+    // Manager/Collaboratore: mostra il nome dell'allievo
+    if ((isManager || isCollaborator) && room.studentId && participants[room.studentId]) {
+      const s = participants[room.studentId];
+      return `${s.name} ${s.surname}`;
+    }
+
+    // Fallback: mostra l'altro partecipante
+    const otherId = (room.participants || []).find((id) => id && id !== user.id);
     if (otherId && participants[otherId]) {
       const p = participants[otherId];
       return `${p.name} ${p.surname}`;
     }
-    // Per l'owner, mostra entrambi i nomi
-    if (isOwner) {
-      const student = participants[room.studentId];
-      const collab = participants[room.collaboratorId];
-      const studentName = student ? `${student.name} ${student.surname}` : 'Allievo';
-      const collabName = collab ? `${collab.name} ${collab.surname}` : 'Collaboratore';
-      return `${studentName} ↔ ${collabName}`;
-    }
     return 'Chat';
   };
 
+  const getUserRoleLabel = (u: User): string => {
+    if (u.role === 'owner') return 'Owner';
+    if (u.role === 'manager') return 'Manager';
+    if (u.role === 'collaborator') {
+      const c = u as unknown as Collaborator;
+      return c.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    }
+    return 'Allievo';
+  };
+
   const getParticipantRole = (room: ChatRoom): string => {
-    if (isOwner) return 'Allievo ↔ Collaboratore';
-    const otherId = room.participants.find((id) => id !== user?.id);
+    if (room.chatType === 'team' || room.type === 'group') return 'Chat di Gruppo';
+    if (isOwner) {
+      const student = room.studentId ? participants[room.studentId] : null;
+      const collab = room.collaboratorId ? participants[room.collaboratorId] : null;
+      const sRole = student ? getUserRoleLabel(student) : 'Allievo';
+      const cRole = collab ? getUserRoleLabel(collab) : 'Collaboratore';
+      return `${sRole} ↔ ${cRole}`;
+    }
+    if (isManager || isCollaborator) return 'Allievo';
+    const otherId = (room.participants || []).find((id) => id && id !== user?.id);
     if (otherId && participants[otherId]) {
-      return participants[otherId].role === 'collaborator' ? 'Collaboratore' : 'Allievo';
+      return getUserRoleLabel(participants[otherId]);
     }
     return '';
   };
 
   const getRoleBadge = (contact: User): string => {
-    if (contact.role === 'collaborator') return 'Coach';
+    if (contact.role === 'manager') return 'Manager';
+    if (contact.role === 'collaborator') {
+      const c = contact as unknown as Collaborator;
+      return c.collaboratorType === 'nutritionist' ? 'Nutrizionista' : 'Coach';
+    }
     if (contact.role === 'student') return 'Allievo';
     return contact.role;
   };
+
+  const filteredRooms = rooms.filter((room) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = getOtherParticipantName(room).toLowerCase();
+    const lastMsg = room.lastMessage?.text?.toLowerCase() || '';
+    return name.includes(q) || lastMsg.includes(q);
+  });
 
   if (selectedRoom) {
     return (
@@ -247,15 +348,35 @@ export const ChatListScreen: React.FC = () => {
         </Text>
       </View>
 
+      {/* Scorciatoie fisse: canali sempre disponibili (M2) */}
+      <View style={styles.pinnedRow}>
+        {(isOwner || isManager || isCollaborator) && (
+          <TouchableOpacity
+            style={styles.pinnedChip}
+            onPress={() => { try { navigation.navigate('TeamChat'); } catch { /* rotta assente */ } }}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="people" size={16} color={colors.accent} />
+            <Text style={styles.pinnedChipText}>Chat del team</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.pinnedChip}
+          onPress={() => { try { navigation.navigate('Assistente'); } catch { /* rotta assente */ } }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="sparkles" size={16} color={colors.accent} />
+          <Text style={styles.pinnedChipText}>Assistente</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Pulsante Nuova Chat */}
-      {!isOwner && (
-        <View style={styles.newChatContainer}>
-          <Button
-            title="+ Nuova Conversazione"
-            onPress={handleNewChat}
-          />
-        </View>
-      )}
+      <View style={styles.newChatContainer}>
+        <Button
+          title="+ Nuova Conversazione"
+          onPress={handleNewChat}
+        />
+      </View>
 
       {isOwner && (
         <View style={styles.ownerActions}>
@@ -280,8 +401,24 @@ export const ChatListScreen: React.FC = () => {
         </View>
       )}
 
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color={colors.textLight} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cerca chat..."
+          placeholderTextColor={colors.textLight}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={18} color={colors.textLight} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
-        data={rooms}
+        data={filteredRooms}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         refreshControl={
@@ -322,6 +459,15 @@ export const ChatListScreen: React.FC = () => {
                     <View style={styles.anonBadge}>
                       <Text style={styles.anonBadgeText}>Anon</Text>
                     </View>
+                  )}
+                  {isOwner && (
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDeleteChat(item)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.error} />
+                    </TouchableOpacity>
                   )}
                 </View>
               </Card>
@@ -390,6 +536,28 @@ export const ChatListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  pinnedRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  pinnedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pinnedChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.text,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -441,7 +609,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modeTextActive: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   list: {
     padding: spacing.md,
@@ -475,7 +643,7 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   roomAvatarText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.lg,
     fontWeight: '700',
   },
@@ -508,6 +676,30 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontWeight: '700',
   },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
+  },
+  deleteBtn: {
+    padding: spacing.sm,
+    marginLeft: spacing.xs,
+  },
   emptyText: {
     color: colors.textSecondary,
     textAlign: 'center',
@@ -516,7 +708,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -551,7 +743,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   contactAvatarText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },

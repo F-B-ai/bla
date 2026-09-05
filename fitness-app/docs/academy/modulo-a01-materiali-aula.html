@@ -1,0 +1,693 @@
+<title>Materiali d'aula A-01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#FCFBF8; --paper-box:#F4EEE2; --paper-sunk:#F2F1ED;
+    --ink:#1A1A1A; --ink-soft:#3E3C39; --ink-faint:#6B6862;
+    --rule:#D8D4CB; --rule-soft:#E7E4DC;
+    --red:#9B1B30; --red-deep:#6E1322; --red-wash:#F6E7E7;
+    --aula:#2C5A63; --aula-wash:#E4EEEF;
+    --bar:#1C1C1C; --bar-ink:#FFFFFF;
+    --cut:#B9B3A7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+      --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+      --rule:#33302A; --rule-soft:#262420;
+      --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+      --aula:#7FBAC4; --aula-wash:#16262A;
+      --bar:#E4E0D6; --bar-ink:#14130F; --cut:#4A463E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --aula:#7FBAC4; --aula-wash:#16262A;
+    --bar:#E4E0D6; --bar-ink:#14130F; --cut:#4A463E;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:Tinos,"Times New Roman",Times,serif; font-size:17px; line-height:1.6; }
+  .sheet { max-width:820px; margin:0 auto; padding:clamp(30px,6vw,72px) clamp(20px,5vw,52px) 96px; }
+
+  .ente { text-align:center; color:var(--red); font-weight:700; font-size:0.84rem;
+    letter-spacing:0.09em; line-height:2; text-transform:uppercase; }
+  .short-rule { width:116px; height:1px; background:var(--red); border:0; margin:18px auto; }
+  h1.titolo { font-size:clamp(1.9rem,5.6vw,2.8rem); font-weight:700; text-align:center;
+    margin:8px 0 18px; line-height:1.1; text-wrap:balance; }
+  .cod-grande { display:block; text-align:center; font-family:"IBM Plex Sans",system-ui,sans-serif;
+    font-size:0.86rem; letter-spacing:0.14em; color:var(--red); font-weight:600; margin-bottom:12px; }
+  .sottotitolo { font-style:italic; text-align:center; color:var(--ink-soft);
+    font-size:1.04rem; margin:0 auto 8px; max-width:32em; text-wrap:balance; }
+
+  h2 { font-size:1.36rem; font-weight:700; color:var(--red); margin:0 0 4px;
+    line-height:1.25; text-wrap:balance; }
+  .cap-rule { width:100%; height:2px; background:var(--red); border:0; margin:0 0 8px; }
+  .kit-cod { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.72rem;
+    letter-spacing:0.07em; color:var(--aula); border:1px solid var(--aula);
+    padding:2px 8px; display:inline-block; margin-bottom:10px; }
+  h3 { font-size:1.04rem; font-weight:700; margin:26px 0 8px; }
+  p { margin:0 0 13px; }
+  ul, ol { margin:0 0 15px; padding-left:1.25em; }
+  li { margin-bottom:6px; }
+
+  .sezione { margin-top:64px; }
+  .istruzioni { background:var(--paper-sunk); border-left:4px solid var(--aula);
+    padding:14px 18px; margin:16px 0 26px; font-size:0.95rem; }
+  .istruzioni p:last-child { margin:0; }
+  .istruzioni b { color:var(--aula); }
+
+  /* ---------- carte a libretto ---------- */
+  .carte { display:grid; gap:14px; margin:24px 0; }
+  .carta { display:grid; grid-template-columns:1fr 1fr; border:1.5px dashed var(--cut); }
+  .c-fronte, .c-retro { padding:16px 18px; }
+  .c-fronte { border-right:1.5px dashed var(--cut); background:var(--paper); }
+  .c-retro { background:var(--paper-sunk); }
+  .c-num { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.66rem;
+    letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:6px; }
+  .c-nome { font-size:1.12rem; font-weight:700; line-height:1.25; margin:0 0 6px; }
+  .c-en { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.72rem;
+    color:var(--ink-faint); letter-spacing:0.03em; margin:0 0 10px; }
+  .c-aum { font-style:italic; color:var(--ink-soft); margin:0; font-size:0.95rem; }
+  .c-riga { display:flex; gap:8px; align-items:baseline; margin-bottom:8px; flex-wrap:wrap; }
+  .c-lab { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.64rem;
+    letter-spacing:0.07em; text-transform:uppercase; color:var(--ink-faint); min-width:5.4em; }
+  .c-val { font-weight:700; font-size:0.94rem; }
+  .fonte { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.66rem;
+    letter-spacing:0.05em; text-transform:uppercase; padding:1px 6px;
+    border:1px solid currentColor; white-space:nowrap; }
+  .f-dati { color:var(--aula); } .f-mista { color:var(--ink-faint); } .f-occhio { color:var(--red); }
+  .c-es { font-size:0.9rem; color:var(--ink-soft); margin:8px 0 0; line-height:1.5; }
+
+  /* ---------- casi ---------- */
+  .caso { border:1px solid var(--rule); margin:22px 0; }
+  .caso-t { background:var(--bar); color:var(--bar-ink); padding:9px 16px;
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.8rem;
+    letter-spacing:0.05em; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .caso-b { padding:16px 18px; }
+  .caso-b p:last-child { margin:0; }
+  .dati { width:100%; border-collapse:collapse; font-size:0.9rem; margin:0 0 12px; }
+  .dati th { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.7rem;
+    letter-spacing:0.05em; text-transform:uppercase; color:var(--ink-faint);
+    text-align:left; padding:5px 10px 5px 0; font-weight:500; border-bottom:1px solid var(--rule); }
+  .dati td { padding:6px 10px 6px 0; border-bottom:1px solid var(--rule-soft);
+    font-variant-numeric:tabular-nums; }
+  .dati td:first-child { font-weight:700; white-space:nowrap; }
+  .contorno { font-size:0.92rem; color:var(--ink-soft); margin:10px 0 0; }
+  .contorno b { color:var(--ink); }
+  .consegna-riga { border-top:1px solid var(--rule); margin-top:14px; padding-top:12px;
+    font-style:italic; color:var(--ink-soft); font-size:0.93rem; }
+
+  .soluzione { border:1px solid var(--red); background:var(--red-wash); padding:14px 18px; margin:14px 0; }
+  .soluzione .s-t { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.7rem;
+    letter-spacing:0.07em; text-transform:uppercase; color:var(--red); margin-bottom:8px; }
+  .soluzione p { margin:0 0 8px; font-size:0.95rem; }
+  .soluzione p:last-child { margin:0; }
+  .soluzione b { color:var(--red-deep); }
+
+  /* ---------- foglio allievo ---------- */
+  .allievo { border:2px solid var(--ink); padding:clamp(20px,4vw,32px); margin:24px 0; }
+  .allievo h3 { margin-top:0; }
+  .catena-mini { display:grid; gap:0; border:1px solid var(--rule); margin:14px 0 20px; }
+  .cm-riga { display:grid; grid-template-columns:2em 8.6em 1fr; gap:12px;
+    padding:8px 12px; border-bottom:1px solid var(--rule-soft); font-size:0.94rem; align-items:baseline; }
+  .cm-riga:last-child { border-bottom:0; }
+  .cm-riga.ultima { background:var(--red-wash); }
+  .cm-n { font-family:"IBM Plex Sans",system-ui,sans-serif; color:var(--red); font-weight:600; }
+  .cm-nome { font-weight:700; }
+  .cm-dom { font-style:italic; color:var(--ink-soft); }
+  .cancelli-mini { display:grid; gap:0; border:1px solid var(--rule); margin:14px 0 20px; }
+  .cnc { display:grid; grid-template-columns:1fr 10.5em; gap:12px; padding:8px 12px;
+    border-bottom:1px solid var(--rule-soft); font-size:0.94rem; align-items:baseline; }
+  .cnc:last-child { border-bottom:0; }
+  .cnc .sog { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.8rem;
+    color:var(--aula); text-align:right; font-variant-numeric:tabular-nums; }
+  .diario { width:100%; border-collapse:collapse; font-size:0.9rem; margin-top:10px; }
+  .diario th { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.68rem;
+    letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-faint);
+    text-align:left; padding:6px 8px; border-bottom:1px solid var(--ink); font-weight:500; }
+  .diario td { border-bottom:1px solid var(--rule); height:2.5em; padding:6px 8px; }
+
+  .nota-piede { font-style:italic; color:var(--ink-faint); font-size:0.92rem; margin:20px 0 0; }
+  .colophon { margin-top:60px; padding-top:18px; border-top:2px solid var(--red);
+    font-size:0.84rem; color:var(--ink-faint); line-height:1.7; }
+
+  @media print {
+    body { background:#fff; font-size:11pt; }
+    .sheet { padding:0; max-width:none; }
+    .sezione { break-before:page; }
+    .carta, .caso, .allievo, .soluzione { break-inside:avoid; }
+    .solo-schermo { display:none; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport · Mind Movement Lab — Gragnano (NA)<br>
+    Accademia · Livello 1 · Modulo A-01
+  </p>
+  <hr class="short-rule">
+  <span class="cod-grande">Kit K-2 · K-3 · K-4 · K-7</span>
+  <h1 class="titolo">Materiali d'aula</h1>
+  <p class="sottotitolo">Le undici carte, i nove casi con le soluzioni, e il foglio
+    dell'allievo — da stampare così come sono</p>
+
+  <div class="istruzioni">
+    <p><b>Come si stampa.</b> Ogni sezione parte su una pagina nuova. Le carte sono
+      <b>a libretto</b>: si stampa su un lato solo, si taglia lungo il tratteggio esterno e si
+      piega a metà sulla linea centrale — fronte e retro combaciano da soli, senza il rischio di
+      disallineamento della stampa fronte-retro.</p>
+    <p>Le <b>soluzioni</b> dei casi sono in coda a ciascun caso: prima di fotocopiare per l'aula,
+      piega o copri quella parte. Il fascicolo intero, com'è, è la tua copia.</p>
+  </div>
+
+  <!-- ============ K-2 ============ -->
+  <div class="sezione">
+    <span class="kit-cod">K-2</span>
+    <h2>Le undici carte degli assi</h2>
+    <hr class="cap-rule">
+    <p>Un mazzo per gruppo di tre. Fronte a sinistra, retro a destra. In aula si distribuiscono
+      <strong>a fronte in su</strong>: l'esercizio è collocare ogni carta nella casella giusta
+      della catena <em>prima</em> di girarla. Il retro si scopre solo dopo la correzione — ed è
+      lì che compare la fonte, che è il momento più importante delle tre ore.</p>
+
+    <div class="carte">
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 01</p>
+          <p class="c-nome">Esposizione progressiva</p>
+          <p class="c-en">Progressive Exposure</p>
+          <p class="c-aum">Aumenta l'esposizione alla richiesta.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Esposizione</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-occhio">occhio</span></div>
+          <p class="c-es"><b>ROM, velocità, instabilità e durata non si registrano sotto il
+            bilanciere.</b> L'app conta le sedute e la tenuta isometrica; il resto lo dichiari tu.</p>
+          <p class="c-es">Squat a ROM parziale → ROM completo → ROM completo con più carico →
+            e poi con più velocità concentrica.</p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 02</p>
+          <p class="c-nome">Sovraccarico progressivo</p>
+          <p class="c-en">Progressive Overload</p>
+          <p class="c-aum">Aumenta il carico esterno.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">Peso della serie migliore, seduta per seduta.</p>
+          <p class="c-es">Squat 80 kg × 8 → 82,5 × 8 → 85 × 8.</p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 03</p>
+          <p class="c-nome">Volume progressivo</p>
+          <p class="c-en">Progressive Volume</p>
+          <p class="c-aum">Aumenta la quantità di lavoro.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">Serie × ripetizioni × carico, sommato sulla seduta.</p>
+          <p class="c-es">3 × 8 × 70 kg = 1.680 kg → 3 × 10 × 70 kg = 2.100 kg.
+            <b>Stesso peso, più lavoro.</b></p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 04</p>
+          <p class="c-nome">Intensità progressiva</p>
+          <p class="c-en">Progressive Intensity</p>
+          <p class="c-aum">Aumenta l'intensità relativa.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">Carico della serie migliore rapportato al massimale stimato dallo
+            storico (Epley).</p>
+          <p class="c-es">100 kg è un carico assoluto. 100 kg all'85% del massimale è
+            un'<b>intensità</b>.</p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 05</p>
+          <p class="c-nome">Prossimità al cedimento</p>
+          <p class="c-en">Progressive Proximity to Failure</p>
+          <p class="c-aum">Aumenta la fatica dentro la serie.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">RIR calcolato dall'RPE registrato (RIR = 10 − RPE).
+            <b>Senza RPE, questo asse resta cieco.</b></p>
+          <p class="c-es">3 RIR → 2 RIR → 1 RIR → 0-1 RIR, con lo stesso peso.</p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 06</p>
+          <p class="c-nome">Densità progressiva</p>
+          <p class="c-en">Progressive Density</p>
+          <p class="c-aum">Aumenta il lavoro per unità di tempo.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">Volume della seduta diviso la durata reale della seduta.</p>
+          <p class="c-es">4 serie in 20 minuti → in 18 → in 16.
+            <b>Stesso lavoro, più densità.</b></p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 07</p>
+          <p class="c-nome">Complessità progressiva</p>
+          <p class="c-en">Progressive Complexity</p>
+          <p class="c-aum">Aumenta la complessità del compito motorio.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-mista">mista</span></div>
+          <p class="c-es">L'app vede il cambio di esercizio e di tecnica. Gradi di libertà,
+            stabilizzazione e controllo del centro di massa li giudichi tu.</p>
+          <p class="c-es">Squat → split squat → bulgarian split squat → squat monopodalico.
+            <b>Il peso può non cambiare.</b></p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 08</p>
+          <p class="c-nome">Domanda meccanica progressiva</p>
+          <p class="c-en">Progressive Mechanical Demand</p>
+          <p class="c-aum">Aumenta la richiesta meccanica reale.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-occhio">occhio</span></div>
+          <p class="c-es">Momento articolare, braccio di leva, profilo di resistenza e curva
+            forza-lunghezza non sono misurabili da uno smartphone.
+            <b>Qui l'app tace di proposito.</b></p>
+          <p class="c-es">20 kg in due esercizi diversi non sono 20 kg di stimolo meccanico.</p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 09</p>
+          <p class="c-nome">Richiesta tecnica progressiva</p>
+          <p class="c-en">Progressive Technical Demand</p>
+          <p class="c-aum">Aumenta la qualità con cui il carico viene gestito.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Domanda</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-mista">mista</span></div>
+          <p class="c-es">Dall'analisi dello squat: valgo del ginocchio, shift dell'anca,
+            inclinazione del tronco. Numeri veri, in gradi e percentuale.</p>
+          <p class="c-es">100 kg × 8 con compensi → 100 kg × 8 puliti. <b>Il carico non è salito:
+            è salita la qualità.</b></p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 10</p>
+          <p class="c-nome">Adattamento progressivo</p>
+          <p class="c-en">Progressive Adaptation</p>
+          <p class="c-aum">Aumenta la capacità di tollerare lo stimolo.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Adattamento</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-dati">dati</span></div>
+          <p class="c-es">Stesso carico che diventa più facile: RIR che sale, o ripetizioni che
+            salgono a parità di peso.</p>
+          <p class="c-es">50 kg × 10 con enorme fatica; sei settimane dopo, 50 kg × 10 facili.
+            <b>Il carico non è cambiato: è cambiata la persona.</b></p>
+        </div>
+      </div>
+
+      <div class="carta">
+        <div class="c-fronte">
+          <p class="c-num">Asse 11</p>
+          <p class="c-nome">Capacità progressiva</p>
+          <p class="c-en">Progressive Capacity</p>
+          <p class="c-aum">Aumenta ciò che il soggetto sa fare oggi.</p>
+        </div>
+        <div class="c-retro">
+          <div class="c-riga"><span class="c-lab">Casella</span><span class="c-val">Capacità</span></div>
+          <div class="c-riga"><span class="c-lab">Fonte</span><span class="fonte f-mista">mista</span></div>
+          <p class="c-es">Forza, lavoro sostenibile e carico tollerato dai dati; movimento,
+            controllo e recupero dalle valutazioni.</p>
+          <p class="c-es">La domanda finale non è «quanto ha alzato», ma <b>«quanto è capace di
+            fare oggi rispetto a prima»</b>.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ K-3 ============ -->
+  <div class="sezione">
+    <span class="kit-cod">K-3</span>
+    <h2>I sei casi — scegli l'asse, e giustificalo</h2>
+    <hr class="cap-rule">
+    <div class="istruzioni">
+      <p><b>Consegna, da leggere ad alta voce prima di distribuire.</b> Per ogni caso: quale asse
+        aumentate, e due righe di motivazione <b>con i numeri dentro</b>. Una risposta senza numeri
+        è sbagliata anche quando l'asse è giusto.</p>
+      <p>Trenta minuti, gruppi di tre, un caso per gruppo alla correzione a voce.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 1 — Marta, 34 anni</span><span>obiettivo: ipertrofia</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Panca piana</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>60 kg × 8</td><td>8</td><td>3</td><td>52 min</td></tr>
+          <tr><td>Seduta B</td><td>60 kg × 8</td><td>7</td><td>3</td><td>50 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 72/100 · <b>Qualità:</b> compensi stabili, ROM
+          completo · <b>Assi usati nelle ultime due progressioni:</b> nessuno registrato.</p>
+        <p class="consegna-riga">Che cosa aumenti, e perché proprio quello?</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 1</p>
+      <p><b>Asse: volume progressivo.</b></p>
+      <p>Nessun cancello è chiuso: due sedute confrontabili, prontezza 72, compensi stabili, ROM
+        completo. L'adattamento è visibile e del tipo più pulito che esista: stesso carico
+        (60 × 8 → 60 × 8) con una riserva in più a fine serie, da 2 a 3 RIR. Il sistema ha
+        risposto, quindi si aumenta. Obiettivo ipertrofia e nessun asse usato di recente: si parte
+        dal primo della preferenza, il volume. In pratica: 3 × 10 invece di 3 × 8, stesso peso.</p>
+      <p><em>L'errore da attendersi:</em> «aumento il carico perché è più facile». È l'asse
+        sbagliato per l'obiettivo, e soprattutto è la risposta data senza guardare la preferenza.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 2 — Marta, tre settimane dopo</span><span>obiettivo: ipertrofia</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Panca piana</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>65 kg × 10</td><td>8</td><td>3</td><td>54 min</td></tr>
+          <tr><td>Seduta B</td><td>65 kg × 10</td><td>7</td><td>3</td><td>53 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 75/100 · <b>Qualità:</b> stabile ·
+          <b>Assi usati nelle ultime due progressioni:</b> volume, poi carico.</p>
+        <p class="consegna-riga">Stessa domanda. Attenzione a che cosa è cambiato rispetto al caso 1.</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 2</p>
+      <p><b>Asse: prossimità al cedimento.</b></p>
+      <p>Il quadro è identico al caso 1 — adattamento visibile, 2 → 3 RIR a parità di carico — ma
+        volume e carico sono stati usati nelle ultime due progressioni. <b>La rotazione impedisce
+        di ripeterli</b>, e il primo asse disponibile nella preferenza per l'ipertrofia è il
+        cedimento. In pratica: stessi 65 kg × 10, ma chiudendo le serie a 1 RIR invece che a 3.</p>
+      <p><em>Perché la rotazione esiste:</em> insistere sempre sullo stesso asse spegne
+        l'adattamento e nasconde le altre vie. È la differenza fra un programma e una ripetizione.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 3 — Salvatore, 41 anni</span><span>obiettivo: forza</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Squat</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>90 kg × 5</td><td>8</td><td>4</td><td>58 min</td></tr>
+          <tr><td>Seduta B</td><td>95 kg × 5</td><td>8</td><td>4</td><td>60 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 78/100 · <b>Qualità:</b> valgo 6% invariato, angolo
+          al fondo 92° · <b>Assi recenti:</b> nessuno registrato.</p>
+        <p class="consegna-riga">Che cosa aumenti? E che tipo di adattamento stai leggendo?</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 3</p>
+      <p><b>Asse: sovraccarico progressivo</b> (o intensità, argomentandolo sul massimale stimato).</p>
+      <p>Il carico è salito del 5,6% — sopra la soglia del 2,5% che distingue «stesso carico» da
+        «carico salito» — <b>a parità di fatica</b>: 2 RIR in entrambe le sedute. Questo è
+        adattamento del tipo <em>carico salito a stessa fatica</em>, il più forte dei tre. Nessun
+        cancello chiuso, obiettivo forza: il carico è il primo della preferenza. Incremento onesto
+        sui 95 kg: 2,5 kg, mai oltre il 5%.</p>
+      <p><em>La distinzione che devono cogliere:</em> se il RIR fosse sceso da 2 a 0, il carico
+        sarebbe salito <b>con</b> la fatica — e quello non è adattamento, è solo lavoro più duro.
+        Va detto all'allievo con queste parole.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 4 — Anna, 58 anni</span><span>obiettivo: salute</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Goblet squat</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>12 kg × 10</td><td>7</td><td>3</td><td>45 min</td></tr>
+          <tr><td>Seduta B</td><td>12 kg × 12</td><td>7</td><td>3</td><td>45 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 68/100 · <b>Qualità:</b> angolo al fondo 96°,
+          compensi stabili · <b>Assi recenti:</b> nessuno.</p>
+        <p class="consegna-riga">Che cosa aumenti? Attenzione all'obiettivo dichiarato.</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 4</p>
+      <p><b>Asse: esposizione progressiva.</b></p>
+      <p>Adattamento visibile per ripetizioni: stesso carico, da 10 a 12 al top. Nessun cancello
+        chiuso — e attenzione, l'angolo di 96° è <em>sotto</em> la soglia dei 100°, quindi il ROM
+        <b>non</b> è parziale e il cancello 4 non si applica. Ma l'obiettivo è salute, e lì
+        l'ordine di preferenza mette l'<b>esposizione al primo posto e il carico all'ultimo</b>.
+        In pratica: stesso peso, ampiezza maggiore o una variante che espone a un compito nuovo.</p>
+      <p><em>Il punto del caso:</em> stessi numeri, obiettivo diverso, risposta diversa. Chi
+        risponde «volume» sta applicando la preferenza dell'ipertrofia a una persona che non ha
+        quell'obiettivo.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 5 — Ciro, 29 anni</span><span>obiettivo: ipertrofia</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Lat machine</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>45 kg × 10</td><td>—</td><td>4</td><td>55 min</td></tr>
+          <tr><td>Seduta B</td><td>45 kg × 12</td><td>—</td><td>4</td><td>55 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 70/100 · <b>Qualità:</b> stabile ·
+          <b>Assi recenti:</b> volume, poi carico · <b>RPE:</b> mai registrato, in nessuna seduta
+          dello storico.</p>
+        <p class="consegna-riga">Il sistema propone il prossimo asse della rotazione. Puoi
+          applicarlo? Che cosa scrivi sulla scheda?</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 5 — il caso difficile</p>
+      <p><b>La rotazione propone il cedimento. Non è applicabile, e va detto.</b></p>
+      <p>L'adattamento c'è (stesso carico, 10 → 12 ripetizioni) e volume e carico sono esclusi
+        dalla rotazione: il prossimo è il cedimento. Ma il cedimento si governa in RIR, e il RIR si
+        calcola dall'RPE — <b>che qui non è mai stato registrato. L'asse è cieco.</b></p>
+      <p>Le due condotte accettabili, entrambe complete: (a) si passa all'asse successivo, la
+        densità, dichiarando perché si è saltato il cedimento; oppure (b) si comincia a registrare
+        l'RPE da questa seduta, e il cedimento si userà dalla prossima. <b>Non è accettabile</b>
+        scrivere un obiettivo di RIR su uno storico che non ne ha mai avuto uno: sarebbe un numero
+        inventato su una scheda.</p>
+      <p><em>Perché questo caso sta nel modulo:</em> è il primo momento in cui il corsista incontra
+        il limite dichiarato dello strumento e deve decidere lui. È esattamente il mestiere che
+        stiamo certificando.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 6 — Lucia, 46 anni</span><span>obiettivo: ricomposizione</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Circuito, es. guida</th><th>Serie migliore</th><th>RPE</th><th>Volume seduta</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>40 kg × 10</td><td>7</td><td>2.400 kg</td><td>32 min</td></tr>
+          <tr><td>Seduta B</td><td>40 kg × 12</td><td>7</td><td>2.400 kg</td><td>28 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 70/100 · <b>Qualità:</b> stabile ·
+          <b>Assi recenti:</b> nessuno · <b>Densità:</b> 75 → 86 kg/min.</p>
+        <p class="consegna-riga">Che cosa aumenti, e quale numero mostri all'allieva?</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 6</p>
+      <p><b>Asse: densità progressiva.</b></p>
+      <p>Adattamento visibile per ripetizioni a parità di carico, nessun cancello chiuso, obiettivo
+        ricomposizione: la densità è il primo della preferenza. In pratica: stesso lavoro, target
+        26 minuti.</p>
+      <p><em>Il numero da mostrare:</em> 75 → 86 kg al minuto. È la risposta concreta all'allieva
+        che dice «ma il peso è sempre quello»: <b>il peso è quello, il lavoro per minuto è salito
+        del 15%</b>. Saperlo dire in due frasi è la sesta competenza del modulo.</p>
+    </div>
+  </div>
+
+  <!-- ============ K-4 ============ -->
+  <div class="sezione">
+    <span class="kit-cod">K-4</span>
+    <h2>I tre casi che dicono no</h2>
+    <hr class="cap-rule">
+    <div class="istruzioni">
+      <p><b>Consegna.</b> Per ciascuno: quale cancello si è chiuso, che cosa scrivete sulla scheda,
+        e <b>le due frasi che dite all'allievo</b> — senza gergo e senza scusarvi. Le due frasi si
+        leggono ad alta voce alla correzione: è la parte che conta.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 7 — Giuseppe, 37 anni</span><span>obiettivo: forza</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Stacco</th><th>Serie migliore</th><th>RPE</th><th>Serie</th><th>Durata</th></tr>
+          <tr><td>Seduta A</td><td>100 kg × 5</td><td>7</td><td>4</td><td>62 min</td></tr>
+          <tr><td>Seduta B</td><td>100 kg × 6</td><td>7</td><td>4</td><td>60 min</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 31/100 — due notti da quattro ore, trasloco in corso ·
+          <b>Qualità:</b> stabile · Si presenta in sala convinto di salire a 105.</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 7</p>
+      <p><b>Cancello 2 — prontezza sotto 40. Questa settimana non si aumenta niente.</b></p>
+      <p>C'è adattamento (100 × 5 → 100 × 6), non c'è nessun problema di qualità, e l'allievo è
+        motivato: tutto spinge verso il sì. Il cancello dice no lo stesso, perché
+        <b>l'adattamento avviene nel recupero, non nello stimolo</b>. Sulla scheda: stessi 100 kg,
+        stesse ripetizioni, ogni serie chiusa con almeno 2 ripetizioni in riserva.</p>
+      <p><em>Le due frasi, per esempio:</em> «Oggi il tuo corpo è a 31 su 100 di prontezza: non è
+        pigrizia, è che hai dormito otto ore in due notti. Se carico adesso ti costruisco fatica,
+        non forza — teniamo questo peso e la settimana prossima saliamo davvero.»</p>
+      <p><em>La difficoltà vera dell'esercizio</em> non è capirlo: è dirlo a chi è venuto apposta.</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 8 — Rosa, 33 anni</span><span>obiettivo: ipertrofia</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Squat</th><th>Serie migliore</th><th>RPE</th><th>Valgo</th><th>Angolo fondo</th></tr>
+          <tr><td>Seduta A</td><td>70 kg × 8</td><td>8</td><td>9%</td><td>94°</td></tr>
+          <tr><td>Seduta B</td><td>70 kg × 8</td><td>7</td><td>13%</td><td>95°</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 74/100 · La serie è più facile di prima e Rosa
+          chiede di salire di peso.</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 8</p>
+      <p><b>Cancello 3 — il compenso è peggiorato di 4 punti, sopra la soglia di 3.
+        Sale la qualità, non il carico.</b></p>
+      <p>Il caso è costruito per ingannare: l'adattamento <em>c'è</em> (stesso carico, RIR da 2 a 3),
+        la prontezza è buona, e l'allieva stessa chiede di salire. Ma il valgo è passato dal 9% al
+        13%. <b>Aggiungere carico su uno schema che sta peggiorando aumenta la domanda nel posto
+        sbagliato.</b> Sulla scheda: stessi 70 kg, stesse ripetizioni, esecuzione più pulita, e una
+        serie in meno se serve a tenere la traiettoria.</p>
+      <p><em>Le due frasi:</em> «Il ginocchio sta rientrando verso l'interno più di prima — di poco,
+        ma di quanto basta. Prima ricompattiamo quello, poi il peso sale e sale su una base che
+        regge.»</p>
+    </div>
+
+    <div class="caso">
+      <div class="caso-t"><span>Caso 9 — Antonio, 24 anni</span><span>obiettivo: ipertrofia</span></div>
+      <div class="caso-b">
+        <table class="dati">
+          <tr><th>Squat</th><th>Serie migliore</th><th>RPE</th><th>Valgo</th><th>Angolo fondo</th></tr>
+          <tr><td>Seduta A</td><td>80 kg × 8</td><td>8</td><td>5%</td><td>118°</td></tr>
+          <tr><td>Seduta B</td><td>80 kg × 8</td><td>7</td><td>5%</td><td>112°</td></tr>
+        </table>
+        <p class="contorno"><b>Prontezza:</b> 80/100 · Il ROM sta migliorando di sei gradi a
+          settimana. Antonio è il più assiduo del gruppo.</p>
+      </div>
+    </div>
+    <div class="soluzione">
+      <p class="s-t">Soluzione · caso 9 — il caso cattivo</p>
+      <p><b>Cancello 4 — angolo al fondo 112°, sopra la soglia dei 100°. Prima il ROM, poi i chili.</b></p>
+      <p>Tutto invita a premiare: prontezza 80, compensi fermi al 5%, adattamento visibile, ROM in
+        miglioramento di sei gradi, e un ragazzo che non salta una seduta. Ma il movimento è ancora
+        parziale, e <b>caricare un ROM parziale allena la parte già facile</b>: sembra progresso e
+        non lo è. Sulla scheda: si scende di peso quanto serve per arrivare in fondo senza
+        compensare, e si torna a salire quando l'angolo è sotto i 100°.</p>
+      <p><em>Le due frasi:</em> «Stai scendendo sei gradi a settimana, ed è la cosa migliore che
+        sta succedendo nella tua scheda. Se ora aggiungo peso, quel guadagno si ferma: teniamo il
+        carico e prendiamoci tutta la profondità, che vale più di cinque chili.»</p>
+      <p><em>Perché è il caso cattivo:</em> è l'unico dei tre in cui dire no <b>toglie</b> qualcosa a
+        chi sta facendo tutto bene. Chi lo supera ha capito il modulo.</p>
+    </div>
+  </div>
+
+  <!-- ============ K-7 ============ -->
+  <div class="sezione">
+    <span class="kit-cod">K-7</span>
+    <h2>Il foglio dell'allievo</h2>
+    <hr class="cap-rule">
+    <p>Una pagina, da consegnare a fine modulo e da riusare in sala ogni settimana. Non contiene
+      altro che questo: se cresce, è stato scritto male.</p>
+
+    <div class="allievo">
+      <p class="ente" style="text-align:left; line-height:1.7">Metodo Mind Movement™ ·
+        A.S.D. Evolution Sport</p>
+      <h3>Perché il tuo corpo cambia</h3>
+
+      <p style="font-size:0.95rem; color:var(--ink-soft)">Il tuo allenamento non progredisce
+        aggiungendo peso. Progredisce aumentando la <em>richiesta</em> — e le vie sono undici,
+        non una. Queste sono le cinque domande a cui il tuo coach risponde ogni settimana, in
+        quest'ordine.</p>
+
+      <div class="catena-mini">
+        <div class="cm-riga"><span class="cm-n">1</span><span class="cm-nome">Esposizione</span><span class="cm-dom">A che cosa ti sto esponendo?</span></div>
+        <div class="cm-riga"><span class="cm-n">2</span><span class="cm-nome">Domanda</span><span class="cm-dom">Quanta richiesta sto creando?</span></div>
+        <div class="cm-riga"><span class="cm-n">3</span><span class="cm-nome">Adattamento</span><span class="cm-dom">Come stai rispondendo?</span></div>
+        <div class="cm-riga"><span class="cm-n">4</span><span class="cm-nome">Capacità</span><span class="cm-dom">Che cosa sai fare oggi che prima non facevi?</span></div>
+        <div class="cm-riga ultima"><span class="cm-n">5</span><span class="cm-nome">Progressione</span><span class="cm-dom">Che cosa aumento — e perché proprio quello?</span></div>
+      </div>
+
+      <h3 style="margin-top:22px">Le cinque settimane in cui non si aumenta</h3>
+      <p style="font-size:0.95rem; color:var(--ink-soft); margin-bottom:8px">Non è prudenza, e non
+        è una settimana persa. È la condizione perché la prossima funzioni.</p>
+      <div class="cancelli-mini">
+        <div class="cnc"><span>Non ci sono ancora due sedute da confrontare</span><span class="sog">&lt; 2 sedute</span></div>
+        <div class="cnc"><span>Non stai recuperando abbastanza</span><span class="sog">prontezza &lt; 40</span></div>
+        <div class="cnc"><span>Il movimento sta perdendo qualità</span><span class="sog">compenso +3</span></div>
+        <div class="cnc"><span>Non arrivi ancora in fondo al movimento</span><span class="sog">angolo &gt; 100°</span></div>
+        <div class="cnc"><span>Il corpo non ha ancora assorbito lo stimolo</span><span class="sog">nessun adattamento</span></div>
+      </div>
+
+      <h3 style="margin-top:22px">Che cosa è aumentato questa settimana</h3>
+      <table class="diario">
+        <tr><th style="width:5.5em">Settimana</th><th>Che cosa è aumentato</th><th>Il numero che lo dimostra</th></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td></tr>
+      </table>
+      <p class="nota-piede">Se una settimana la colonna centrale dice «niente», deve esserci
+        scritto quale delle cinque righe qui sopra si è chiusa. Una settimana ferma senza motivo
+        scritto non è metodo.</p>
+    </div>
+  </div>
+
+  <div class="colophon">
+    <p><b>Verifica delle soluzioni.</b> I nove casi sono stati costruiti contro le regole vere del
+      motore in <code>src/domain/progressione.ts</code>: soglia del carico uguale al 2,5%, riserva
+      in salita di almeno 0,5 RIR per parlare di adattamento, compenso peggiorato di 3 punti,
+      angolo di 100°, prontezza 40, e rotazione che esclude gli ultimi due assi usati. Le risposte
+      indicate sono quelle che ESSĒRE propone sugli stessi dati: se un giorno l'app rispondesse
+      diversamente su questi casi, è un difetto del codice e va aperto come tale.</p>
+    <p>A.S.D. Evolution Sport — Mind Movement Lab, Gragnano (NA). Materiale d'aula del modulo A-01.
+      Le soluzioni non si consegnano ai corsisti; il foglio K-7 sì.</p>
+  </div>
+
+</div>

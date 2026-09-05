@@ -15,6 +15,8 @@ import {
   serverTimestamp,
   Timestamp,
   Unsubscribe,
+  writeBatch,
+  limit,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { ChatRoom, ChatMessage } from '../types';
@@ -75,8 +77,8 @@ export const getUserChatRooms = async (userId: string): Promise<ChatRoom[]> => {
 };
 
 // Il titolare può vedere TUTTE le chat
-export const getAllChatRooms = async (): Promise<ChatRoom[]> => {
-  const snapshot = await getDocs(collection(db, ROOMS_COLLECTION));
+export const getAllChatRooms = async (maxResults = 200): Promise<ChatRoom[]> => {
+  const snapshot = await getDocs(query(collection(db, ROOMS_COLLECTION), limit(maxResults)));
   return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
 };
 
@@ -309,3 +311,101 @@ export const markMessagesAsRead = async (
   });
   await Promise.all(batch);
 };
+
+// --- Team Chat (staff-only) ---
+
+export const createTeamChatRoom = async (
+  creatorId: string,
+  participantIds: string[],
+  name: string
+): Promise<string> => {
+  const allParticipants = Array.from(new Set([creatorId, ...participantIds]));
+  const docRef = await addDoc(collection(db, ROOMS_COLLECTION), {
+    participants: allParticipants,
+    type: 'group',
+    chatType: 'team',
+    name,
+    studentId: '',
+    collaboratorId: '',
+    createdAt: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
+export const getTeamChatRooms = async (userId: string): Promise<ChatRoom[]> => {
+  const q = query(
+    collection(db, ROOMS_COLLECTION),
+    where('chatType', '==', 'team'),
+    where('participants', 'array-contains', userId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+};
+
+export const getAllTeamChatRooms = async (): Promise<ChatRoom[]> => {
+  const q = query(
+    collection(db, ROOMS_COLLECTION),
+    where('chatType', '==', 'team')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+};
+
+export const subscribeToTeamChatRooms = (
+  userId: string,
+  isOwner: boolean,
+  callback: (rooms: ChatRoom[]) => void
+): Unsubscribe => {
+  const q = isOwner
+    ? query(collection(db, ROOMS_COLLECTION), where('chatType', '==', 'team'))
+    : query(
+        collection(db, ROOMS_COLLECTION),
+        where('chatType', '==', 'team'),
+        where('participants', 'array-contains', userId)
+      );
+  return onSnapshot(q, (snapshot) => {
+    const rooms = snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as ChatRoom));
+    callback(rooms);
+  }, (error) => {
+    console.error('Errore listener team chat rooms:', error);
+  });
+};
+
+export const addParticipantToRoom = async (
+  roomId: string,
+  userId: string
+): Promise<void> => {
+  await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+    participants: arrayUnion(userId),
+  });
+};
+
+export const deleteChatRoom = async (roomId: string): Promise<void> => {
+  const messagesQuery = query(
+    collection(db, MESSAGES_COLLECTION),
+    where('chatRoomId', '==', roomId)
+  );
+  const msgSnapshot = await getDocs(messagesQuery);
+
+  const batchSize = 400;
+  const docs = msgSnapshot.docs;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const batch = writeBatch(db);
+    docs.slice(i, i + batchSize).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  const typingQuery = query(
+    collection(db, 'chatTyping'),
+    where('chatRoomId', '==', roomId)
+  );
+  const typingSnapshot = await getDocs(typingQuery);
+  if (!typingSnapshot.empty) {
+    const batch = writeBatch(db);
+    typingSnapshot.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
+
+  await deleteDoc(doc(db, ROOMS_COLLECTION, roomId));
+};
+

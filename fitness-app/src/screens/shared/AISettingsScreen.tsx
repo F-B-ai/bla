@@ -12,10 +12,14 @@ import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { setAIApiKey, getAIApiKey } from '../../services/aiService';
+import { useAuth } from '../../hooks/useAuth';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 const AI_KEY_STORAGE = '@essère_ai_key';
 
 export const AISettingsScreen: React.FC = () => {
+  const { isOwner } = useAuth();
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -38,6 +42,11 @@ export const AISettingsScreen: React.FC = () => {
       await AsyncStorage.setItem(AI_KEY_STORAGE, apiKey);
       setAIApiKey(apiKey);
       setSaved(true);
+      // L'owner propaga la chiave a tutti i dispositivi via Firestore
+      // (così AI Coach e Assistente funzionano anche per gli allievi)
+      if (isOwner) {
+        setDoc(doc(db, 'config', 'aiKey'), { key: apiKey, updatedAt: Timestamp.now() }, { merge: true }).catch(() => {});
+      }
       crossAlert('Salvato', 'Chiave API configurata con successo!');
     } catch {
       crossAlert('Errore', 'Impossibile salvare la chiave');

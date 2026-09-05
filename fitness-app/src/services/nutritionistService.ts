@@ -8,7 +8,10 @@ import {
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
+  onSnapshot,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
@@ -58,25 +61,35 @@ export const cancelAppointment = async (
   return { success: true, isLate };
 };
 
+const sortByDateDesc = (items: NutritionistAppointment[]) => {
+  items.sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return db2 - da;
+  });
+  return items;
+};
+
 export const getStudentAppointments = async (
   studentId: string
 ): Promise<NutritionistAppointment[]> => {
   const q = query(
     collection(db, APPOINTMENTS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('date', 'desc')
+    where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
+  );
 };
 
-export const getAllAppointments = async (): Promise<NutritionistAppointment[]> => {
-  const q = query(
-    collection(db, APPOINTMENTS_COLLECTION),
-    orderBy('date', 'desc')
+export const getAllAppointments = async (maxResults = 500): Promise<NutritionistAppointment[]> => {
+  const snapshot = await getDocs(query(collection(db, APPOINTMENTS_COLLECTION), limit(maxResults)));
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
   );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment));
 };
 
 export const updateAppointmentStatus = async (
@@ -88,6 +101,30 @@ export const updateAppointmentStatus = async (
   if (notes !== undefined) updateData.notes = notes;
   if (status === 'completed') updateData.isCountedAsCompleted = true;
   await updateDoc(doc(db, APPOINTMENTS_COLLECTION, appointmentId), updateData);
+};
+
+export const updateAppointment = async (
+  appointmentId: string,
+  updates: Partial<Omit<NutritionistAppointment, 'id'>>
+): Promise<void> => {
+  const data: Record<string, unknown> = { ...updates };
+  if (updates.date) {
+    data.date = Timestamp.fromDate(updates.date);
+  }
+  await updateDoc(doc(db, APPOINTMENTS_COLLECTION, appointmentId), data);
+};
+
+export const getNutritionistAppointmentsByStaff = async (
+  staffId: string
+): Promise<NutritionistAppointment[]> => {
+  const q = query(
+    collection(db, APPOINTMENTS_COLLECTION),
+    where('nutritionistId', '==', staffId)
+  );
+  const snapshot = await getDocs(q);
+  return sortByDateDesc(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))
+  );
 };
 
 export const deleteAppointment = async (appointmentId: string): Promise<void> => {
@@ -172,4 +209,21 @@ export const getStudentBiaDocuments = async (
 
 export const deleteBiaDocument = async (biaDocId: string): Promise<void> => {
   await deleteDoc(doc(db, BIA_COLLECTION, biaDocId));
+};
+
+/** Le visite nutrizionista, in tempo reale. */
+export const subscribeToAppointments = (
+  callback: (appts: NutritionistAppointment[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, APPOINTMENTS_COLLECTION),
+    orderBy('date', 'desc'),
+    limit(500)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as NutritionistAppointment))),
+    () => { if (onError) onError(); }
+  );
 };

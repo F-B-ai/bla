@@ -23,6 +23,7 @@ import {
   updatePresence,
   subscribeToPresence,
 } from '../../services/chatService';
+import { createNotification } from '../../services/notificationService';
 
 interface Props {
   room: ChatRoom;
@@ -120,15 +121,25 @@ export const ChatConversationScreen: React.FC<Props> = ({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     setTypingStatus(room.id, user.id, '', false);
 
+    const msgText = newMessage.trim();
     try {
       await sendMessage(
         room.id,
         user.id,
         `${user.name} ${user.surname}`,
-        newMessage.trim(),
+        msgText,
         false
       );
       setNewMessage('');
+      const recipients = room.participants.filter((id) => id !== user.id);
+      for (const recipientId of recipients) {
+        createNotification(
+          recipientId,
+          'new_message',
+          `${user.name} ${user.surname}`,
+          msgText.length > 100 ? msgText.slice(0, 100) + '...' : msgText
+        ).catch(() => {});
+      }
     } catch {
       // Silently handle
     }
@@ -191,7 +202,7 @@ export const ChatConversationScreen: React.FC<Props> = ({
     );
   };
 
-  // Titolo della conversazione
+  // Titolo della conversazione: mostra sempre il nome dell'allievo
   const getTitle = (): string => {
     if (isOwner) {
       const student = participants[room.studentId];
@@ -199,6 +210,11 @@ export const ChatConversationScreen: React.FC<Props> = ({
       const sName = student ? `${student.name} ${student.surname}` : 'Allievo';
       const cName = collab ? `${collab.name} ${collab.surname}` : 'Collaboratore';
       return `${sName} ↔ ${cName}`;
+    }
+    // Manager/Collaboratore: mostra il nome dell'allievo
+    if (room.studentId && participants[room.studentId]) {
+      const s = participants[room.studentId];
+      return `${s.name} ${s.surname}`;
     }
     const otherId = room.participants.find((id) => id !== user?.id);
     if (otherId && participants[otherId]) {
@@ -321,7 +337,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     padding: spacing.md,
-    paddingTop: spacing.xxl,
+    paddingTop: 60,
     flexDirection: 'row',
     alignItems: 'center',
   },

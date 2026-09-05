@@ -8,8 +8,9 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
-import { getFirebaseErrorMessage } from '../../utils/helpers';
+import { getFirebaseErrorMessage, isValidEmail } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -34,7 +35,7 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [owner, setOwner] = useState<Owner | null>(null);
-  const [selectedCollaboratorId, setSelectedCollaboratorId] = useState('');
+  const [selectedCoachIds, setSelectedCoachIds] = useState<string[]>([]);
   const [selectedManagerId, setSelectedManagerId] = useState('');
   const [managerCommission, setManagerCommission] = useState('');
   const [coachCommission, setCoachCommission] = useState('');
@@ -50,10 +51,18 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
       setCollaborators(collabs);
       setManagers(mgrs);
       setOwner(ownerData);
-      // Include anche i manager come possibili assegnatari diretti
-      if (collabs.length > 0) {
-        setSelectedCollaboratorId(collabs[0].id);
-        setCoachCommission(String(collabs[0].commissionPercentage));
+      // Manager/collaboratore: pre-seleziona se stesso come coach assegnato
+      if (currentUser && !isOwner) {
+        setSelectedCoachIds((prev) => (prev.length === 0 ? [currentUser.id] : prev));
+        const meMgr = mgrs.find((m) => m.id === currentUser.id);
+        if (meMgr) {
+          setSelectedManagerId(meMgr.id);
+          setManagerCommission(String(meMgr.commissionPercentage ?? 10));
+        }
+        const meCollab = collabs.find((c) => c.id === currentUser.id);
+        if (meCollab) {
+          setCoachCommission(String(meCollab.commissionPercentage ?? 60));
+        }
       }
     } catch {
       crossAlert('Errore', 'Impossibile caricare i dati');
@@ -65,12 +74,16 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
       crossAlert('Errore', 'Compila tutti i campi obbligatori');
       return;
     }
+    if (!isValidEmail(email)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
+      return;
+    }
     if (password.length < 6) {
       crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
     }
-    if (!selectedCollaboratorId) {
-      crossAlert('Errore', 'Seleziona un coach o manager da assegnare');
+    if (selectedCoachIds.length === 0) {
+      crossAlert('Errore', 'Seleziona almeno un coach o manager da assegnare');
       return;
     }
 
@@ -89,7 +102,7 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
         name.trim(),
         surname.trim(),
         phone.trim(),
-        selectedCollaboratorId,
+        selectedCoachIds,
         goals.trim(),
         medicalNotes.trim() || undefined,
         selectedManagerId || undefined,
@@ -154,8 +167,18 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="Numero di telefono"
           />
 
-          {/* Selezione manager (opzionale) */}
-          {managers.length > 0 && (
+          {/* Per manager/coach: l'allievo viene assegnato automaticamente a loro */}
+          {!isOwner && (
+            <View style={styles.autoAssignNote}>
+              <Ionicons name="information-circle" size={18} color={colors.accent} />
+              <Text style={styles.autoAssignText}>
+                L'allievo verrà assegnato automaticamente a te.
+              </Text>
+            </View>
+          )}
+
+          {/* Selezione manager (opzionale) — solo owner */}
+          {isOwner && managers.length > 0 && (
             <>
               <Text style={styles.fieldLabel}>Manager responsabile</Text>
               <View style={styles.collabList}>
@@ -194,84 +217,115 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             </>
           )}
 
-          {/* Selezione coach o manager diretto */}
-          <Text style={styles.fieldLabel}>Coach / Manager assegnato *</Text>
+          {/* Selezione coach (multi-select) — solo owner */}
+          {isOwner && (
+          <>
+          <Text style={styles.fieldLabel}>Coach assegnati * (puoi selezionarne più di uno)</Text>
+          {selectedCoachIds.length > 0 && (
+            <Text style={styles.selectedCount}>{selectedCoachIds.length} selezionati</Text>
+          )}
           {collaborators.length === 0 && managers.length === 0 && !owner ? (
             <Text style={styles.noCollabText}>
               Nessun coach o manager disponibile. Registrane uno prima.
             </Text>
           ) : (
             <View style={styles.collabList}>
-              {/* Owner come coach diretto */}
               {owner && (
                 <TouchableOpacity
                   key={`owner-${owner.id}`}
                   style={[
                     styles.collabOption,
-                    selectedCollaboratorId === owner.id && styles.collabOptionSelected,
+                    selectedCoachIds.includes(owner.id) && styles.collabOptionSelected,
                   ]}
                   onPress={() => {
-                    setSelectedCollaboratorId(owner.id);
-                    setCoachCommission('100');
-                    setSelectedManagerId('');
-                    setManagerCommission('0');
+                    setSelectedCoachIds((prev) =>
+                      prev.includes(owner.id) ? prev.filter((id) => id !== owner.id) : [...prev, owner.id]
+                    );
                   }}
                 >
-                  <Text style={[styles.collabOptionText, selectedCollaboratorId === owner.id && styles.collabOptionTextSelected]}>
-                    {owner.name} {owner.surname} (Titolare - diretto)
-                  </Text>
-                  <Text style={styles.collabSpecText}>
-                    {(owner.specializations || []).join(', ')} 100%
-                  </Text>
+                  <View style={styles.collabOptionRow}>
+                    <Ionicons
+                      name={selectedCoachIds.includes(owner.id) ? 'checkbox' : 'square-outline'}
+                      size={20}
+                      color={selectedCoachIds.includes(owner.id) ? colors.accent : colors.textSecondary}
+                    />
+                    <View style={styles.collabOptionInfo}>
+                      <Text style={[styles.collabOptionText, selectedCoachIds.includes(owner.id) && styles.collabOptionTextSelected]}>
+                        {owner.name} {owner.surname} (Titolare)
+                      </Text>
+                      <Text style={styles.collabSpecText}>
+                        {(owner.specializations || []).join(', ')}
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               )}
-              {/* Manager come coach diretto */}
               {managers.map((mgr) => (
                 <TouchableOpacity
                   key={`mgr-${mgr.id}`}
                   style={[
                     styles.collabOption,
-                    selectedCollaboratorId === mgr.id && styles.collabOptionSelected,
+                    selectedCoachIds.includes(mgr.id) && styles.collabOptionSelected,
                   ]}
                   onPress={() => {
-                    setSelectedCollaboratorId(mgr.id);
-                    setCoachCommission(String(mgr.commissionPercentage ?? 10));
-                    setSelectedManagerId('');
-                    setManagerCommission('0');
+                    setSelectedCoachIds((prev) =>
+                      prev.includes(mgr.id) ? prev.filter((id) => id !== mgr.id) : [...prev, mgr.id]
+                    );
                   }}
                 >
-                  <Text style={[styles.collabOptionText, selectedCollaboratorId === mgr.id && styles.collabOptionTextSelected]}>
-                    {mgr.name} {mgr.surname} (Manager - diretto)
-                  </Text>
-                  <Text style={styles.collabSpecText}>
-                    {(mgr.specializations || []).join(', ')} {mgr.commissionPercentage ?? 10}%
-                  </Text>
+                  <View style={styles.collabOptionRow}>
+                    <Ionicons
+                      name={selectedCoachIds.includes(mgr.id) ? 'checkbox' : 'square-outline'}
+                      size={20}
+                      color={selectedCoachIds.includes(mgr.id) ? colors.accent : colors.textSecondary}
+                    />
+                    <View style={styles.collabOptionInfo}>
+                      <Text style={[styles.collabOptionText, selectedCoachIds.includes(mgr.id) && styles.collabOptionTextSelected]}>
+                        {mgr.name} {mgr.surname} (Manager)
+                      </Text>
+                      <Text style={styles.collabSpecText}>
+                        {(mgr.specializations || []).join(', ')} {mgr.commissionPercentage ?? 10}%
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               ))}
-              {/* Coach */}
               {collaborators.map((collab) => (
                 <TouchableOpacity
                   key={collab.id}
                   style={[
                     styles.collabOption,
-                    selectedCollaboratorId === collab.id && styles.collabOptionSelected,
+                    selectedCoachIds.includes(collab.id) && styles.collabOptionSelected,
                   ]}
                   onPress={() => {
-                    setSelectedCollaboratorId(collab.id);
-                    setCoachCommission(String(collab.commissionPercentage));
+                    setSelectedCoachIds((prev) =>
+                      prev.includes(collab.id) ? prev.filter((id) => id !== collab.id) : [...prev, collab.id]
+                    );
+                    if (!coachCommission) {
+                      setCoachCommission(String(collab.commissionPercentage));
+                    }
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.collabOptionText,
-                      selectedCollaboratorId === collab.id && styles.collabOptionTextSelected,
-                    ]}
-                  >
-                    {collab.name} {collab.surname} (Coach)
-                  </Text>
-                  <Text style={styles.collabSpecText}>
-                    {collab.specializations.join(', ')} {collab.commissionPercentage}%
-                  </Text>
+                  <View style={styles.collabOptionRow}>
+                    <Ionicons
+                      name={selectedCoachIds.includes(collab.id) ? 'checkbox' : 'square-outline'}
+                      size={20}
+                      color={selectedCoachIds.includes(collab.id) ? colors.accent : colors.textSecondary}
+                    />
+                    <View style={styles.collabOptionInfo}>
+                      <Text
+                        style={[
+                          styles.collabOptionText,
+                          selectedCoachIds.includes(collab.id) && styles.collabOptionTextSelected,
+                        ]}
+                      >
+                        {collab.name} {collab.surname} (Coach)
+                      </Text>
+                      <Text style={styles.collabSpecText}>
+                        {collab.specializations.join(', ')} {collab.commissionPercentage}%
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
@@ -294,6 +348,8 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             keyboardType="numeric"
             placeholder="Es: 60"
           />
+          </>
+          )}
 
           <InputField
             label="Obiettivi"
@@ -378,6 +434,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.sm,
   },
+  selectedCount: {
+    fontSize: fontSize.sm,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
   collabOption: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
@@ -388,6 +450,14 @@ const styles = StyleSheet.create({
   collabOptionSelected: {
     borderColor: colors.accent,
     backgroundColor: colors.primaryLight,
+  },
+  collabOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  collabOptionInfo: {
+    flex: 1,
   },
   collabOptionText: {
     fontSize: fontSize.md,
@@ -405,5 +475,21 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: spacing.lg,
+  },
+  autoAssignNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent + '15',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  autoAssignText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '500',
   },
 });

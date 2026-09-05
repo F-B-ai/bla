@@ -1,12 +1,15 @@
 {
   "name": "ESSĒRE",
   "short_name": "ESSĒRE",
-  "description": "Fitness Coaching App",
+  "description": "Comprendi chi sei attraverso il movimento.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0D0D0D",
   "theme_color": "#0D0D0D",
+  "categories": ["fitness", "health"],
   "icons": [
     {
       "src": "/icon-180.png",

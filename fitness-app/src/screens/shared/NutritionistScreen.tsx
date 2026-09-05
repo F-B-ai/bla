@@ -19,6 +19,7 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Badge } from '../../components/common/Badge';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import {
   NutritionistAppointment,
   BodyMeasurement,
@@ -41,6 +42,7 @@ import {
   deleteBiaDocument,
 } from '../../services/nutritionistService';
 import { getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -90,9 +92,9 @@ export const NutritionistScreen: React.FC = () => {
     try {
       const studs = await getStudents();
       if (isCollaborator) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else if (isManager) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }
@@ -571,22 +573,12 @@ export const NutritionistScreen: React.FC = () => {
       {/* Selezione allievo (solo per staff) */}
       {!isStudent && (
         <View style={styles.studentSelector}>
-          <Text style={styles.fieldLabel}>Allievo</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
-              {students.map((s) => (
-                <TouchableOpacity
-                  key={s.id}
-                  style={[styles.chip, selectedStudentId === s.id && styles.chipActive]}
-                  onPress={() => setSelectedStudentId(s.id)}
-                >
-                  <Text style={[styles.chipText, selectedStudentId === s.id && styles.chipTextActive]}>
-                    {s.name} {s.surname}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+          <StudentSearchPicker
+            students={students}
+            selectedId={selectedStudentId}
+            onSelect={(id) => setSelectedStudentId(id)}
+            label="Allievo"
+          />
         </View>
       )}
 
@@ -1064,7 +1056,7 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
