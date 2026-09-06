@@ -193,3 +193,18 @@ Nota su `academy-7-moduli-completi.docx`: contiene gli stessi moduli 06-12 delle
 tre parti, in un file solo. Non è un doppione bit-a-bit — va deciso quale delle
 due forme è quella buona prima di produrre le dispense, per non correggere due
 volte lo stesso testo.
+
+---
+
+## Settimo rientro — l'edizione master del Modulo 1
+
+| File | Che cos'è | Ampiezza |
+|---|---|---|
+| `modulo-01-approfondimenti.pdf` | **Modulo 1 — Edizione Master.** «Anatomia Fasciale Integrata & Anatomy Trains — approfondimenti scientifici avanzati» | 34 pagine · ~40.400 car |
+
+Con questo il Modulo 1 esiste in **quattro forme**: il docx «Anatomia
+Funzionale», la variante PDF «Anatomia Fasciale Integrata» (42 h, €350), le
+appendici con casi clinici e protocolli, e ora l'edizione master di
+approfondimenti. Vale l'avvertenza già scritta per i moduli 06-12: **prima di
+produrre le dispense va deciso quale forma è quella buona**, altrimenti si
+corregge quattro volte lo stesso contenuto.

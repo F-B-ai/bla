@@ -226,3 +226,29 @@ clinici con protocolli a 12 settimane e 10 protocolli per patologie comuni**.
 Sono i «protocolli riabilitativi standardizzati» che l'inventario del 01/02
 dava per esistenti e che risultavano mancanti: il documento dice che
 «diventano casi clinici d'esame». Non mancano più.
+
+---
+
+## Il terzo documento strategico
+
+`strategici/blueprint-strategico.docx` — **«Mind Movement · Movimento Mondiale
+— Blueprint Strategico Integrato: Libro × Movimento × Business»**, ~18.000
+caratteri.
+
+Non è il Blueprint formativo (quello dei 12 moduli): è un documento di
+strategia d'impresa che mette il **libro al centro** come fulcro, e dichiara un
+obiettivo a cinque anni di **500+ certificati in 20+ paesi**.
+
+Porta quindi a **tre** i documenti di indirizzo, e con un'ambizione diversa
+ciascuno:
+
+| Documento | Orizzonte | Che cosa promette |
+|---|---|---|
+| Strategico 01/02 | 90 giorni | Prima edizione L1 venduta a 18-20 posti |
+| Strategico 02/02 | 90 giorni | Primo cliente B2B chiuso |
+| **Blueprint Strategico** | 5 anni | 500+ certificati in 20+ paesi |
+
+I primi due sono piani esecutivi con deliverable settimanali; il terzo è una
+visione. Non sono in conflitto — ma il terzo si realizza **solo** se i primi
+due partono, e nessuno dei due è ancora partito: il deposito del marchio, che
+il 01/02 marca come bloccante per tutto il resto, non risulta fatto.
