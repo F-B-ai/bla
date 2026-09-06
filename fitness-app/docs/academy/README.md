@@ -133,6 +133,34 @@ registrazione del marchio (classi 41 e 44)**.
 
 ---
 
+## Che cosa manca — confronto con l'inventario del Documento strategico 01/02
+
+Il §1.1 del 01/02 elenca gli asset che **esistono già**. Questo è il confronto
+con ciò che è effettivamente in archivio, al 6 settembre 2026.
+
+| Asset dichiarato esistente | In archivio | Perché serve |
+|---|---|---|
+| Curriculum 22 moduli / 5 aree / 3 livelli | **Struttura sì, titoli no** | I titoli stanno nel cap. 1 dell'Operativo 03 |
+| **Modulo Nutrizione Fasciale e PNEI** (completo) | ✗ | È il **modello-tipo a 9 blocchi** per gli altri 21. Senza, ogni modulo nuovo si scrive a occhio |
+| **Protocolli riabilitativi standardizzati** (casi reali) | ✗ | Il 01/02 dice che «diventano casi clinici d'esame». Senza casi veri, l'esame è finto |
+| **Diagrammi SVG catene miofasciali (originali)** | ✗ | Sono **originali**: risolvono da soli il problema di licenza sulle tavole di Myers |
+| Manuale di produzione CCGT (PDF brandizzato) | ✗ | Da elevare a standard editoriale ufficiale |
+| Standard documentale di casa (palette, Georgia, clausole) | ✗ | Da estendere a slide, attestati, contratti |
+| Script Reel biomeccanica (affondo, sling posteriore) | ✗ | Da riciclare come micro-lezioni video del L1 |
+| Libro Mind Movement (KDP) | ✗ | Testo di riferimento del Livello 1. È pubblicato, quindi meno urgente |
+
+**Uno su otto.** Più il Documento operativo 03, che non compare nell'inventario
+perché è posteriore.
+
+Ordine di utilità per chi li cerca:
+
+1. **Documento operativo 03** — i 22 titoli reali
+2. **Modulo Nutrizione Fasciale e PNEI** — il modello-tipo
+3. **Protocolli riabilitativi standardizzati** — i casi d'esame
+4. **Diagrammi SVG originali** — chiudono la questione delle figure
+
+---
+
 ## Come si aggiunge un documento
 
 1. Metti il file qui (`.pdf` o `.docx` per gli originali, `.html` per quelli composti).
