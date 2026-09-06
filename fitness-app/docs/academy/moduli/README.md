@@ -50,3 +50,19 @@ Il modulo **Nutrizione Fasciale e PNEI**, che il Documento strategico 01/02
 indica come **modello-tipo a 9 blocchi per tutti gli altri 21 moduli**, non è
 ancora in questa cartella. È il file più utile da recuperare dopo l'elenco dei
 titoli.
+
+---
+
+## Secondo rientro — contenuti clinici e materiali d'evento
+
+| File | Che cos'è |
+|---|---|
+| `manuale-specialistico-scoliosi.docx` | **Manuale specialistico sul trattamento delle scoliosi.** Classificazione completa, assessment, protocolli correttivi integrati — Anatomy Trains, PNEI, posturologia, respiro. ~19.000 caratteri |
+| `handout-talk-2-guerriero-consapevole.docx` | Handout della talk «Guerriero Consapevole» — Combat Nutrition & Performance |
+| `risveglio-live-quaderno-partecipante.pdf` | Quaderno del partecipante di Risveglio Live, l'esperienza di 3 giorni |
+
+Il manuale sulle scoliosi è **contenuto clinico** e va trattato con lo stesso
+perimetro del resto del sistema: il metodo è screening e orientamento
+educativo-motorio, non atto diagnostico né terapeutico. Prima di erogarlo o
+venderlo va riletto con quel confine davanti, perché è il documento
+dell'archivio che ci si avvicina di più.

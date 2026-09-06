@@ -117,9 +117,11 @@ questo ordine**.
    otto catene e ne trova cinque nell'applicazione si ferma. Va deciso come si
    tengono insieme, e dichiarato.
 
-2. **L'autore sulla copertina.** Il Modulo 1 riporta «A cura di Francesco
-   Filippi»; gli altri documenti riportano Francesco Busanca. Su un documento di
-   certificazione l'autore va verificato.
+2. **~~L'autore sulla copertina~~ — CHIUSA.** Alcune copertine riportavano
+   «Francesco Filippi» o «Francesco Cacace». **L'autore ha confermato di aver
+   scritto tutto lui: Francesco Busanca.** Erano artefatti di generazione, non
+   coautori. Resta solo da correggere il nome nei file che lo riportano sbagliato
+   prima di stamparli o depositarli.
 
 3. **Le figure anatomiche.** La guida indica di salvare le tavole da
    BasicMedicalKey, che ospita immagini tratte dal libro di Thomas Myers.
@@ -182,7 +184,7 @@ Accademie diverse**, ciascuna coerente al proprio interno, mai riconciliate.
 | Nomi dei blocchi | Fondamenti · Integrazione · Trascendenza | L1 Operatore · L2 Educatore Somatico · L3 Trainer/Docente |
 | Chiave | Il Sapere · Il Saper Fare · L'Essere | monte ore, prerequisiti, titolo rilasciato |
 | Stato dichiarato | 5 completati, 7 nuovi | 8/8/6, titoli nel cap. 1 dell'Operativo 03 |
-| Firma | Francesco **Cacace** | Francesco **Busanca** |
+| Firma sul file | «Francesco Cacace» *(refuso)* | Francesco Busanca |
 
 Non sono due versioni dello stesso documento: sono due impianti diversi. Il
 Blueprint è un piano di contenuti; lo Strategico è un impianto di
@@ -201,12 +203,16 @@ prodotto per l'altra.**
 E nell'app il Sistema Stellato ne usa **cinque**. Quattro conteggi diversi
 delle catene miofasciali nello stesso metodo.
 
-### Le firme
+### Le firme — questione chiusa
 
-Gli stessi contenuti risultano firmati **Busanca**, **Filippi** e **Cacace** —
-con credenziali identiche (ingegnere biomedico, campione europeo natural
-bodybuilding). Su documenti di certificazione l'autore va uniformato prima di
-qualsiasi erogazione o deposito di marchio.
+Alcune copertine riportano «Filippi» o «Cacace» al posto di «Busanca».
+**L'autore ha confermato: ha scritto tutto lui, Francesco Busanca.** Sono
+refusi introdotti in generazione. Vanno corretti nei file prima della stampa e
+prima del deposito del marchio, ma non c'è nessuna questione di paternità.
+
+Va invece verificata una cosa diversa, perché finisce in materiale pubblico: le
+credenziali compaiono sia come **campione europeo** sia come **campione del
+mondo** natural bodybuilding. Va usata una sola formulazione, quella esatta.
 
 ### Un ritrovamento
 
