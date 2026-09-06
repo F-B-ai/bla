@@ -66,3 +66,46 @@ perimetro del resto del sistema: il metodo è screening e orientamento
 educativo-motorio, non atto diagnostico né terapeutico. Prima di erogarlo o
 venderlo va riletto con quel confine davanti, perché è il documento
 dell'archivio che ci si avvicina di più.
+
+---
+
+## Terzo rientro — i manuali docente numerati
+
+| File | Che cos'è | Ampiezza |
+|---|---|---|
+| `modulo-02-pnei-parte-b.docx` | **Modulo 02 — PNEI, parte B.** Dalla lezione 2.5: GH, IGF-1 e asse somatotropo | ~27.000 car |
+| `modulo-03-mente-da-campione-parte-a.docx` | **Modulo 03 — Mente da Campione**, manuale docente. Psicologia dello sport applicata al coaching | ~26.000 car |
+| `modulo-03-mente-da-campione-parte-b.docx` | **Modulo 03, parte B.** Dalla lezione 3.6: arousal, ansia e performance sotto pressione | ~16.000 car |
+| `modulo-04-nlp-e-charisma-training.docx` | **Modulo 04 — NLP & Charisma Training**, completo. Comunicazione trasformativa per il coach | ~24.000 car |
+| `protocollo-insufficienza-venosa.docx` | Programma di allenamento per insufficienza venosa, su carta intestata dell'associazione | — |
+
+### Che cosa dice questo rientro sull'architettura
+
+I moduli prodotti sono **numerati 01, 02, 03, 04** e i titoli corrispondono
+esattamente ai primi quattro del **Blueprint** — Anatomia Funzionale, PNEI,
+Psicologia dello Sport, NLP & Carisma — che il Blueprint stesso marca
+«✅ Completato».
+
+Non corrispondono invece a nessun codice della griglia a 5 aree del Documento
+strategico 01/02 (A-xx … E-xx).
+
+**Il contenuto reale è stato prodotto sull'impianto del Blueprint.** Questo non
+decide da solo quale architettura tenere — il Blueprint è un piano di contenuti,
+lo Strategico un impianto di certificazione — ma cambia il costo della scelta:
+adottare lo Strategico significa **rimappare quattro manuali già scritti** sulle
+cinque aree e sui tre livelli, non riscriverli.
+
+### Sono manuali docente, non dispense
+
+Le intestazioni dicono «MANUALE DOCENTE». Nello standard a 9 blocchi del
+Documento strategico 01/02 il manuale docente è **una parte** del modulo: manca
+ancora, per ciascuno, la mappa in SVG, la scheda di pratica guidata con dosaggi,
+la tabella degli 8 errori tipici, i 2 casi e la scheda d'esame.
+
+### Il protocollo per insufficienza venosa
+
+È **contenuto clinico su carta intestata dell'associazione**, con nome e codice
+fiscale. Vale lo stesso perimetro del manuale scoliosi: screening e orientamento
+educativo-motorio, mai atto diagnostico o terapeutico. Un programma
+d'allenamento per una condizione vascolare va concordato con il medico della
+persona — e il documento dovrebbe dirlo per iscritto, in testa.
