@@ -356,3 +356,34 @@ versione avanzata.
 Vale quanto già annotato per il Modulo 1 (quattro forme) e per i moduli 06-12
 (due forme): **prima delle dispense va deciso quale versione è quella buona.**
 Il conto sale, e ogni versione in più moltiplica il lavoro di correzione.
+
+---
+
+## Dodicesimo rientro — i manuali docente 01 e 02, e le figure risolte
+
+| File | Che cos'è | Ampiezza |
+|---|---|---|
+| `manuale-docente-modulo-01-parte-a.docx` | **Modulo 01 — Anatomia Funzionale Integrata**, Anatomy Trains di Myers | ~29.300 car |
+| `manuale-docente-modulo-01-parte-b.docx` | Parte B: Lateral Line, Spiral, Arm, Functional, Deep Front — con origini, inserzioni e riferimenti figura | ~16.400 car |
+| `manuale-docente-modulo-02-pnei-applicata.docx` | **Modulo 02 — PNEI Applicata**, completo | ~30.500 car |
+| `modulo-programmazione-parte-3-integrazioni.docx` | Parte 3: profili mancanti, **profilo 7 riabilitazione post-infortunio**, progressioni dettagliate, periodizzazione avanzata | ~21.900 car |
+
+### ✅ Il Modulo 02 non ha più buchi
+
+Mancava la parte A: questo file è il **modulo 02 completo**. Con il Modulo 01 in
+due parti, il blocco «Fondamenti» del Blueprint è coperto per intero tranne il
+**Modulo 05 — Metodologia Mind Movement**, che resta l'unico assente dei dodici.
+
+### ✅ La questione delle figure è risolta, e bene
+
+Il manuale docente del Modulo 01 parte B **cita le figure di Myers per numero**
+(«Myers Fig. 5.1») e **rimanda cinque volte a `anatomytrains.com/at-posters`**,
+il sito ufficiale dove i poster si acquistano.
+
+È esattamente il criterio corretto: **citare una figura e indicare dove comprarla
+è legittimo; riprodurla in una dispensa venduta no.** Il materiale più recente
+ha già adottato la pratica giusta senza che nessuno lo chiedesse.
+
+Resta solo da allineare la vecchia `guida-figure-anatomy-trains.md`, che
+suggerisce di salvare le immagini da un sito terzo, o da archiviarla come
+superata.

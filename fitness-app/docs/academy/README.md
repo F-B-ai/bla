@@ -123,11 +123,16 @@ questo ordine**.
    coautori. Resta solo da correggere il nome nei file che lo riportano sbagliato
    prima di stamparli o depositarli.
 
-3. **Le figure anatomiche.** La guida indica di salvare le tavole da
-   BasicMedicalKey, che ospita immagini tratte dal libro di Thomas Myers.
-   Riprodurle in dispense vendute o in un atlante è uso di materiale protetto:
-   serve una licenza, oppure illustrazioni proprie. Il modello concettuale di
-   Myers si insegna e si cita liberamente; le sue tavole no.
+3. **~~Le figure anatomiche~~ — RISOLTA nel materiale più recente.** La vecchia
+   `guida-figure-anatomy-trains.md` indicava di salvare le tavole da
+   BasicMedicalKey, che ospita immagini tratte dal libro di Myers: riprodurle in
+   dispense vendute sarebbe uso di materiale protetto.
+   **Il manuale docente del Modulo 01 (parte B) fa la cosa giusta**: cita le
+   figure per numero — «Myers Fig. 5.1» — e rimanda al sito ufficiale
+   `anatomytrains.com/at-posters`, dove i poster si acquistano. Citare una figura
+   e indicare dove comprarla è legittimo; riprodurla no.
+   **Resta solo da allineare la vecchia guida a questo criterio**, o da
+   archiviarla come superata.
 
 E una quarta, che viene dalla roadmap del Documento strategico 01/02 ed è
 segnata lì come bloccante per tutto il resto: **il deposito della domanda di
