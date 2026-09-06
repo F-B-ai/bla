@@ -1,0 +1,389 @@
+<title>Human interface</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:#FCFBF8; --paper-box:#F4EEE2; --paper-sunk:#F2F1ED;
+    --ink:#1A1A1A; --ink-soft:#3E3C39; --ink-faint:#6B6862;
+    --rule:#D8D4CB; --rule-soft:#E7E4DC;
+    --red:#9B1B30; --red-deep:#6E1322; --red-wash:#F6E7E7;
+    --bar:#1C1C1C; --bar-ink:#FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+      --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+      --rule:#33302A; --rule-soft:#262420;
+      --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+      --bar:#E4E0D6; --bar-ink:#14130F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --bar:#E4E0D6; --bar-ink:#14130F;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:Tinos,"Times New Roman",Times,serif; font-size:17.5px; line-height:1.62; }
+  .sheet { max-width:760px; margin:0 auto; padding:clamp(30px,6vw,76px) clamp(20px,5vw,54px) 100px; }
+
+  .ente { text-align:center; color:var(--red); font-weight:700; font-size:0.84rem;
+    letter-spacing:0.09em; line-height:2; text-transform:uppercase; }
+  .ente .doc { display:block; margin-top:12px; }
+  .short-rule { width:116px; height:1px; background:var(--red); border:0; margin:18px auto; }
+  h1 { font-size:clamp(2.3rem,7vw,3.5rem); font-weight:700; text-align:center;
+    margin:10px 0 20px; line-height:1.05; }
+  .sottotitolo { font-style:italic; text-align:center; color:var(--ink-soft);
+    font-size:1.06rem; margin:0 auto; max-width:30em; text-wrap:balance; }
+  .ink-rule { width:96px; height:1px; background:var(--rule); border:0; margin:26px auto; }
+  .firma { text-align:center; font-style:italic; line-height:1.9; }
+  .firma b { font-style:normal; font-weight:700; }
+
+  h2 { font-size:1.38rem; font-weight:700; color:var(--red); margin:56px 0 4px; line-height:1.24; }
+  .cap-rule { width:100%; height:2px; background:var(--red); border:0; margin:0 0 20px; }
+  h3 { font-size:1.05rem; font-weight:700; margin:28px 0 8px; }
+  p { margin:0 0 15px; }
+  ul,ol { margin:0 0 16px; padding-left:1.25em; }
+  li { margin-bottom:8px; }
+
+  /* la definizione */
+  .definizione {
+    border-top:3px solid var(--red); border-bottom:3px solid var(--red);
+    padding:26px 0; margin:34px 0;
+  }
+  .definizione p {
+    font-size:clamp(1.2rem,3.2vw,1.5rem); line-height:1.45; margin:0;
+    text-align:center; text-wrap:balance;
+  }
+  .definizione b { color:var(--red-deep); }
+  .corta {
+    text-align:center; font-style:italic; color:var(--ink-soft);
+    margin:14px 0 0; font-size:1.02rem;
+  }
+
+  /* parola per parola */
+  .parola { display:grid; grid-template-columns:1fr; gap:2px 20px;
+    padding:16px 0; border-bottom:1px solid var(--rule-soft); }
+  @media (min-width:620px) { .parola { grid-template-columns:11em 1fr; } }
+  .parola:first-of-type { border-top:1px solid var(--rule); }
+  .parola .p-t { font-weight:700; color:var(--red); }
+  .parola p { margin:0; font-size:0.98rem; }
+
+  .riquadro { border:1px solid var(--red); background:var(--paper-box);
+    padding:clamp(18px,3.2vw,28px); margin:32px 0; }
+  .riquadro h3 { margin:0 0 12px; }
+  .riquadro p:last-child { margin:0; }
+
+  .tab-wrap { overflow-x:auto; margin:22px 0 26px; }
+  table { border-collapse:collapse; width:100%; font-size:0.93rem; }
+  thead th { background:var(--bar); color:var(--bar-ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif; font-weight:500; font-size:0.76rem;
+    letter-spacing:0.05em; text-align:left; padding:9px 12px; }
+  td, tbody th { border-bottom:1px solid var(--rule); padding:10px 12px; vertical-align:top; text-align:left; }
+  tbody th { font-weight:700; white-space:nowrap; }
+
+  /* conseguenze operative */
+  .regola { display:grid; grid-template-columns:1.6em 1fr; gap:6px 14px;
+    padding:15px 0; border-bottom:1px solid var(--rule-soft); }
+  .regola:first-of-type { border-top:1px solid var(--rule); }
+  .regola .n { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:0.95rem;
+    color:var(--red); font-weight:600; padding-top:2px; }
+  .regola p { margin:0 0 6px; }
+  .regola p:last-child { margin:0; }
+  .regola b { font-weight:700; }
+  .regola .costo { font-size:0.92rem; color:var(--ink-faint); font-style:italic; }
+
+  .inversione {
+    background:var(--paper-sunk); border-left:4px solid var(--red);
+    padding:20px 24px; margin:28px 0;
+  }
+  .inversione p { margin:0 0 10px; }
+  .inversione p:last-child { margin:0; }
+  .inversione .frase { font-size:1.12rem; font-style:italic; }
+
+  .colophon { margin-top:64px; padding-top:20px; border-top:2px solid var(--red);
+    font-size:0.86rem; color:var(--ink-faint); line-height:1.7; }
+
+  @media print {
+    body { background:#fff; font-size:11.5pt; }
+    .sheet { padding:0; max-width:none; }
+    h2 { break-after:avoid; }
+    .definizione,.riquadro,.regola,.parola,table { break-inside:avoid; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport<br>
+    Mind Movement Lab — Gragnano (NA)
+    <span class="doc">Documento strategico 02/02 · Pagina fondativa</span>
+  </p>
+  <hr class="short-rule">
+
+  <h1>Human interface</h1>
+  <p class="sottotitolo">Che cos'è ESSĒRE — e la definizione con cui si decide,
+    d'ora in avanti, che cosa entra e che cosa resta fuori</p>
+
+  <hr class="ink-rule">
+  <p class="firma">
+    <b>Francesco Busanca</b><br>
+    Fondatore e Direttore Tecnico — Metodo Mind Movement
+  </p>
+
+  <!-- ============ LA DEFINIZIONE ============ -->
+  <h2>La definizione</h2>
+  <hr class="cap-rule">
+
+  <div class="definizione">
+    <p>ESSĒRE è l'<b>interfaccia fra un professionista e una persona</b>:
+      rende leggibile un corpo nel tempo, con misure che dichiarano sempre
+      la propria fonte e il proprio limite.</p>
+  </div>
+  <p class="corta">Versione corta: non gestisce allenamenti — rende leggibile una persona.</p>
+
+  <p>Questa non è una frase per la copertina. È uno <strong>strumento di
+    decisione</strong>: ogni volta che qualcuno proporrà una funzione nuova, la
+    domanda sarà se quella funzione rende una persona più leggibile. Se non lo fa,
+    non è nostra — per quanto possa vendere.</p>
+
+  <!-- ============ PAROLA PER PAROLA ============ -->
+  <h2>Parola per parola</h2>
+  <hr class="cap-rule">
+  <p>Ogni parola della definizione porta un vincolo. Se una parola non vincola
+    niente, va tolta.</p>
+
+  <div class="parola">
+    <div class="p-t">Interfaccia</div>
+    <p>Uno strumento che sta in mezzo. Non decide al posto di nessuno, e non è il
+      fine: è il vetro attraverso cui si guarda. Ne segue che ESSĒRE non prescrive
+      e non sostituisce — <em>mostra</em>.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">Fra un professionista<br>e una persona</div>
+    <p>I due capi sono entrambi umani. Non è l'interfaccia fra un uomo e una
+      macchina: è quella fra chi sa leggere e chi va letto. Ne segue che
+      l'operatore certificato non è un accessorio del software — è uno dei due
+      capi, e senza di lui l'interfaccia non ha senso.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">Rende leggibile</div>
+    <p>Trasforma in numeri confrontabili ciò che prima si guardava a occhio.
+      Angoli in gradi da una fotografia, cadenza dal cammino, un profilo su cinque
+      catene. Ne segue che una funzione che non produce una lettura — che
+      intrattiene, che motiva, che fa punteggio e basta — è periferica.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">Un corpo</div>
+    <p>Non un utente, non un cliente, non un profilo. Una cosa fisica, che pesa e
+      che si muove, e che appartiene a qualcuno.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">Nel tempo</div>
+    <p>La misura singola vale poco; la traiettoria vale tutto. Ne segue il vincolo
+      più duro che abbiamo: <strong>non si introduce una misura che non si possa
+      rifare identica fra sei mesi.</strong> Una misura irripetibile è un aneddoto.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">Dichiarano la<br>propria fonte</div>
+    <p>Ogni numero dice da dove viene: misurato dallo strumento, ricavato in parte,
+      oppure dichiarato dall'occhio del professionista. Ne segue che non
+      camufferemo mai una stima da misura, nemmeno quando sarebbe più comodo.</p>
+  </div>
+
+  <div class="parola">
+    <div class="p-t">E il proprio limite</div>
+    <p>Dove lo strumento non arriva, lo dice. Una fotografia illeggibile diventa
+      «qualità insufficiente», non un numero inventato. Ne segue che ESSĒRE deve
+      poter rispondere <em>non lo so</em> — ed è la funzione di cui andiamo più
+      fieri.</p>
+  </div>
+
+  <!-- ============ L'INVERSIONE ============ -->
+  <h2>L'inversione, e come si dice</h2>
+  <hr class="cap-rule">
+
+  <p>Nel vocabolario tecnico <em>human interface</em> significa già un'altra cosa:
+    la superficie fra un umano e <strong>la macchina</strong> — il mouse, la
+    tastiera, le linee guida di chi disegna il software. Noi usiamo il termine nel
+    verso opposto.</p>
+
+  <p>Non è un equivoco da evitare: è la posizione, purché la si dichiari per primi.</p>
+
+  <div class="inversione">
+    <p class="frase">«Tutti chiamano <em>human interface</em> quello che sta fra te
+      e la macchina. Noi chiamiamo così quello che sta fra te e <strong>una
+      persona</strong>.»</p>
+    <p>Detta così, l'inversione è una presa di posizione e si ricorda. Non detta,
+      sembra un termine usato male da chi non lo conosce.</p>
+  </div>
+
+  <!-- ============ PERCHÉ NON LE ALTRE ============ -->
+  <h2>Perché non le categorie ovvie</h2>
+  <hr class="cap-rule">
+  <p>Una categoria non descrive: <strong>sceglie con chi ti confrontano</strong>.
+    Le tre alternative disponibili ci mettevano in confronti che non possiamo
+    vincere, o non vogliamo.</p>
+
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Categoria</th><th>Con chi ti confronta</th><th>Che cosa costa</th></tr></thead>
+      <tbody>
+        <tr>
+          <th>App per il fitness</th>
+          <td>Migliaia di app, molte gratuite</td>
+          <td>Si compete su funzioni e prezzo dell'abbonamento. Il metodo diventa invisibile: nessuno compra un metodo dentro una categoria che confronta schede.</td>
+        </tr>
+        <tr>
+          <th>Gestionale per palestre</th>
+          <td>Software di amministrazione consolidati</td>
+          <td>Si compete su anagrafiche, incassi e prezzo per utente. Il corpo dell'allievo sparisce dal prodotto.</td>
+        </tr>
+        <tr>
+          <th>Dispositivo medico</th>
+          <td>Il settore regolatorio</td>
+          <td>Certificazione, obblighi, tempi e costi da azienda strutturata — e la perdita di ciò che ci rende utili: poter essere usati da un operatore, in sala, ogni giorno.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Human interface</strong> non ha un occupante. Il prezzo di una
+    categoria che non esiste è che nessuno la cerca: per questo non è un termine da
+    vendita al pubblico, ed è dichiarato più sotto dove si usa e dove no.</p>
+
+  <!-- ============ CONSEGUENZE ============ -->
+  <h2>Che cosa ne discende</h2>
+  <hr class="cap-rule">
+  <p>Una definizione che non fa scartare niente è un ornamento. Queste sono le sei
+    conseguenze operative, e ognuna ha un costo che accettiamo consapevolmente.</p>
+
+  <div class="regola">
+    <span class="n">1</span>
+    <div>
+      <p><b>Se una funzione non rende una persona più leggibile, non è nostra.</b></p>
+      <p class="costo">Costo: rinunciamo a funzioni che vendono — social, sfide,
+        classifiche — quando non producono una lettura.</p>
+    </div>
+  </div>
+
+  <div class="regola">
+    <span class="n">2</span>
+    <div>
+      <p><b>Nessun numero entra senza la sua fonte dichiarata.</b></p>
+      <p class="costo">Costo: alcune schermate sono meno impressionanti di quelle
+        dei concorrenti, che mostrano tutto come se fosse misurato.</p>
+    </div>
+  </div>
+
+  <div class="regola">
+    <span class="n">3</span>
+    <div>
+      <p><b>Non si introduce una misura che non si possa ripetere identica fra sei
+        mesi.</b></p>
+      <p class="costo">Costo: escludiamo misurazioni suggestive ma irripetibili,
+        che farebbero una bella prima impressione.</p>
+    </div>
+  </div>
+
+  <div class="regola">
+    <span class="n">4</span>
+    <div>
+      <p><b>Lo strumento deve poter dire «non lo so».</b> Dove il dato non è
+        leggibile si dichiara, non si stima.</p>
+      <p class="costo">Costo: qualche volta chiediamo all'allievo di rifare una
+        fotografia invece di dargli subito un risultato.</p>
+    </div>
+  </div>
+
+  <div class="regola">
+    <span class="n">5</span>
+    <div>
+      <p><b>Le formule calcolano, l'intelligenza artificiale spiega.</b> Mai il
+        contrario: un numero deve restare lo stesso a ogni misurazione, e
+        un'intelligenza artificiale non lo garantisce.</p>
+      <p class="costo">Costo: rinunciamo a promettere che «l'AI analizza il tuo
+        corpo», che è la frase che oggi vende di più.</p>
+    </div>
+  </div>
+
+  <div class="regola">
+    <span class="n">6</span>
+    <div>
+      <p><b>Il perimetro non si supera nemmeno quando conviene.</b> Screening e
+        orientamento educativo-motorio; mai atto diagnostico.</p>
+      <p class="costo">Costo: non possiamo dire la cosa che il mercato vorrebbe
+        sentirsi dire. È anche la ragione per cui siamo difendibili.</p>
+    </div>
+  </div>
+
+  <!-- ============ I TRE REGISTRI ============ -->
+  <h2>A chi si dice, e come</h2>
+  <hr class="cap-rule">
+  <p>La definizione è una sola; le parole cambiano con l'interlocutore. Le tre righe
+    non competono fra loro: coprono registri diversi.</p>
+
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Interlocutore</th><th>Che cosa sente</th></tr></thead>
+      <tbody>
+        <tr><th>L'allievo</th><td><em>«Comprendi chi sei attraverso il movimento.»</em> È già la riga dell'applicazione e non si tocca.</td></tr>
+        <tr><th>Il professionista,<br>l'aula dell'Academy</th><td><em>«L'interfaccia fra te e la persona che alleni.»</em></td></tr>
+        <tr><th>Il tecnico, l'investitore,<br>chi compra il white-label</th><td><em>«Human interface: strumentazione che rende una persona leggibile nel tempo, dentro un perimetro dichiarato.»</em></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="riquadro">
+    <h3>La regola che protegge il termine</h3>
+    <p><strong>«Human interface» non si mette mai davanti a un allievo.</strong> È
+      astratto, è in inglese, e non dice che cosa fa: davanti a chi paga per stare
+      meglio suona come le parole grosse di tutte le altre app. Vive nel registro
+      professionale e in quello tecnico, dove invece dice esattamente la cosa
+      giusta.</p>
+  </div>
+
+  <!-- ============ LA PROVA ============ -->
+  <h2>Come si usa questa pagina</h2>
+  <hr class="cap-rule">
+
+  <p>Quando arriva una proposta — una funzione, una collaborazione, una richiesta di
+    un cliente white-label — si fanno tre domande in quest'ordine:</p>
+
+  <ol>
+    <li><strong>Rende una persona più leggibile?</strong> Se no, si scarta, per
+      quanto vendibile sia.</li>
+    <li><strong>La misura che introduce si può rifare identica fra sei mesi?</strong>
+      Se no, non è una misura: è un'impressione con la grafica.</li>
+    <li><strong>Sta dentro il perimetro?</strong> Se no, si scarta senza discutere —
+      e si spiega perché, perché è quella la nostra differenza.</li>
+  </ol>
+
+  <p>Una proposta che passa le tre domande è nostra anche se oggi non sappiamo
+    ancora costruirla. Una che non le passa non diventa nostra nemmeno se ce la
+    regalano già fatta.</p>
+
+  <div class="colophon">
+    <p><b>Fondamento nel sistema.</b> Le sei conseguenze non sono intenzioni: sono
+      già scritte nel codice e protette da test. La dichiarazione della fonte vive
+      negli undici assi della progressione (<code>dati</code>, <code>mista</code>,
+      <code>occhio</code>); il «non lo so» nella qualità insufficiente dell'analisi
+      posturale; la traiettoria nel modulo <em>human interface</em>, che con un
+      punto solo scrive «prima volta» invece di disegnare una tendenza; il perimetro
+      nel protocollo del Sistema Stellato ed è criterio eliminatorio dell'esame di
+      Livello 1.</p>
+    <p>Pagina fondativa del Documento strategico 02/02. Da rileggere prima di ogni
+      decisione che aggiunge qualcosa al prodotto.</p>
+  </div>
+
+</div>
