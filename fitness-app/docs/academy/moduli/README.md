@@ -36,3 +36,17 @@ Sono emerse leggendo i file, e sono annotate qui perché non si perdano.
    prima dell'erogazione serve una licenza, oppure illustrazioni proprie. Il
    modello concettuale di Myers si può insegnare e citare liberamente; le sue
    tavole no.
+
+---
+
+## Aggiornamento — rientrati altri contenuti
+
+| File | Che cos'è |
+|---|---|
+| `mindmovement-rivoluzione.docx` | **RIVOLUZIONE** — il manifesto, il format, la filosofia, il percorso |
+| `risveglio-i-il-corpo-che-parla.docx` | **RISVEGLIO I — Il corpo che parla.** Documento operativo completo di un evento con il Dott. Antonio Cannavacciuolo (nutrizionista PNEI), 19 aprile 2026. Nella roadmap del Documento strategico 01/02 questo formato è indicato come **modello per l'open day** che apre le vendite del Livello 1 |
+
+Il modulo **Nutrizione Fasciale e PNEI**, che il Documento strategico 01/02
+indica come **modello-tipo a 9 blocchi per tutti gli altri 21 moduli**, non è
+ancora in questa cartella. È il file più utile da recuperare dopo l'elenco dei
+titoli.

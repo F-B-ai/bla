@@ -1,62 +1,140 @@
 # Academy — l'archivio dei documenti
 
-Questa cartella esiste per una ragione precisa: i documenti dell'Accademia sono
-stati scritti, stampati, e poi persi. Erano nati in conversazioni diverse, non
-erano in nessun repository, e quando è servito ritrovarli non c'era un posto
+Questa cartella esiste per una ragione precisa: i documenti dell'Accademia erano
+stati scritti, stampati, e poi perduti. Erano nati in conversazioni diverse, non
+stavano in nessun repository, e quando è servito ritrovarli non c'era un posto
 dove cercarli.
 
-**Da qui in avanti la regola è una sola: un documento dell'Accademia esiste se
-sta in questa cartella.** Se è solo stampato, o solo in una chat, non esiste —
-esiste una copia, che è un'altra cosa.
+**La regola è una sola: un documento dell'Accademia esiste se sta in questa
+cartella.** Se è solo stampato, o solo in una chat, non esiste — esiste una
+copia, e le copie si perdono.
 
 I file qui dentro sono versionati con il codice: hanno una storia, si possono
 confrontare, e non si perdono.
 
 ---
 
-## Lo stato dei sei documenti
+## Che cosa c'è, e dove
 
-| Documento | File | Stato |
+### `strategici/` — i documenti di indirizzo
+
+| Documento | File | Che cosa contiene |
 |---|---|---|
-| Specifica clinica e tecnica — Valutazione in due sessioni e Sistema Stellato | `valutazione-due-sessioni-e-sistema-stellato.pdf` | **Originale, integro** (14 pagine). Già implementato in `src/data/stellatoProtocol.ts` |
-| Percorso formatori, Sessione 01 — Docimologia | `docimologia.html` | **Ricostruito a norma di copertina.** Non è la scansione dell'originale: vedi l'avvertenza dentro il documento |
-| Livello 1, modulo A-01 — Perché un corpo cambia | `modulo-a01-perche-un-corpo-cambia.html` | **Completo**, due strade + kit d'aula. Codice A-01 proposto, da confermare col Documento operativo 03 |
-| Livello 1, modulo A-01 — Materiali d'aula (K-2, K-3, K-4, K-7) | `modulo-a01-materiali-aula.html` | **Completo e stampabile.** Undici carte, nove casi con soluzioni, foglio dell'allievo |
-| Documento strategico 01/02 — Mind Movement Academy | — | **Mancante.** Esiste solo su carta |
-| Documento operativo 03 — I 22 moduli | — | **Mancante.** È il più urgente: contiene l'elenco dei 22 moduli con codice e area |
-| Documento strategico 02/02 — ESSĒRE | — | **Mancante.** Esiste solo su carta |
-| Moduli C-23 e C-24 — I meccanismi dell'ipertrofia e la scheda sartoriale | — | **Mancante.** Esiste solo su carta |
+| **Strategico 01/02** — Mind Movement Academy | `01-academy-punto-situazione-e-piano-sviluppo.pdf` | Inventario reale degli asset, **12 lacune**, architettura definitiva dei 3 livelli con monte ore e prezzi, distribuzione dei 22 moduli sulle 5 aree, **standard di produzione a 9 blocchi**, sistema di valutazione e rubrica, tutela del metodo, roadmap a 90 giorni |
+| **Strategico 02/02** — ESSĒRE | `02-processo-vendita-e-inquadramento-societario.pdf` | Perché oggi non vende, a chi si vende, listino, **processo di vendita in 7 stadi**, strumenti, demo in 6 blocchi, obiezioni e risposte, prerequisiti, inquadramento societario, roadmap a 90 giorni |
+| Contenuti e piano di espansione | `contenuti-piano-espansione.docx` | Storie, Reel, podcast, marketing, app |
+| Scheda di transizione dal sit-up | `scheda-transizione-situp-academy.pdf` | Materiale formativo per coach: protocollo di sostituzione, progressione, valutazione |
 
-## Che cosa sappiamo dell'architettura, dalle copertine
+### `moduli/` — i contenuti didattici
 
-Le copertine fotografate dei documenti mancanti fissano alcuni fatti che valgono
-come canone finché non rientrano i testi completi:
+Vedi [`moduli/README.md`](./moduli/README.md).
 
-- **3 livelli, 22 moduli**, ripartiti **8 / 8 / 6**. La ripartizione 8 / 9 / 5 è
-  un errore corretto nel capitolo 2 del Documento operativo 03.
-- I moduli hanno **codici per area**: A-02, C-23, C-24.
-- Il percorso è **doppio**: quello che il formatore studia e quello che si eroga
-  in aula.
-- Il modulo C-23/C-24 rimanda ad A-02 per gli studi sulla frequenza di
-  allenamento: i moduli si citano fra loro, quindi l'ordine dei codici è
-  significativo e non va rinumerato a piacere.
+### Alla radice
 
-L'artifact «ESSĒRE Academy» contiene una bozza a 13 moduli scritta prima che
-queste copertine fossero disponibili: **non è il canone** e va sostituita quando
-il Documento operativo 03 rientra.
+| File | Che cos'è |
+|---|---|
+| `valutazione-due-sessioni-e-sistema-stellato.pdf` | Specifica clinica e tecnica. Già implementata in `src/data/stellatoProtocol.ts` |
+| `docimologia.html` | Sessione 01 del percorso formatori. **Ricostruita a norma di copertina**, non originale |
+| `modulo-a01-*.html` | Modulo proposto e materiali d'aula. **Non è il Modulo 1 reale**: vedi sotto |
+| `i-22-moduli-ricostruzione.html` | Ricostruzione fatta prima che i documenti rientrassero. **Superata**, tenuta come storia |
+| `pagina-fondativa-human-interface.html` | Definizione fondativa di ESSĒRE |
+| `nota-due-diligence-stato-reale.html` | Stato verificabile del sistema, per chi valuta |
 
-## Il vincolo di coerenza fra documento e codice
+---
 
-Il modulo A-01 e `src/domain/progressione.ts` dicono le stesse cose: le cinque
-caselle della catena, gli undici assi con la loro fonte, le soglie numeriche
-(2 sedute, prontezza 40, compenso 3, angolo 100°) e l'ordine dei cinque cancelli.
+## L'architettura vera, dal Documento strategico 01/02
 
-Se un giorno divergono, **ha ragione il documento e si corregge il codice** — mai
-il contrario. Un corsista che ritrova in app parole diverse da quelle dell'aula
-smette di fidarsi di entrambi.
+### I tre livelli
+
+| Livello | Titolo rilasciato | Monte ore | Formato | Prezzo indicativo |
+|---|---|---|---|---|
+| **L1** | Operatore Mind Movement | 60 h (40 online + 20 presenza) | Blended, 3 mesi | € 890 – 1.200 |
+| **L2** | Educatore Somatico Mind Movement | 100 h (50 + 50) | Blended, 5 mesi | € 1.800 – 2.400 |
+| **L3** | Trainer / Docente Mind Movement | 120 h + tirocinio + tesi | In presenza + supervisione, 8 mesi | € 3.500 – 4.900 |
+
+### Le cinque aree
+
+| Codice | Area | Nucleo |
+|---|---|---|
+| **A** | Anatomia fasciale e biomeccanica | Catene miofasciali, sling, trasmissione delle forze, valutazione posturale |
+| **B** | PNEI, respiro e nutrizione | Asse HPA, respirazione, nutrizione fasciale, infiammazione, recupero |
+| **C** | Pratica del movimento e programmazione | Protocollo CCGT, progressioni, adattamento del carico, casi speciali |
+| **D** | Coscienza, meditazione e pratiche interne | Qi Gong, interocezione, propriocezione, stati attentivi |
+| **E** | Comunicazione somatica e conduzione | PNL applicata, linguaggio del corpo, conduzione d'aula, colloquio |
+
+**Vincolo dichiarato:** nessun modulo può appartenere a due livelli. Se un
+contenuto serve a entrambi si sdoppia in versione base e avanzata con obiettivi
+diversi. È la regola che impedisce all'Accademia di diventare un unico corso
+lungo 22 moduli.
+
+### La ripartizione, e la sua correzione
+
+Il Documento strategico 01/02 propone **8 / 9 / 5** e chiude con
+«Decisione richiesta n.1 — confermi o modifichi la ripartizione?».
+
+Il **Documento operativo 03**, capitolo 2, registra la risposta: la ripartizione
+reale è **8 / 8 / 6**. Quel documento è quindi posteriore e prevale.
+
+---
+
+## Che cosa manca ancora
+
+Una cosa sola, ed è la stessa da giorni: **l'elenco dei 22 titoli reali**.
+
+Il Documento strategico 01/02 lo dice esplicitamente: *«La griglia va compilata
+con i titoli reali dei tuoi moduli: è il primo esercizio da fare insieme.»* Quei
+titoli sono stati poi scritti nel **capitolo 1 del Documento operativo 03**, che
+è l'unico documento della serie ancora non rientrato in forma digitale.
+
+---
+
+## Lo standard di produzione di un modulo — 9 blocchi
+
+Dal Documento strategico 01/02 §4. Il modulo di Nutrizione Fasciale e PNEI è il
+modello-tipo; ogni altro modulo deve avere **esattamente questa struttura, in
+questo ordine**.
+
+1. **Esito di apprendimento** — 3–5 frasi «alla fine l'allievo sa fare X», verificabili · 1 pagina
+2. **Mappa** — schema visivo delle relazioni, in palette Mind Movement · 1 SVG
+3. **Fondamento teorico** — teoria, letteratura di riferimento, limiti · 6–12 pagine · 60'
+4. **Fondamento metodologico** — perché il metodo lo integra così e non altrimenti · 2–4 pagine · 20'
+5. **Pratica guidata** — esercizi con dosaggio, progressione, criteri · scheda + video · 90'
+6. **Errori comuni e correzioni** — minimo 8 errori tipici con correzione somatica · tabella · 30'
+7. **Casi e ragionamento** — 2 casi reali, uno complesso · 4 pagine · 45'
+8. **Verifica** — 10 domande chiuse + 1 prova pratica + 1 caso · scheda esame · 30'
+9. **Bibliografia e fonti** — fonti primarie, non citazioni di seconda mano · 1 pagina
+
+> Il modulo A-01 prodotto in questo repository **non** segue questi nove blocchi:
+> è stato scritto prima che il documento rientrasse. Va riformattato o rifatto.
+
+---
+
+## Tre cose da sistemare prima di erogare
+
+1. **Due modelli di catene convivono.** Il Modulo 1 insegna le **otto** catene
+   miofasciali di Myers; il Sistema Stellato implementato nell'app ne usa
+   **cinque** (I-E, A, F, C, E). Entrambi legittimi, ma un corsista che studia
+   otto catene e ne trova cinque nell'applicazione si ferma. Va deciso come si
+   tengono insieme, e dichiarato.
+
+2. **L'autore sulla copertina.** Il Modulo 1 riporta «A cura di Francesco
+   Filippi»; gli altri documenti riportano Francesco Busanca. Su un documento di
+   certificazione l'autore va verificato.
+
+3. **Le figure anatomiche.** La guida indica di salvare le tavole da
+   BasicMedicalKey, che ospita immagini tratte dal libro di Thomas Myers.
+   Riprodurle in dispense vendute o in un atlante è uso di materiale protetto:
+   serve una licenza, oppure illustrazioni proprie. Il modello concettuale di
+   Myers si insegna e si cita liberamente; le sue tavole no.
+
+E una quarta, che viene dalla roadmap del Documento strategico 01/02 ed è
+segnata lì come bloccante per tutto il resto: **il deposito della domanda di
+registrazione del marchio (classi 41 e 44)**.
+
+---
 
 ## Come si aggiunge un documento
 
-1. Metti il file qui (`.pdf` per gli originali, `.html` per quelli composti).
-2. Aggiungi la riga nella tabella qui sopra, con lo stato reale.
+1. Metti il file qui (`.pdf` o `.docx` per gli originali, `.html` per quelli composti).
+2. Aggiorna la tabella che gli compete.
 3. Committa. Non serve altro.
