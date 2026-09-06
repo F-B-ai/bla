@@ -316,3 +316,43 @@ Le due parti coprono **44 esercizi** con leve, vettori, profili di forza e curve
 di resistenza. È il contenuto che alimenta direttamente la libreria esercizi
 dell'app, dove oggi 3 esercizi su 115 hanno il film e nessuno ha l'analisi
 biomeccanica.
+
+---
+
+## Undicesimo rientro — programmazione, e le versioni doppie
+
+Cinque file, tutti nuovi, ~196.000 caratteri.
+
+| File | Che cos'è | Ampiezza |
+|---|---|---|
+| `modulo-programmazione-parte-1-fondamenti-profili-tecniche.docx` | **Programmazione delle schede.** Fondamenti, profili allievo, periodizzazione, tecniche avanzate | ~41.200 car |
+| `modulo-programmazione-parte-2-template-tabelle-checklist.docx` | Template operativi: tabelle RPE/RIR/%1RM, mesociclo, schede pre-compilate per profilo, macrociclo 24 settimane, checklist del coach, **20 regole d'oro** | ~23.200 car |
+| `modulo-pnl-carisma-versione-avanzata.docx` | PNL & Carisma, versione avanzata | ~68.500 car |
+| `modulo-pnl-carisma-versione-base.docx` | PNL & Carisma, versione più breve | ~31.000 car |
+| `modulo-mente-da-campione-versione-avanzata.docx` | Mente da Campione — la psicologia della performance d'élite | ~32.300 car |
+
+### Il modulo che parla direttamente al software
+
+La **Programmazione** è il modulo più vicino a ESSĒRE di tutto l'archivio: le
+tabelle di conversione RPE / RIR / %1RM sono **le stesse grandezze** che il
+motore usa in `src/domain/progressione.ts` — RIR calcolato come 10 − RPE,
+massimale stimato con Epley, prossimità al cedimento come asse di progressione.
+
+Vanno confrontate: se le tabelle del modulo e le formule del codice divergono,
+un corsista vedrà due numeri diversi per la stessa cosa. **È una verifica da
+fare, non un'ipotesi** — e finora nessuno l'ha fatta.
+
+Le **20 regole d'oro della programmazione** e la **checklist operativa del
+coach** sono inoltre materiale direttamente utilizzabile come blocco «errori
+comuni» e «verifica» dello standard a 9 blocchi.
+
+### Terzo caso di versioni multiple
+
+PNL & Carisma esiste ora in **tre** forme: il manuale docente `modulo-04-…`, la
+versione avanzata (68.500 car) e la versione base (31.000 car), più i tre
+allegati di pratica. Mente da Campione in **tre**: parti A e B più questa
+versione avanzata.
+
+Vale quanto già annotato per il Modulo 1 (quattro forme) e per i moduli 06-12
+(due forme): **prima delle dispense va deciso quale versione è quella buona.**
+Il conto sale, e ogni versione in più moltiplica il lavoro di correzione.
