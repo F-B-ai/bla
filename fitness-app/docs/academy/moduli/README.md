@@ -208,3 +208,31 @@ appendici con casi clinici e protocolli, e ora l'edizione master di
 approfondimenti. Vale l'avvertenza già scritta per i moduli 06-12: **prima di
 produrre le dispense va deciso quale forma è quella buona**, altrimenti si
 corregge quattro volte lo stesso contenuto.
+
+---
+
+## Ottavo rientro — Talks Master Manual e l'«enciclopedia»
+
+| File | Che cos'è |
+|---|---|
+| `talks-master-manual.docx` | **Mind Movement Talks — Manuale completo.** Indice a volumi: mindset e filosofia, script parola-per-parola delle talk (60 minuti), psicologia del trasformatore, stati mentali del partecipante · ~9.200 car |
+| `enciclopedia-parte-1-lower-body.pdf` | **Opera enciclopedica — Parte 1, anatomia lower body.** Vedi avvertenza qui sotto |
+
+### ⚠ L'enciclopedia è un'intelaiatura, non un contenuto
+
+Il file dichiara in copertina *«55 Muscoli · 250+ Pagine · 15 Sezioni per
+Muscolo»*. Il PDF ha **8 pagine**, e la verifica dà questo:
+
+- **55 voci su 55** riportano il segnaposto letterale `MUSCOLO n/55 - [NOME]`
+- **nessun muscolo è nominato**
+- ogni voce chiude con: *«[Contenuto integrale 4-5 pagine per muscolo presente
+  versione stampata]»*
+
+È quindi **l'indice dell'opera, con lo schema a 15 sezioni ripetuto 55 volte** —
+uno scheletro utile, ma non l'opera. Se esiste davvero una versione stampata con
+i contenuti, è quella che va recuperata e archiviata; se non esiste, il file
+descrive un lavoro da fare, non un lavoro fatto.
+
+Va detto perché fa differenza in due punti: nell'inventario degli asset (un
+indice non è un contenuto) e in qualsiasi materiale di vendita che citasse
+«250+ pagine di opera enciclopedica».
