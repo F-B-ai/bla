@@ -257,3 +257,45 @@ I primi due sono piani esecutivi con deliverable settimanali; il terzo è una
 visione. Non sono in conflitto — ma il terzo si realizza **solo** se i primi
 due partono, e nessuno dei due è ancora partito: il deposito del marchio, che
 il 01/02 marca come bloccante per tutto il resto, non risulta fatto.
+
+---
+
+## ✅ Il catalogo dei moduli — `riepilogo-moduli-e-struttura-libro.docx`
+
+Non è il Documento operativo 03, ma è **l'inventario autorevole di ciò che è
+stato prodotto**, con conteggi per modulo. Chiude la domanda «che cosa esiste».
+
+**Numeri dichiarati:** 24 documenti · ~6.700 paragrafi · **44 esercizi con
+analisi biomeccanica** · 10 profili allievo · 30+ schede operative · 10 tecniche
+avanzate · 4 modelli di periodizzazione.
+
+### Che cosa sono davvero i moduli 06-12
+
+Il catalogo li nomina, e **non coincidono con i nomi del Blueprint**:
+
+| # | Catalogo | Blueprint |
+|---|---|---|
+| 06 | Breathwork | Neuroscienza della Trasformazione |
+| 07 | Mindfulness | Scienza del Respiro Avanzata |
+| 08 | Qi Gong | Nutrizione Funzionale PNEI |
+| 09 | Posturologia | Energia, Coscienza e Campo Quantistico |
+| 10 | Assessment | Business & Leadership |
+| 11 | Business | Somatic Intelligence |
+| 12 | Etica | Practicum & Certificazione |
+
+Due liste diverse per gli stessi sette numeri. Il catalogo è **posteriore** e
+descrive i file realmente consegnati: prevale, ma va allineato il Blueprint.
+
+### I 5 pilastri del metodo
+
+Dal Modulo 05 secondo il catalogo: **Anatomy Trains + PNEI + Breathwork +
+Mindfulness + RT**. È la definizione più compatta del metodo che esista
+nell'archivio.
+
+### Le linee fasciali: il conto definitivo
+
+Il catalogo dice **7 linee** e le nomina: SBL, SFL, LL, SpL, AL, DFL, DBAL.
+Questo chiude la questione dei conteggi discordanti (5 / 7 / 8): **sette**, e la
+tabella riassuntiva dice «7 + Deep Front Line».
+Resta da riconciliare con le **cinque catene** del Sistema Stellato nell'app,
+che sono un modello diverso e non un conteggio diverso dello stesso modello.

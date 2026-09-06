@@ -24,3 +24,19 @@ cosa deve fare la piattaforma, chiunque la fornisca.
 componente finisce in una demo commerciale, quei numeri vanno sostituiti con
 dati veri e anonimizzati, o dichiarati come esempio — la regola della nota di
 due diligence vale anche qui.
+
+## `respira-esperienza-guidata.html`
+
+Esperienza di respirazione guidata, autonoma e completa: orbo pulsante
+sincronizzato al respiro (inspira 5s · trattieni 0,9s · espira 5,8s, ritmo di
+coerenza), braci animate, audio generato dal browser su D3 e A3 che sale e
+scende col respiro, frasi che ruotano, chiusura poetica.
+
+Funziona da sola in un file, rispetta `prefers-reduced-motion`, non carica
+nulla dall'esterno. È dichiarata «Risveglio Live · Mind Movement — Il cuore del
+Metodo».
+
+**È l'unico pezzo dell'archivio che non è un documento ma un'esperienza.** Il
+Modulo 05 mette il Centring come prima delle cinque fasi della sessione: questo
+file è quella fase, già fatta. Andrebbe dentro ESSĒRE — l'app ha già una
+schermata Respiro, e oggi non fa questo.
