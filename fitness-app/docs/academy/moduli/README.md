@@ -236,3 +236,36 @@ descrive un lavoro da fare, non un lavoro fatto.
 Va detto perché fa differenza in due punti: nell'inventario degli asset (un
 indice non è un contenuto) e in qualsiasi materiale di vendita che citasse
 «250+ pagine di opera enciclopedica».
+
+---
+
+## Nono rientro — due sintesi del Modulo 1, e l'opera stampata
+
+| File | Pagine | Contenuto reale |
+|---|---|---|
+| `modulo-01-anatomia-lower-body.pdf` | 14 | Trattazione condensata, **16 muscoli nominati**. Dichiara «35+ muscoli, 15 sezioni ciascuno» |
+| `modulo-01-manuale-definitivo.pdf` | 12 | **23 muscoli nominati**. Dichiara «300+ pagine, 94 muscoli, 6 catene fasciali» |
+
+Diversamente dall'`enciclopedia-parte-1-lower-body.pdf` — che è puro scheletro,
+55 segnaposto `[NOME]` e nessun muscolo — **questi due hanno contenuto vero**,
+ma condensato: sono sintesi, non l'opera che annunciano.
+
+### C'è un'opera stampata, ed è quella che manca
+
+Il manuale definitivo rimanda **quattro volte** a una «versione stampata» per il
+contenuto integrale, e l'enciclopedia fa lo stesso per tutti e 55 i muscoli.
+
+**Esiste dunque un'opera stampata di cui l'archivio ha solo gli indici e le
+sintesi.** Se quel file digitale esiste, è l'asset singolo più grosso che manca
+— più dei sette dell'inventario. Se esiste solo su carta, va scansionato prima
+di qualsiasi altra cosa.
+
+### Dati commerciali nuovi, e divergenti
+
+Il manuale definitivo riporta: **€350 corso + €50 tesseramento = €400 primo
+anno**, 3 weekend, 6 giorni, 42 ore, **«Certificazione Bronze»**.
+
+«Bronze» è un nome di livello che non compare altrove: il Documento strategico
+01/02 chiama il primo livello **Operatore Mind Movement** e lo prezza
+**€890–1.200** per 60 ore. Sono due offerte diverse per lo stesso posto nella
+scala — un'altra faccia della scelta d'architettura ancora aperta.
