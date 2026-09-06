@@ -9,6 +9,7 @@ import {
   Modal,
   RefreshControl,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
@@ -26,6 +27,7 @@ import { getStudentPaymentPlans } from '../../services/paymentService';
 import { generatePaymentReminders, sendPaymentReminder } from '../../services/paymentReminderService';
 import { VideoEsercizio } from '../../components/common/VideoEsercizio';
 import { trovaFilm } from '../../domain/filmEsercizio';
+import { leggiRomPrescritto, criteriDiStop } from '../../domain/schedaSartoriale';
 import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -125,6 +127,19 @@ export const MyProgramScreen: React.FC = () => {
 
       {exercise.description && (
         <Text style={styles.exerciseDescription}>{exercise.description}</Text>
+      )}
+
+      {/* ROM prescritto: livello 6 della scheda sartoriale. Non e'
+          una nota fra le altre — dice fin dove arrivare, ed e' la
+          differenza fra una scheda e un elenco di esercizi. */}
+      {leggiRomPrescritto(exercise.romPrescritto) && (
+        <View style={styles.romRiga}>
+          <Ionicons name="resize-outline" size={16} color={colors.accent} />
+          <Text style={styles.romTesto}>
+            <Text style={styles.romEtichetta}>ROM prescritto: </Text>
+            {leggiRomPrescritto(exercise.romPrescritto)!.testo}
+          </Text>
+        </View>
       )}
 
       {/* Il filmato si guarda QUI DENTRO. E se il programma non porta
@@ -243,6 +258,29 @@ export const MyProgramScreen: React.FC = () => {
           activePlan.weeklySchedule[selectedDay]?.exercises.map(
             (ex, i) => renderExercise(ex, i)
           )
+        )}
+
+        {/* Criteri di stop: livello 8 della scheda sartoriale.
+            Stanno in fondo alla scheda perche' e' li' che si
+            guardano — e ci sono SEMPRE, anche quando il coach non
+            ha aggiunto nulla di specifico per questa persona. */}
+        {activePlan && (activePlan.weeklySchedule[selectedDay]?.exercises.length || 0) > 0 && (
+          <Card>
+            <View style={styles.stopTestata}>
+              <Ionicons name="hand-left-outline" size={18} color={colors.warning} />
+              <Text style={styles.stopTitolo}>Quando fermarti e avvisarmi</Text>
+            </View>
+            {criteriDiStop(activePlan.criteriDiStopAggiunti).map((c, i) => (
+              <View key={i} style={styles.stopRiga}>
+                <View style={styles.stopPallino} />
+                <Text style={styles.stopTesto}>{c}</Text>
+              </View>
+            ))}
+            <Text style={styles.stopNota}>
+              Fermarsi non e' un passo indietro: e' quello che permette a tutto il
+              resto di funzionare.
+            </Text>
+          </Card>
         )}
       </View>
 
@@ -468,6 +506,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 4,
   },
+  romRiga: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+  },
+  romTesto: { flex: 1, fontSize: fontSize.sm, color: colors.text, lineHeight: 19 },
+  romEtichetta: { fontWeight: '600', color: colors.accent },
+
+  stopTestata: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  stopTitolo: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
+  stopRiga: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  stopPallino: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: colors.warning, marginTop: 7,
+  },
+  stopTesto: { flex: 1, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  stopNota: {
+    fontSize: fontSize.xs, color: colors.textLight, fontStyle: 'italic',
+    marginTop: spacing.sm, lineHeight: 17,
+  },
+
   exerciseDescription: {
     fontSize: fontSize.md,
     color: colors.textSecondary,

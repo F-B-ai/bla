@@ -80,6 +80,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exCategory, setExCategory] = useState<ExerciseCategory>('forza');
   const [exVideoUrl, setExVideoUrl] = useState('');
   const [exNotes, setExNotes] = useState('');
+  // ROM prescritto (scheda sartoriale, livello 6): l'app misura
+  // l'angolo al fondo, ma finora il coach non poteva prescriverlo.
+  const [exRom, setExRom] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
 
   // Tecnica
@@ -560,6 +563,7 @@ export const WorkoutPlanScreen: React.FC = () => {
       restSeconds: parseInt(exRest, 10) || 60,
       notes: exNotes,
       category: exCategory,
+      ...(exRom.trim() ? { romPrescritto: exRom.trim() } : {}),
       ...(exVideoUrl ? { videoUrl: exVideoUrl } : {}),
       technique: exTechnique || 'standard',
       ...(exTechnique === 'rest_pause' ? {
@@ -659,6 +663,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExRest('');
     setExVideoUrl('');
     setExNotes('');
+    setExRom('');
     setExTechnique('standard');
     setExMiniSets('4');
     setExMiniReps('6');
@@ -697,6 +702,7 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExCategory(ex.category || 'forza');
     setExVideoUrl(ex.videoUrl || '');
     setExNotes(ex.notes || '');
+    setExRom(ex.romPrescritto || '');
     setExTechnique(ex.technique || 'standard');
     setExMiniSets(String(ex.miniSets || 4));
     setExMiniReps(ex.miniReps || '6');
@@ -1181,6 +1187,20 @@ export const WorkoutPlanScreen: React.FC = () => {
               keyboardType="number-pad"
               placeholder="90"
             />
+
+            {/* ROM prescritto — livello 6 della scheda sartoriale.
+                L'app misura gia' l'angolo al fondo: prescriverlo
+                vuol dire poterlo confrontare. */}
+            <InputField
+              label="ROM prescritto"
+              value={exRom}
+              onChangeText={setExRom}
+              placeholder="completo · 90° · fin dove la schiena resta neutra"
+            />
+            <Text style={styles.helpText}>
+              Scrivi «completo», un angolo in gradi, oppure a parole. Un angolo si
+              confronta da solo con la misura dell'analisi; una descrizione la giudichi tu.
+            </Text>
 
             {/* Tecnica */}
             <Text style={styles.fieldLabel}>Tecnica</Text>
@@ -2294,6 +2314,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: spacing.sm,
+  },
+  helpText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    lineHeight: 17,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
   },
   categoryRow: {
     flexDirection: 'row',

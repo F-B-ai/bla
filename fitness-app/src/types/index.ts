@@ -148,6 +148,9 @@ export interface Exercise {
   notes: string;
   category: ExerciseCategory;
   technique?: ExerciseTechnique;
+  /** ROM prescritto (scheda sartoriale, livello 6): «completo»,
+   *  «90°», o una descrizione. Vuoto = non prescritto. */
+  romPrescritto?: string;
   // Serie Interrotte (rest-pause)
   miniSets?: number;
   miniReps?: string;
@@ -214,6 +217,10 @@ export interface WorkoutPlan {
   weeklySchedule: WeeklyDay[];
   createdAt: Date;
   isActive: boolean;
+  /** Criteri di stop aggiunti dal coach per questa persona
+   *  (scheda sartoriale, livello 8). Quelli di base sono sempre
+   *  presenti e vivono in domain/schedaSartoriale.ts. */
+  criteriDiStopAggiunti?: string[];
 }
 
 export interface WeeklyDay {
