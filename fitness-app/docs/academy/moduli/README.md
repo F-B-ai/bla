@@ -434,3 +434,44 @@ dà la forma della seduta, la forma del primo incontro e la forma del percorso.
 2. **L'assessment da 90 minuti** e la **valutazione in due sessioni** del Sistema
    Stellato descrivono lo stesso momento — il primo incontro — in due modi
    diversi. Vanno riconciliati: sono la porta d'ingresso di ogni allievo.
+
+---
+
+## ✅ Rientra C-23 / C-24 — l'ultimo dei cinque documenti stampati
+
+`c23-c24-ipertrofia-e-scheda-sartoriale.pdf` — 10 pagine, ~23.700 caratteri.
+Sottotitolo: **«proposta di integrazione»**, e si apre con *«Perché questo
+modulo mancava — e perché è un problema serio»*.
+
+Dei cinque documenti fotografati all'inizio ne mancava solo questo e
+l'Operativo 03. **Ne resta uno.**
+
+### Struttura
+
+1. I meccanismi dell'ipertrofia — e come è cambiata la teoria
+2. Le variabili che governano il risultato
+3. Il ponte con il metodo Mind Movement
+4. Dalla valutazione all'obiettivo
+5. **La scheda sartoriale — i nove livelli**
+
+### La scheda sartoriale è una specifica di prodotto, non solo didattica
+
+I nove livelli sono, in ordine: intestazione con dati allievo e numero di ciclo ·
+sintesi della valutazione (catena dominante, vincoli attivi, red flag) ·
+obiettivo del ciclo in una frase misurabile e datata · 2-3 indicatori di
+verifica con valore di partenza · fase preparatoria prescritta (respiro,
+rilascio, attivazione — «non lasciati al *riscaldati*») · programma con serie,
+ripetizioni, **RIR**, recupero, **ROM prescritto** · regola scritta di
+progressione settimana per settimana · **criteri di stop** · piano economico.
+
+**Questo è il documento più direttamente applicabile al software di tutto
+l'archivio.** Sette dei nove livelli esistono già in ESSĒRE in qualche forma —
+valutazione, obiettivo, programma con RIR, progressione, piano di pagamento.
+Due no, e sono quelli che distinguono una scheda da un elenco di esercizi:
+
+- **il ROM prescritto** per esercizio (oggi l'app misura l'angolo al fondo ma
+  non permette di prescriverlo)
+- **i criteri di stop** — quando l'allievo si ferma e avvisa (oggi non esistono
+  come campo: sono la traduzione operativa del perimetro)
+
+Sono due campi, e renderebbero la scheda dell'app conforme al metodo.
