@@ -109,3 +109,40 @@ fiscale. Vale lo stesso perimetro del manuale scoliosi: screening e orientamento
 educativo-motorio, mai atto diagnostico o terapeutico. Un programma
 d'allenamento per una condizione vascolare va concordato con il medico della
 persona — e il documento dovrebbe dirlo per iscritto, in testa.
+
+---
+
+## Quarto rientro — allegati del Modulo 04 e guida assessment scoliosi
+
+### Allegati del Modulo 04 (PNL & Carisma) — `modulo-04-allegati/`
+
+| File | Che cos'è |
+|---|---|
+| `04-metafore-isomorfiche.docx` | Metafore isomorfiche · ~14.500 car |
+| `05-protocollo-30-giorni.docx` | Protocollo 30 giorni · ~5.500 car |
+| `06-schede-vak-calibrazione.docx` | Schede VAK e calibrazione · ~6.700 car |
+
+La numerazione 04-05-06 è **interna al Modulo 04**, non della griglia dei
+moduli. Sono i materiali operativi che nello standard a 9 blocchi
+corrispondono alla *pratica guidata*: il Modulo 04 è quindi il più completo
+dell'archivio.
+
+### Guida assessment scoliosi — due versioni
+
+| File | Differenza dichiarata in copertina | Ampiezza |
+|---|---|---|
+| `scoliosi-guida-assessment-v1-riferimenti-video.docx` | «riferimenti video professionali per ogni esercizio e test» | ~30.500 car |
+| `scoliosi-guida-assessment-v2-query-youtube.docx` | «query di ricerca YouTube **verificate** per ogni esercizio e test» | ~20.700 car |
+
+**Sono due documenti diversi, non due copie.** La v2 è più corta di un terzo e
+sostituisce i riferimenti a video con query di ricerca. Nessuna delle due
+contiene URL nel testo.
+
+Il passaggio da «riferimenti video» a «query di ricerca verificate» è il
+cambiamento tipico che si fa quando i riferimenti della prima versione non
+reggono al controllo. **Prima di distribuire la v1 a un corsista pagante,
+va verificato che i video citati esistano e dicano quello che il testo
+sostiene** — altrimenti si distribuisce la v2 e si archivia la v1 come storia.
+
+> Vale anche qui il perimetro del manuale scoliosi: assessment è screening e
+> orientamento educativo-motorio, mai atto diagnostico.
