@@ -146,3 +146,16 @@ sostiene** — altrimenti si distribuisce la v2 e si archivia la v1 come storia.
 
 > Vale anche qui il perimetro del manuale scoliosi: assessment è screening e
 > orientamento educativo-motorio, mai atto diagnostico.
+
+---
+
+## Quinto rientro — il libro, e due materiali d'evento
+
+| File | Che cos'è |
+|---|---|
+| `../libro-mind-movement.pdf` | **Il libro.** «Mind Movement — Il Metodo che unisce Scienza, Corpo e Coscienza». 98 pagine, prima edizione 2026, © Francesco Busanca. Il Documento strategico 01/02 lo destina a **testo di riferimento del Livello 1** |
+| `handout-talk-1-nutrizione-vibrazionale.docx` | Handout della talk 1 — Nutrizione Vibrazionale (la 2, Guerriero Consapevole, era già in archivio) |
+| `il-rito-del-potere-script-audio.pdf` | «Il Rito del Potere» — script audio |
+
+Con il libro sono **due** i sette asset mancanti che si chiudono (l'altro erano
+i protocolli riabilitativi, dentro le appendici del Modulo 1).

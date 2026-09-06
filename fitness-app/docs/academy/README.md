@@ -210,9 +210,14 @@ Alcune copertine riportano «Filippi» o «Cacace» al posto di «Busanca».
 refusi introdotti in generazione. Vanno corretti nei file prima della stampa e
 prima del deposito del marchio, ma non c'è nessuna questione di paternità.
 
-Va invece verificata una cosa diversa, perché finisce in materiale pubblico: le
-credenziali compaiono sia come **campione europeo** sia come **campione del
-mondo** natural bodybuilding. Va usata una sola formulazione, quella esatta.
+**Sulle credenziali, correzione.** Avevo segnalato come discrepanza il fatto che
+comparissero sia «campione europeo» sia «campione del mondo». Non è una
+discrepanza: il libro racconta la progressione per intero — campione italiano,
+poi migliore della federazione, poi campione europeo, poi **campione del mondo
+INBA/PNBA**, poi **Vice Mr. Olympia Natural a Las Vegas**. Entrambe le
+formulazioni sono vere; «campione europeo» è solo un titolo precedente. Per il
+materiale pubblico conviene una formulazione sola e la più alta, ma non c'era
+nulla da correggere.
 
 ### Un ritrovamento
 
