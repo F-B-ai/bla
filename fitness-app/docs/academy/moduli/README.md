@@ -387,3 +387,50 @@ ha già adottato la pratica giusta senza che nessuno lo chiedesse.
 Resta solo da allineare la vecchia `guida-figure-anatomy-trains.md`, che
 suggerisce di salvare le immagini da un sito terzo, o da archiviarla come
 superata.
+
+---
+
+## ✅ Tredicesimo rientro — IL BLUEPRINT È COMPLETO
+
+`manuale-docente-modulo-05-metodologia.docx` — **Modulo 05, Metodologia Mind
+Movement**: struttura, programmazione, assessment, progressioni. ~20.200
+caratteri. Era **l'ultimo dei dodici moduli del Blueprint a mancare**.
+
+### I dodici moduli del Blueprint, stato finale
+
+| # | Modulo | In archivio |
+|---|---|---|
+| 01 | Anatomia Funzionale Integrata | ✅ (docente A+B, docx, 4 varianti) |
+| 02 | PNEI Applicata | ✅ (completo + parte B) |
+| 03 | Mente da Campione | ✅ (A+B, + versione avanzata) |
+| 04 | NLP & Carisma | ✅ (+ 3 allegati di pratica, 2 varianti) |
+| **05** | **Metodologia Mind Movement** | ✅ **arrivato ora** |
+| 06 | Neuroscienza della Trasformazione | ✅ |
+| 07 | Scienza del Respiro Avanzata | ✅ |
+| 08 | Nutrizione Funzionale PNEI | ✅ |
+| 09 | Energia, Coscienza e Campo Quantistico | ✅ |
+| 10 | Business & Leadership del Coach | ✅ |
+| 11 | Somatic Intelligence | ✅ |
+| 12 | Practicum & Certificazione | ✅ |
+
+**Dodici su dodici.** Il Blueprint non ha più moduli mancanti.
+
+### Che cosa contiene il Modulo 05 — ed è il cuore
+
+- **5.1 L'architettura della sessione MM — le 5 fasi.** Sessione da 50 minuti:
+  Centring (7-10') · Movement Flow (12-15') · Intensity Peak (10-15') ·
+  Cool-down attivo (5-7') · Integration (5-8')
+- **5.2 L'assessment deep dive.** «Il primo incontro: 90 minuti che cambiano tutto»
+- **5.3 Programmazione e periodizzazione.** Il **Percorso RESET 12 settimane**
+
+È il modulo che rende il metodo un metodo invece che una raccolta di contenuti:
+dà la forma della seduta, la forma del primo incontro e la forma del percorso.
+
+### Due cose da confrontare con il software
+
+1. **Le 5 fasi della sessione MM** non esistono in ESSĒRE. L'app struttura la
+   seduta per esercizi, non per fasi. Se la sessione MM è la forma canonica,
+   la seduta dal vivo dovrebbe rifletterla.
+2. **L'assessment da 90 minuti** e la **valutazione in due sessioni** del Sistema
+   Stellato descrivono lo stesso momento — il primo incontro — in due modi
+   diversi. Vanno riconciliati: sono la porta d'ingresso di ogni allievo.
