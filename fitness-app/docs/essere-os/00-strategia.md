@@ -12,7 +12,14 @@
 
 ESSĒRE oggi è una PWA funzionante (`essere-3fe6f.web.app`) usata da ~30 allievi di una palestra reale, Mind Movement Lab. Ha già in produzione più funzioni di molti competitor seed-stage: programmazione allenamenti, live workout, valutazione posturale AI da foto, stima composizione corporea, Stato ESSĒRE (readiness 0–100 senza hardware), gamification con premi reali, check-in QR, pagamenti a rate con promemoria WhatsApp, agenda multi-staff, chat, Academy, AI Coach, e un impianto white-label pronto (`src/config/brand.ts` + kill-switch licenza).
 
-Ha anche debiti seri: password gestite in chiaro leggibili da ogni utente autenticato, chiave Anthropic distribuita ai client, zero test, zero CI/CD, tab bar da 20 voci. Questo documento non li nasconde: li tratta come **precondizioni di vendita** (vedi §6 rischio R6 e [06-sicurezza-compliance](./06-sicurezza-compliance.md)).
+Aveva anche debiti seri, elencati qui sopra quando nessuno ce li chiedeva: password gestite in chiaro leggibili da ogni utente autenticato, chiave Anthropic distribuita ai client, zero test, zero CI/CD, tab bar da 20 voci. Erano trattati come **precondizioni di vendita** (vedi §6 rischio R6 e [06-sicurezza-compliance](./06-sicurezza-compliance.md)).
+
+> **Aggiornamento · 6 settembre 2026 — tutti e cinque chiusi.** Password e chiave AI rimosse dal client, con grep anti-regressione che ne impediscono il ritorno; **505 test** su 24 suite sul dominio puro; **9 workflow** di CI, con typecheck, test, guardiano palette e grep di sicurezza su ogni PR; tab bar a **5 voci**.
+>
+> Sono aperti altri debiti, e non si nascondono nemmeno quelli: 73 vulnerabilità note nelle dipendenze (4 critiche), typecheck non ancora bloccante, **analisi posturale funzionante solo in PWA e non su nativo**, 3 filmati esercizio su 115, 4 moduli Academy certi su 22, 148 colori fuori dal tema.
+>
+> Lo stato verificabile riga per riga, con i comandi per controllarlo, sta in
+> [`docs/academy/nota-due-diligence-stato-reale.html`](../academy/nota-due-diligence-stato-reale.html). **Da rifare a ogni consegna a terzi**: una pagina di stato che invecchia diventa il contrario di ciò per cui è stata scritta.
 
 La strategia qui sotto ha un vincolo non negoziabile: **ogni mossa deve avere una versione eseguibile oggi da 1 persona + AI con budget ~0**, e una versione scalabile domani. Dove i due si separano, lo diciamo esplicitamente.
 
