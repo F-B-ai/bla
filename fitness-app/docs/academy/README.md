@@ -176,7 +176,45 @@ Ordine di utilità per chi li cerca:
 
 ---
 
-## ⚠ Due architetture in conflitto — decisione richiesta
+## ✅ DECISO — l'Academy è l'impianto a 22 moduli su tre livelli
+
+**Decisione del Direttore Tecnico, 6 settembre 2026.** Fra i due impianti che
+convivevano in archivio si adotta quello del **Documento strategico 01/02 +
+Operativo 03**: tre livelli, cinque aree, 22 moduli, ripartizione 8 / 8 / 6.
+
+Il **Blueprint a 12 moduli non si butta**: i suoi contenuti — che esistono tutti
+e dodici, scritti — si ridistribuiscono sulle cinque aree e sui tre livelli.
+Cambia la mappa, non il materiale.
+
+Conseguenze operative immediate:
+
+- I dodici manuali docente esistenti vanno **rimappati**, non riscritti. È
+  lavoro di catalogazione, non di produzione.
+- I titoli veri dei 22 restano nel **capitolo 1 del Documento operativo 03**,
+  l'unico documento della serie ancora non rientrato. Fino ad allora la griglia
+  resta da compilare.
+- I livelli hanno i nomi, il monte ore e i prezzi del 01/02: Operatore Mind
+  Movement · Educatore Somatico · Trainer/Docente.
+- Il prezzo «€350 + €50 tesseramento, Certificazione Bronze» del manuale
+  definitivo del Modulo 1 **non è più a listino**: appartiene all'altro impianto.
+- Lo standard di produzione è quello **a 9 blocchi** del 01/02 §4.
+
+### Il vincolo che il Direttore Tecnico ha aggiunto
+
+> «L'Accademia deve essere qualcosa di unico, ma allo stesso tempo deve essere
+> qualcosa da mettere in pratica subito per chi supera l'esame.»
+
+Non è una frase di contorno: è un criterio di accettazione dei moduli. Un modulo
+è finito quando chi lo ha superato **può usarlo il lunedì mattina su un allievo
+vero**. Nello standard a 9 blocchi questo ricade su tre blocchi in particolare —
+la pratica guidata con i dosaggi, i casi con ragionamento, e la verifica — e su
+ciò che ESSĒRE deve mettere in mano al diplomato il giorno dopo l'esame.
+
+Il documento qui sotto resta come storia del confronto.
+
+---
+
+## ~~Due architetture in conflitto~~ — risolto sopra
 
 Con il rientro del **Blueprint formativo** è emerso il problema più grosso
 dell'archivio, e non è un problema di file mancanti: è che **coesistono due
