@@ -159,3 +159,37 @@ sostiene** — altrimenti si distribuisce la v2 e si archivia la v1 come storia.
 
 Con il libro sono **due** i sette asset mancanti che si chiudono (l'altro erano
 i protocolli riabilitativi, dentro le appendici del Modulo 1).
+
+---
+
+## Sesto rientro — i moduli 06-12. Il Blueprint è completo.
+
+| File | Copre | Ampiezza |
+|---|---|---|
+| `manuale-docente-parte-1-modulo-06.docx` | Modulo 06 — Neuroscienza della Trasformazione | ~43.800 car |
+| `manuale-docente-parte-2-moduli-07-08.docx` | Moduli 07 (Scienza del Respiro Avanzata) e 08 | ~44.100 car |
+| `manuale-docente-parte-3-moduli-09-12.docx` | Moduli 09, 10, 11, 12 | ~38.200 car |
+| `academy-7-moduli-completi.docx` | **Raccolta unica dei moduli 06-12** | ~54.000 car |
+
+### Il Blueprint non ha più moduli «da produrre»
+
+Il Blueprint elencava 12 moduli: 5 completati e **7 marcati «🔥 Nuovo»**, cioè
+da scrivere. Quei sette sono i moduli 06-12, e sono **tutti qui**.
+
+| Blueprint | Stato reale |
+|---|---|
+| 01 Anatomia Funzionale | ✅ in archivio |
+| 02 PNEI | ✅ in archivio (parte B; della parte A manca il file) |
+| 03 Psicologia dello Sport | ✅ in archivio (A + B) |
+| 04 NLP & Carisma | ✅ in archivio, **con 3 allegati di pratica** |
+| 05 Metodologia Mind Movement | ✗ **unico modulo assente** |
+| 06-12 | ✅ in archivio (tre parti + raccolta unica) |
+
+**Undici moduli su dodici sono scritti.** Manca il 05 — Metodologia Mind
+Movement — che, per posizione nel Blueprint, è il modulo che collega i
+Fondamenti all'Integrazione: il cuore del metodo.
+
+Nota su `academy-7-moduli-completi.docx`: contiene gli stessi moduli 06-12 delle
+tre parti, in un file solo. Non è un doppione bit-a-bit — va deciso quale delle
+due forme è quella buona prima di produrre le dispense, per non correggere due
+volte lo stesso testo.
