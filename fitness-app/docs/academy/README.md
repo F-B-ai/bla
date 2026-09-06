@@ -166,3 +166,52 @@ Ordine di utilità per chi li cerca:
 1. Metti il file qui (`.pdf` o `.docx` per gli originali, `.html` per quelli composti).
 2. Aggiorna la tabella che gli compete.
 3. Committa. Non serve altro.
+
+---
+
+## ⚠ Due architetture in conflitto — decisione richiesta
+
+Con il rientro del **Blueprint formativo** è emerso il problema più grosso
+dell'archivio, e non è un problema di file mancanti: è che **coesistono due
+Accademie diverse**, ciascuna coerente al proprio interno, mai riconciliate.
+
+| | **Blueprint formativo** | **Strategico 01/02 + Operativo 03** |
+|---|---|---|
+| Moduli | **12** | **22** |
+| Struttura | 3 blocchi | 3 livelli × 5 aree |
+| Nomi dei blocchi | Fondamenti · Integrazione · Trascendenza | L1 Operatore · L2 Educatore Somatico · L3 Trainer/Docente |
+| Chiave | Il Sapere · Il Saper Fare · L'Essere | monte ore, prerequisiti, titolo rilasciato |
+| Stato dichiarato | 5 completati, 7 nuovi | 8/8/6, titoli nel cap. 1 dell'Operativo 03 |
+| Firma | Francesco **Cacace** | Francesco **Busanca** |
+
+Non sono due versioni dello stesso documento: sono due impianti diversi. Il
+Blueprint è un piano di contenuti; lo Strategico è un impianto di
+certificazione (ammissione, monte ore, valutazione, titolo). **Finché non si
+sceglie quale dei due è l'Accademia, ogni modulo prodotto rischia di essere
+prodotto per l'altra.**
+
+### Tre versioni del Modulo 1
+
+| File | Titolo | Catene | Note |
+|---|---|---|---|
+| `moduli/modulo-01-anatomia-funzionale.docx` | Anatomia Funzionale | **8** | firmato Francesco Filippi |
+| `strategici/blueprint-formativo-12-moduli.docx` | Anatomia Funzionale Integrata | **7** | dentro il Blueprint |
+| `moduli/modulo-01-variante-anatomia-fasciale-integrata.pdf` | Anatomia Fasciale Integrata & Anatomy Trains | — | 3 weekend, 42 h, **€350** offerta lancio |
+
+E nell'app il Sistema Stellato ne usa **cinque**. Quattro conteggi diversi
+delle catene miofasciali nello stesso metodo.
+
+### Le firme
+
+Gli stessi contenuti risultano firmati **Busanca**, **Filippi** e **Cacace** —
+con credenziali identiche (ingegnere biomedico, campione europeo natural
+bodybuilding). Su documenti di certificazione l'autore va uniformato prima di
+qualsiasi erogazione o deposito di marchio.
+
+### Un ritrovamento
+
+`moduli/modulo-01-appendici-casi-clinici-e-protocolli.pdf` contiene **5 casi
+clinici con protocolli a 12 settimane e 10 protocolli per patologie comuni**.
+Sono i «protocolli riabilitativi standardizzati» che l'inventario del 01/02
+dava per esistenti e che risultavano mancanti: il documento dice che
+«diventano casi clinici d'esame». Non mancano più.
