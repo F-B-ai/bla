@@ -269,3 +269,50 @@ anno**, 3 weekend, 6 giorni, 42 ore, **«Certificazione Bronze»**.
 01/02 chiama il primo livello **Operatore Mind Movement** e lo prezza
 **€890–1.200** per 60 ore. Sono due offerte diverse per lo stesso posto nella
 scala — un'altra faccia della scelta d'architettura ancora aperta.
+
+---
+
+## Decimo rientro — arriva il modello-tipo, e ~300.000 caratteri
+
+Cinque file, **tutti nuovi**, per circa 300.000 caratteri.
+
+| File | Che cos'è | Ampiezza |
+|---|---|---|
+| `modulo-nutrizione-e-pnei-fascia.docx` | **Nutrizione e PNEI — come nutrire al meglio la fascia** | ~33.700 car |
+| `modulo-biomeccanica-parte-1-fondamenti-esercizi-1-22.docx` | Biomeccanica degli esercizi in sala, parte 1: leve, vettori, profili di forza, curve di resistenza | ~62.800 car |
+| `modulo-biomeccanica-parte-2-esercizi-23-44.docx` | Parte 2: schede esercizi 23-44 + appendice figure | ~45.500 car |
+| `moduli-avanzati-di-specializzazione.docx` | Postura, pattern di movimento, myofascial release, neuro-somatic repatterning, breathwork dinamico | ~62.600 car |
+| `manuale-definitivo-mma.docx` | Il manuale definitivo: tutte le specializzazioni in un volume | ~97.800 car |
+
+### ✅ Il modello-tipo è arrivato
+
+`modulo-nutrizione-e-pnei-fascia.docx` è **il modulo di Nutrizione Fasciale e
+PNEI** che il Documento strategico 01/02 indica come **modello-tipo per gli
+altri 21**. Era il numero 2 della lista dei mancanti, e il più importante dopo
+l'Operativo 03.
+
+La sua struttura reale è in **sei parti più i riferimenti**:
+
+1. Fondamenti — la fascia come sistema PNEI
+2. L'asse neuroendocrinoimmunitario della fascia
+3. I pilastri nutrizionali per la fascia
+4. Frontiere della ricerca
+5. Il protocollo Mind Movement per la fascia
+6. Tabelle riassuntive e protocolli pratici · Riferimenti scientifici
+
+**Non coincide con i 9 blocchi** descritti nel Documento strategico 01/02 §4
+(esito, mappa, fondamento teorico, fondamento metodologico, pratica guidata,
+errori comuni, casi, verifica, bibliografia). Il documento diceva «ogni altro
+modulo deve avere **esattamente questa struttura**» indicando questo come
+modello: o i 9 blocchi sono una proposta successiva mai applicata, oppure il
+modello-tipo va riformattato prima di essere usato come tale.
+
+**È una decisione da prendere una volta sola**, perché vincola la produzione di
+tutti gli altri moduli.
+
+### Biomeccanica: 44 esercizi schedati
+
+Le due parti coprono **44 esercizi** con leve, vettori, profili di forza e curve
+di resistenza. È il contenuto che alimenta direttamente la libreria esercizi
+dell'app, dove oggi 3 esercizi su 115 hanno il film e nessuno ha l'analisi
+biomeccanica.
