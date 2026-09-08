@@ -36,6 +36,7 @@ Vedi [`moduli/README.md`](./moduli/README.md).
 | `valutazione-due-sessioni-e-sistema-stellato.pdf` | Specifica clinica e tecnica. Già implementata in `src/data/stellatoProtocol.ts` |
 | `docimologia.html` | Sessione 01 del percorso formatori. **Ricostruita a norma di copertina**, non originale |
 | `modulo-a01-*.html` | Modulo proposto e materiali d'aula. **Non è il Modulo 1 reale**: vedi sotto |
+| **`i-22-moduli.md`** | **La griglia completa: 22 moduli, 3 livelli, 5 aree, 280 h, con il materiale agganciato riga per riga.** È il documento di riferimento dell'Accademia |
 | `i-22-moduli-ricostruzione.html` | Ricostruzione fatta prima che i documenti rientrassero. **Superata**, tenuta come storia |
 | `pagina-fondativa-human-interface.html` | Definizione fondativa di ESSĒRE |
 | `nota-due-diligence-stato-reale.html` | Stato verificabile del sistema, per chi valuta |
@@ -74,6 +75,21 @@ Il Documento strategico 01/02 propone **8 / 9 / 5** e chiude con
 
 Il **Documento operativo 03**, capitolo 2, registra la risposta: la ripartizione
 reale è **8 / 8 / 6**. Quel documento è quindi posteriore e prevale.
+
+---
+
+### La griglia è stata compilata — 8 settembre
+
+`i-22-moduli.md` è la prima griglia completa: 22 moduli distribuiti 8 / 8 / 6 sui
+tre livelli e sulle cinque aree, 280 ore, **ognuno agganciato al documento che
+esiste già in archivio**. Il conto che ne esce è il numero da tenere a mente:
+
+> **22 moduli su 22 hanno un testo scritto dietro. 0 su 22 sono a norma dei nove
+> blocchi.** Non manca il contenuto: manca la forma. Il Livello 1 sono otto
+> riformattazioni, non otto libri.
+
+I titoli restano **una proposta** finché non rientra il capitolo 1 dell'Operativo
+03. Ma una mappa sbagliata si corregge; l'assenza di mappa no.
 
 ---
 
