@@ -3,6 +3,16 @@
 **Questa cartella è la fonte, non una copia.** Chi esegue (Grok e la squadra)
 legge da qui. Se un contenuto non è qui, non si gira.
 
+> ⚠️ **Questo repository è pubblico.** Tutto ciò che finisce qui dentro è
+> leggibile da chiunque abbia il link, concorrenti compresi. Qui vanno **solo i
+> contenuti destinati a uscire comunque**: piani editoriali, copioni, regole di
+> produzione.
+>
+> **Non vanno qui:** il piano di ricavo, i prezzi non ancora annunciati, gli
+> ostacoli interni, il registro delle decisioni. La Rotta al milione vive come
+> pagina privata e la consegna il fondatore, a chi decide lui — è già stata tolta
+> da questa cartella una volta, il giorno in cui ci era finita.
+
 ---
 
 ## I file, in ordine di utilità
@@ -13,7 +23,6 @@ legge da qui. Se un contenuto non è qui, non si gira.
 | [`copioni-serie-A-essere.md`](./copioni-serie-A-essere.md) | Dieci copioni ESSĒRE, **parola per parola e scena per scena** | chi gira, chi monta |
 | [`copioni-serie-B-mestiere.md`](./copioni-serie-B-mestiere.md) | Dieci copioni Mestiere, parola per parola e scena per scena | chi gira, chi monta |
 | [`brief-reel-analisi-posturale.md`](./brief-reel-analisi-posturale.md) | Il brief originale dei primi sei. **Superato dai copioni**, tenuto per la provenienza tecnica | archivio |
-| [`rotta-al-milione-testo.md`](./rotta-al-milione-testo.md) | La rotta in testo. **Copia datata, non la fonte** — la pagina viva sta altrove | chi pianifica |
 | `super-prompt-grok-*.docx` | I prompt di produzione | chi produce |
 | `mockup-assistenza-home.html` · `essere-spot.mp4` | Materiali | archivio |
 
