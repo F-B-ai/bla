@@ -4,6 +4,7 @@ import {onCall, HttpsError} from "firebase-functions/v2/https";
 export {aiMessages} from "./ai";
 export {nightlyBrain, brainRun} from "./brain";
 export {calIngest, calKeyRotate} from "./cal";
+export {validaInvito} from "./inviti";
 
 admin.initializeApp();
 

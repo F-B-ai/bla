@@ -11,7 +11,8 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, db, storage } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, storage, functions } from '../config/firebase';
 import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
@@ -374,16 +375,49 @@ export const createStudentInvite = async (
   return { id: docRef.id, ...inviteData, createdAt: new Date() } as StudentInvite;
 };
 
+/**
+ * Valida un codice invito.
+ *
+ * Non interroga più la collezione: prima lo faceva, e per riuscirci
+ * la regola Firestore doveva dire `allow read: if true` — cioè
+ * l'elenco degli invitati, con nomi, email e codici, era scaricabile
+ * da chiunque senza autenticarsi. Verificato in produzione l'8
+ * settembre 2026.
+ *
+ * Adesso la lettura la fa la Cloud Function `validaInvito`, con
+ * privilegi di amministratore: risponde su un codice per volta,
+ * restituisce solo i campi che servono a finire la registrazione, e
+ * rallenta chi tenta a raffica.
+ */
 export const validateInviteCode = async (inviteCode: string): Promise<StudentInvite | null> => {
-  const q = query(
-    collection(db, 'studentInvites'),
-    where('inviteCode', '==', inviteCode.toUpperCase()),
-    where('isUsed', '==', false)
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return null;
-  const d = snapshot.docs[0];
-  return { ...d.data(), id: d.id } as StudentInvite;
+  const chiama = httpsCallable<{ codice: string }, {
+    valido: boolean;
+    invito?: {
+      id: string; email: string; nome: string; cognome: string;
+      collaboratoreId: string; collaboratoreNome: string;
+    };
+  }>(functions, 'validaInvito');
+
+  const res = await chiama({ codice: inviteCode });
+  const d = res.data;
+  if (!d?.valido || !d.invito) return null;
+
+  // Si rimonta la forma che il resto dell'app già conosce. I campi
+  // che la funzione non restituisce restano vuoti apposta: non
+  // servono a registrarsi, e non riguardano chi si sta registrando.
+  return {
+    id: d.invito.id,
+    inviteCode: inviteCode.toUpperCase(),
+    email: d.invito.email,
+    name: d.invito.nome,
+    surname: d.invito.cognome,
+    assignedCollaboratorId: d.invito.collaboratoreId,
+    assignedCollaboratorName: d.invito.collaboratoreNome,
+    createdBy: '',
+    createdByName: '',
+    createdAt: new Date(),
+    isUsed: false,
+  };
 };
 
 export const getStudentInvites = async (): Promise<StudentInvite[]> => {
