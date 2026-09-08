@@ -4,10 +4,14 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, updateDoc, arrayUnion, deleteDoc, arrayRemove, addDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../config/firebase';
 import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
@@ -34,9 +38,23 @@ const createUserWithRestApi = async (email: string, password: string): Promise<s
   const data = await response.json();
 
   if (!response.ok) {
-    // Traduci errori Firebase REST API
     const errorCode = data?.error?.message || '';
+
     if (errorCode === 'EMAIL_EXISTS') {
+      // Account Auth esiste (es. documento Firestore eliminato in precedenza).
+      // Recupera l'UID tramite sign-in REST (non cambia la sessione corrente).
+      const signInRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, returnSecureToken: true }),
+        }
+      );
+      const signInData = await signInRes.json();
+      if (signInRes.ok && signInData.localId) {
+        return signInData.localId;
+      }
       throw { code: 'auth/email-already-in-use' };
     } else if (errorCode === 'WEAK_PASSWORD') {
       throw { code: 'auth/weak-password' };
@@ -46,15 +64,28 @@ const createUserWithRestApi = async (email: string, password: string): Promise<s
     throw new Error(data?.error?.message || 'Errore durante la creazione dell\'utente');
   }
 
-  return data.localId; // UID dell'utente creato
+  return data.localId;
 };
 
 export const signIn = async (email: string, password: string): Promise<User> => {
   const credential = await signInWithEmailAndPassword(auth, email, password);
   const userDoc = await getDoc(doc(db, 'users', credential.user.uid));
   if (!userDoc.exists()) {
-    throw new Error('Utente non trovato nel database');
+    throw new Error('Profilo utente non trovato. Contatta l\'amministratore per ripristinare il tuo account.');
   }
+
+  // ACCESSO REVOCATO. Prima «Disattiva» toglieva l'utente dagli
+  // elenchi ma NON gli impediva di entrare: bastava la vecchia
+  // password. Chi è disattivato ora non entra, e viene disconnesso
+  // subito — non basta togliere il nome da una lista.
+  const dati = userDoc.data() as { isActive?: boolean };
+  if (dati.isActive === false) {
+    await firebaseSignOut(auth).catch(() => { /* si esce comunque */ });
+    throw new Error(
+      'Questo accesso è stato disattivato. Se pensi sia un errore, parlane con il titolare.'
+    );
+  }
+
   return { ...userDoc.data(), id: userDoc.id } as User;
 };
 
@@ -103,6 +134,7 @@ export const registerManager = async (
   specializations: string[] = []
 ): Promise<Manager> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const managerData: Omit<Manager, 'id'> = {
     email,
@@ -112,6 +144,7 @@ export const registerManager = async (
     role: 'manager',
     assignedCollaborators: [],
     assignedStudents: [],
+    assignedNutritionists: [],
     commissionPercentage,
     specializations,
     createdAt: new Date(),
@@ -132,6 +165,18 @@ export const signOut = async (): Promise<void> => {
 
 export const resetPassword = async (email: string): Promise<void> => {
   await sendPasswordResetEmail(auth, email);
+};
+
+// Account creati dallo staff: si invia subito il link "imposta la tua
+// password" all'email reale dell'allievo/collaboratore. La password
+// temporanea scelta alla creazione NON viene mai salvata (bonifica V1):
+// il canale credenziali è il link, che arriva alla persona e non allo staff.
+const sendPasswordSetupEmail = async (email: string): Promise<void> => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch {
+    // Email non raggiungibile: lo staff può reinviare il link dal profilo
+  }
 };
 
 export const getCurrentUser = (): Promise<FirebaseUser | null> => {
@@ -164,6 +209,7 @@ export const registerCollaborator = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -197,6 +243,7 @@ export const registerNutritionist = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -226,7 +273,7 @@ export const registerStudent = async (
   name: string,
   surname: string,
   phone: string,
-  assignedCollaboratorId: string,
+  assignedCollaboratorIds: string | string[],
   goals: string,
   medicalNotes?: string,
   assignedManagerId?: string,
@@ -234,6 +281,8 @@ export const registerStudent = async (
   coachCommissionPercentage?: number
 ): Promise<Student> => {
   const uid = await createUserWithRestApi(email, password);
+  await sendPasswordSetupEmail(email);
+  const coachIds = Array.isArray(assignedCollaboratorIds) ? assignedCollaboratorIds : [assignedCollaboratorIds];
 
   const studentData: Omit<Student, 'id'> = {
     email,
@@ -241,7 +290,8 @@ export const registerStudent = async (
     surname,
     phone,
     role: 'student',
-    assignedCollaboratorId,
+    assignedCollaboratorIds: coachIds,
+    assignedCollaboratorId: coachIds[0] || '',
     assignedManagerId: assignedManagerId || '',
     managerCommissionPercentage: managerCommissionPercentage ?? 0,
     coachCommissionPercentage: coachCommissionPercentage ?? 0,
@@ -259,11 +309,12 @@ export const registerStudent = async (
     startDate: Timestamp.now(),
   });
 
-  // Aggiorna la lista allievi del collaboratore/manager
-  if (assignedCollaboratorId) {
-    await updateDoc(doc(db, 'users', assignedCollaboratorId), {
-      assignedStudents: arrayUnion(uid),
-    });
+  for (const coachId of coachIds) {
+    if (coachId) {
+      await updateDoc(doc(db, 'users', coachId), {
+        assignedStudents: arrayUnion(uid),
+      });
+    }
   }
 
   return { id: uid, ...studentData };
@@ -367,6 +418,7 @@ export const registerStudentWithInvite = async (
     surname: invite.surname,
     phone,
     role: 'student',
+    assignedCollaboratorIds: [invite.assignedCollaboratorId],
     assignedCollaboratorId: invite.assignedCollaboratorId,
     startDate: new Date(),
     goals,
@@ -382,7 +434,6 @@ export const registerStudentWithInvite = async (
     startDate: Timestamp.now(),
   });
 
-  // Aggiorna la lista allievi del collaboratore
   if (invite.assignedCollaboratorId) {
     await updateDoc(doc(db, 'users', invite.assignedCollaboratorId), {
       assignedStudents: arrayUnion(uid),
@@ -437,8 +488,16 @@ export const toggleUserActive = async (userId: string, isActive: boolean): Promi
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
-  // Rimuove il documento utente da Firestore
-  // Nota: non elimina l'account Firebase Auth (richiede admin SDK lato server)
+  // Eliminazione account Auth server-side (Cloud Function adminDeleteUser).
+  // Se le Functions non sono ancora deployate (piano Spark), si elimina
+  // comunque il profilo Firestore: l'account Auth orfano resta inutilizzabile
+  // (il login richiede il profilo) e si rimuove con lo script di bonifica.
+  try {
+    const { adminDeleteAuthUser } = await import('./adminAuthService');
+    await adminDeleteAuthUser(userId);
+  } catch {
+    // Auth deletion non disponibile — si procede con la pulizia Firestore
+  }
   await deleteDoc(doc(db, 'users', userId));
 };
 
@@ -453,4 +512,111 @@ export const removeStudentFromCollaborator = async (
       assignedStudents: arrayRemove(studentId),
     });
   }
+};
+
+export const updateStudentCoaches = async (
+  studentId: string,
+  newCoachIds: string[],
+  oldCoachIds: string[]
+): Promise<void> => {
+  const studentRef = doc(db, 'users', studentId);
+  await updateDoc(studentRef, {
+    assignedCollaboratorIds: newCoachIds,
+    assignedCollaboratorId: newCoachIds[0] || '',
+  });
+
+  const removed = oldCoachIds.filter((id) => !newCoachIds.includes(id));
+  const added = newCoachIds.filter((id) => !oldCoachIds.includes(id));
+
+  for (const coachId of removed) {
+    const ref = doc(db, 'users', coachId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { assignedStudents: arrayRemove(studentId) });
+    }
+  }
+  for (const coachId of added) {
+    const ref = doc(db, 'users', coachId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { assignedStudents: arrayUnion(studentId) });
+    }
+  }
+};
+
+// --- Avatar upload ---
+
+export const uploadAvatar = async (userId: string, imageUri: string): Promise<string> => {
+  const timestamp = Date.now();
+  const imageRef = ref(storage, `avatars/${userId}/${timestamp}.jpg`);
+  const response = await fetch(imageUri);
+  const blob = await response.blob();
+  await uploadBytes(imageRef, blob);
+  const downloadUrl = await getDownloadURL(imageRef);
+  await updateDoc(doc(db, 'users', userId), { avatarUrl: downloadUrl });
+  return downloadUrl;
+};
+
+export const updateUserProfile = async (
+  userId: string,
+  data: {
+    name?: string;
+    surname?: string;
+    phone?: string;
+    commissionPercentage?: number;
+    specializations?: string[];
+    collaboratorType?: 'coach' | 'nutritionist';
+  }
+): Promise<void> => {
+  const update: Record<string, any> = {};
+  if (data.name !== undefined) update.name = data.name.trim();
+  if (data.surname !== undefined) update.surname = data.surname.trim();
+  if (data.phone !== undefined) update.phone = data.phone.trim();
+  if (data.commissionPercentage !== undefined) update.commissionPercentage = data.commissionPercentage;
+  if (data.specializations !== undefined) update.specializations = data.specializations;
+  if (data.collaboratorType !== undefined) update.collaboratorType = data.collaboratorType;
+  if (Object.keys(update).length > 0) {
+    await updateDoc(doc(db, 'users', userId), update);
+  }
+};
+
+// --- Cambio password (utente loggato) ---
+
+export const changeOwnPassword = async (
+  currentPassword: string,
+  newPassword: string
+): Promise<void> => {
+  const fbUser = auth.currentUser;
+  if (!fbUser || !fbUser.email) throw new Error('Utente non autenticato');
+  const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
+  await reauthenticateWithCredential(fbUser, credential);
+  await updatePassword(fbUser, newPassword);
+};
+
+// --- Staff resetta password allievo via REST API ---
+
+export const adminResetStudentPassword = async (
+  studentEmail: string,
+  newPassword: string
+): Promise<void> => {
+  const apiKey = auth.app.options.apiKey;
+  if (!apiKey) throw new Error('Firebase API key non trovata');
+
+  const signInRes = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: studentEmail, password: newPassword, returnSecureToken: true }),
+    }
+  );
+
+  if (!signInRes.ok) {
+    await sendPasswordResetEmail(auth, studentEmail);
+    return;
+  }
+};
+
+export const sendStudentPasswordReset = async (studentEmail: string): Promise<void> => {
+  await sendPasswordResetEmail(auth, studentEmail);
 };

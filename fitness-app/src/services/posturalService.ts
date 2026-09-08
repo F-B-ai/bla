@@ -6,12 +6,13 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { PosturalAssessment, PosturalFinding, PosturalArea } from '../types';
+import { emitTwinEvent } from './twinEventService';
+import { CONFIDENCE } from '../domain/twinEvents';
 
 const ASSESSMENTS_COLLECTION = 'posturalAssessments';
 
@@ -22,6 +23,27 @@ export const createAssessment = async (
     ...assessment,
     date: Timestamp.fromDate(assessment.date),
   });
+
+  // Dual-write twin (M3): findings sintetici per distretto (02 §3.3),
+  // le foto e le note complete restano nel doc legacy via source_ref.
+  const hasAi = !!assessment.aiAnalysis;
+  emitTwinEvent(
+    'posture.assessed',
+    {
+      findings: (assessment.findings || []).map((f) => ({
+        area: f.area,
+        severity: f.severity,
+      })),
+      ai_assisted: hasAi,
+    },
+    {
+      subjectUid: assessment.studentId,
+      source: hasAi ? 'ai' : 'coach',
+      confidence: hasAi ? CONFIDENCE.aiPosture : CONFIDENCE.coach,
+      sourceRef: { collection: ASSESSMENTS_COLLECTION, doc_id: docRef.id },
+    }
+  );
+
   return docRef.id;
 };
 
@@ -30,19 +52,26 @@ export const getStudentAssessments = async (
 ): Promise<PosturalAssessment[]> => {
   const q = query(
     collection(db, ASSESSMENTS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('date', 'desc')
+    where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(
+  const results = snapshot.docs.map(
     (d) => ({ ...d.data(), id: d.id } as PosturalAssessment)
   );
+  results.sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return db2 - da;
+  });
+  return results;
 };
 
 export const uploadPosturalImage = async (
   studentId: string,
   imageUri: string,
-  view: 'front' | 'side' | 'back'
+  view: 'front' | 'side_left' | 'side_right' | 'back'
 ): Promise<string> => {
   const timestamp = Date.now();
   const imageRef = ref(
@@ -111,4 +140,52 @@ export const analyzePosture = (
   }
 
   return { summary, riskAreas, recommendations };
+};
+
+export const generateProgressReport = (
+  assessments: PosturalAssessment[]
+): { timeline: { date: Date; severityScore: number; areas: string[] }[]; improvements: string[]; persistent: string[] } => {
+  const sorted = [...assessments].sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return da - db2;
+  });
+
+  const severityScore = (f: PosturalFinding[]): number => {
+    return f.reduce((score, finding) => {
+      const weights = { normal: 0, mild: 1, moderate: 2, severe: 3 };
+      return score + (weights[finding.severity] || 0);
+    }, 0);
+  };
+
+  const timeline = sorted.map((a) => ({
+    date: a.date,
+    severityScore: severityScore(a.findings),
+    areas: a.findings.filter((f) => f.severity !== 'normal').map((f) => f.area),
+  }));
+
+  const improvements: string[] = [];
+  const persistent: string[] = [];
+
+  if (sorted.length >= 2) {
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+
+    const firstAreas = new Map(first.findings.map((f) => [f.area, f.severity]));
+    const lastAreas = new Map(last.findings.map((f) => [f.area, f.severity]));
+    const severityOrder = ['normal', 'mild', 'moderate', 'severe'];
+
+    for (const [area, firstSev] of firstAreas) {
+      const lastSev = lastAreas.get(area);
+      if (lastSev && severityOrder.indexOf(lastSev) < severityOrder.indexOf(firstSev)) {
+        improvements.push(area);
+      } else if (lastSev && severityOrder.indexOf(lastSev) >= severityOrder.indexOf(firstSev) && firstSev !== 'normal') {
+        persistent.push(area);
+      }
+    }
+  }
+
+  return { timeline, improvements, persistent };
 };

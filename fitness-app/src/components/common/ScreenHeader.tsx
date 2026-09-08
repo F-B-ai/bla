@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { colors, spacing, fontSize } from '../../config/theme';
 
 interface Props {
@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary,
     padding: spacing.lg,
-    paddingTop: spacing.xxl,
+    paddingTop: Platform.OS === 'ios' ? 54 : Platform.OS === 'web' ? 54 : spacing.xxl,
   },
   row: {
     flexDirection: 'row',

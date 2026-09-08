@@ -1,12 +1,15 @@
 import {
   collection,
   doc,
+  onSnapshot,
+  Unsubscribe,
   addDoc,
   updateDoc,
   getDocs,
   deleteDoc,
   query,
   where,
+  limit,
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
@@ -47,16 +50,28 @@ export const cancelSession = async (
   return { success: true, isLate };
 };
 
+const sortSessionsByDate = (items: TrainingSession[]) => {
+  items.sort((a, b) => {
+    const da = a.date && typeof a.date === 'object' && 'seconds' in a.date
+      ? (a.date as any).seconds : new Date(a.date as any).getTime() / 1000;
+    const db2 = b.date && typeof b.date === 'object' && 'seconds' in b.date
+      ? (b.date as any).seconds : new Date(b.date as any).getTime() / 1000;
+    return db2 - da;
+  });
+  return items;
+};
+
 export const getStudentSessions = async (
   studentId: string
 ): Promise<TrainingSession[]> => {
   const q = query(
     collection(db, SESSIONS_COLLECTION),
-    where('studentId', '==', studentId),
-    orderBy('date', 'desc')
+    where('studentId', '==', studentId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
+  );
 };
 
 export const getCollaboratorSessions = async (
@@ -64,20 +79,24 @@ export const getCollaboratorSessions = async (
 ): Promise<TrainingSession[]> => {
   const q = query(
     collection(db, SESSIONS_COLLECTION),
-    where('collaboratorId', '==', collaboratorId),
-    orderBy('date', 'desc')
+    where('collaboratorId', '==', collaboratorId)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
+  );
 };
 
-export const getAllSessions = async (): Promise<TrainingSession[]> => {
+export const getAllSessions = async (maxResults = 500): Promise<TrainingSession[]> => {
   const q = query(
     collection(db, SESSIONS_COLLECTION),
-    orderBy('date', 'desc')
+    orderBy('date', 'desc'),
+    limit(maxResults)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession));
+  return sortSessionsByDate(
+    snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))
+  );
 };
 
 export const updateSessionStatus = async (
@@ -98,6 +117,72 @@ export const getCompletedSessionsCount = async (
   return sessions.filter((s) => s.isCountedAsCompleted).length;
 };
 
+export const updateSession = async (
+  sessionId: string,
+  updates: Partial<Omit<TrainingSession, 'id'>>
+): Promise<void> => {
+  const data: Record<string, unknown> = { ...updates };
+  if (updates.date) {
+    data.date = Timestamp.fromDate(updates.date);
+  }
+  await updateDoc(doc(db, SESSIONS_COLLECTION, sessionId), data);
+};
+
 export const deleteSession = async (sessionId: string): Promise<void> => {
   await deleteDoc(doc(db, SESSIONS_COLLECTION, sessionId));
+};
+
+/**
+ * Tutte le sedute, in tempo reale. Prima l'agenda si leggeva una
+ * volta sola all'apertura: chi fissava un appuntamento doveva
+ * chiudere e riaprire l'app per vederlo. Adesso arriva da solo.
+ */
+export const subscribeToSessions = (
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    orderBy('date', 'desc'),
+    limit(500)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
+};
+
+/** Le sedute di un singolo allievo, in tempo reale. */
+export const subscribeToStudentSessions = (
+  studentId: string,
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('studentId', '==', studentId)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
+};
+
+/** Le sedute di un collaboratore, in tempo reale (stesso perimetro di prima). */
+export const subscribeToCollaboratorSessions = (
+  collaboratorId: string,
+  callback: (sessions: TrainingSession[]) => void,
+  onError?: () => void
+): Unsubscribe => {
+  const q = query(
+    collection(db, SESSIONS_COLLECTION),
+    where('collaboratorId', '==', collaboratorId)
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id } as TrainingSession))),
+    () => { if (onError) onError(); }
+  );
 };

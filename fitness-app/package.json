@@ -12,12 +12,14 @@
     "build:preview": "eas build --profile preview --platform ios",
     "build:dev": "eas build --profile development --platform ios",
     "build:prod": "eas build --profile production --platform ios",
-    "build:web": "expo export --platform web && cp web/manifest.json web/icon-192.png web/icon-512.png web/Ionicons.ttf web/sw.js dist/ && node postbuild-web.js",
+    "build:web": "expo export --platform web && cp web/manifest.json web/icon-192.png web/icon-512.png web/Ionicons.ttf web/sw.js web/cal.html dist/ && cp -r web/video dist/video && node postbuild-web.js",
     "serve": "node serve.js",
-    "serve:80": "PORT=80 node serve.js"
+    "serve:80": "PORT=80 node serve.js",
+    "check:colors": "node scripts/check-colors.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
+    "@mediapipe/tasks-vision": "^0.10.35",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-navigation/bottom-tabs": "^6.5.0",
     "@react-navigation/native": "^6.1.0",
@@ -26,6 +28,7 @@
     "date-fns": "^3.0.0",
     "expo": "~52.0.0",
     "expo-av": "~15.0.2",
+    "expo-clipboard": "~7.0.1",
     "expo-dev-client": "~5.0.0",
     "expo-document-picker": "~13.0.3",
     "expo-font": "~13.0.0",
@@ -33,6 +36,9 @@
     "expo-notifications": "^0.29.14",
     "expo-status-bar": "~2.0.0",
     "firebase": "^12.10.0",
+    "html5-qrcode": "^2.3.8",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4",
     "react": "18.3.1",
     "react-dom": "^18.3.1",
     "react-native": "^0.76.9",
@@ -54,11 +60,24 @@
   },
   "devDependencies": {
     "@testing-library/react-native": "^12.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "~18.3.0",
     "firebase-tools": "^15.9.1",
+    "javascript-obfuscator": "^5.4.3",
     "jest": "^29.0.0",
     "puppeteer-core": "^24.39.0",
     "react-test-renderer": "18.3.1",
     "typescript": "^5.3.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/src/domain/__tests__/**/*.test.ts",
+      "**/src/data/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.tsx?$": "babel-jest"
+    }
   }
 }

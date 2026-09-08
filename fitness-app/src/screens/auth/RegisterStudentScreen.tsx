@@ -9,11 +9,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
-import { getFirebaseErrorMessage } from '../../utils/helpers';
+import { getFirebaseErrorMessage, isValidEmail } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
 import { validateInviteCode, registerStudentWithInvite, StudentInvite } from '../../services/authService';
+import { brand } from '../../config/brand';
 
 interface Props {
   onBack: () => void;
@@ -57,6 +58,10 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
       crossAlert('Errore', 'Compila email e password');
       return;
     }
+    if (!isValidEmail(email)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
+      return;
+    }
     if (password.length < 6) {
       crossAlert('Errore', 'La password deve essere di almeno 6 caratteri');
       return;
@@ -93,7 +98,7 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={styles.title}>ESSĒRE</Text>
+          <Text style={styles.title}>{brand.appName}</Text>
           <Text style={styles.subtitle}>Registrazione Allievo</Text>
         </View>
 

@@ -1,0 +1,1074 @@
+<title>Docimologia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --paper:      #FCFBF8;
+    --paper-box:  #F4EEE2;
+    --paper-sunk: #F2F1ED;
+    --ink:        #1A1A1A;
+    --ink-soft:   #3E3C39;
+    --ink-faint:  #6B6862;
+    --rule:       #D8D4CB;
+    --rule-soft:  #E7E4DC;
+    --red:        #9B1B30;   /* il rosso della serie stampata */
+    --red-deep:   #6E1322;
+    --red-wash:   #F6E7E7;
+    --bar:        #1C1C1C;   /* le testate nere delle tabelle */
+    --bar-ink:    #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #14130F;
+      --paper-box:  #221E17;
+      --paper-sunk: #1C1B17;
+      --ink:        #EDEAE2;
+      --ink-soft:   #C0BBB0;
+      --ink-faint:  #8B857A;
+      --rule:       #33302A;
+      --rule-soft:  #262420;
+      --red:        #E0798B;
+      --red-deep:   #F0A3B0;
+      --red-wash:   #2A1A1E;
+      --bar:        #E4E0D6;
+      --bar-ink:    #14130F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --bar:#E4E0D6; --bar-ink:#14130F;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Tinos, "Times New Roman", Times, serif;
+    font-size: 17px;
+    line-height: 1.62;
+  }
+  .sheet {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: clamp(30px, 6vw, 76px) clamp(20px, 5vw, 56px) 96px;
+  }
+
+  /* ---------- testata della serie ---------- */
+  .ente {
+    text-align: center;
+    color: var(--red);
+    font-weight: 700;
+    font-size: 0.86rem;
+    letter-spacing: 0.09em;
+    line-height: 2;
+    text-transform: uppercase;
+  }
+  .ente .doc { display: block; margin-top: 12px; }
+  .short-rule {
+    width: 116px; height: 1px; background: var(--red);
+    border: 0; margin: 18px auto;
+  }
+  h1.titolo {
+    font-size: clamp(2.5rem, 8vw, 3.9rem);
+    font-weight: 700;
+    letter-spacing: 0.015em;
+    text-align: center;
+    margin: 10px 0 22px;
+    line-height: 1.06;
+    text-wrap: balance;
+  }
+  .sottotitolo {
+    font-style: italic; text-align: center; color: var(--ink-soft);
+    font-size: 1.08rem; margin: 0 auto; max-width: 30em; text-wrap: balance;
+  }
+  .firma {
+    text-align: center; font-style: italic; margin-top: 30px; line-height: 1.9;
+  }
+  .firma b { font-style: normal; font-weight: 700; }
+  .ink-rule { width: 96px; height: 1px; background: var(--rule); border: 0; margin: 26px auto; }
+
+  /* ---------- riquadri color crema ---------- */
+  .riquadro {
+    border: 1px solid var(--red);
+    background: var(--paper-box);
+    padding: clamp(18px, 3.4vw, 30px);
+    margin: 38px 0;
+  }
+  .riquadro > h3 {
+    margin: 0 0 14px; font-size: 1.12rem; font-weight: 700;
+  }
+  .riquadro ul { margin: 0; padding-left: 1.15em; }
+  .riquadro li { margin-bottom: 9px; }
+  .riquadro li:last-child { margin-bottom: 0; }
+  .riquadro p { margin: 0 0 12px; }
+  .riquadro p:last-child { margin-bottom: 0; }
+
+  .nota-piede {
+    font-style: italic; color: var(--ink-faint); font-size: 0.94rem;
+    line-height: 1.6; margin: 26px 0 0; text-align: justify;
+  }
+
+  /* ---------- corpo ---------- */
+  h2 {
+    font-size: 1.42rem; font-weight: 700; color: var(--red);
+    margin: 58px 0 4px; line-height: 1.24; text-wrap: balance;
+  }
+  h2 .num { color: var(--ink-faint); font-weight: 400; }
+  h2 + .cap-rule { width: 100%; height: 2px; background: var(--red); border: 0; margin: 0 0 22px; }
+  h3 { font-size: 1.08rem; font-weight: 700; margin: 32px 0 8px; }
+  h4 {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--red);
+    margin: 26px 0 6px;
+  }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 16px; padding-left: 1.25em; }
+  li { margin-bottom: 7px; }
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  .indice {
+    display: grid; gap: 0; margin: 34px 0 10px;
+    border-top: 1px solid var(--rule);
+  }
+  .indice a {
+    display: flex; gap: 14px; align-items: baseline;
+    padding: 9px 2px; border-bottom: 1px solid var(--rule-soft);
+    color: var(--ink); text-decoration: none;
+  }
+  .indice a:hover, .indice a:focus-visible { background: var(--paper-sunk); color: var(--red); }
+  .indice .n {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.76rem; color: var(--red); min-width: 2.2em;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
+  }
+  .indice .t { flex: 1; }
+  .indice .k {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.74rem; color: var(--ink-faint); text-align: right;
+  }
+
+  /* ---------- tabelle ---------- */
+  .tab-wrap { overflow-x: auto; margin: 22px 0 26px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  thead th {
+    background: var(--bar); color: var(--bar-ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-weight: 500; font-size: 0.78rem; letter-spacing: 0.05em;
+    text-align: left; padding: 9px 12px; vertical-align: bottom;
+  }
+  td, tbody th {
+    border-bottom: 1px solid var(--rule); padding: 10px 12px;
+    vertical-align: top; text-align: left;
+  }
+  tbody th { font-weight: 700; width: 26%; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tfoot td { font-weight: 700; border-top: 2px solid var(--rule); border-bottom: 0; }
+
+  /* ---------- errori numerati ---------- */
+  .errore {
+    display: grid; grid-template-columns: 2.6em 1fr; gap: 4px 14px;
+    padding: 16px 0; border-bottom: 1px solid var(--rule-soft);
+  }
+  .errore:first-of-type { border-top: 1px solid var(--rule); }
+  .errore .e-n {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 1.32rem; font-weight: 600; color: var(--red);
+    line-height: 1.1; font-variant-numeric: tabular-nums;
+  }
+  .errore .e-b > *:first-child { margin-top: 0; }
+  .errore .e-b > *:last-child { margin-bottom: 0; }
+  .errore h3 { margin: 0 0 6px; }
+
+  .esempio {
+    border-left: 3px solid var(--rule); padding: 2px 0 2px 14px;
+    margin: 10px 0; color: var(--ink-soft); font-size: 0.95rem;
+  }
+  .esempio b { color: var(--ink); font-style: normal; }
+  .esempio .no { color: var(--red); font-weight: 700; }
+  .esempio .si { color: var(--ink); font-weight: 700; }
+
+  .formula {
+    background: var(--paper-sunk); border: 1px solid var(--rule);
+    padding: 14px 18px; margin: 18px 0; text-align: center;
+    font-size: 1.02rem;
+  }
+  .formula .def { display: block; font-size: 0.86rem; color: var(--ink-faint); margin-top: 6px; font-style: italic; }
+
+  .regola {
+    border-left: 4px solid var(--red); background: var(--red-wash);
+    padding: 14px 18px; margin: 22px 0;
+  }
+  .regola p { margin: 0; }
+  .regola b { color: var(--red-deep); }
+
+  .esercizio {
+    border-top: 1px solid var(--rule); padding: 16px 0 4px;
+  }
+  .esercizio h3 { margin-top: 0; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .esercizio .ex-cod {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.72rem; letter-spacing: 0.06em; color: var(--red);
+    border: 1px solid var(--red); padding: 2px 7px; white-space: nowrap;
+  }
+  .consegna {
+    font-size: 0.92rem; color: var(--ink-soft); font-style: italic;
+    margin: 8px 0 0;
+  }
+  .consegna b { font-style: normal; color: var(--ink); }
+
+  .art { margin: 0 0 20px; }
+  .art h3 {
+    margin: 0 0 6px; font-size: 1rem;
+  }
+  .art h3 .a-n {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.74rem; letter-spacing: 0.06em; color: var(--red);
+    margin-right: 8px;
+  }
+  .da-decidere {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 0.7rem; letter-spacing: 0.05em; color: var(--red);
+    background: var(--red-wash); border: 1px solid var(--red);
+    padding: 1px 6px; white-space: nowrap;
+  }
+
+  .firma-blocco {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 30px 40px; margin: 34px 0 0;
+  }
+  .firma-riga { border-top: 1px solid var(--ink); padding-top: 7px; font-size: 0.86rem; color: var(--ink-faint); }
+
+  .colophon {
+    margin-top: 66px; padding-top: 20px; border-top: 2px solid var(--red);
+    font-size: 0.86rem; color: var(--ink-faint); line-height: 1.7;
+  }
+
+  @media print {
+    body { background: #fff; font-size: 11.5pt; }
+    .sheet { padding: 0; max-width: none; }
+    h2 { break-after: avoid; }
+    .errore, .esercizio, .art, .riquadro, table { break-inside: avoid; }
+    .indice a:hover { background: none; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport<br>
+    Mind Movement Lab — Gragnano (NA)
+    <span class="doc">Percorso formativo formatori — Sessione 01</span>
+  </p>
+  <hr class="short-rule">
+
+  <h1 class="titolo">Docimologia</h1>
+  <p class="sottotitolo">La scienza della valutazione applicata alla certificazione
+    Mind Movement — con la struttura completa dell'Esame di Livello 1</p>
+
+  <hr class="ink-rule">
+
+  <p class="firma">
+    Redatto per <b>Francesco Busanca</b><br>
+    Fondatore e Direttore Tecnico — Metodo Mind Movement
+  </p>
+
+  <div class="riquadro">
+    <h3>Che cosa saprai fare alla fine di questa sessione</h3>
+    <ul>
+      <li>Distinguere <b>validità, affidabilità ed equità</b> di una prova, e riconoscere quando una prova misura la cosa sbagliata.</li>
+      <li>Costruire il <b>blueprint</b> (tabella di specificazione) di un esame, cioè decidere <em>prima</em> cosa si misura e con che peso.</li>
+      <li>Scrivere <b>item a scelta multipla</b> che discriminano davvero, evitando i sette errori tipici.</li>
+      <li>Costruire una <b>rubrica ancorata a comportamenti osservabili</b> e tararla su valutatori diversi.</li>
+      <li>Riconoscere e neutralizzare i <b>sei errori sistematici del valutatore</b>.</li>
+      <li>Fissare la <b>soglia di superamento</b> con un metodo difendibile, invece di scegliere «70» a sentimento.</li>
+      <li>Analizzare gli item dopo l'esame e <b>migliorare la prova ogni edizione</b> con due soli indici numerici.</li>
+    </ul>
+  </div>
+
+  <p class="nota-piede">Modalità di lavoro: studia i capitoli 1–8, poi esegui gli esercizi del
+    capitolo 9. Il capitolo 10 è già l'output: il Regolamento d'Esame di Livello 1, pronto da
+    adottare dopo la taratura. Nulla di questo studio è a vuoto: ogni pagina produce un pezzo
+    di Accademia.</p>
+
+  <div class="riquadro" style="border-style: dashed;">
+    <h3>Avvertenza sulla provenienza di questa copia</h3>
+    <p>Questa non è la scansione del tuo originale stampato: è una <b>ricostruzione a norma di
+      copertina</b>. I sette risultati d'apprendimento qui sopra, la ripartizione dei capitoli
+      1–8 / 9 / 10 e i conteggi dichiarati — <em>sette</em> errori tipici degli item, <em>sei</em>
+      errori sistematici del valutatore, <em>due</em> soli indici numerici — sono trascritti
+      dalla tua copertina. Il contenuto dei capitoli è ricostruito dalla docimologia come
+      disciplina, che è pubblica e verificabile, e calato sul Livello 1 Mind Movement.</p>
+    <p>Dove il documento chiede una tua decisione — pesi, soglie, composizione della commissione —
+      trovi la marca <span class="da-decidere">da decidere</span>. Quelle caselle restano vuote
+      finché non le riempi tu: non le invento.</p>
+  </div>
+
+  <nav class="indice">
+    <a href="#c1"><span class="n">1</span><span class="t">Che cosa misura davvero una prova</span><span class="k">validità · affidabilità · equità</span></a>
+    <a href="#c2"><span class="n">2</span><span class="t">Il blueprint: decidere prima</span><span class="k">tabella di specificazione</span></a>
+    <a href="#c3"><span class="n">3</span><span class="t">Gli item a scelta multipla</span><span class="k">i sette errori tipici</span></a>
+    <a href="#c4"><span class="n">4</span><span class="t">La prova pratica e la rubrica ancorata</span><span class="k">comportamenti osservabili</span></a>
+    <a href="#c5"><span class="n">5</span><span class="t">La taratura tra valutatori</span><span class="k">concordanza</span></a>
+    <a href="#c6"><span class="n">6</span><span class="t">I sei errori sistematici del valutatore</span><span class="k">e le contromisure</span></a>
+    <a href="#c7"><span class="n">7</span><span class="t">La soglia di superamento</span><span class="k">perché non «70»</span></a>
+    <a href="#c8"><span class="n">8</span><span class="t">L'analisi degli item</span><span class="k">due indici: p e D</span></a>
+    <a href="#c9"><span class="n">9</span><span class="t">Esercizi</span><span class="k">otto consegne</span></a>
+    <a href="#c10"><span class="n">10</span><span class="t">Regolamento d'Esame di Livello 1</span><span class="k">l'output</span></a>
+  </nav>
+
+  <!-- =============== 1 =============== -->
+  <h2 id="c1"><span class="num">1.</span> Che cosa misura davvero una prova</h2>
+  <hr class="cap-rule">
+
+  <p>Un esame non misura una persona. Misura un <em>campione</em> del suo comportamento, in
+    condizioni artificiali, in un giorno solo. Tutto il mestiere della docimologia sta nel
+    rendere quel campione abbastanza fedele da poterci appoggiare sopra una decisione — nel
+    nostro caso: <strong>questa persona può portare il nome Mind Movement davanti a un allievo?</strong></p>
+
+  <p>Tre proprietà rendono difendibile quella decisione. Non sono intercambiabili, e non si
+    sostituiscono a vicenda.</p>
+
+  <h4>Validità</h4>
+  <p>La validità non è una proprietà del test: è una proprietà <em>dell'interpretazione che dai
+    ai punteggi</em>. La domanda non è «questo esame è valido?», ma «il punteggio di questo
+    esame autorizza la decisione che ci voglio prendere?». Quattro forme ci riguardano:</p>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Forma</th><th>La domanda che pone</th><th>Come la si presidia</th></tr></thead>
+      <tbody>
+        <tr><th>Di contenuto</th><td>La prova copre tutto ciò che conta, nelle proporzioni giuste?</td><td>Il blueprint (cap. 2). È l'unica difesa vera.</td></tr>
+        <tr><th>Di costrutto</th><td>Sto misurando la competenza, o qualcos'altro correlato (memoria, disinvoltura, italiano)?</td><td>Item che chiedono decisioni, non definizioni.</td></tr>
+        <tr><th>Predittiva</th><td>Chi passa lavora meglio di chi non passa?</td><td>Si verifica dopo: esiti e reclami dei diplomati a 6–12 mesi.</td></tr>
+        <tr><th>Di facciata</th><td>Al candidato la prova sembra pertinente al mestiere?</td><td>Conta per l'accettazione, non per la difendibilità. Non basta mai da sola.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Affidabilità</h4>
+  <p>È la <em>stabilità</em>: se ripetessimo la misura — altro giorno, altro valutatore, altri
+    item equivalenti — otterremmo lo stesso esito? Tre facce, tre misure:</p>
+  <ul>
+    <li><strong>Coerenza interna</strong> (gli item della stessa area concordano fra loro):
+      alfa di Cronbach. Per decisioni di gruppo basta ≥ 0,70; per una decisione
+      <em>individuale</em> come una certificazione si punta a ≥ 0,80.</li>
+    <li><strong>Stabilità nel tempo</strong> (test–retest): ci riguarda poco, perché fra una
+      somministrazione e l'altra il candidato studia.</li>
+    <li><strong>Concordanza fra valutatori</strong> (inter-rater): è la nostra faccia critica,
+      perché il Livello 1 ha una prova pratica giudicata da persone. Si misura con la
+      percentuale di accordo e con kappa (cap. 5).</li>
+  </ul>
+
+  <h4>Equità</h4>
+  <p>Stesse condizioni per tutti, e nessun elemento della prova che avvantaggi o penalizzi un
+    candidato per ragioni estranee alla competenza: lessico inutilmente accademico, riferimenti
+    culturali, un test pratico che richieda un'attrezzatura vista solo da chi frequenta la
+    nostra sala. Equità è anche <em>accomodamento</em>: dislessia, disabilità, lingua — si
+    modifica il modo di somministrare, mai lo standard richiesto.</p>
+
+  <div class="regola">
+    <p><b>La tensione da tenere sempre a mente.</b> Una prova può essere altissimamente
+      affidabile e completamente non valida. Un quiz sui nomi latini dei muscoli è
+      riproducibile, oggettivo, rapido da correggere — e non dice assolutamente nulla sulla
+      capacità di condurre una valutazione in due sessioni e di scriverne il referto.
+      <b>L'affidabilità è facile da comprare, la validità no.</b> Chi progetta esami mediocri
+      finisce sempre a ottimizzare quella facile.</p>
+  </div>
+
+  <h3>La regola d'ordine</h3>
+  <p>Si dichiara <em>prima</em> la decisione che il punteggio deve sostenere, <em>poi</em> si
+    costruisce la prova che la sostiene. Mai il contrario. Per noi la decisione è scritta e
+    non si tocca:</p>
+  <div class="riquadro">
+    <p>«Il candidato è in grado di condurre in autonomia la valutazione in due sessioni,
+      leggerne l'esito dentro il perimetro di screening e orientamento educativo-motorio,
+      costruire una scheda coerente con quell'esito, e riconoscere quando <b>non</b> deve
+      procedere e deve rinviare a un professionista sanitario.»</p>
+  </div>
+  <p>L'ultima riga è la più importante, ed è quella che quasi nessuna certificazione del
+    settore misura. Noi la misuriamo, e la rendiamo eliminatoria (cap. 4).</p>
+
+  <!-- =============== 2 =============== -->
+  <h2 id="c2"><span class="num">2.</span> Il blueprint: decidere prima</h2>
+  <hr class="cap-rule">
+
+  <p>Il blueprint — in italiano <em>tabella di specificazione</em> — è la mappa dell'esame
+    scritta prima di scrivere una sola domanda. Righe: le aree di competenza. Colonne: il
+    livello cognitivo richiesto. Celle: quanto pesa, e con quanti item.</p>
+
+  <p>Serve a due cose, e sono entrambe difensive. Primo: garantisce la validità di contenuto,
+    perché nessuna area importante può essere dimenticata e nessuna area simpatica può gonfiarsi.
+    Secondo: se un candidato bocciato contesta, il blueprint è il documento che dimostra che
+    l'esame è stato progettato, non improvvisato.</p>
+
+  <h3>I tre livelli cognitivi che usiamo</h3>
+  <p>Le tassonomie accademiche ne elencano sei. Per una certificazione professionale ne bastano
+    tre, e sono quelli che distinguono davvero un operatore da un ripetitore:</p>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Livello</th><th>Che cosa chiede</th><th>Verbo tipico dell'item</th></tr></thead>
+      <tbody>
+        <tr><th>Ricordare</th><td>Il fatto, la soglia, il nome, il limite</td><td>«Qual è…», «Quanti…»</td></tr>
+        <tr><th>Applicare</th><td>Usare la regola su un caso semplice</td><td>«Dato questo punteggio, quale…»</td></tr>
+        <tr><th>Decidere</th><td>Scegliere fra alternative in un caso ambiguo, e giustificare</td><td>«Il cliente presenta…, che cosa fai per primo?»</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>La proporzione dice tutto di una scuola. Un esame fatto per l'80% di «ricordare» certifica
+    la memoria. Il nostro deve pesare sul <strong>decidere</strong>, perché è lì che un errore
+    fa male a un allievo vero.</p>
+
+  <h3>Come si assegnano i pesi</h3>
+  <p>Non «a occhio» e non «in parti uguali». Il peso di un'area si ricava da due domande, e si
+    prende il valore più alto delle due:</p>
+  <ol>
+    <li><strong>Frequenza</strong>: quanto spesso l'operatore fa questa cosa nel lavoro reale?</li>
+    <li><strong>Danno</strong>: se la sbaglia, quanto male fa all'allievo?</li>
+  </ol>
+  <p>È la ragione per cui «perimetro e sicurezza» pesa molto pur essendo l'area con meno
+    contenuto da studiare: la frequenza è bassa, il danno è massimo.</p>
+
+  <h3>Il blueprint del Livello 1 — impianto proposto</h3>
+  <div class="tab-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Area di competenza</th>
+          <th class="num">Ricordare</th><th class="num">Applicare</th><th class="num">Decidere</th>
+          <th class="num">Item</th><th class="num">Peso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>Perimetro, sicurezza, quando fermarsi</th><td class="num">2</td><td class="num">2</td><td class="num">4</td><td class="num">8</td><td class="num">20%</td></tr>
+        <tr><th>Lettura del movimento e delle cinque catene</th><td class="num">2</td><td class="num">4</td><td class="num">2</td><td class="num">8</td><td class="num">20%</td></tr>
+        <tr><th>Batteria test in due sessioni: condurre e registrare</th><td class="num">2</td><td class="num">4</td><td class="num">2</td><td class="num">8</td><td class="num">20%</td></tr>
+        <tr><th>Interpretazione integrata e referto</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">6</td><td class="num">15%</td></tr>
+        <tr><th>Costruzione della scheda e progressione dello stimolo</th><td class="num">1</td><td class="num">2</td><td class="num">3</td><td class="num">6</td><td class="num">15%</td></tr>
+        <tr><th>Uso di ESSĒRE: dati, tracciabilità, consenso</th><td class="num">2</td><td class="num">2</td><td class="num">0</td><td class="num">4</td><td class="num">10%</td></tr>
+      </tbody>
+      <tfoot>
+        <tr><td>Totale</td><td class="num">10</td><td class="num">16</td><td class="num">14</td><td class="num">40</td><td class="num">100%</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <p><span class="da-decidere">da decidere</span> I pesi qui sopra sono una proposta coerente
+    con il criterio frequenza × danno. Vanno confermati da te prima della prima edizione: una
+    volta pubblicati, non si cambiano a metà anno.</p>
+
+  <div class="regola">
+    <p><b>Nessun item entra in prova se non ha una cella.</b> Se scrivi una bella domanda e non
+      trovi dove metterla nel blueprint, la domanda non è bella: è fuori programma. Si butta, o
+      si cambia il blueprint <em>prima</em>, dichiarandolo.</p>
+  </div>
+
+  <!-- =============== 3 =============== -->
+  <h2 id="c3"><span class="num">3.</span> Gli item a scelta multipla: i sette errori tipici</h2>
+  <hr class="cap-rule">
+
+  <p>L'item a scelta multipla ha una virtù enorme — si corregge senza valutatore, quindi senza
+    errore del valutatore — e un difetto altrettanto grande: è facilissimo scriverne di
+    pessimi, e un item pessimo <em>sembra</em> buono finché non guardi i numeri (cap. 8).</p>
+
+  <p>La struttura è sempre la stessa: un <strong>stem</strong> (la domanda, che deve essere una
+    domanda completa, comprensibile anche coprendo le risposte), una <strong>chiave</strong>
+    (l'unica risposta corretta) e tre <strong>distrattori</strong> (errori <em>plausibili</em>,
+    ciascuno corrispondente a un fraintendimento che i candidati fanno davvero).</p>
+
+  <p>Questi sono i sette errori che rendono un item inservibile. Sono in ordine di frequenza:
+    il primo lo commettono tutti.</p>
+
+  <div class="errore">
+    <div class="e-n">1</div>
+    <div class="e-b">
+      <h3>Il distrattore implausibile</h3>
+      <p>Tre opzioni serie e una comica. Il candidato scarta la comica senza sapere nulla della
+        materia: l'item da quattro opzioni diventa da tre, e la probabilità di indovinare sale
+        dal 25% al 33%. Ogni distrattore deve essere l'errore di qualcuno.</p>
+      <p class="esempio"><span class="no">Debole</span> — Dopo il test di respirazione, la prima cosa che registri è:
+        (a) il pattern osservato · (b) il peso corporeo · (c) il numero di scarpe · (d) l'ora di pranzo.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">2</div>
+    <div class="e-b">
+      <h3>La chiave più lunga e più prudente</h3>
+      <p>Chi scrive l'item vuole che la risposta giusta sia inattaccabile, e le aggiunge
+        precisazioni. Risultato: la chiave è la più lunga, la più articolata, l'unica con
+        «generalmente» o «nella maggior parte dei casi». I candidati furbi lo sanno.
+        <strong>Regola meccanica: pareggia la lunghezza delle quattro opzioni</strong> — se
+        differiscono di più del 25% di caratteri, riscrivi.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">3</div>
+    <div class="e-b">
+      <h3>L'indizio grammaticale</h3>
+      <p>Lo stem finisce con «un…» e una sola opzione comincia per consonante; o il verbo è al
+        plurale e una sola opzione è plurale. L'item si risolve con la grammatica.
+        Contromisura: chiudi lo stem con i due punti e rendi ogni opzione una frase che sta in
+        piedi da sola.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">4</div>
+    <div class="e-b">
+      <h3>«Tutte le precedenti» e «Nessuna delle precedenti»</h3>
+      <p>Sono scorciatoie di chi non ha trovato il quarto distrattore. «Tutte le precedenti»
+        si indovina riconoscendone due; «Nessuna delle precedenti» premia chi sa che qualcosa è
+        sbagliato senza sapere che cosa sia giusto — che è il contrario di ciò che vogliamo
+        misurare. Vietate entrambe.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">5</div>
+    <div class="e-b">
+      <h3>La negazione, e peggio la doppia negazione</h3>
+      <p>«Quale delle seguenti <em>non</em> è una controindicazione…»: misura l'attenzione alla
+        lettura, non la competenza, e sotto stress d'esame produce errori in chi sa la risposta.
+        Se la negazione è davvero indispensabile, evidenziala in grassetto — ma nella quasi
+        totalità dei casi l'item si può girare in positivo.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">6</div>
+    <div class="e-b">
+      <h3>Gli item concatenati</h3>
+      <p>La domanda 12 si può rispondere solo se hai indovinato la 11. Un solo errore iniziale
+        ne produce tre, e il punteggio finale esagera la differenza fra candidati vicini. Ogni
+        item deve essere indipendente. Se il caso clinico richiede più domande, fornisci il
+        dato necessario <em>dentro</em> ogni domanda.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">7</div>
+    <div class="e-b">
+      <h3>L'item che misura la memoria di una frase</h3>
+      <p>È l'errore più grave, perché è invisibile: l'item è formalmente perfetto e chiede la
+        definizione testuale del manuale. Certifica chi ha studiato la sera prima, non chi sa
+        lavorare. Il test è semplice: <strong>se un candidato può rispondere senza aver mai
+        visto un allievo, l'item non appartiene a una certificazione professionale.</strong></p>
+      <p class="esempio">
+        <span class="no">Memoria</span> — La catena anteriore superficiale comprende: (…)<br>
+        <span class="si">Decisione</span> — Un cliente riferisce dolore lombare comparso tre
+        giorni fa, in aumento, con formicolio lungo la gamba. La sessione di test è già
+        fissata. Che cosa fai per primo?</p>
+    </div>
+  </div>
+
+  <!-- =============== 4 =============== -->
+  <h2 id="c4"><span class="num">4.</span> La prova pratica e la rubrica ancorata</h2>
+  <hr class="cap-rule">
+
+  <p>La parte scritta non può certificare un operatore: nessuno ha mai imparato a leggere un
+    corpo rispondendo a quaranta domande. Il peso vero sta nella prova pratica — e la prova
+    pratica è giudicata da persone, quindi introduce l'errore umano che il capitolo 6 dovrà
+    neutralizzare. La rubrica è lo strumento che lo tiene sotto controllo.</p>
+
+  <h3>Ancorare vuol dire eliminare gli aggettivi</h3>
+  <p>Una rubrica non ancorata dice: «3 = ottimo, 2 = buono, 1 = sufficiente». Sono aggettivi:
+    ognuno li riempie con la propria esperienza, e due valutatori onesti danno voti diversi
+    allo stesso candidato. Una rubrica <strong>ancorata a comportamenti osservabili</strong>
+    descrive che cosa si <em>vede fare</em> a ciascun livello. Se due persone che guardano lo
+    stesso video non possono che scrivere lo stesso numero, la rubrica è ancorata.</p>
+
+  <h3>Quattro livelli, non cinque</h3>
+  <p>La scala pari elimina il centro comodo, che è il rifugio del valutatore incerto
+    (cap. 6, errore 3).</p>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th class="num">Liv.</th><th>Nome</th><th>Che cosa si vede</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0</td><th>Non sicuro</th><td>Compare un comportamento che espone l'allievo a rischio, o si procede in presenza di un segnale di rinvio.</td></tr>
+        <tr><td class="num">1</td><th>Insufficiente</th><td>Esegue con errori che alterano il dato raccolto o l'esito della seduta; se ne accorge solo se glielo dici.</td></tr>
+        <tr><td class="num">2</td><th>Competente</th><td>Esegue correttamente, con imprecisioni che riconosce e corregge da solo. È il livello richiesto per certificare.</td></tr>
+        <tr><td class="num">3</td><th>Esemplare</th><td>Esegue correttamente e adatta la conduzione all'allievo che ha davanti, spiegando perché.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>I quattro criteri della prova pratica</h3>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Criterio</th><th>Ancoraggio del livello 2 (soglia)</th><th class="num">Peso</th></tr></thead>
+      <tbody>
+        <tr><th>Sicurezza e perimetro</th><td>Riconosce i segnali di rinvio, interrompe o non avvia, dichiara il limite all'allievo senza formulare ipotesi diagnostiche.</td><td class="num">eliminatorio</td></tr>
+        <tr><th>Esecuzione dei test</th><td>Somministra la batteria nell'ordine previsto, con le posizioni e i riferimenti corretti; registra ogni dato prima di passare oltre.</td><td class="num">30%</td></tr>
+        <tr><th>Lettura e decisione</th><td>Integra i dati delle due sessioni, indica il profilo prevalente e ne fa discendere una scelta operativa argomentata.</td><td class="num">40%</td></tr>
+        <tr><th>Condotta e comunicazione</th><td>Spiega all'allievo che cosa si sta facendo e perché, in parole comprensibili; chiede consenso prima del contatto.</td><td class="num">30%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="regola">
+    <p><b>La sicurezza non si compensa.</b> Un candidato che prende 3 ovunque e 0 in sicurezza
+      <b>non è promosso</b>, e nessuna media lo salva. È il criterio eliminatorio, e va scritto
+      nel regolamento (art. 7) prima di essere applicato a qualcuno. Una scuola si riconosce da
+      ciò che si rifiuta di compensare.</p>
+  </div>
+
+  <!-- =============== 5 =============== -->
+  <h2 id="c5"><span class="num">5.</span> La taratura tra valutatori</h2>
+  <hr class="cap-rule">
+
+  <p>Una rubrica ancorata riduce la variabilità fra valutatori. Non la azzera. La taratura è la
+    sessione — obbligatoria, prima di ogni edizione d'esame — in cui la commissione allinea la
+    lettura sulla stessa scala.</p>
+
+  <h3>Come si fa, in novanta minuti</h3>
+  <ol>
+    <li>Si scelgono <strong>tre casi registrati</strong>: uno chiaramente sopra soglia, uno
+      chiaramente sotto, uno borderline. Il terzo è quello che conta.</li>
+    <li>Ogni valutatore assegna i punteggi <strong>in cieco</strong>, da solo, senza commentare.</li>
+    <li>Si confrontano. <strong>Si discute solo dove lo scarto è ≥ 1 livello</strong>: dove
+      tutti concordano non c'è niente da imparare e si perde tempo.</li>
+    <li>Ogni disaccordo si chiude in un solo modo: <strong>riscrivendo l'ancoraggio</strong> di
+      quel livello, così che l'ambiguità non si ripresenti. Non «ci siamo capiti»: si cambia
+      il testo della rubrica.</li>
+  </ol>
+
+  <h3>Le due misure, e la soglia operativa</h3>
+  <ul>
+    <li><strong>Accordo esatto</strong>: percentuale di criteri su cui i valutatori hanno
+      scritto lo stesso numero. Obiettivo ≥ 70%.</li>
+    <li><strong>Accordo entro un livello</strong>: percentuale in cui differiscono al massimo di
+      1. Obiettivo ≥ 90%.</li>
+    <li>Con più di due valutatori e volendo un dato pubblicabile si usa <strong>kappa</strong>
+      (o l'ICC per scale ordinali), che corregge per l'accordo dovuto al caso: sotto 0,60 la
+      rubrica non è utilizzabile per decisioni individuali.</li>
+  </ul>
+
+  <div class="regola">
+    <p><b>Se la concordanza è bassa, l'imputata è la rubrica, non la commissione.</b> Il
+      riflesso naturale è pensare che un valutatore sia troppo severo. Quasi sempre il problema
+      è che l'ancoraggio di quel livello ammette due letture. Si riscrive il testo, si ritara,
+      si riprova.</p>
+  </div>
+
+  <!-- =============== 6 =============== -->
+  <h2 id="c6"><span class="num">6.</span> I sei errori sistematici del valutatore</h2>
+  <hr class="cap-rule">
+
+  <p>Sistematico significa che non si annulla facendo la media: spinge sempre nella stessa
+    direzione. Sono errori di persone competenti e in buona fede — chi crede di esserne immune
+    è semplicemente quello che li commette senza accorgersene. Per ciascuno: che cos'è, come
+    si vede nei dati, e la contromisura <em>procedurale</em> (perché la buona volontà non è
+    una contromisura).</p>
+
+  <div class="errore">
+    <div class="e-n">1</div>
+    <div class="e-b">
+      <h3>Effetto alone</h3>
+      <p>Un'impressione forte su una dimensione tinge tutte le altre: il candidato che comunica
+        benissimo prende un buon voto anche sull'esecuzione tecnica.</p>
+      <p><em>Nei dati:</em> i punteggi dei quattro criteri correlano quasi perfettamente fra
+        loro. Se «comunicazione» e «sicurezza» viaggiano insieme al centesimo, non stai
+        misurando due cose.</p>
+      <p><em>Contromisura:</em> si valuta <strong>un criterio alla volta su tutti i candidati</strong>,
+        non tutti i criteri su un candidato alla volta.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">2</div>
+    <div class="e-b">
+      <h3>Indulgenza e severità</h3>
+      <p>Lo stesso valutatore sposta sistematicamente tutta la propria scala verso l'alto (per
+        generosità, o perché il candidato è un proprio allievo) o verso il basso (per difendere
+        il livello della scuola).</p>
+      <p><em>Nei dati:</em> la media di un valutatore si scosta stabilmente dalla media degli
+        altri sugli stessi candidati.</p>
+      <p><em>Contromisura:</em> taratura obbligatoria prima di ogni edizione, e
+        <strong>incompatibilità dichiarata</strong>: chi ha formato un candidato non lo valuta.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">3</div>
+    <div class="e-b">
+      <h3>Tendenza centrale</h3>
+      <p>Il valutatore incerto si rifugia nei valori medi ed evita gli estremi. La prova smette
+        di discriminare: tutti «quasi uguali», e la decisione di promozione finisce affidata al
+        rumore.</p>
+      <p><em>Nei dati:</em> deviazione standard dei punteggi molto bassa; nessuno o quasi ai
+        livelli 0 e 3.</p>
+      <p><em>Contromisura:</em> scala a quattro livelli (senza centro), e obbligo di
+        <strong>motivare per iscritto</strong> ogni 0 e ogni 3 — così l'estremo costa una riga,
+        non una vita.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">4</div>
+    <div class="e-b">
+      <h3>Effetto contrasto</h3>
+      <p>Il candidato viene giudicato rispetto a chi l'ha preceduto, non rispetto alla rubrica.
+        Un medio dopo un eccellente sembra scarso; lo stesso medio dopo un disastro sembra
+        buono.</p>
+      <p><em>Nei dati:</em> correlazione fra il punteggio di un candidato e quello del
+        precedente nell'ordine d'esame.</p>
+      <p><em>Contromisura:</em> <strong>rileggere l'ancoraggio prima di ogni candidato</strong>
+        — trenta secondi, ad alta voce — e ordine di convocazione casuale, non per merito
+        atteso né alfabetico.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">5</div>
+    <div class="e-b">
+      <h3>Ancoraggio alla prima impressione</h3>
+      <p>Il giudizio si forma nei primi minuti e il resto della prova viene letto come conferma:
+        ciò che è coerente pesa, ciò che è discordante si giustifica. È l'effetto Pigmalione
+        applicato a un esame.</p>
+      <p><em>Nei dati:</em> il punteggio finale è predetto quasi interamente dal primo criterio
+        osservato in ordine di tempo.</p>
+      <p><em>Contromisura:</em> <strong>nessun punteggio si scrive prima della fine della
+        prova</strong>; durante si prendono solo appunti descrittivi — che cosa ha fatto, non
+        quanto è bravo.</p>
+    </div>
+  </div>
+
+  <div class="errore">
+    <div class="e-n">6</div>
+    <div class="e-b">
+      <h3>Errore logico</h3>
+      <p>Il valutatore deduce una dimensione da un'altra perché nella sua testa «vanno insieme»:
+        chi esegue con precisione i test <em>deve</em> saper leggere il referto. Sono due
+        competenze diverse, e la seconda non è stata osservata.</p>
+      <p><em>Nei dati:</em> criteri valutati alti anche quando la prova non conteneva un compito
+        che li mettesse alla prova.</p>
+      <p><em>Contromisura:</em> ogni criterio deve avere nella prova <strong>un compito
+        dedicato</strong>; se il compito non c'è stato, il criterio si segna «non osservato» e
+        non entra nella media.</p>
+    </div>
+  </div>
+
+  <!-- =============== 7 =============== -->
+  <h2 id="c7"><span class="num">7.</span> La soglia di superamento</h2>
+  <hr class="cap-rule">
+
+  <p>«Si passa con 70». È il numero più diffuso nella formazione professionale, ed è
+    indifendibile: nessuno sa dire perché non 68 o 74. È un'eredità, non una decisione. Il
+    giorno in cui un candidato bocciato con 69 chiede conto della differenza, non c'è risposta.</p>
+
+  <p>Fissare una soglia in modo difendibile significa una cosa sola: <strong>definire il
+    candidato borderline</strong> — quello appena appena promuovibile — e chiedersi che
+    punteggio otterrebbe. La soglia non descrive un numero: descrive una persona.</p>
+
+  <h3>Angoff modificato — per la prova scritta</h3>
+  <ol>
+    <li>La commissione si accorda su chi è il borderline, a parole: «l'operatore che sa condurre
+      la valutazione e riconosce quando fermarsi, ma è lento e ha bisogno di riguardare le
+      tabelle».</li>
+    <li>Per <strong>ogni item</strong>, ciascun esperto stima: su cento candidati borderline,
+      quanti risponderebbero correttamente? (in percentuale)</li>
+    <li>Si mediano le stime di ogni item; si sommano le medie di tutti gli item. Quella somma
+      <strong>è</strong> il cut score.</li>
+    <li>Si discutono solo gli item in cui gli esperti divergono di oltre 20 punti, e si rifà la
+      stima su quelli.</li>
+  </ol>
+  <p>Il risultato tipico non è mai un numero tondo — ed è esattamente il segno che è stato
+    calcolato invece che scelto.</p>
+
+  <h3>Gruppo borderline — per la prova pratica</h3>
+  <p>Con coorti piccole, come saranno le prime edizioni, funziona meglio così: alla fine di ogni
+    prova pratica ciascun valutatore classifica il candidato in tre gruppi — <em>sotto</em>,
+    <em>borderline</em>, <em>sopra</em> — senza guardare i punteggi. La soglia è la
+    <strong>mediana del punteggio ottenuto dai candidati classificati borderline</strong>.
+    Il metodo si autocorregge edizione dopo edizione.</p>
+
+  <h3>L'errore standard di misura, e la fascia</h3>
+  <p>Nessun punteggio è esatto: ogni misura porta con sé un margine. Un candidato a 71 e uno a
+    69, con soglia 70, sono <em>indistinguibili</em>. Fingere il contrario è la cosa meno
+    scientifica che una scuola possa fare.</p>
+  <div class="formula">
+    fascia di incertezza = soglia ± errore standard di misura
+    <span class="def">chi cade nella fascia non si decide con la media, ma con evidenza aggiuntiva</span>
+  </div>
+  <p>Per noi «evidenza aggiuntiva» significa: la commissione riesamina la registrazione della
+    prova pratica sul criterio più debole, e decide con motivazione scritta. È una procedura,
+    non un favore.</p>
+
+  <div class="regola">
+    <p><b>Teoria e pratica non si compensano.</b> Le due prove misurano cose diverse e vanno
+      superate <b>entrambe</b>. Un ottimo scritto non compra una pratica insufficiente: se lo
+      facesse, staremmo certificando lo studio invece del mestiere — e avremmo speso otto
+      capitoli per tornare esattamente al punto di partenza.</p>
+  </div>
+
+  <!-- =============== 8 =============== -->
+  <h2 id="c8"><span class="num">8.</span> L'analisi degli item: due soli indici</h2>
+  <hr class="cap-rule">
+
+  <p>Dopo ogni edizione, prima di archiviare, si passa mezz'ora sui numeri. Bastano due indici
+    per far migliorare la prova per sempre — e per accorgersi di un item sbagliato prima che
+    faccia un danno alla seconda edizione.</p>
+
+  <h3>p — indice di difficoltà</h3>
+  <div class="formula">
+    p = risposte corrette ÷ candidati
+    <span class="def">0 = nessuno l'ha azzeccata · 1 = l'hanno azzeccata tutti</span>
+  </div>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th class="num">p</th><th>Lettura</th><th>Che cosa farne</th></tr></thead>
+      <tbody>
+        <tr><td class="num">&gt; 0,95</td><td>Lo sanno tutti</td><td>Non discrimina. Si tiene solo se è un fondamentale di sicurezza che <em>deve</em> sapere il 100%.</td></tr>
+        <tr><td class="num">0,30 – 0,90</td><td>Zona utile</td><td>Si conserva in banca item.</td></tr>
+        <tr><td class="num">&lt; 0,20</td><td>Quasi nessuno risponde</td><td>Raramente è «difficile»: quasi sempre è scritto male, o la chiave è sbagliata. Si legge <em>insieme a D</em>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>D — indice di discriminazione</h3>
+  <p>È l'indice che conta davvero: separa chi sa da chi non sa. Si ordinano i candidati per
+    punteggio totale, si prende il 27% migliore e il 27% peggiore:</p>
+  <div class="formula">
+    D = p<sub>(gruppo alto)</sub> − p<sub>(gruppo basso)</sub>
+    <span class="def">quanto quell'item da solo racconta ciò che racconta l'esame intero</span>
+  </div>
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th class="num">D</th><th>Lettura</th><th>Decisione</th></tr></thead>
+      <tbody>
+        <tr><td class="num">≥ 0,30</td><td>Discrimina bene</td><td>Si conserva.</td></tr>
+        <tr><td class="num">0,20 – 0,29</td><td>Marginale</td><td>Si riscrive il distrattore più debole.</td></tr>
+        <tr><td class="num">0,10 – 0,19</td><td>Non lavora</td><td>Si riscrive l'item.</td></tr>
+        <tr><td class="num">&lt; 0</td><td><b>I bravi lo sbagliano più dei deboli</b></td><td><b>Si annulla subito</b>, anche a esame già corretto: la chiave è errata o l'item è ambiguo.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="regola">
+    <p><b>Un D negativo è un allarme, non una curiosità statistica.</b> Significa che stai
+      penalizzando i candidati migliori. L'item si annulla e il punteggio si ricalcola su tutti
+      — compresi quelli già promossi. È la prova che la scuola corregge sé stessa, ed è la cosa
+      che i candidati ricordano di te.</p>
+  </div>
+
+  <h3>L'analisi dei distrattori</h3>
+  <p>Per gli item con D basso, si guarda quante volte è stato scelto ciascun distrattore. Un
+    distrattore che non sceglie nessuno è un posto vuoto: va sostituito con un fraintendimento
+    reale — e i fraintendimenti reali li hai già raccolti in aula. Un distrattore scelto più
+    della chiave dal gruppo alto segnala invece che l'item è ambiguo, o che <em>tu</em> hai
+    insegnato la cosa in modo ambiguo. Entrambe le informazioni valgono l'ora spesa.</p>
+
+  <h3>Il ciclo, edizione dopo edizione</h3>
+  <ol>
+    <li>Si annullano gli item con D negativo e si ricalcola.</li>
+    <li>Si riscrivono quelli con D fra 0,10 e 0,29.</li>
+    <li>Il resto entra in <strong>banca item</strong>, con p e D dell'edizione annotati accanto.</li>
+    <li>Alla terza edizione la banca è abbastanza grande da comporre prove equivalenti — ed è il
+      momento in cui l'esame smette di essere un evento e diventa uno strumento.</li>
+  </ol>
+
+  <!-- =============== 9 =============== -->
+  <h2 id="c9"><span class="num">9.</span> Esercizi</h2>
+  <hr class="cap-rule">
+  <p>Otto consegne, una per risultato d'apprendimento più una di sintesi. Ognuna produce un
+    pezzo di Accademia utilizzabile: alla fine del capitolo 9 hai in mano l'esame, non gli
+    appunti sull'esame.</p>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 1</span> La prova che misura la cosa sbagliata</h3>
+    <p>Prendi un quiz di una certificazione del settore che hai già visto — una qualsiasi.
+      Individua tre item che sono affidabili ma non validi, e scrivi in una riga quale
+      decisione professionale <em>non</em> autorizzano.</p>
+    <p class="consegna"><b>Consegna:</b> mezza pagina. <b>Serve a:</b> riconoscere il difetto
+      da fuori prima di doverlo evitare da dentro.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 2</span> Il tuo blueprint</h3>
+    <p>Compila la tabella del capitolo 2 con i <em>tuoi</em> pesi. Per ogni area scrivi le due
+      motivazioni: frequenza nel lavoro reale e danno in caso di errore.</p>
+    <p class="consegna"><b>Consegna:</b> la tabella firmata e datata. <b>Diventa:</b> allegato A
+      del Regolamento.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 3</span> Dieci item, e i sette errori</h3>
+    <p>Scrivi dieci item per l'area «perimetro e sicurezza». Poi rileggili con l'elenco dei
+      sette errori accanto e correggili. Conta quanti errori avevi commesso: il numero onesto
+      è fra tre e sei.</p>
+    <p class="consegna"><b>Consegna:</b> dieci item, versione prima e dopo.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 4</span> L'ancoraggio del livello 2</h3>
+    <p>Per ciascuno dei quattro criteri della prova pratica, riscrivi l'ancoraggio del livello 2
+      con parole tue, in modo che descriva <em>solo</em> comportamenti che si vedono. Prova
+      finale: cancella tutti gli aggettivi valutativi. Se il testo regge ancora, è ancorato.</p>
+    <p class="consegna"><b>Consegna:</b> la rubrica a quattro livelli, completa.
+      <b>Diventa:</b> allegato B.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 5</span> La taratura in cieco</h3>
+    <p>Registra tre prove pratiche. Fatele valutare in cieco a te e a un secondo valutatore.
+      Calcola accordo esatto e accordo entro un livello. Dove lo scarto è ≥ 1, riscrivi
+      l'ancoraggio — non convincete l'altro.</p>
+    <p class="consegna"><b>Consegna:</b> le due griglie, le due percentuali, e le righe di
+      rubrica riscritte.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 6</span> Trova il tuo errore</h3>
+    <p>Dei sei errori sistematici, individua onestamente <em>il tuo</em>: quello che commetteresti
+      valutando i tuoi allievi. Scrivi la contromisura procedurale che ti impedirà di
+      commetterlo, e inseriscila nel Regolamento come obbligo, non come buon proposito.</p>
+    <p class="consegna"><b>Consegna:</b> una riga di regolamento.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 7</span> La soglia, con Angoff</h3>
+    <p>Descrivi il candidato borderline in cinque righe. Poi applica l'Angoff modificato ai
+      dieci item dell'esercizio 3 e ricava il cut score parziale.</p>
+    <p class="consegna"><b>Consegna:</b> il profilo borderline e il numero, con le stime che lo
+      hanno prodotto. <b>Diventa:</b> allegato C.</p>
+  </div>
+
+  <div class="esercizio">
+    <h3><span class="ex-cod">ES 8</span> Il ciclo completo, su carta</h3>
+    <p>Simula un'edizione con dieci candidati inventati. Calcola p e D per i dieci item. Trova
+      quello che avresti annullato e spiega perché.</p>
+    <p class="consegna"><b>Consegna:</b> il foglio di calcolo e tre righe di conclusione.
+      <b>Serve a:</b> non trovarsi a farlo per la prima volta con candidati veri.</p>
+  </div>
+
+  <!-- =============== 10 =============== -->
+  <h2 id="c10"><span class="num">10.</span> Regolamento d'Esame di Livello 1</h2>
+  <hr class="cap-rule">
+  <p class="nota-piede" style="margin-top:0">Questo capitolo non si studia: si adotta. Va
+    approvato dopo la prima taratura (cap. 5) e dopo l'esercizio 7, che ne riempie l'articolo 6.
+    Fino ad allora resta una bozza e non va consegnato ai candidati.</p>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 1</span> Oggetto e natura del titolo</h3>
+    <p>Il presente regolamento disciplina l'Esame di Livello 1 del percorso di certificazione
+      Metodo Mind Movement, rilasciato da A.S.D. Evolution Sport — Mind Movement Lab. Il titolo
+      è una <strong>certificazione privata</strong> attestante la padronanza di un metodo
+      proprietario. Non costituisce abilitazione professionale né titolo sanitario, e non
+      autorizza atti diagnostici, terapeutici o riabilitativi.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 2</span> Requisiti di ammissione</h3>
+    <p>È ammesso il candidato che abbia completato i moduli previsti per il Livello 1 e
+      documentato le ore di pratica richieste. <span class="da-decidere">da decidere</span>
+      numero di ore e modalità di documentazione.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 3</span> Struttura della prova</h3>
+    <p>L'esame si compone di due prove, entrambe obbligatorie e non compensabili fra loro:</p>
+    <ul>
+      <li><strong>Prova scritta</strong> — 40 item a scelta multipla, quattro opzioni, una sola
+        corretta, composti secondo il blueprint (allegato A). Durata 60 minuti. Nessuna
+        penalità per risposta errata.</li>
+      <li><strong>Prova pratica</strong> — conduzione di una sessione di valutazione su un
+        allievo reale o simulato, valutata sui quattro criteri della rubrica (allegato B).
+        Durata 45 minuti, più 10 minuti di restituzione argomentata.</li>
+    </ul>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 4</span> Commissione e incompatibilità</h3>
+    <p>La prova pratica è valutata da almeno due valutatori, indipendentemente e in cieco l'uno
+      rispetto all'altro. <strong>Chi ha formato il candidato non lo valuta.</strong> In caso di
+      scarto pari o superiore a un livello su un criterio, il punteggio è deciso da un terzo
+      valutatore, che non conosce i punteggi precedenti.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 5</span> Taratura obbligatoria</h3>
+    <p>Prima di ogni edizione la commissione svolge la sessione di taratura su tre casi
+      registrati. L'edizione non si apre se l'accordo esatto è inferiore al 70% o l'accordo
+      entro un livello è inferiore al 90%: in tal caso si riscrivono gli ancoraggi e si ritara.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 6</span> Soglia di superamento</h3>
+    <p>La soglia della prova scritta è determinata con il metodo Angoff modificato (allegato C)
+      e ricalcolata a ogni revisione del blueprint. La soglia della prova pratica è il livello 2
+      su ciascun criterio. <span class="da-decidere">da decidere</span> valore numerico del cut
+      score, da riportare qui dopo l'esercizio 7.</p>
+    <p>Il candidato che cade entro la fascia di incertezza (soglia ± errore standard di misura)
+      è riesaminato dalla commissione sul criterio più debole della prova pratica, con
+      motivazione scritta a verbale.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 7</span> Criterio eliminatorio</h3>
+    <p>Il criterio «sicurezza e perimetro» è <strong>eliminatorio e non compensabile</strong>.
+      Il livello 0 su tale criterio comporta il non superamento dell'esame indipendentemente da
+      ogni altro punteggio. Rientrano nel livello 0, a titolo esemplificativo: procedere in
+      presenza di un segnale di rinvio a professionista sanitario; formulare all'allievo
+      un'ipotesi diagnostica; proseguire un test in presenza di dolore riferito acuto.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 8</span> Esito, verbale, tracciabilità</h3>
+    <p>L'esito è comunicato entro <span class="da-decidere">da decidere</span> giorni, per
+      iscritto, con il dettaglio per criterio. Ogni verbale riporta: blueprint applicato,
+      versione della rubrica, valutatori, punteggi analitici, soglia in vigore ed eventuali item
+      annullati. I verbali sono conservati per <span class="da-decidere">da decidere</span>
+      anni e sono registrati in ESSĒRE.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 9</span> Riesame e ricorso</h3>
+    <p>Il candidato può chiedere il riesame entro 15 giorni, con istanza motivata. Il riesame
+      verifica la corretta applicazione della rubrica e del regolamento; non rivaluta nel merito
+      la prestazione, salvo errore materiale documentato. L'esito del riesame è definitivo e
+      motivato per iscritto.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 10</span> Ripetizione</h3>
+    <p>Chi non supera una sola prova ripete unicamente quella, entro dodici mesi. Chi non supera
+      entrambe ripete l'intero esame. <span class="da-decidere">da decidere</span> numero
+      massimo di ripetizioni e relativi costi.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 11</span> Validità e mantenimento</h3>
+    <p>La certificazione ha validità <span class="da-decidere">da decidere</span> anni. Il
+      mantenimento è subordinato all'aggiornamento previsto dall'Accademia. La certificazione è
+      condizione di accesso alle funzioni professionali di ESSĒRE ed è revocabile in caso di uso
+      del metodo fuori dal perimetro dichiarato all'art. 1.</p>
+  </div>
+
+  <div class="art">
+    <h3><span class="a-n">Art. 12</span> Revisione della prova</h3>
+    <p>Dopo ogni edizione si calcolano p e D di ciascun item. Gli item con D negativo sono
+      annullati e i punteggi ricalcolati per tutti i candidati di quell'edizione, anche se già
+      promossi. Gli item conservati entrano in banca item con i rispettivi indici.</p>
+  </div>
+
+  <div class="firma-blocco">
+    <div class="firma-riga">Il Direttore Tecnico — data e firma</div>
+    <div class="firma-riga">Delibera del Consiglio Direttivo — data</div>
+  </div>
+
+  <div class="colophon">
+    <p><b>Allegati richiamati.</b> A — blueprint e pesi (es. 2) · B — rubrica a quattro livelli
+      (es. 4) · C — determinazione della soglia con Angoff modificato (es. 7) · D — verbale di
+      taratura (es. 5).</p>
+    <p>A.S.D. Evolution Sport — Mind Movement Lab, Gragnano (NA). Percorso formativo formatori,
+      Sessione 01. Documento riservato ai formatori dell'Accademia: non si consegna ai candidati,
+      salvo il capitolo 10 una volta approvato.</p>
+  </div>
+
+</div>

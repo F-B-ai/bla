@@ -8,24 +8,42 @@ import {
   Modal,
   ScrollView,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { crossAlert } from '../../utils/alert';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { SpecialContent, ContentType, Student } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { addContent, getAllContent, deleteContent } from '../../services/contentService';
+import { addContent, getAllContent, deleteContent, uploadContentFile } from '../../services/contentService';
 import { getStudents } from '../../services/authService';
+import { createBulkNotifications } from '../../services/notificationService';
+import { Ionicons } from '@expo/vector-icons';
 
-const CONTENT_TYPES: { value: ContentType; label: string; color: string }[] = [
-  { value: 'podcast', label: 'Podcast', color: '#9C27B0' },
-  { value: 'video', label: 'Video', color: '#F44336' },
-  { value: 'article', label: 'Articolo', color: '#2196F3' },
-  { value: 'resource', label: 'Risorsa', color: '#4CAF50' },
+const CONTENT_TYPES: { value: ContentType; label: string; color: string; icon: string }[] = [
+  { value: 'video', label: 'Video', color: '#F44336', icon: 'videocam' },
+  { value: 'audio', label: 'Audio', color: '#FF9800', icon: 'musical-notes' },
+  { value: 'pdf', label: 'PDF', color: '#4CAF50', icon: 'document-text' },
+  { value: 'podcast', label: 'Podcast', color: '#9C27B0', icon: 'mic' },
+  { value: 'article', label: 'Articolo', color: '#2196F3', icon: 'newspaper' },
+  { value: 'resource', label: 'Risorsa', color: '#607D8B', icon: 'link' },
 ];
+
+type InputMode = 'url' | 'file';
+
+const FILE_TYPES_MAP: Record<string, string[]> = {
+  video: ['video/mp4', 'video/quicktime', 'video/x-m4v', 'video/*'],
+  audio: ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/*'],
+  pdf: ['application/pdf'],
+};
+
+const canUploadFile = (type: ContentType): boolean =>
+  type === 'video' || type === 'audio' || type === 'pdf';
 
 export const ContentManagementScreen: React.FC = () => {
   const { user } = useAuth();
@@ -42,6 +60,9 @@ export const ContentManagementScreen: React.FC = () => {
   const [contentType, setContentType] = useState<ContentType>('video');
   const [tags, setTags] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [inputMode, setInputMode] = useState<InputMode>('file');
+  const [selectedFile, setSelectedFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const loadData = useCallback(async () => {
     try {
@@ -72,24 +93,85 @@ export const ContentManagementScreen: React.FC = () => {
     );
   };
 
+  const handlePickFile = async () => {
+    try {
+      const mimeTypes = FILE_TYPES_MAP[contentType] || ['*/*'];
+      const result = await DocumentPicker.getDocumentAsync({
+        type: mimeTypes,
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSelectedFile({
+          uri: asset.uri,
+          name: asset.name,
+          mimeType: asset.mimeType || 'application/octet-stream',
+        });
+        if (!title) {
+          const nameWithoutExt = asset.name.replace(/\.[^/.]+$/, '');
+          setTitle(nameWithoutExt);
+        }
+      }
+    } catch {
+      crossAlert('Errore', 'Impossibile selezionare il file');
+    }
+  };
+
   const handleSave = async () => {
-    if (!title || !url || !user) {
-      crossAlert('Errore', 'Inserisci titolo e URL');
+    if (!user) return;
+
+    if (inputMode === 'url' && !url) {
+      crossAlert('Errore', 'Inserisci un URL');
+      return;
+    }
+    if (inputMode === 'file' && !selectedFile) {
+      crossAlert('Errore', 'Seleziona un file');
+      return;
+    }
+    if (!title) {
+      crossAlert('Errore', 'Inserisci un titolo');
       return;
     }
 
     setSaving(true);
     try {
+      let finalUrl = url;
+
+      if (inputMode === 'file' && selectedFile) {
+        setUploadProgress('Caricamento file...');
+        finalUrl = await uploadContentFile(
+          selectedFile.uri,
+          selectedFile.name,
+          selectedFile.mimeType
+        );
+        setUploadProgress('');
+      }
+
       await addContent({
         title,
         description,
         type: contentType,
-        url,
+        url: finalUrl,
         createdBy: user.id,
         createdAt: new Date(),
         assignedTo: selectedStudentIds,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
       });
+
+      const notifTargets = selectedStudentIds.length > 0
+        ? selectedStudentIds
+        : students.map((s) => s.id);
+      if (notifTargets.length > 0) {
+        const typeLabel = CONTENT_TYPES.find((t) => t.value === contentType)?.label || contentType;
+        createBulkNotifications(
+          notifTargets.filter((id) => id !== user.id),
+          'new_content',
+          'Nuovo contenuto disponibile',
+          `${title} — ${typeLabel}`
+        ).catch(() => {});
+      }
+
       crossAlert('Successo', 'Contenuto pubblicato!');
       resetForm();
       setShowModal(false);
@@ -98,6 +180,7 @@ export const ContentManagementScreen: React.FC = () => {
       crossAlert('Errore', 'Impossibile salvare il contenuto');
     } finally {
       setSaving(false);
+      setUploadProgress('');
     }
   };
 
@@ -130,10 +213,13 @@ export const ContentManagementScreen: React.FC = () => {
     setContentType('video');
     setTags('');
     setSelectedStudentIds([]);
+    setSelectedFile(null);
+    setInputMode('file');
+    setUploadProgress('');
   };
 
   const getTypeInfo = (type: ContentType) =>
-    CONTENT_TYPES.find((t) => t.value === type)!;
+    CONTENT_TYPES.find((t) => t.value === type) || CONTENT_TYPES[5];
 
   return (
     <View style={styles.container}>
@@ -169,6 +255,7 @@ export const ContentManagementScreen: React.FC = () => {
                     { backgroundColor: typeInfo.color + '20' },
                   ]}
                 >
+                  <Ionicons name={typeInfo.icon as any} size={18} color={typeInfo.color} />
                   <Text style={[styles.typeBadgeText, { color: typeInfo.color }]}>
                     {typeInfo.label}
                   </Text>
@@ -200,7 +287,7 @@ export const ContentManagementScreen: React.FC = () => {
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              Nessun contenuto pubblicato.{'\n'}Aggiungi podcast, video, articoli e risorse per i tuoi allievi.
+              Nessun contenuto pubblicato.{'\n'}Aggiungi video, audio, PDF, podcast e articoli per i tuoi allievi.
             </Text>
           </Card>
         }
@@ -222,8 +309,23 @@ export const ContentManagementScreen: React.FC = () => {
                     styles.typeChip,
                     contentType === t.value && { backgroundColor: t.color + '20', borderColor: t.color },
                   ]}
-                  onPress={() => setContentType(t.value)}
+                  onPress={() => {
+                    setContentType(t.value);
+                    setSelectedFile(null);
+                    setUrl('');
+                    if (canUploadFile(t.value)) {
+                      setInputMode('file');
+                    } else {
+                      setInputMode('url');
+                    }
+                  }}
                 >
+                  <Ionicons
+                    name={t.icon as any}
+                    size={14}
+                    color={contentType === t.value ? t.color : colors.textSecondary}
+                    style={{ marginRight: 4 }}
+                  />
                   <Text
                     style={[
                       styles.typeChipText,
@@ -252,13 +354,60 @@ export const ContentManagementScreen: React.FC = () => {
               numberOfLines={3}
             />
 
-            <InputField
-              label="URL"
-              value={url}
-              onChangeText={setUrl}
-              placeholder="Link al contenuto"
-              autoCapitalize="none"
-            />
+            {/* Upload / URL toggle */}
+            {canUploadFile(contentType) && (
+              <View style={styles.modeToggle}>
+                <TouchableOpacity
+                  style={[styles.modeBtn, inputMode === 'file' && styles.modeBtnActive]}
+                  onPress={() => { setInputMode('file'); setUrl(''); }}
+                >
+                  <Ionicons name="cloud-upload-outline" size={16} color={inputMode === 'file' ? colors.textOnAccent : colors.textSecondary} />
+                  <Text style={[styles.modeBtnText, inputMode === 'file' && styles.modeBtnTextActive]}>
+                    Carica File
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modeBtn, inputMode === 'url' && styles.modeBtnActive]}
+                  onPress={() => { setInputMode('url'); setSelectedFile(null); }}
+                >
+                  <Ionicons name="link-outline" size={16} color={inputMode === 'url' ? colors.textOnAccent : colors.textSecondary} />
+                  <Text style={[styles.modeBtnText, inputMode === 'url' && styles.modeBtnTextActive]}>
+                    URL Esterno
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {inputMode === 'file' && canUploadFile(contentType) ? (
+              <View style={styles.filePickerSection}>
+                <TouchableOpacity style={styles.filePickerBtn} onPress={handlePickFile}>
+                  <Ionicons
+                    name={selectedFile ? 'checkmark-circle' : 'cloud-upload-outline'}
+                    size={28}
+                    color={selectedFile ? colors.success : colors.accent}
+                  />
+                  <Text style={styles.filePickerText}>
+                    {selectedFile ? selectedFile.name : `Seleziona ${contentType === 'video' ? 'video' : contentType === 'audio' ? 'audio' : 'PDF'}...`}
+                  </Text>
+                  {selectedFile && (
+                    <TouchableOpacity onPress={() => setSelectedFile(null)}>
+                      <Ionicons name="close-circle" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.fileHint}>
+                  {contentType === 'video' ? 'MP4, MOV' : contentType === 'audio' ? 'MP3, M4A, WAV' : 'PDF'}
+                </Text>
+              </View>
+            ) : (
+              <InputField
+                label="URL"
+                value={url}
+                onChangeText={setUrl}
+                placeholder="Link al contenuto (YouTube, Spotify, ecc.)"
+                autoCapitalize="none"
+              />
+            )}
 
             <InputField
               label="Tag (separati da virgola)"
@@ -268,32 +417,20 @@ export const ContentManagementScreen: React.FC = () => {
             />
 
             {/* Assegnazione allievi */}
-            <Text style={styles.fieldLabel}>
-              Assegna a (vuoto = tutti gli allievi)
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.studentRow}>
-                {students.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[
-                      styles.studentChip,
-                      selectedStudentIds.includes(s.id) && styles.studentChipActive,
-                    ]}
-                    onPress={() => toggleStudent(s.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.studentChipText,
-                        selectedStudentIds.includes(s.id) && styles.studentChipTextActive,
-                      ]}
-                    >
-                      {s.name} {s.surname}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <StudentSearchPicker
+              students={students}
+              selectedIds={selectedStudentIds}
+              onSelect={(id) => toggleStudent(id)}
+              multiSelect
+              label="Assegna a (vuoto = tutti gli allievi)"
+            />
+
+            {uploadProgress ? (
+              <View style={styles.uploadProgressRow}>
+                <ActivityIndicator size="small" color={colors.accent} />
+                <Text style={styles.uploadProgressText}>{uploadProgress}</Text>
               </View>
-            </ScrollView>
+            ) : null}
 
             <View style={styles.modalButtons}>
               <Button
@@ -303,7 +440,7 @@ export const ContentManagementScreen: React.FC = () => {
                 style={styles.modalButton}
               />
               <Button
-                title={saving ? 'Salvataggio...' : 'Pubblica'}
+                title={saving ? 'Caricamento...' : 'Pubblica'}
                 onPress={handleSave}
                 style={styles.modalButton}
                 loading={saving}
@@ -351,9 +488,12 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   typeBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
+    alignItems: 'center',
+    gap: 2,
+    minWidth: 52,
   },
   typeBadgeText: {
     fontSize: fontSize.xs,
@@ -393,7 +533,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -402,12 +542,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl,
     padding: spacing.lg,
     maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: spacing.lg,
   },
   fieldLabel: {
     fontSize: fontSize.md,
@@ -420,8 +554,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginBottom: spacing.md,
+    flexWrap: 'wrap',
   },
   typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.round,
@@ -433,29 +570,83 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
   },
-  studentRow: {
+
+  // Mode toggle
+  modeToggle: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingBottom: spacing.sm,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
-  studentChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.round,
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
   },
-  studentChipActive: {
+  modeBtnActive: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,
   },
-  studentChipText: {
-    fontSize: fontSize.sm,
+  modeBtnText: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
-  studentChipTextActive: {
+  modeBtnTextActive: {
     color: colors.textOnAccent,
   },
+
+  // File picker
+  filePickerSection: {
+    marginBottom: spacing.md,
+  },
+  filePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  filePickerText: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  fileHint: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
+  },
+
+  // Upload progress
+  uploadProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+  },
+  uploadProgressText: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '500',
+  },
+
   modalButtons: {
     flexDirection: 'row',
     gap: spacing.sm,

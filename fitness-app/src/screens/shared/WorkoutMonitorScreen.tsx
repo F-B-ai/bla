@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +21,17 @@ import {
   getCollaboratorWorkoutLogs,
   getAllWorkoutLogs,
   subscribeToWorkoutLog,
+  deleteWorkoutLog,
 } from '../../services/workoutLogService';
 import { getUserProfile } from '../../services/authService';
+import { crossAlert } from '../../utils/alert';
 
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
 export const WorkoutMonitorScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, isManager } = useAuth();
+  const canSeeAll = isOwner || isManager;
   const [activeWorkouts, setActiveWorkouts] = useState<WorkoutLog[]>([]);
   const [studentNames, setStudentNames] = useState<Record<string, string>>({});
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutLog | null>(null);
@@ -37,6 +41,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [studentHistoryLogs, setStudentHistoryLogs] = useState<WorkoutLog[]>([]);
   const [showStudentHistory, setShowStudentHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
 
   const unsubActiveRef = useRef<(() => void) | null>(null);
   const unsubDetailRef = useRef<(() => void) | null>(null);
@@ -44,7 +49,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
   // Sottoscrivi allenamenti in corso
   useEffect(() => {
     if (!user) return;
-    const collaboratorId = isOwner ? null : user.id;
+    const collaboratorId = canSeeAll ? null : user.id;
     unsubActiveRef.current = subscribeToActiveWorkouts(collaboratorId, async (logs) => {
       setActiveWorkouts(logs);
       // Carica nomi studenti
@@ -63,7 +68,7 @@ export const WorkoutMonitorScreen: React.FC = () => {
     return () => {
       if (unsubActiveRef.current) unsubActiveRef.current();
     };
-  }, [user, isOwner]);
+  }, [user, canSeeAll]);
 
   // Dettaglio real-time di un workout selezionato
   useEffect(() => {
@@ -79,11 +84,11 @@ export const WorkoutMonitorScreen: React.FC = () => {
     };
   }, [selectedWorkout?.id]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!user) return;
     setRefreshing(true);
     try {
-      const logs = isOwner
+      const logs = canSeeAll
         ? await getAllWorkoutLogs()
         : await getCollaboratorWorkoutLogs(user.id);
       setHistoryLogs(logs);
@@ -103,13 +108,94 @@ export const WorkoutMonitorScreen: React.FC = () => {
       console.error('Errore caricamento storico:', err);
     }
     setRefreshing(false);
-  };
+    // studentNames intentionally not in deps to avoid re-running on every name resolution
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, canSeeAll]);
+
+  // Precarica lo storico all'apertura della schermata cosi' i risultati
+  // sono visibili senza dover premere "Storico Risultati"
+  useEffect(() => {
+    if (user) loadHistory();
+  }, [user, canSeeAll, loadHistory]);
 
   const handleShowStudentHistory = async (studentId: string) => {
     setSelectedStudent(studentId);
     const logs = historyLogs.filter((l) => l.studentId === studentId);
     setStudentHistoryLogs(logs);
     setShowStudentHistory(true);
+  };
+
+  const handleDeleteLog = (log: WorkoutLog) => {
+    crossAlert(
+      'Elimina sessione',
+      `Eliminare la sessione del ${formatDateShort(log.startedAt)}? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteWorkoutLog(log.id);
+              setActiveWorkouts((prev) => prev.filter((l) => l.id !== log.id));
+              setHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
+              setStudentHistoryLogs((prev) => prev.filter((l) => l.id !== log.id));
+              if (selectedWorkout?.id === log.id) setSelectedWorkout(null);
+            } catch (err) {
+              console.error('Errore eliminazione sessione:', err);
+              crossAlert('Errore', 'Impossibile eliminare la sessione. Riprova.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllActive = () => {
+    if (activeWorkouts.length === 0) return;
+    crossAlert(
+      'Pulisci Monitor',
+      `Eliminare tutti i ${activeWorkouts.length} allenamenti in corso? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina tutti',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(activeWorkouts.map((w) => deleteWorkoutLog(w.id)));
+              setActiveWorkouts([]);
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare alcune sessioni.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleClearAllHistory = () => {
+    if (historyLogs.length === 0) return;
+    crossAlert(
+      'Pulisci Storico',
+      `Eliminare tutti i ${historyLogs.length} allenamenti nello storico? L'operazione non e' reversibile.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina tutti',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await Promise.all(historyLogs.map((w) => deleteWorkoutLog(w.id)));
+              setHistoryLogs([]);
+              setStudentHistoryLogs([]);
+            } catch {
+              crossAlert('Errore', 'Impossibile eliminare alcune sessioni.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDateFull = (date: any): string => {
@@ -145,6 +231,12 @@ export const WorkoutMonitorScreen: React.FC = () => {
               <Text style={styles.liveText}>LIVE</Text>
             </View>
           )}
+          {activeWorkouts.length > 0 && (
+            <TouchableOpacity onPress={handleClearAllActive} style={styles.clearBtn}>
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+              <Text style={styles.clearBtnText}>Pulisci</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {activeWorkouts.length === 0 ? (
@@ -177,10 +269,18 @@ export const WorkoutMonitorScreen: React.FC = () => {
                         <View style={[styles.miniProgressFill, { width: `${progress}%` }]} />
                       </View>
                       <Text style={styles.workoutStats}>
-                        {doneSets}/{totalSets} serie | {workout.exerciseLogs?.length || 0} esercizi
+                        {doneSets}/{totalSets} serie | {workout.exerciseLogs?.filter((e) => e.sets.length > 0).length || 0}/{workout.exerciseLogs?.length || 0} esercizi
                       </Text>
                     </View>
-                    <Ionicons name="eye-outline" size={24} color={colors.accent} />
+                    <View style={{ alignItems: 'center', gap: spacing.sm }}>
+                      <Ionicons name="eye-outline" size={24} color={colors.accent} />
+                      <TouchableOpacity
+                        onPress={(e) => { e.stopPropagation(); handleDeleteLog(workout); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -224,8 +324,8 @@ export const WorkoutMonitorScreen: React.FC = () => {
                   )}
                 </View>
 
-                {/* Dettaglio esercizi */}
-                {selectedWorkout.exerciseLogs?.map((ex, i) => {
+                {/* Dettaglio esercizi (solo quelli con almeno una serie registrata) */}
+                {selectedWorkout.exerciseLogs?.filter((ex) => ex.sets.length > 0).map((ex, i) => {
                   const done = ex.sets.length >= ex.targetSets;
                   return (
                     <Card key={i} variant={done ? 'outlined' : 'elevated'}>
@@ -238,20 +338,34 @@ export const WorkoutMonitorScreen: React.FC = () => {
                           <Text style={styles.exTarget}>
                             {ex.sets.length}/{ex.targetSets} serie x {ex.targetReps}
                           </Text>
+                          {ex.technique && ex.technique !== 'standard' && (
+                            <Text style={styles.restPauseTag}>
+                              {ex.technique === 'rest_pause' && `SERIE INTERROTTE · ${ex.targetMiniSets || 4} mini da ${ex.targetMiniReps || '6'} · rec ${ex.targetMiniRestSeconds || 20}s`}
+                              {ex.technique === 'stripping' && `STRIPPING · ${ex.targetStripDrops || 3} scarichi da ${ex.targetStripRepsPerDrop || '8'} · max -${ex.targetStripMaxDropPct || 50}%`}
+                              {ex.technique === 'pyramid' && `PIRAMIDALI · ${ex.targetPyramidType === 'ascending' ? 'ascendente ↑' : ex.targetPyramidType === 'descending' ? 'discendente ↓' : 'triangolare ↑↓'}`}
+                              {ex.technique === 'tempo' && `TEMPO · ${ex.targetTempoNotation || '4-1-2-0'}`}
+                              {ex.technique === 'myo_reps' && `MYO-REPS · ${ex.targetMyoActivationReps || '12'} + ${ex.targetMyoMiniSets || 4}x${ex.targetMyoMiniReps || '3'}`}
+                              {ex.technique === 'isometric' && `ISOMETRIA · ${ex.targetIsometricHoldSeconds || 30}s`}
+                              {ex.technique === 'twentyone' && '21s · 7+7+7'}
+                              {ex.technique === 'cluster' && `CLUSTER · ${ex.targetClusterSets || 5}x${ex.targetClusterReps || 2} · pausa ${ex.targetClusterRestSeconds || 15}s`}
+                              {ex.technique === 'negative' && `NEGATIVA · ${ex.targetNegativeSeconds || 5}s ecc`}
+                              {ex.technique === 'emom' && `EMOM · ${ex.targetEmomRepsPerMinute || '5'} reps x ${ex.targetEmomMinutes || 10} min`}
+                            </Text>
+                          )}
                         </View>
                         {done && <Ionicons name="checkmark-circle" size={24} color={colors.success} />}
                       </View>
 
-                      {ex.sets.length > 0 && (
-                        <View style={styles.setsTable}>
-                          <View style={styles.setsTableHeader}>
-                            <Text style={[styles.tableCell, styles.tableHeader]}>#</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Peso</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Reps</Text>
-                            <Text style={[styles.tableCell, styles.tableHeader]}>RPE</Text>
-                          </View>
-                          {ex.sets.map((s, si) => (
-                            <View key={si} style={styles.setsTableRow}>
+                      <View style={styles.setsTable}>
+                        <View style={styles.setsTableHeader}>
+                          <Text style={[styles.tableCell, styles.tableHeader]}>#</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Peso</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader, { flex: 2 }]}>Reps</Text>
+                          <Text style={[styles.tableCell, styles.tableHeader]}>RPE</Text>
+                        </View>
+                        {ex.sets.map((s, si) => (
+                          <View key={si}>
+                            <View style={styles.setsTableRow}>
                               <Text style={styles.tableCell}>{s.setNumber}</Text>
                               <Text style={[styles.tableCell, { flex: 2 }]}>
                                 {s.weight > 0 ? `${s.weight} kg` : '-'}
@@ -259,9 +373,20 @@ export const WorkoutMonitorScreen: React.FC = () => {
                               <Text style={[styles.tableCell, { flex: 2 }]}>{s.reps}</Text>
                               <Text style={styles.tableCell}>{s.rpe || '-'}</Text>
                             </View>
-                          ))}
-                        </View>
-                      )}
+                            {s.miniSetDetails && s.miniSetDetails.length > 0 && (
+                              <Text style={styles.miniSetDetail}>
+                                {s.miniSetsCompleted} mini serie: {s.miniSetDetails.map((m) => m.reps).join('/')}
+                                {' '}· rec: {s.miniSetDetails.slice(0, -1).map((m) => `${m.restSeconds}s`).join('/') || '-'}
+                              </Text>
+                            )}
+                            {s.dropSetDetails && s.dropSetDetails.length > 0 && (
+                              <Text style={styles.miniSetDetail}>
+                                Stripping · {s.dropSetsCompleted} drop: {s.dropSetDetails.map((d) => `${d.weight}kg x${d.reps}`).join(' → ')}
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
                     </Card>
                   );
                 })}
@@ -283,7 +408,30 @@ export const WorkoutMonitorScreen: React.FC = () => {
       <Modal visible={showHistory} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <ScrollView style={styles.modalContent}>
-            <ModalHeader title="Storico Allenamenti" onClose={() => { setShowHistory(false); setShowStudentHistory(false); }} />
+            <ModalHeader title="Storico Allenamenti" onClose={() => { setShowHistory(false); setShowStudentHistory(false); setHistorySearch(''); }} />
+
+            {historyLogs.length > 0 && !showStudentHistory && (
+              <TouchableOpacity onPress={handleClearAllHistory} style={styles.clearAllRow}>
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+                <Text style={styles.clearAllText}>Pulisci tutto lo storico ({historyLogs.length})</Text>
+              </TouchableOpacity>
+            )}
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={18} color={colors.textLight} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Cerca allievo..."
+                placeholderTextColor={colors.textLight}
+                value={historySearch}
+                onChangeText={setHistorySearch}
+              />
+              {historySearch.length > 0 && (
+                <TouchableOpacity onPress={() => setHistorySearch('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.textLight} />
+                </TouchableOpacity>
+              )}
+            </View>
 
             {!showStudentHistory ? (
               <>
@@ -295,7 +443,10 @@ export const WorkoutMonitorScreen: React.FC = () => {
                     grouped[log.studentId].push(log);
                   });
 
-                  return Object.entries(grouped).map(([studentId, logs]) => (
+                  const q = historySearch.toLowerCase();
+                  return Object.entries(grouped)
+                    .filter(([studentId]) => !q || (studentNames[studentId] || '').toLowerCase().includes(q))
+                    .map(([studentId, logs]) => (
                     <TouchableOpacity
                       key={studentId}
                       onPress={() => handleShowStudentHistory(studentId)}
@@ -335,41 +486,50 @@ export const WorkoutMonitorScreen: React.FC = () => {
                 </Text>
 
                 {studentHistoryLogs.map((log) => (
-                  <TouchableOpacity
-                    key={log.id}
-                    onPress={() => { setSelectedWorkout(log); setShowHistory(false); }}
-                  >
-                    <Card variant="outlined">
-                      <View style={styles.historyRow}>
-                        <View style={styles.historyInfo}>
-                          <Text style={styles.historyDate}>
-                            {formatDateShort(log.startedAt)} - {DAYS[log.dayOfWeek]}
-                          </Text>
-                          <Text style={styles.historyStats}>
-                            {log.exerciseLogs?.reduce((s, e) => s + e.sets.length, 0) || 0} serie |{' '}
-                            {log.durationMinutes ? `${log.durationMinutes} min` : '--'}
-                          </Text>
+                  <Card key={log.id} variant="outlined">
+                    <View style={styles.historyCardRow}>
+                      <TouchableOpacity
+                        style={styles.historyMain}
+                        onPress={() => { setSelectedWorkout(log); setShowHistory(false); }}
+                      >
+                        <View style={styles.historyRow}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyDate}>
+                              {formatDateShort(log.startedAt)} - {DAYS[log.dayOfWeek]}
+                            </Text>
+                            <Text style={styles.historyStats}>
+                              {log.exerciseLogs?.reduce((s, e) => s + e.sets.length, 0) || 0} serie |{' '}
+                              {log.durationMinutes ? `${log.durationMinutes} min` : '--'}
+                            </Text>
+                          </View>
+                          <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: log.status === 'completed' ? colors.success : colors.warning },
+                          ]}>
+                            <Text style={styles.statusText}>
+                              {log.status === 'completed' ? 'OK' : 'ABB'}
+                            </Text>
+                          </View>
                         </View>
-                        <View style={[
-                          styles.statusBadge,
-                          { backgroundColor: log.status === 'completed' ? colors.success : colors.warning },
-                        ]}>
-                          <Text style={styles.statusText}>
-                            {log.status === 'completed' ? 'OK' : 'ABB'}
-                          </Text>
-                        </View>
-                      </View>
-                      {/* Mini riepilogo esercizi */}
-                      {log.exerciseLogs?.map((el, i) => (
-                        <View key={i} style={styles.miniExRow}>
-                          <Text style={styles.miniExName} numberOfLines={1}>{el.exerciseName}</Text>
-                          <Text style={styles.miniExSets}>
-                            {el.sets.map((s) => `${s.weight}x${s.reps}`).join(' | ')}
-                          </Text>
-                        </View>
-                      ))}
-                    </Card>
-                  </TouchableOpacity>
+                        {/* Mini riepilogo esercizi */}
+                        {log.exerciseLogs?.filter((el) => el.sets.length > 0).map((el, i) => (
+                          <View key={i} style={styles.miniExRow}>
+                            <Text style={styles.miniExName} numberOfLines={1}>{el.exerciseName}</Text>
+                            <Text style={styles.miniExSets}>
+                              {el.sets.map((s) => `${s.weight}x${s.reps}`).join(' | ')}
+                            </Text>
+                          </View>
+                        ))}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteLog(log)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={colors.error} />
+                      </TouchableOpacity>
+                    </View>
+                  </Card>
                 ))}
               </>
             )}
@@ -432,6 +592,24 @@ const styles = StyleSheet.create({
   },
   miniProgressFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 2 },
   workoutStats: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: 0,
+  },
   historyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -444,7 +622,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   historyButtonText: { color: colors.accent, fontSize: fontSize.md, fontWeight: '600' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
@@ -457,10 +635,12 @@ const styles = StyleSheet.create({
   detailDuration: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
   exHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   exBadge: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  exBadgeText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.md },
+  exBadgeText: { color: colors.white, fontWeight: '700', fontSize: fontSize.md },
   exInfo: { flex: 1 },
   exName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
   exTarget: { fontSize: fontSize.sm, color: colors.textSecondary },
+  restPauseTag: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '700', marginTop: 2 },
+  miniSetDetail: { fontSize: fontSize.xs, color: colors.accent, paddingBottom: spacing.xs, paddingLeft: spacing.sm },
   setsTable: { marginTop: spacing.md },
   setsTableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.divider, paddingBottom: spacing.xs },
   setsTableRow: { flexDirection: 'row', paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.divider },
@@ -477,11 +657,39 @@ const styles = StyleSheet.create({
   studentHistoryTitle: { fontSize: fontSize.xl, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
   historyRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   historyInfo: { flex: 1 },
+  historyCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  historyMain: { flex: 1 },
+  deleteBtn: {
+    padding: spacing.xs,
+    borderRadius: borderRadius.round,
+    alignSelf: 'flex-start',
+  },
   historyDate: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   historyStats: { fontSize: fontSize.sm, color: colors.textSecondary },
   statusBadge: { borderRadius: borderRadius.md, paddingHorizontal: spacing.sm, paddingVertical: 2 },
-  statusText: { color: '#FFF', fontSize: fontSize.xs, fontWeight: '700' },
+  statusText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
   miniExRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 2, paddingLeft: spacing.md },
   miniExName: { fontSize: fontSize.xs, fontWeight: '600', color: colors.text, width: 100 },
   miniExSets: { fontSize: fontSize.xs, color: colors.textSecondary, flex: 1 },
+  clearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error + '15',
+  },
+  clearBtnText: { fontSize: fontSize.xs, color: colors.error, fontWeight: '600' },
+  clearAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.error + '15',
+  },
+  clearAllText: { fontSize: fontSize.sm, color: colors.error, fontWeight: '600' },
 });

@@ -58,7 +58,7 @@ const showAlert = (title: string, message: string, buttons?: any[]) => {
 
 const CATEGORY_CONFIG: Record<AcademyCourseCategory, { label: string; color: string; icon: string }> = {
   mind: { label: 'Mind', color: '#9C27B0', icon: 'bulb-outline' },
-  movement: { label: 'Movement', color: '#D40000', icon: 'fitness-outline' },
+  movement: { label: 'Movement', color: colors.accent, icon: 'fitness-outline' },
   nutrition: { label: 'Nutrizione', color: '#4CAF50', icon: 'nutrition-outline' },
   lifestyle: { label: 'Lifestyle', color: '#FF9800', icon: 'sunny-outline' },
   recovery: { label: 'Recovery', color: '#2196F3', icon: 'medkit-outline' },
@@ -1090,7 +1090,7 @@ export const AcademyManagementScreen: React.FC = () => {
                   disabled={savingLesson || uploading}
                 >
                   {savingLesson || uploading ? (
-                    <ActivityIndicator size="small" color="#FFF" />
+                    <ActivityIndicator size="small" color={colors.white} />
                   ) : (
                     <Text style={styles.saveBtnText}>Salva</Text>
                   )}
@@ -1192,7 +1192,7 @@ const styles = StyleSheet.create({
   logoFB: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: colors.white,
   },
   headerTitle: {
     fontSize: fontSize.xl,
@@ -1398,7 +1398,7 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     padding: spacing.lg,
   },
@@ -1487,7 +1487,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textLight,
   },
   toggleDotActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     alignSelf: 'flex-end',
   },
   modalActions: {

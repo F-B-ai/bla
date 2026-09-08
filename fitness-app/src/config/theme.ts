@@ -1,15 +1,16 @@
 // ============================================================
-// ESSĒRE - THEME CONFIGURATION
-// Palette: Nero, Rosso, Bianco/Crema
+// THEME CONFIGURATION (white-label)
+// I colori del brand arrivano da src/config/brand.ts
 // ============================================================
+import { brand } from './brand';
 
 export const colors = {
-  // --- Brand ---
-  primary: '#0A0A0A',
-  primaryLight: '#161616',
-  accent: '#D40000',
-  accentLight: '#E63333',
-  accentDark: '#990000',
+  // --- Brand (da brand.ts) ---
+  primary: brand.colors.primary,
+  primaryLight: brand.colors.primaryLight,
+  accent: brand.colors.accent,
+  accentLight: brand.colors.accentLight,
+  accentDark: brand.colors.accentDark,
 
   // --- Status ---
   success: '#34C759',
@@ -30,6 +31,36 @@ export const colors = {
   textLight: '#636366',
   textOnPrimary: '#F2F2F7',
   textOnAccent: '#FFFFFF',
+
+  // --- Carta: i documenti che si stampano ---
+  // Un patto stampato è nero su bianco, sempre: non segue il tema
+  // dell'app. Vivono qui perché il cancello della palette li veda.
+  cartaInchiostro: '#111111',
+  cartaTesto: '#333333',
+  cartaGrigio: '#555555',
+  cartaGrigioChiaro: '#666666',
+  cartaLinea: '#999999',
+  cartaLineaTenue: '#CCCCCC',
+  cartaFondo: '#F4F4F2',
+
+  // --- Il Twin: contratto visivo del gemello ---
+  // La seta cremisi e la scintilla d'oro. Non sono decorazione:
+  // sono il segno di ESSĒRE. Vivono qui perché siano UNA sola
+  // verità, e perché il cancello della palette li protegga.
+  twinSeta1: '#FF1A1A',
+  twinSeta2: '#D40000',
+  twinSeta3: '#8B0000',
+  twinOroNucleo: '#FFFCF5',
+  twinOroMezzo: '#FFDC96',
+  twinOroBordo: '#C9943A',
+  twinAvorio: '#F2F2F7',
+
+  // --- Neutri e overlay (M2: centralizzati per il white-label) ---
+  white: '#FFFFFF',
+  black: '#000000',
+  overlay: 'rgba(0,0,0,0.5)',
+  overlayDark: 'rgba(0,0,0,0.7)',
+  glass: 'rgba(255,255,255,0.12)',
 
   // --- Badge ruoli ---
   ownerBadge: '#D40000',

@@ -105,11 +105,15 @@ export const DiaryScreen: React.FC = () => {
       <Card variant="elevated">
         <View style={styles.entryHeader}>
           <Text style={styles.entryDate}>
-            {new Date(item.date as unknown as string).toLocaleDateString('it-IT', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
+            {(() => {
+              const d = item.date as any;
+              const date = d?.toDate ? d.toDate() : d?.seconds ? new Date(d.seconds * 1000) : new Date(d);
+              return date.toLocaleDateString('it-IT', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              });
+            })()}
           </Text>
           <View style={[styles.moodBadge, { backgroundColor: mood.color + '20' }]}>
             <Text style={[styles.moodText, { color: mood.color }]}>
@@ -368,7 +372,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

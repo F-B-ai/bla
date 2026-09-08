@@ -1,85 +1,129 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
-import { TrainingSession } from '../../types';
+import { TrainingSession, NutritionistAppointment } from '../../types';
 import { cancelSession, getStudentSessions } from '../../services/sessionService';
+import {
+  getStudentAppointments,
+  cancelAppointment,
+} from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
 
 const CANCELLATION_HOURS = 10;
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
+type UnifiedItem = {
+  id: string;
+  kind: 'training' | 'nutrition';
+  date: Date;
+  startTime: string;
+  endTime: string;
+  status: string;
+  notes: string;
+  isCountedAsCompleted: boolean;
+};
+
+const toUnified = (
+  sessions: TrainingSession[],
+  appointments: NutritionistAppointment[]
+): UnifiedItem[] => {
+  const items: UnifiedItem[] = [];
+  sessions.forEach((s) => {
+    items.push({
+      id: s.id, kind: 'training',
+      date: toSafeDate(s.date),
+      startTime: s.startTime, endTime: s.endTime,
+      status: s.status, notes: s.notes,
+      isCountedAsCompleted: s.isCountedAsCompleted,
+    });
+  });
+  appointments.forEach((a) => {
+    items.push({
+      id: a.id, kind: 'nutrition',
+      date: toSafeDate(a.date),
+      startTime: a.startTime, endTime: a.endTime,
+      status: a.status, notes: a.notes,
+      isCountedAsCompleted: a.isCountedAsCompleted,
+    });
+  });
+  items.sort((a, b) => b.date.getTime() - a.date.getTime());
+  return items;
+};
+
 export const SessionsScreen: React.FC = () => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
+  const [appointments, setAppointments] = useState<NutritionistAppointment[]>([]);
   const [activeSection, setActiveSection] = useState<'upcoming' | 'completed' | 'all'>('upcoming');
 
-  const loadSessions = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await getStudentSessions(user.id);
-      setSessions(data);
+      const [sessData, apptData] = await Promise.all([
+        getStudentSessions(user.id),
+        getStudentAppointments(user.id),
+      ]);
+      setSessions(sessData);
+      setAppointments(apptData);
     } catch (err) {
       console.error('Errore caricamento sessioni:', err);
       crossAlert('Errore', 'Impossibile caricare le sessioni. Riprova più tardi.');
     }
   }, [user]);
 
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const allItems = useMemo(() => toUnified(sessions, appointments), [sessions, appointments]);
 
   const now = new Date();
-  const upcomingSessions = sessions.filter(
-    (s) => new Date(s.date) > now && s.status === 'scheduled'
+  const upcomingItems = allItems.filter(
+    (s) => s.date > now && s.status === 'scheduled'
   );
-  const completedSessions = sessions.filter(
+  const completedItems = allItems.filter(
     (s) => s.status === 'completed' || s.isCountedAsCompleted
   );
-  const filteredSessions = activeSection === 'upcoming'
-    ? upcomingSessions
+  const filteredItems = activeSection === 'upcoming'
+    ? upcomingItems
     : activeSection === 'completed'
-    ? completedSessions
-    : sessions;
+    ? completedItems
+    : allItems;
 
-  const canCancel = (sessionDate: Date): boolean => {
-    const now = new Date();
-    const hours = (new Date(sessionDate).getTime() - now.getTime()) / (1000 * 60 * 60);
-    return hours >= CANCELLATION_HOURS;
-  };
-
-  const handleCancel = async (session: TrainingSession) => {
-    const sessionDate = new Date(session.date);
-    const hoursLeft = (sessionDate.getTime() - Date.now()) / (1000 * 60 * 60);
+  const handleCancel = async (item: UnifiedItem) => {
+    const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
 
     if (hoursLeft < CANCELLATION_HOURS) {
       crossAlert(
         'Attenzione',
-        `Non puoi annullare la sessione meno di ${CANCELLATION_HOURS} ore prima. La sessione sarà considerata come eseguita e verrà addebitata.`,
+        `Non puoi annullare meno di ${CANCELLATION_HOURS} ore prima. La sessione sarà considerata come eseguita e verrà addebitata.`,
         [
           { text: 'Ho capito', style: 'cancel' },
           {
             text: 'Annulla comunque',
             style: 'destructive',
             onPress: async () => {
-              const result = await cancelSession(session.id, sessionDate);
-              await loadSessions();
-              if (result.isLate) {
-                crossAlert(
-                  'Sessione annullata',
-                  'La sessione è stata annullata ma sarà conteggiata e addebitata poiché annullata con meno di 10 ore di preavviso.'
-                );
-              }
+              if (item.kind === 'training') await cancelSession(item.id, item.date);
+              else await cancelAppointment(item.id, item.date);
+              await loadData();
+              crossAlert('Sessione annullata', 'Annullata con meno di 10 ore di preavviso: sarà conteggiata.');
             },
           },
         ]
@@ -87,37 +131,42 @@ export const SessionsScreen: React.FC = () => {
       return;
     }
 
-    crossAlert(
-      'Conferma annullamento',
-      'Sei sicuro di voler annullare questa sessione?',
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: 'Sì, annulla',
-          onPress: async () => {
-            await cancelSession(session.id, sessionDate);
-            await loadSessions();
-            crossAlert('Fatto', 'Sessione annullata con successo');
-          },
+    crossAlert('Conferma annullamento', 'Sei sicuro di voler annullare?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Sì, annulla',
+        onPress: async () => {
+          if (item.kind === 'training') await cancelSession(item.id, item.date);
+          else await cancelAppointment(item.id, item.date);
+          await loadData();
+          crossAlert('Fatto', 'Appuntamento annullato con successo');
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const renderSession = ({ item }: { item: TrainingSession }) => {
-    const sessionDate = new Date(item.date);
-    const isFuture = sessionDate > new Date();
+  const renderItem = ({ item }: { item: UnifiedItem }) => {
+    const isFuture = item.date > new Date();
     const cancellable = isFuture && item.status === 'scheduled';
+    const isLateCancel = cancellable && (item.date.getTime() - Date.now()) / (1000 * 60 * 60) < CANCELLATION_HOURS;
 
     return (
       <Card variant="elevated">
         <View style={styles.sessionHeader}>
-          <View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.kindRow}>
+              <Ionicons
+                name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+                size={14}
+                color={item.kind === 'training' ? colors.accent : colors.success}
+              />
+              <Text style={[styles.kindLabel, { color: item.kind === 'training' ? colors.accent : colors.success }]}>
+                {item.kind === 'training' ? 'Training' : 'Nutrizione'}
+              </Text>
+            </View>
             <Text style={styles.sessionDate}>
-              {sessionDate.toLocaleDateString('it-IT', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
+              {item.date.toLocaleDateString('it-IT', {
+                weekday: 'long', day: 'numeric', month: 'long',
               })}
             </Text>
             <Text style={styles.sessionTime}>
@@ -127,29 +176,19 @@ export const SessionsScreen: React.FC = () => {
           <Badge status={item.status} />
         </View>
 
-        {item.notes && (
-          <Text style={styles.sessionNotes}>{item.notes}</Text>
-        )}
+        {item.notes ? <Text style={styles.sessionNotes}>{item.notes}</Text> : null}
 
         {cancellable && (
           <View style={styles.cancelContainer}>
-            {canCancel(sessionDate) ? (
-              <Button
-                title="Annulla Sessione"
-                onPress={() => handleCancel(item)}
-                variant="danger"
-              />
-            ) : (
-              <View>
-                <Button
-                  title="Annulla (sarà addebitata)"
-                  onPress={() => handleCancel(item)}
-                  variant="danger"
-                />
-                <Text style={styles.lateWarning}>
-                  Meno di {CANCELLATION_HOURS} ore - la sessione sarà conteggiata
-                </Text>
-              </View>
+            <Button
+              title={isLateCancel ? 'Annulla (sarà addebitata)' : 'Annulla Sessione'}
+              onPress={() => handleCancel(item)}
+              variant="danger"
+            />
+            {isLateCancel && (
+              <Text style={styles.lateWarning}>
+                Meno di {CANCELLATION_HOURS} ore - sarà conteggiata
+              </Text>
             )}
           </View>
         )}
@@ -160,54 +199,43 @@ export const SessionsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Il Mio Percorso</Text>
+        <Text style={styles.title}>I Miei Appuntamenti</Text>
         <Text style={styles.subtitle}>
-          {completedSessions.length} completate · {upcomingSessions.length} in programma
+          {completedItems.length} completat{completedItems.length === 1 ? 'o' : 'i'} · {upcomingItems.length} in programma
         </Text>
         <Text style={styles.cancelHint}>
           Disdetta gratuita entro {CANCELLATION_HOURS} ore prima
         </Text>
       </View>
 
-      {/* Filtri sezione */}
       <View style={styles.sectionTabs}>
-        <TouchableOpacity
-          style={[styles.sectionTab, activeSection === 'upcoming' && styles.sectionTabActive]}
-          onPress={() => setActiveSection('upcoming')}
-        >
-          <Text style={[styles.sectionTabText, activeSection === 'upcoming' && styles.sectionTabTextActive]}>
-            Da fare ({upcomingSessions.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.sectionTab, activeSection === 'completed' && styles.sectionTabActive]}
-          onPress={() => setActiveSection('completed')}
-        >
-          <Text style={[styles.sectionTabText, activeSection === 'completed' && styles.sectionTabTextActive]}>
-            Fatte ({completedSessions.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.sectionTab, activeSection === 'all' && styles.sectionTabActive]}
-          onPress={() => setActiveSection('all')}
-        >
-          <Text style={[styles.sectionTabText, activeSection === 'all' && styles.sectionTabTextActive]}>
-            Tutte ({sessions.length})
-          </Text>
-        </TouchableOpacity>
+        {(['upcoming', 'completed', 'all'] as const).map((sec) => {
+          const labels = { upcoming: `Da fare (${upcomingItems.length})`, completed: `Fatti (${completedItems.length})`, all: `Tutti (${allItems.length})` };
+          return (
+            <TouchableOpacity
+              key={sec}
+              style={[styles.sectionTab, activeSection === sec && styles.sectionTabActive]}
+              onPress={() => setActiveSection(sec)}
+            >
+              <Text style={[styles.sectionTabText, activeSection === sec && styles.sectionTabTextActive]}>
+                {labels[sec]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <FlatList
-        data={filteredSessions}
-        renderItem={renderSession}
-        keyExtractor={(item) => item.id}
+        data={filteredItems}
+        renderItem={renderItem}
+        keyExtractor={(item) => `${item.kind}-${item.id}`}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Card>
             <Text style={styles.emptyText}>
-              {activeSection === 'upcoming' ? 'Nessuna sessione in programma' :
-               activeSection === 'completed' ? 'Nessuna sessione completata' :
-               'Nessuna sessione'}
+              {activeSection === 'upcoming' ? 'Nessun appuntamento in programma' :
+               activeSection === 'completed' ? 'Nessun appuntamento completato' :
+               'Nessun appuntamento'}
             </Text>
           </Card>
         }
@@ -217,30 +245,15 @@ export const SessionsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: colors.primary,
     padding: spacing.lg,
     paddingTop: spacing.xxl,
   },
-  title: {
-    fontSize: fontSize.xxl,
-    fontWeight: '700',
-    color: colors.textOnPrimary,
-  },
-  subtitle: {
-    fontSize: fontSize.md,
-    color: colors.textLight,
-    marginTop: spacing.xs,
-  },
-  cancelHint: {
-    fontSize: fontSize.xs,
-    color: colors.warning,
-    marginTop: spacing.xs,
-  },
+  title: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.textOnPrimary },
+  subtitle: { fontSize: fontSize.md, color: colors.textLight, marginTop: spacing.xs },
+  cancelHint: { fontSize: fontSize.xs, color: colors.warning, marginTop: spacing.xs },
   sectionTabs: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
@@ -256,37 +269,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  sectionTabActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  sectionTabText: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  sectionTabTextActive: {
-    color: colors.textOnAccent,
-  },
-  list: {
-    padding: spacing.md,
-  },
+  sectionTabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  sectionTabText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.textSecondary },
+  sectionTabTextActive: { color: colors.textOnAccent },
+  list: { padding: spacing.md },
   sessionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  kindLabel: { fontSize: fontSize.xs, fontWeight: '700' },
   sessionDate: {
     fontSize: fontSize.lg,
     fontWeight: '600',
     color: colors.text,
     textTransform: 'capitalize',
   },
-  sessionTime: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
+  sessionTime: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: 2 },
   sessionNotes: {
     fontSize: fontSize.md,
     color: colors.textSecondary,

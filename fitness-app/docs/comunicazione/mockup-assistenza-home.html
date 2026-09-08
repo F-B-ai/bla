@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ESSĒRE — Assistenza</title>
+<style>
+  :root{
+    --bg:#0D0C0B;
+    --surface:#171513;
+    --surface-2:#1E1B18;
+    --line:#2E2823;
+    --red:#D62A43;
+    --red-soft:rgba(214,42,67,.12);
+    --text:#EFE9DF;
+    --text-soft:#A79E92;
+    --head:#FBF7F1;
+    --serif:Georgia,'Times New Roman',serif;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;
+       -webkit-font-smoothing:antialiased;padding:0 0 48px}
+  .screen{max-width:520px;margin:0 auto;padding:0 22px}
+
+  /* header */
+  .top{padding:26px 0 4px;display:flex;align-items:center;gap:12px}
+  .top .back{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+       display:grid;place-items:center;color:var(--text-soft);text-decoration:none;font-size:17px;flex:none}
+  .top .label{font-size:12px;letter-spacing:2.4px;text-transform:uppercase;color:var(--text-soft)}
+
+  h1{font-family:var(--serif);font-weight:400;font-size:2rem;line-height:1.15;color:var(--head);
+     margin:22px 0 10px}
+  .intro{color:var(--text-soft);font-size:1rem;max-width:44ch}
+
+  /* ricerca */
+  .search{margin:22px 0 30px;position:relative}
+  .search input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+     padding:14px 16px 14px 44px;color:var(--text);font-size:16px;font-family:inherit}
+  .search input::placeholder{color:#6F675E}
+  .search input:focus{outline:none;border-color:var(--red)}
+  .search svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);stroke:#6F675E}
+
+  /* blocco coach */
+  .coach{background:var(--surface);border:1px solid var(--red);border-radius:16px;padding:22px;
+     margin-bottom:34px}
+  .coach h2{font-family:var(--serif);font-weight:400;font-size:1.4rem;color:var(--head);margin-bottom:8px}
+  .coach p{color:var(--text-soft);font-size:.95rem;margin-bottom:16px}
+  .coach .who{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .coach .who .dot{width:38px;height:38px;border-radius:50%;background:var(--red-soft);
+     border:1px solid var(--red);display:grid;place-items:center;color:var(--red);
+     font-family:var(--serif);font-size:1.05rem;flex:none}
+  .coach .who span{font-size:.95rem;color:var(--text)}
+  .coach .who span small{display:block;color:var(--text-soft);font-size:.8rem;letter-spacing:.2px}
+  .btn{display:inline-block;background:var(--red);color:#fff;text-decoration:none;font-weight:600;
+     font-size:.95rem;padding:13px 20px;border-radius:10px;width:100%;text-align:center}
+  .btn:focus-visible{outline:2px solid var(--head);outline-offset:2px}
+
+  /* sezioni */
+  .sec-title{font-size:12px;letter-spacing:2.4px;text-transform:uppercase;color:var(--text-soft);
+     margin:0 0 6px}
+  .sec{margin-bottom:34px}
+
+  /* elenco argomenti */
+  .rows{border-top:1px solid var(--line)}
+  .row{display:flex;align-items:flex-start;gap:14px;padding:17px 2px;border-bottom:1px solid var(--line);
+     text-decoration:none;color:inherit}
+  .row:focus-visible{outline:2px solid var(--red);outline-offset:-2px;border-radius:6px}
+  .row .mark{width:7px;height:7px;border-radius:50%;background:var(--red);margin-top:9px;flex:none}
+  .row .txt strong{display:block;font-size:1.03rem;color:var(--head);font-weight:600;margin-bottom:2px}
+  .row .txt span{font-size:.88rem;color:var(--text-soft);line-height:1.45}
+  .row .arw{margin-left:auto;color:#5E574F;font-size:18px;line-height:1;padding-top:4px}
+
+  /* problemi rapidi */
+  .fix{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:6px 18px}
+  .fix a{display:block;padding:14px 0;border-bottom:1px solid var(--line);text-decoration:none;
+     color:var(--text);font-size:.97rem}
+  .fix a:last-child{border-bottom:0}
+  .fix a:focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:6px}
+
+  .foot{color:#6F675E;font-size:.8rem;line-height:1.6;border-top:1px solid var(--line);padding-top:18px}
+  .foot a{color:var(--text-soft)}
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <div class="top">
+    <a href="#" class="back" aria-label="Torna indietro">&#8249;</a>
+    <div class="label">Assistenza</div>
+  </div>
+
+  <h1>Come possiamo aiutarti, {{nome}}?</h1>
+  <p class="intro">Qui trovi le risposte alle domande più frequenti. Se non basta, c'è sempre una persona dall'altra parte.</p>
+
+  <div class="search">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input type="search" placeholder="Cerca una risposta" aria-label="Cerca nell'assistenza" />
+  </div>
+
+  <div class="coach">
+    <h2>Parla con il tuo coach</h2>
+    <p>Per tutto ciò che riguarda il tuo corpo, il tuo programma o come ti senti, la risposta giusta è la sua.</p>
+    <div class="who">
+      <div class="dot">{{iniziale_coach}}</div>
+      <span>{{nome_coach}}<small>Ti risponde negli orari dello studio</small></span>
+    </div>
+    <a href="#" class="btn">Scrivi a {{nome_coach}}</a>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Argomenti</div>
+    <div class="rows">
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Iniziare con ESSĒRE</strong>
+        <span>Come è fatta l'app, cosa trovi in ogni schermata e da dove conviene partire.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Il tuo programma</strong>
+        <span>Come leggere gli esercizi assegnati, cosa significano i parametri, come segnare una sessione svolta.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Check-in in studio</strong>
+        <span>Come funziona il QR all'ingresso e cosa fare se non viene letto.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Valutazioni e progressi</strong>
+        <span>Dove ritrovi la tua valutazione Mind Movement e come leggere i cambiamenti nel tempo.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Indice di Risveglio e dati del corpo</strong>
+        <span>Cosa misurano questi valori, cosa non misurano, e perché vanno letti insieme al coach.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Account e accesso</strong>
+        <span>Password, email, dispositivi collegati, notifiche.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>Il tuo percorso e i rinnovi</strong>
+        <span>Quale formula hai attiva, fino a quando, e a chi rivolgerti per cambiarla.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+      <a class="row" href="#">
+        <span class="mark"></span>
+        <span class="txt"><strong>I tuoi dati e la privacy</strong>
+        <span>Chi vede cosa, come sono conservati i tuoi dati, come chiederne la cancellazione.</span></span>
+        <span class="arw">&#8250;</span>
+      </a>
+
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-title">Qualcosa non funziona</div>
+    <div class="fix">
+      <a href="#">Non riesco ad accedere</a>
+      <a href="#">Il programma non si aggiorna</a>
+      <a href="#">Il check-in non ha registrato la sessione</a>
+      <a href="#">Non ricevo le notifiche</a>
+      <a href="#">Segnala un altro problema</a>
+    </div>
+  </div>
+
+  <p class="foot">ESSĒRE — A.S.D. Evolution Sport, Gragnano (NA). Versione {{versione}}.<br>
+  Le informazioni in questa sezione riguardano l'uso dell'app. Per qualsiasi cosa riguardi la tua salute, parlane con il tuo coach o con un medico.</p>
+
+</div>
+</body>
+</html>

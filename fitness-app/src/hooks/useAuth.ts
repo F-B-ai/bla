@@ -24,6 +24,7 @@ interface AuthContextValue {
   isStudent: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,6 +96,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (state.firebaseUser) {
+      const profile = await getUserProfile(state.firebaseUser.uid);
+      setState((prev) => ({ ...prev, userProfile: profile }));
+    }
+  }, [state.firebaseUser]);
+
   const value: AuthContextValue = {
     user: state.userProfile,
     firebaseUser: state.firebaseUser,
@@ -108,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isStudent: state.userProfile?.role === 'student',
     login,
     logout,
+    refreshProfile,
   };
 
   return React.createElement(AuthContext.Provider, { value }, children);

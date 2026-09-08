@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  Platform,
+  TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
+import { printFinancialReport } from '../../utils/printUtils';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { StatCard } from '../../components/common/StatCard';
@@ -17,8 +21,10 @@ import {
   FinancialTransaction,
   TransactionType,
   TransactionCategory,
+  PaymentPlan,
 } from '../../types';
 import { addTransaction, getTransactions, getFinancialSummary, deleteTransaction } from '../../services/financialService';
+import { getAllPaymentPlans } from '../../services/paymentService';
 
 const CATEGORIES: { value: TransactionCategory; label: string }[] = [
   { value: 'student_payment', label: 'Pagamento allievi' },
@@ -31,6 +37,15 @@ const CATEGORIES: { value: TransactionCategory; label: string }[] = [
   { value: 'other', label: 'Altro' },
 ];
 
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
 export const FinancialScreen: React.FC = () => {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -40,20 +55,76 @@ export const FinancialScreen: React.FC = () => {
   const [newCategory, setNewCategory] = useState<TransactionCategory>('other');
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [txs, summary] = await Promise.all([
+      const [txs, summary, plans] = await Promise.all([
         getTransactions(),
         getFinancialSummary(),
+        getAllPaymentPlans(),
       ]);
       setTransactions(txs);
       setTotalIncome(summary.totalIncome);
       setTotalExpenses(summary.totalExpenses);
+      setPaymentPlans(plans);
     } catch {
       // Silently handle
     }
   }, []);
+
+  const planStats = useMemo(() => {
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let overdueCount = 0;
+    let activePlans = 0;
+    let totalLessons = 0;
+    let usedLessons = 0;
+    let totalConsultations = 0;
+    let usedConsultations = 0;
+    let activeCourses = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const plan of paymentPlans) {
+      for (const inst of plan.installments) {
+        if (inst.status === 'paid') {
+          totalCollected += inst.amount;
+        } else {
+          totalOutstanding += inst.amount;
+          if (inst.status === 'overdue') overdueCount++;
+        }
+      }
+
+      const start = toSafeDate(plan.startDate);
+      const end = toSafeDate(plan.endDate);
+      const s = new Date(start); s.setHours(0, 0, 0, 0);
+      const e = new Date(end); e.setHours(0, 0, 0, 0);
+      if (s <= today && e >= today) {
+        activePlans++;
+        if (plan.paymentType === 'monthly_course') activeCourses++;
+      }
+
+      totalLessons += plan.includedLessons || 0;
+      usedLessons += plan.usedLessons || 0;
+      totalConsultations += plan.includedConsultations || 0;
+      usedConsultations += plan.usedConsultations || 0;
+    }
+
+    return {
+      totalCollected,
+      totalOutstanding,
+      overdueCount,
+      activePlans,
+      totalLessons,
+      usedLessons,
+      remainingLessons: totalLessons - usedLessons,
+      totalConsultations,
+      usedConsultations,
+      remainingConsultations: totalConsultations - usedConsultations,
+      activeCourses,
+    };
+  }, [paymentPlans]);
 
   useEffect(() => {
     loadData();
@@ -112,17 +183,96 @@ export const FinancialScreen: React.FC = () => {
     );
   };
 
+  const [printStartDate, setPrintStartDate] = useState('');
+  const [printEndDate, setPrintEndDate] = useState('');
+
+  const handlePrintFinancial = () => {
+    const parseDate = (str: string): Date | null => {
+      if (!str) return null;
+      if (str.includes('/')) {
+        const parts = str.split('/');
+        if (parts.length === 3) return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      }
+      if (str.includes('-')) return new Date(str);
+      return null;
+    };
+    const start = parseDate(printStartDate);
+    const end = parseDate(printEndDate);
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
+      crossAlert('Errore', 'Inserisci date valide (gg/mm/aaaa)');
+      return;
+    }
+    end.setHours(23, 59, 59, 999);
+    const filtered = transactions.filter((t) => {
+      const d = toSafeDate(t.date);
+      return d >= start && d <= end;
+    });
+    let inc = 0, exp = 0;
+    for (const t of filtered) {
+      if (t.type === 'income') inc += t.amount;
+      else exp += t.amount;
+    }
+    printFinancialReport({
+      transactions: filtered,
+      startDate: start.toLocaleDateString('it-IT'),
+      endDate: end.toLocaleDateString('it-IT'),
+      totalIncome: inc,
+      totalExpenses: exp,
+    });
+  };
+
+  const combinedIncome = totalIncome + planStats.totalCollected;
+  const combinedProfit = combinedIncome - totalExpenses;
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Gestione Economica</Text>
       </View>
 
-      {/* Riepilogo */}
+      {/* Stampa report economico */}
+      {Platform.OS === 'web' && (
+        <Card style={styles.printSection}>
+          <View style={styles.printHeader}>
+            <Ionicons name="print-outline" size={20} color={colors.accent} />
+            <Text style={styles.printTitle}>Stampa Report Economico</Text>
+          </View>
+          <View style={styles.printDateRow}>
+            <View style={styles.printDateField}>
+              <Text style={styles.printDateLabel}>Da</Text>
+              <input
+                type="date"
+                value={printStartDate}
+                onChange={(e: any) => setPrintStartDate(e.target.value)}
+                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
+              />
+            </View>
+            <View style={styles.printDateField}>
+              <Text style={styles.printDateLabel}>A</Text>
+              <input
+                type="date"
+                value={printEndDate}
+                onChange={(e: any) => setPrintEndDate(e.target.value)}
+                style={{ fontSize: 14, padding: 8, borderRadius: 8, border: '1px solid #333', background: '#1a1a1a', color: colors.white, width: '100%' } as any}
+              />
+            </View>
+          </View>
+          <Button
+            title="Stampa Report"
+            onPress={handlePrintFinancial}
+            icon={<Ionicons name="print" size={18} color={colors.white} />}
+          />
+        </Card>
+      )}
+
+      {/* Riepilogo generale */}
       <View style={styles.statsRow}>
         <StatCard
-          title="Ricavi"
-          value={`€${totalIncome.toLocaleString()}`}
+          title="Ricavi Totali"
+          value={`€${combinedIncome.toLocaleString()}`}
+          subtitle={totalIncome > 0 && planStats.totalCollected > 0
+            ? `Transazioni €${totalIncome.toLocaleString()} + Piani €${planStats.totalCollected.toLocaleString()}`
+            : undefined}
           color={colors.success}
         />
         <StatCard
@@ -135,10 +285,136 @@ export const FinancialScreen: React.FC = () => {
       <View style={styles.netProfitContainer}>
         <StatCard
           title="Profitto Netto"
-          value={`€${(totalIncome - totalExpenses).toLocaleString()}`}
-          color={totalIncome - totalExpenses >= 0 ? colors.success : colors.error}
+          value={`€${combinedProfit.toLocaleString()}`}
+          color={combinedProfit >= 0 ? colors.success : colors.error}
         />
       </View>
+
+      {/* Panoramica Piani di Pagamento */}
+      <Text style={styles.sectionTitle}>Panoramica Piani</Text>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Incassato dai Piani"
+          value={`€${planStats.totalCollected.toLocaleString()}`}
+          color={colors.success}
+          icon={<Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />}
+        />
+        <StatCard
+          title="Da incassare"
+          value={`€${planStats.totalOutstanding.toLocaleString()}`}
+          color={colors.warning}
+          icon={<Ionicons name="time-outline" size={14} color={colors.warning} />}
+        />
+      </View>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Piani Attivi"
+          value={planStats.activePlans}
+          color={colors.info}
+        />
+        <StatCard
+          title="Rate Scadute"
+          value={planStats.overdueCount}
+          color={colors.error}
+        />
+      </View>
+
+      {/* Lezioni e Consulenze */}
+      <Text style={styles.sectionTitle}>Lezioni e Consulenze</Text>
+      <View style={styles.statsRow}>
+        <StatCard
+          title="Lezioni erogate"
+          value={`${planStats.usedLessons}/${planStats.totalLessons}`}
+          subtitle={`${planStats.remainingLessons} rimanenti`}
+          color={colors.info}
+        />
+        <StatCard
+          title="Consulenze erogate"
+          value={`${planStats.usedConsultations}/${planStats.totalConsultations}`}
+          subtitle={`${planStats.remainingConsultations} rimanenti`}
+          color={colors.warning}
+        />
+      </View>
+
+      {/* Progress bar lezioni */}
+      {planStats.totalLessons > 0 && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Lezioni</Text>
+            <Text style={styles.progressValue}>
+              {planStats.usedLessons}/{planStats.totalLessons}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={{
+                ...styles.progressFill,
+                width: `${Math.min((planStats.usedLessons / planStats.totalLessons) * 100, 100)}%`,
+                backgroundColor: colors.info,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Progress bar consulenze */}
+      {planStats.totalConsultations > 0 && (
+        <View style={styles.progressSection}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Consulenze Nutrizionali</Text>
+            <Text style={styles.progressValue}>
+              {planStats.usedConsultations}/{planStats.totalConsultations}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={{
+                ...styles.progressFill,
+                width: `${Math.min((planStats.usedConsultations / planStats.totalConsultations) * 100, 100)}%`,
+                backgroundColor: colors.warning,
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Corsi Attivi */}
+      {planStats.activeCourses > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Corsi Attivi</Text>
+          {paymentPlans
+            .filter((p) => {
+              if (p.paymentType !== 'monthly_course') return false;
+              const today = new Date();
+              const start = toSafeDate(p.startDate);
+              const end = toSafeDate(p.endDate);
+              return start <= today && end >= today;
+            })
+            .map((plan) => (
+              <Card key={plan.id} style={styles.courseCard}>
+                <View style={styles.courseRow}>
+                  <Ionicons name="school-outline" size={20} color={colors.accent} />
+                  <View style={styles.courseInfo}>
+                    <Text style={styles.courseType}>{plan.courseType || 'Corso'}</Text>
+                    <Text style={styles.courseSubscription}>
+                      {plan.subscriptionType || 'Mensile'} · €{plan.totalAmount.toLocaleString()}
+                    </Text>
+                    <Text style={styles.courseDates}>
+                      {toSafeDate(plan.startDate).toLocaleDateString('it-IT')} -{' '}
+                      {toSafeDate(plan.endDate).toLocaleDateString('it-IT')}
+                    </Text>
+                  </View>
+                  <View style={styles.courseLessons}>
+                    <Text style={styles.courseLessonsValue}>
+                      {(plan.includedLessons || 0) - (plan.usedLessons || 0)}
+                    </Text>
+                    <Text style={styles.courseLessonsLabel}>lezioni rim.</Text>
+                  </View>
+                </View>
+              </Card>
+            ))}
+        </>
+      )}
 
       {/* Aggiungi transazione */}
       <Button
@@ -392,7 +668,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -474,7 +750,113 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
   },
+  progressSection: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  progressLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  progressValue: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden' as const,
+  },
+  progressFill: {
+    height: '100%' as const,
+    borderRadius: 3,
+  },
+  courseCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  courseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  courseInfo: {
+    flex: 1,
+  },
+  courseType: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  courseSubscription: {
+    fontSize: fontSize.sm,
+    color: colors.text,
+    marginTop: 2,
+  },
+  courseDates: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  courseLessons: {
+    alignItems: 'center',
+  },
+  courseLessonsValue: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.info,
+  },
+  courseLessonsLabel: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   bottomSpacer: {
     height: spacing.xxl,
+  },
+  printSection: {
+    margin: spacing.md,
+  },
+  printHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  printTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  printDateRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  printDateField: {
+    flex: 1,
+  },
+  printDateLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  printInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    color: colors.text,
+    fontSize: fontSize.md,
   },
 });

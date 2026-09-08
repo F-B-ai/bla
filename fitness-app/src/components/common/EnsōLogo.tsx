@@ -59,6 +59,7 @@ export const EnsoLogo: React.FC<EnsoLogoProps> = ({ size = 160 }) => {
         />
         <Path
           d={`
+            M 100 141
             C 70 148, 38 138, 24 112
             C 10 86, 16 56, 38 36
             C 54 22, 76 20, 90 24

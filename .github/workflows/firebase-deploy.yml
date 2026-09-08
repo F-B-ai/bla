@@ -1,15 +1,94 @@
-name: Deploy to Firebase Hosting
+# ============================================================
+# DEPLOY ESSĒRE — pubblica app + regole su Firebase Hosting.
+#
+# QUANDO SCATTA (mai per sbaglio):
+#  - push il cui messaggio di commit ha "[deploy]" NELLA PRIMA RIGA
+#  - oppure avvio manuale dalla tab Actions (workflow_dispatch)
+#
+# La prima riga, e non tutto il messaggio: il corpo deve poter
+# parlare della pubblicazione senza provocarla. Vedi il commento
+# sul job "guardia".
+#
+# EXTRA: se la prima riga contiene anche "[deploy-functions]"
+# vengono pubblicate pure le Cloud Functions (gateway AI, brain).
+# Tenuto opt-in perché è lo step più lento e tocca il backend.
+#
+# COSA SERVE (una tantum): il secret FIREBASE_SERVICE_ACCOUNT
+# in Settings → Secrets and variables → Actions, con dentro il
+# JSON completo del service account di essere-3fe6f.
+# Da quel momento: nessuna chiave passa più in chat.
+# ============================================================
+name: Deploy to Firebase (ESSĒRE)
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
       - master
       - claude/fitness-coaching-app-*
 
+concurrency:
+  group: firebase-deploy-essere
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  # ------------------------------------------------------------
+  # GUARDIA — legge SOLO LA PRIMA RIGA del messaggio di commit.
+  #
+  # Prima si guardava tutto il messaggio con contains(): bastava
+  # che il marcatore comparisse ovunque, corpo compreso, perché la
+  # pubblicazione partisse. È già successo: una commit che nel
+  # corpo spiegava di NON voler pubblicare ha pubblicato, perché
+  # per spiegarlo aveva dovuto scrivere il marcatore.
+  #
+  # La prima riga non si scrive per sbaglio: è il titolo, e chi lo
+  # scrive sa che cosa sta chiedendo. Il corpo resta libero di
+  # parlare della pubblicazione senza provocarla.
+  #
+  # Il messaggio arriva come variabile d'ambiente e non interpolato
+  # dentro lo script: un messaggio di commit è testo che arriva da
+  # fuori, e non deve poter diventare comando.
+  # ------------------------------------------------------------
+  guardia:
     runs-on: ubuntu-latest
+    outputs:
+      pubblica: ${{ steps.leggi.outputs.pubblica }}
+      funzioni: ${{ steps.leggi.outputs.funzioni }}
+    steps:
+      - name: Leggi la prima riga del messaggio
+        id: leggi
+        env:
+          MESSAGGIO: ${{ github.event.head_commit.message }}
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            echo "Avvio manuale: si pubblica."
+            echo "pubblica=true"  >> "$GITHUB_OUTPUT"
+            echo "funzioni=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          PRIMA=$(printf '%s' "${MESSAGGIO:-}" | tr -d '\r' | head -n 1)
+          echo "Prima riga: $PRIMA"
+          case "$PRIMA" in
+            *'[deploy]'*) P=true ;;
+            *)            P=false ;;
+          esac
+          case "$PRIMA" in
+            *'[deploy-functions]'*) F=true ;;
+            *)                      F=false ;;
+          esac
+          echo "pubblica=$P" >> "$GITHUB_OUTPUT"
+          echo "funzioni=$F" >> "$GITHUB_OUTPUT"
+          echo "Pubblica hosting: $P · Cloud Functions: $F"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: guardia
+    # Si pubblica solo se il marcatore sta nella PRIMA RIGA del
+    # messaggio; l'avvio manuale da Actions passa sempre.
+    if: needs.guardia.outputs.pubblica == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -23,15 +102,57 @@ jobs:
         run: npm install --legacy-peer-deps
         working-directory: fitness-app
 
-      - name: Build web app
+      - name: Gate di qualità (test + palette)
+        run: |
+          npx jest --ci --silent
+          node scripts/check-colors.js
+        working-directory: fitness-app
+
+      - name: Build web app (brand ESSĒRE)
         run: npm run build:web
         working-directory: fitness-app
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: essere-3fe6f
-          entryPoint: fitness-app
+      - name: Write service account key
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SA" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT mancante: aggiungilo in Settings → Secrets → Actions."
+            exit 1
+          fi
+          node -e "
+            const sa = JSON.parse(process.env.FIREBASE_SA);
+            if (sa.project_id !== 'essere-3fe6f') { throw new Error('La chiave non è del progetto essere-3fe6f: ' + sa.project_id); }
+            require('fs').writeFileSync('/tmp/firebase_sa.json', JSON.stringify(sa));
+            console.log('SA ok:', sa.client_email);
+          "
+
+      - name: Deploy hosting
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: npx firebase-tools deploy --only hosting --project essere-3fe6f --non-interactive
+        working-directory: fitness-app
+
+      - name: Deploy Cloud Functions (solo col marcatore nella prima riga)
+        if: needs.guardia.outputs.funzioni == 'true'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: |
+          npm install --no-audit --no-fund --prefix functions
+          npx firebase-tools deploy --only functions --project essere-3fe6f --non-interactive --force \
+            || (echo "retry tra 20s…" && sleep 20 && \
+                npx firebase-tools deploy --only functions --project essere-3fe6f --non-interactive --force)
+        working-directory: fitness-app
+
+      - name: Deploy Firestore rules + indexes (retry sul 409)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: |
+          npx firebase-tools deploy --only firestore:rules,firestore:indexes --project essere-3fe6f --non-interactive \
+            || (echo "retry tra 10s (release contesa)…" && sleep 10 && \
+                npx firebase-tools deploy --only firestore:rules,firestore:indexes --project essere-3fe6f --non-interactive)
+        working-directory: fitness-app
+
+      - name: Cleanup key
+        if: always()
+        run: rm -f /tmp/firebase_sa.json

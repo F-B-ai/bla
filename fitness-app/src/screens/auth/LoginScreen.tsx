@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { crossAlert } from '../../utils/alert';
+import { isValidEmail } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -17,6 +19,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { resetPassword } from '../../services/authService';
 import { RegisterStudentScreen } from './RegisterStudentScreen';
 import { EnsoLogo } from '../../components/common/EnsōLogo';
+import { brand } from '../../config/brand';
 
 interface LoginScreenProps {
   onBack?: () => void;
@@ -36,6 +39,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
       crossAlert('Errore', 'Inserisci email e password');
       return;
     }
+    if (!isValidEmail(email)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
+      return;
+    }
     try {
       await login(email.trim(), password);
     } catch {
@@ -47,6 +54,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
     const target = resetEmail.trim() || email.trim();
     if (!target) {
       crossAlert('Errore', 'Inserisci la tua email per recuperare la password');
+      return;
+    }
+    if (!isValidEmail(target)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
       return;
     }
     setResetLoading(true);
@@ -77,20 +88,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {onBack && (
+        <SafeAreaView edges={['top']} style={styles.backButtonSafe}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Text style={styles.backText}>{'← Indietro'}</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      )}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{'← Indietro'}</Text>
-          </TouchableOpacity>
-        )}
-
         <View style={styles.header}>
           <EnsoLogo size={120} />
-          <Text style={styles.title}>Essère</Text>
-          <Text style={styles.subtitle}>Il tuo percorso di benessere</Text>
+          <Text style={styles.title}>{brand.appName}</Text>
+          <Text style={styles.subtitle}>Comprendi chi sei attraverso il movimento.</Text>
         </View>
 
         <View style={styles.form}>
@@ -250,17 +262,21 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
   },
-  backButton: {
+  backButtonSafe: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? spacing.md : 50,
+    top: 0,
     left: 0,
-    padding: spacing.md,
     zIndex: 10,
+    backgroundColor: 'transparent',
+  },
+  backButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   backText: {
     color: colors.accent,
-    fontSize: fontSize.md,
-    fontWeight: '600',
+    fontSize: fontSize.lg,
+    fontWeight: '700',
   },
   footer: {
     color: colors.textLight,
@@ -271,7 +287,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,

@@ -1,0 +1,1408 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+  Platform,
+  TextInput,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
+import { Card } from '../../components/common/Card';
+import { Badge } from '../../components/common/Badge';
+import { StatCard } from '../../components/common/StatCard';
+import { useAuth } from '../../hooks/useAuth';
+import { getStudents, getCollaborators } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
+import {
+  getAllPaymentPlans,
+  subscribeToPaymentPlans,
+  createPaymentPlan,
+  updatePaymentPlan,
+  deletePaymentPlan,
+  markInstallmentPaid,
+  getPaymentReminderMessage,
+} from '../../services/paymentService';
+import { getStudentSessions } from '../../services/sessionService';
+import { getTransactions } from '../../services/financialService';
+import { crossAlert } from '../../utils/alert';
+import { createNotification } from '../../services/notificationService';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
+import { PaymentPlan, Installment, PaymentType, PaymentStatus, Student, TrainingSession, FinancialTransaction } from '../../types';
+import { printPlanDetail, printPaymentReceipt } from '../../utils/printUtils';
+import { CreatePlanModal } from './paymentPlan/CreatePlanModal';
+import { EditPlanModal } from './paymentPlan/EditPlanModal';
+import { PlanDetailModal } from './paymentPlan/PlanDetailModal';
+
+// ---------------------------------------------------------------------------
+// PaymentPlanScreen
+// ---------------------------------------------------------------------------
+const toSafeDate = (d: unknown): Date => {
+  if (d instanceof Date) return d;
+  if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+    return (d as any).toDate();
+  if (d && typeof d === 'object' && 'seconds' in d)
+    return new Date((d as any).seconds * 1000);
+  return new Date(d as string);
+};
+
+export const PaymentPlanScreen: React.FC = () => {
+  const { user, isOwner } = useAuth();
+  const insets = useSafeAreaInsets();
+  const isManager = user?.role === 'manager';
+  const canEdit = isOwner; // only owner can create/edit/delete
+
+  // Data
+  const [plans, setPlans] = useState<PaymentPlan[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Modals
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<PaymentPlan | null>(null);
+  const [detailPlan, setDetailPlan] = useState<PaymentPlan | null>(null);
+  const [detailSessions, setDetailSessions] = useState<TrainingSession[]>([]);
+  const [detailTransactions, setDetailTransactions] = useState<FinancialTransaction[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  // Create form state
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [paymentType, setPaymentType] = useState<PaymentType>('full');
+  const [numInstallments, setNumInstallments] = useState('2');
+  const [firstDueDate, setFirstDueDate] = useState('');
+  const [customInstallments, setCustomInstallments] = useState<
+    { amount: string; dueDate: string }[]
+  >([]);
+  const [includedLessons, setIncludedLessons] = useState('');
+  const [includedConsultations, setIncludedConsultations] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [courseType, setCourseType] = useState('');
+  const [subscriptionType, setSubscriptionType] = useState('');
+
+  // Edit form state
+  const [editTotalAmount, setEditTotalAmount] = useState('');
+  const [editInstallments, setEditInstallments] = useState<Installment[]>([]);
+  const [editCustomAmounts, setEditCustomAmounts] = useState<string[]>([]);
+  const [editCustomDates, setEditCustomDates] = useState<string[]>([]);
+  const [editIncludedLessons, setEditIncludedLessons] = useState('');
+  const [editIncludedConsultations, setEditIncludedConsultations] = useState('');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editCourseType, setEditCourseType] = useState('');
+  const [editSubscriptionType, setEditSubscriptionType] = useState('');
+  const [editUsedLessons, setEditUsedLessons] = useState(0);
+  const [editUsedConsultations, setEditUsedConsultations] = useState(0);
+  const [editPaymentType, setEditPaymentType] = useState<PaymentType>('full');
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // -----------------------------------------------------------------------
+  // Load data
+  // -----------------------------------------------------------------------
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [plansData, studentsData] = await Promise.all([
+        getAllPaymentPlans(),
+        getStudents(),
+      ]);
+
+      if (isOwner) {
+        setPlans(plansData);
+        setStudents(studentsData);
+      } else if (isManager && user) {
+        const collabs = await getCollaborators();
+        const myCollabIds = collabs
+          .filter((c) => (c as any).assignedManagerId === user.id || (user as any).assignedCollaborators?.includes(c.id))
+          .map((c) => c.id);
+
+        const myStudentIds = new Set<string>();
+        for (const s of studentsData) {
+          if (s.assignedManagerId === user.id || isStudentAssignedTo(s, user.id)) {
+            myStudentIds.add(s.id);
+          }
+          for (const cid of myCollabIds) {
+            if (isStudentAssignedTo(s, cid)) {
+              myStudentIds.add(s.id);
+            }
+          }
+        }
+
+        setPlans(plansData.filter((p) => myStudentIds.has(p.studentId)));
+        setStudents(studentsData.filter((s) => myStudentIds.has(s.id)));
+      } else {
+        setPlans(plansData);
+        setStudents(studentsData);
+      }
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile caricare i dati dei pagamenti.');
+    } finally {
+      setLoading(false);
+    }
+  }, [isOwner, isManager, user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // TEMPO REALE: quando una lezione viene scalata, il numero qui
+  // cambia da solo. Prima restava quello vecchio finché non si
+  // chiudeva l'app, e il conto giusto sembrava sbagliato.
+  useEffect(() => {
+    if (!user) return;
+    let stop: (() => void) | null = null;
+    try {
+      stop = subscribeToPaymentPlans((tutti) => {
+        // Stesso perimetro del caricamento normale: il titolare vede
+        // tutto, il manager solo i percorsi dei propri allievi — che
+        // sono esattamente quelli già filtrati in `students`.
+        if (isOwner) {
+          setPlans(tutti);
+          return;
+        }
+        const miei = new Set(students.map((s) => s.id));
+        setPlans(miei.size ? tutti.filter((p) => miei.has(p.studentId)) : tutti);
+      });
+    } catch {
+      /* niente tempo reale: resta il caricamento normale */
+    }
+    return () => { try { stop?.(); } catch { /* già chiuso */ } };
+  }, [user, isOwner, students]);
+
+  // -----------------------------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------------------------
+  const studentMap = useMemo(() => {
+    const map: Record<string, Student> = {};
+    for (const s of students) {
+      map[s.id] = s;
+    }
+    return map;
+  }, [students]);
+
+  const getStudentName = useCallback(
+    (studentId: string) => {
+      const s = studentMap[studentId];
+      return s ? `${s.name} ${s.surname}` : studentId;
+    },
+    [studentMap],
+  );
+
+  const getStudentPhone = useCallback(
+    (studentId: string) => {
+      const s = studentMap[studentId];
+      return s?.phone || '';
+    },
+    [studentMap],
+  );
+
+  const parseDateString = (str: string): Date | null => {
+    // accept dd/mm/yyyy or yyyy-mm-dd
+    if (!str) return null;
+    const parts = str.includes('/') ? str.split('/') : null;
+    if (parts && parts.length === 3) {
+      const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatDate = (date: Date | string | any): string => {
+    const d = toSafeDate(date);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('it-IT');
+  };
+
+  const formatDateForInput = (date: Date | string | any): string => {
+    const d = toSafeDate(date);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  const daysUntilDate = (date: Date | string | any): number => {
+    const d = toSafeDate(date);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getPaymentTypeLabel = (type: PaymentType): string => {
+    switch (type) {
+      case 'full':
+        return 'Unica soluzione';
+      case 'installment':
+        return 'Rate';
+      case 'monthly_course':
+        return 'Corso Mensile';
+      default:
+        return type;
+    }
+  };
+
+  const getPaymentTypeBadgeStatus = (type: PaymentType): 'paid' | 'pending' | 'overdue' => {
+    switch (type) {
+      case 'full':
+        return 'paid';
+      case 'installment':
+        return 'pending';
+      case 'monthly_course':
+        return 'overdue';
+      default:
+        return 'pending';
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Stats
+  // -----------------------------------------------------------------------
+  const stats = useMemo(() => {
+    let totalOutstanding = 0;
+    let totalPaid = 0;
+    let overdueCount = 0;
+    let activePlansCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const plan of plans) {
+      for (const inst of plan.installments) {
+        if (inst.status === 'paid') {
+          totalPaid += inst.amount;
+        } else if (inst.status === 'overdue') {
+          totalOutstanding += inst.amount;
+          overdueCount++;
+        } else {
+          totalOutstanding += inst.amount;
+        }
+      }
+
+      // Check if plan is active (today is between startDate and endDate)
+      const planStart = toSafeDate(plan.startDate);
+      const planEnd = toSafeDate(plan.endDate);
+      if (!isNaN(planStart.getTime()) && !isNaN(planEnd.getTime())) {
+        const startNorm = new Date(planStart);
+        startNorm.setHours(0, 0, 0, 0);
+        const endNorm = new Date(planEnd);
+        endNorm.setHours(0, 0, 0, 0);
+        if (today >= startNorm && today <= endNorm) {
+          activePlansCount++;
+        }
+      }
+    }
+
+    return { totalOutstanding, totalPaid, overdueCount, activePlansCount };
+  }, [plans]);
+
+  // -----------------------------------------------------------------------
+  // Group plans by student
+  // -----------------------------------------------------------------------
+  const plansByStudent = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    const grouped: Record<string, PaymentPlan[]> = {};
+    for (const plan of plans) {
+      if (query) {
+        const s = studentMap[plan.studentId];
+        const fullName = s ? `${s.name} ${s.surname}`.toLowerCase() : '';
+        if (!fullName.includes(query)) continue;
+      }
+      if (!grouped[plan.studentId]) {
+        grouped[plan.studentId] = [];
+      }
+      grouped[plan.studentId].push(plan);
+    }
+    return grouped;
+  }, [plans, searchQuery, studentMap]);
+
+  // -----------------------------------------------------------------------
+  // Generate installments for create form
+  // -----------------------------------------------------------------------
+  const generateInstallments = useCallback(() => {
+    const amount = parseFloat(totalAmount);
+    const count = parseInt(numInstallments, 10);
+    const firstDate = parseDateString(firstDueDate);
+
+    if (!amount || amount <= 0 || !count || count < 1 || !firstDate) return;
+
+    const perInstallment = Math.floor((amount / count) * 100) / 100;
+    const remainder = Math.round((amount - perInstallment * count) * 100) / 100;
+
+    const items: { amount: string; dueDate: string }[] = [];
+    for (let i = 0; i < count; i++) {
+      const dueDate = new Date(firstDate);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      const instAmount = i === count - 1 ? perInstallment + remainder : perInstallment;
+      items.push({
+        amount: instAmount.toFixed(2),
+        dueDate: formatDateForInput(dueDate),
+      });
+    }
+    setCustomInstallments(items);
+  }, [totalAmount, numInstallments, firstDueDate]);
+
+  useEffect(() => {
+    if (paymentType === 'installment') {
+      generateInstallments();
+    }
+  }, [paymentType, totalAmount, numInstallments, firstDueDate, generateInstallments]);
+
+  // -----------------------------------------------------------------------
+  // Create plan
+  // -----------------------------------------------------------------------
+  const resetCreateForm = () => {
+    setSelectedStudentId('');
+    setTotalAmount('');
+    setPaymentType('full');
+    setNumInstallments('2');
+    setFirstDueDate('');
+    setCustomInstallments([]);
+    setIncludedLessons('');
+    setIncludedConsultations('');
+    setStartDate('');
+    setEndDate('');
+    setCourseType('');
+    setSubscriptionType('');
+  };
+
+  const handleCreate = async () => {
+    if (!selectedStudentId) {
+      crossAlert('Errore', 'Seleziona un allievo.');
+      return;
+    }
+    const amount = parseFloat(totalAmount);
+    if (!amount || amount <= 0) {
+      crossAlert('Errore', 'Inserisci un importo valido.');
+      return;
+    }
+
+    const parsedStartDate = parseDateString(startDate);
+    const parsedEndDate = parseDateString(endDate);
+
+    if (!parsedStartDate || !parsedEndDate) {
+      crossAlert('Errore', 'Inserisci le date di inizio e fine percorso.');
+      return;
+    }
+
+    if (paymentType === 'monthly_course' && !courseType) {
+      crossAlert('Errore', 'Inserisci il tipo di corso.');
+      return;
+    }
+
+    let installments: Installment[] = [];
+
+    if (paymentType === 'full' || paymentType === 'monthly_course') {
+      const dueDate = parseDateString(firstDueDate) || new Date();
+      installments = [
+        {
+          id: Date.now().toString() + '_0',
+          amount,
+          dueDate,
+          status: 'pending' as PaymentStatus,
+        },
+      ];
+    } else {
+      if (customInstallments.length === 0) {
+        crossAlert('Errore', 'Configura le rate prima di salvare.');
+        return;
+      }
+      installments = customInstallments.map((ci, index) => {
+        const dueDate = parseDateString(ci.dueDate) || new Date();
+        return {
+          id: Date.now().toString() + '_' + index,
+          amount: parseFloat(ci.amount) || 0,
+          dueDate,
+          status: 'pending' as PaymentStatus,
+        };
+      });
+    }
+
+    try {
+      setSaving(true);
+      await createPaymentPlan({
+        studentId: selectedStudentId,
+        collaboratorId: user?.id || '',
+        totalAmount: amount,
+        paymentType,
+        installments,
+        createdAt: new Date(),
+        includedLessons: parseInt(includedLessons, 10) || 0,
+        usedLessons: 0,
+        includedConsultations: parseInt(includedConsultations, 10) || 0,
+        usedConsultations: 0,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+        ...(paymentType === 'monthly_course'
+          ? { courseType, subscriptionType }
+          : {}),
+      });
+      createNotification(
+        selectedStudentId,
+        'payment_due',
+        'Nuovo piano di pagamento',
+        `Ti è stato assegnato un nuovo piano di pagamento di €${amount}. Controlla i dettagli nella sezione Pagamenti.`
+      ).catch(() => {});
+      resetCreateForm();
+      setShowCreateModal(false);
+      await loadData();
+      crossAlert('Successo', 'Piano di pagamento creato con successo.');
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile creare il piano di pagamento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Edit plan
+  // -----------------------------------------------------------------------
+  const openEditModal = (plan: PaymentPlan) => {
+    setEditingPlan(plan);
+    setEditTotalAmount(plan.totalAmount.toString());
+    setEditInstallments([...plan.installments]);
+    setEditCustomAmounts(plan.installments.map((i) => i.amount.toString()));
+    setEditCustomDates(plan.installments.map((i) => formatDateForInput(i.dueDate)));
+    setEditIncludedLessons((plan.includedLessons ?? 0).toString());
+    setEditIncludedConsultations((plan.includedConsultations ?? 0).toString());
+    setEditStartDate(plan.startDate ? formatDateForInput(plan.startDate) : '');
+    setEditEndDate(plan.endDate ? formatDateForInput(plan.endDate) : '');
+    setEditCourseType(plan.courseType || '');
+    setEditSubscriptionType(plan.subscriptionType || '');
+    setEditUsedLessons(plan.usedLessons ?? 0);
+    setEditUsedConsultations(plan.usedConsultations ?? 0);
+    setEditPaymentType(plan.paymentType);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPlan) return;
+    const amount = parseFloat(editTotalAmount);
+    if (!amount || amount <= 0) {
+      crossAlert('Errore', 'Inserisci un importo valido.');
+      return;
+    }
+
+    const parsedStartDate = parseDateString(editStartDate);
+    const parsedEndDate = parseDateString(editEndDate);
+
+    const updatedInstallments: Installment[] = editInstallments.map((inst, i) => ({
+      ...inst,
+      amount: parseFloat(editCustomAmounts[i]) || inst.amount,
+      dueDate: parseDateString(editCustomDates[i]) || inst.dueDate,
+    }));
+
+    try {
+      setSaving(true);
+      await updatePaymentPlan(editingPlan.id, {
+        totalAmount: amount,
+        installments: updatedInstallments,
+        includedLessons: parseInt(editIncludedLessons, 10) || 0,
+        includedConsultations: parseInt(editIncludedConsultations, 10) || 0,
+        ...(parsedStartDate ? { startDate: parsedStartDate } : {}),
+        ...(parsedEndDate ? { endDate: parsedEndDate } : {}),
+        ...(editPaymentType === 'monthly_course'
+          ? { courseType: editCourseType, subscriptionType: editSubscriptionType }
+          : {}),
+      });
+      setEditingPlan(null);
+      await loadData();
+      crossAlert('Successo', 'Piano aggiornato con successo.');
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile aggiornare il piano.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMarkPaid = async (planId: string, installmentId: string, installments: Installment[], studentId?: string) => {
+    try {
+      setSaving(true);
+      await markInstallmentPaid(planId, installmentId, installments);
+      const inst = installments.find((i) => i.id === installmentId);
+      if (studentId) {
+        createNotification(
+          studentId,
+          'payment_due',
+          'Pagamento registrato',
+          `Il tuo pagamento${inst ? ` di €${inst.amount}` : ''} è stato registrato. Grazie!`
+        ).catch(() => {});
+      }
+
+      await loadData();
+      if (editingPlan && editingPlan.id === planId) {
+        const refreshedPlans = await getAllPaymentPlans();
+        const refreshedPlan = refreshedPlans.find((p) => p.id === planId);
+        if (refreshedPlan) {
+          openEditModal(refreshedPlan);
+        }
+      }
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile segnare come pagato.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Confirm bank transfer (mark paid + clear transferPending)
+  // -----------------------------------------------------------------------
+  const handleConfirmTransfer = async (planId: string, installmentId: string, installments: Installment[], studentId?: string) => {
+    try {
+      setSaving(true);
+      const clearedInstallments = installments.map((inst) => {
+        const clean: Record<string, any> = { ...inst };
+        Object.keys(clean).forEach((k) => { if (clean[k] === undefined) delete clean[k]; });
+        if (inst.id === installmentId) {
+          clean.transferPending = false;
+          delete clean.transferMarkedAt;
+          clean.status = 'paid';
+          clean.paidDate = new Date();
+        }
+        if (clean.dueDate && typeof clean.dueDate === 'object' && 'toDate' in clean.dueDate) {
+          clean.dueDate = clean.dueDate.toDate();
+        }
+        if (clean.paidDate && typeof clean.paidDate === 'object' && 'toDate' in clean.paidDate) {
+          clean.paidDate = clean.paidDate.toDate();
+        }
+        if (clean.transferMarkedAt && typeof clean.transferMarkedAt === 'object' && 'toDate' in clean.transferMarkedAt) {
+          clean.transferMarkedAt = clean.transferMarkedAt.toDate();
+        }
+        return clean;
+      });
+      await updateDoc(doc(db, 'paymentPlans', planId), {
+        installments: clearedInstallments,
+      });
+      const inst = installments.find((i) => i.id === installmentId);
+      if (studentId) {
+        createNotification(
+          studentId,
+          'payment_due',
+          'Bonifico confermato',
+          `Il tuo bonifico${inst ? ` di €${inst.amount}` : ''} è stato confermato. Grazie!`
+        ).catch(() => {});
+      }
+
+      await loadData();
+      if (editingPlan && editingPlan.id === planId) {
+        const refreshedPlans = await getAllPaymentPlans();
+        const refreshedPlan = refreshedPlans.find((p) => p.id === planId);
+        if (refreshedPlan) {
+          openEditModal(refreshedPlan);
+        }
+      }
+      crossAlert('Fatto', 'Bonifico confermato e pagamento registrato.');
+    } catch (e) {
+      crossAlert('Errore', 'Impossibile confermare il pagamento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Delete plan
+  // -----------------------------------------------------------------------
+  const handleDelete = (planId: string) => {
+    crossAlert(
+      'Conferma eliminazione',
+      'Sei sicuro di voler eliminare questo piano di pagamento? Questa azione non può essere annullata.',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setSaving(true);
+              await deletePaymentPlan(planId);
+              if (editingPlan?.id === planId) {
+                setEditingPlan(null);
+              }
+              await loadData();
+            } catch (e) {
+              crossAlert('Errore', 'Impossibile eliminare il piano.');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // -----------------------------------------------------------------------
+  // WhatsApp / SMS reminder
+  // -----------------------------------------------------------------------
+  const sendReminder = (type: 'whatsapp' | 'sms', studentId: string, installment: Installment) => {
+    const phone = getStudentPhone(studentId);
+    if (!phone) {
+      crossAlert('Errore', 'Numero di telefono non disponibile per questo allievo.');
+      return;
+    }
+    const studentName = getStudentName(studentId);
+    const dueDate = installment.dueDate instanceof Date ? installment.dueDate : new Date(installment.dueDate as unknown as string);
+    const days = daysUntilDate(new Date(dueDate));
+    const message = getPaymentReminderMessage(studentName, installment.amount, dueDate, days);
+
+    // Clean phone: remove spaces, leading + stays
+    const cleanPhone = phone.replace(/\s+/g, '').replace(/^00/, '+');
+    const phoneForWa = cleanPhone.startsWith('+') ? cleanPhone.substring(1) : cleanPhone;
+
+    if (type === 'whatsapp') {
+      Linking.openURL(`https://wa.me/${phoneForWa}?text=${encodeURIComponent(message)}`);
+    } else {
+      Linking.openURL(`sms:${cleanPhone}?body=${encodeURIComponent(message)}`);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Detail modal – show sessions + transactions for a plan
+  // -----------------------------------------------------------------------
+  const openDetailModal = async (plan: PaymentPlan) => {
+    setDetailPlan(plan);
+    setDetailLoading(true);
+    try {
+      const planStart = toSafeDate(plan.startDate);
+      const planEnd = toSafeDate(plan.endDate);
+      const planEndOfDay = new Date(planEnd.getFullYear(), planEnd.getMonth(), planEnd.getDate(), 23, 59, 59, 999);
+      const [sessions, transactions] = await Promise.all([
+        getStudentSessions(plan.studentId),
+        getTransactions(),
+      ]);
+      const filteredSessions = sessions.filter((s) => {
+        if (!s.isCountedAsCompleted && s.status !== 'completed') return false;
+        const sDate = toSafeDate(s.date);
+        return sDate >= planStart && sDate <= planEndOfDay;
+      });
+      const filteredTransactions = transactions.filter((t) => {
+        if (t.studentId !== plan.studentId) return false;
+        const tDate = toSafeDate(t.date);
+        return tDate >= planStart && tDate <= planEndOfDay;
+      });
+      setDetailSessions(filteredSessions);
+      setDetailTransactions(filteredTransactions);
+    } catch {
+      setDetailSessions([]);
+      setDetailTransactions([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Progress bar component
+  // -----------------------------------------------------------------------
+  const ProgressBar: React.FC<{ used: number; total: number; color: string }> = ({
+    used,
+    total,
+    color,
+  }) => {
+    const progress = total > 0 ? Math.min(used / total, 1) : 0;
+    return (
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBarTrack}>
+          <View
+            style={[
+              styles.progressBarFill,
+              { width: `${progress * 100}%`, backgroundColor: color },
+            ]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // -----------------------------------------------------------------------
+  // RENDER
+  // -----------------------------------------------------------------------
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={styles.loadingText}>Caricamento pagamenti...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={{ ...styles.header, paddingTop: insets.top + spacing.md }}>
+        <Text style={styles.headerTitle}>Piani di Pagamento</Text>
+        {canEdit && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              resetCreateForm();
+              setShowCreateModal(true);
+            }}
+          >
+            <Ionicons name="add-circle" size={28} color={colors.accent} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          <StatCard
+            title="Da incassare"
+            value={`€${stats.totalOutstanding.toFixed(2)}`}
+            color={colors.warning}
+            icon={<Ionicons name="time-outline" size={14} color={colors.warning} />}
+          />
+          <StatCard
+            title="Incassato"
+            value={`€${stats.totalPaid.toFixed(2)}`}
+            color={colors.success}
+            icon={<Ionicons name="checkmark-circle-outline" size={14} color={colors.success} />}
+          />
+        </View>
+        <View style={styles.statsRow}>
+          <StatCard
+            title="Scadute"
+            value={stats.overdueCount}
+            color={colors.error}
+            icon={<Ionicons name="alert-circle-outline" size={14} color={colors.error} />}
+          />
+          <StatCard
+            title="Piani Attivi"
+            value={stats.activePlansCount}
+            color={colors.info}
+            icon={<Ionicons name="fitness-outline" size={14} color={colors.info} />}
+          />
+        </View>
+
+        {/* Barra di ricerca */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.textLight} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Cerca allievo per nome..."
+            placeholderTextColor={colors.textLight}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Plans grouped by student */}
+        {Object.keys(plansByStudent).length === 0 ? (
+          <Card>
+            <View style={styles.emptyState}>
+              <Ionicons name="card-outline" size={48} color={colors.textLight} />
+              <Text style={styles.emptyText}>Nessun piano di pagamento</Text>
+              <Text style={styles.emptySubtext}>
+                {canEdit
+                  ? 'Tocca il pulsante + per creare un nuovo piano'
+                  : 'Nessun piano disponibile al momento'}
+              </Text>
+            </View>
+          </Card>
+        ) : (
+          Object.entries(plansByStudent).map(([studentId, studentPlans]) => (
+            <View key={studentId} style={styles.studentGroup}>
+              <View style={styles.studentHeader}>
+                <View style={styles.studentAvatar}>
+                  <Text style={styles.studentAvatarText}>
+                    {studentMap[studentId]
+                      ? `${studentMap[studentId].name[0]}${studentMap[studentId].surname[0]}`
+                      : '??'}
+                  </Text>
+                </View>
+                <Text style={styles.studentName}>{getStudentName(studentId)}</Text>
+                <Text style={styles.planCount}>
+                  {studentPlans.length} pian{studentPlans.length === 1 ? 'o' : 'i'}
+                </Text>
+              </View>
+
+              {studentPlans.map((plan) => {
+                const planStartDate = toSafeDate(plan.startDate);
+                const planEndDate = toSafeDate(plan.endDate);
+                const hasValidDates = !isNaN(planStartDate.getTime()) && !isNaN(planEndDate.getTime());
+                const planIncludedLessons = plan.includedLessons ?? 0;
+                const planUsedLessons = plan.usedLessons ?? 0;
+                const planIncludedConsultations = plan.includedConsultations ?? 0;
+                const planUsedConsultations = plan.usedConsultations ?? 0;
+
+                return (
+                  <TouchableOpacity
+                    key={plan.id}
+                    activeOpacity={0.7}
+                    onPress={() => openDetailModal(plan)}
+                  >
+                    <Card style={styles.planCard}>
+                      {/* Plan header: amount + badge + delete */}
+                      <View style={styles.planHeader}>
+                        <View style={styles.planInfo}>
+                          <Text style={styles.planAmount}>
+                            {'€'}{plan.totalAmount.toFixed(2)}
+                          </Text>
+                          <Badge
+                            status={getPaymentTypeBadgeStatus(plan.paymentType)}
+                            label={getPaymentTypeLabel(plan.paymentType)}
+                          />
+                        </View>
+                        {canEdit && (
+                          <TouchableOpacity
+                            onPress={() => handleDelete(plan.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="trash-outline" size={20} color={colors.error} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Date percorso */}
+                      {hasValidDates && (
+                        <View style={styles.planDetailRow}>
+                          <Ionicons name="calendar-outline" size={14} color={colors.textSecondary} />
+                          <Text style={styles.planDetailText}>
+                            Date percorso: {formatDate(planStartDate)} - {formatDate(planEndDate)}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Monthly course details */}
+                      {plan.paymentType === 'monthly_course' && (
+                        <View style={styles.planCourseDetails}>
+                          {plan.courseType ? (
+                            <View style={styles.planDetailRow}>
+                              <Ionicons name="barbell-outline" size={14} color={colors.accent} />
+                              <Text style={styles.planDetailText}>
+                                Corso: {plan.courseType}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {plan.subscriptionType ? (
+                            <View style={styles.planDetailRow}>
+                              <Ionicons name="repeat-outline" size={14} color={colors.accent} />
+                              <Text style={styles.planDetailText}>
+                                Abbonamento: {plan.subscriptionType}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      )}
+
+                      {/* Lezioni progress */}
+                      {planIncludedLessons > 0 && (
+                        <View style={styles.planProgressSection}>
+                          <View style={styles.planProgressHeader}>
+                            <Ionicons name="body-outline" size={14} color={colors.info} />
+                            <Text style={styles.planProgressLabel}>Lezioni</Text>
+                            <Text style={styles.planProgressValue}>
+                              {planUsedLessons} / {planIncludedLessons}
+                            </Text>
+                          </View>
+                          <ProgressBar
+                            used={planUsedLessons}
+                            total={planIncludedLessons}
+                            color={colors.info}
+                          />
+                        </View>
+                      )}
+
+                      {/* Consulenze progress */}
+                      {planIncludedConsultations > 0 && (
+                        <View style={styles.planProgressSection}>
+                          <View style={styles.planProgressHeader}>
+                            <Ionicons name="nutrition-outline" size={14} color={colors.warning} />
+                            <Text style={styles.planProgressLabel}>Consulenze</Text>
+                            <Text style={styles.planProgressValue}>
+                              {planUsedConsultations} / {planIncludedConsultations}
+                            </Text>
+                          </View>
+                          <ProgressBar
+                            used={planUsedConsultations}
+                            total={planIncludedConsultations}
+                            color={colors.warning}
+                          />
+                        </View>
+                      )}
+
+                      {/* Installments summary */}
+                      {plan.installments.map((inst) => {
+                        const dueDate = inst.dueDate instanceof Date ? inst.dueDate : new Date(inst.dueDate as unknown as string);
+                        const days = daysUntilDate(new Date(dueDate));
+                        const isUpcoming = inst.status !== 'paid' && days >= 0 && days <= 15;
+
+                        return (
+                          <View key={inst.id}>
+                            <View style={styles.installmentRow}>
+                              <View style={styles.installmentInfo}>
+                                <Badge status={inst.status} />
+                                <Text style={styles.installmentAmount}>
+                                  {'€'}{inst.amount.toFixed(2)}
+                                </Text>
+                                <Text style={styles.installmentDate}>
+                                  {formatDate(dueDate)}
+                                </Text>
+                              </View>
+
+                              <View style={styles.installmentActions}>
+                                {isUpcoming && (
+                                  <>
+                                    <TouchableOpacity
+                                      style={[styles.reminderBtn, { backgroundColor: '#25D366' + '20' }]}
+                                      onPress={() => sendReminder('whatsapp', plan.studentId, inst)}
+                                    >
+                                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={[styles.reminderBtn, { backgroundColor: colors.info + '20' }]}
+                                      onPress={() => sendReminder('sms', plan.studentId, inst)}
+                                    >
+                                      <Ionicons name="chatbubble-outline" size={14} color={colors.info} />
+                                    </TouchableOpacity>
+                                  </>
+                                )}
+                                {inst.status !== 'paid' && !inst.transferPending && (
+                                  <TouchableOpacity
+                                    style={styles.paidBtn}
+                                    onPress={() => handleMarkPaid(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  >
+                                    <Ionicons name="checkmark" size={14} color={colors.success} />
+                                  </TouchableOpacity>
+                                )}
+                                {inst.status === 'paid' && Platform.OS === 'web' && (
+                                  <TouchableOpacity
+                                    style={[styles.reminderBtn, { backgroundColor: colors.accent + '20' }]}
+                                    onPress={() => {
+                                      const instIndex = plan.installments.findIndex((i) => i.id === inst.id);
+                                      printPaymentReceipt({
+                                        studentName: plan.studentId ? getStudentName(plan.studentId) : '',
+                                        amount: inst.amount,
+                                        dueDate: inst.dueDate,
+                                        paidDate: inst.paidDate ?? new Date(),
+                                        installmentNumber: instIndex + 1,
+                                        totalInstallments: plan.installments.length,
+                                        planTotal: plan.totalAmount ?? inst.amount,
+                                        paymentType: plan.paymentType ?? 'full',
+                                        planStartDate: plan.startDate,
+                                        planEndDate: plan.endDate,
+                                      });
+                                    }}
+                                  >
+                                    <Ionicons name="receipt-outline" size={14} color={colors.accent} />
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            </View>
+
+                            {/* Transfer pending badge + confirm button */}
+                            {inst.transferPending && inst.status !== 'paid' && (
+                              <View style={styles.transferPendingRow}>
+                                <View style={styles.transferPendingBadge}>
+                                  <Ionicons name="time-outline" size={14} color={colors.warning} />
+                                  <Text style={styles.transferPendingText}>Bonifico segnalato</Text>
+                                </View>
+                                <TouchableOpacity
+                                  style={styles.confirmTransferBtn}
+                                  onPress={() => handleConfirmTransfer(plan.id, inst.id, plan.installments, plan.studentId)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                                  <Text style={styles.confirmTransferText}>Conferma pagamento</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </Card>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))
+        )}
+
+        <View style={{ height: 80 }} />
+      </ScrollView>
+
+      {/* CREATE MODAL */}
+      {canEdit && (
+        <CreatePlanModal
+          visible={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          students={students}
+          selectedStudentId={selectedStudentId}
+          onSelectStudent={setSelectedStudentId}
+          totalAmount={totalAmount}
+          onChangeTotalAmount={setTotalAmount}
+          paymentType={paymentType}
+          onChangePaymentType={setPaymentType}
+          courseType={courseType}
+          onChangeCourseType={setCourseType}
+          subscriptionType={subscriptionType}
+          onChangeSubscriptionType={setSubscriptionType}
+          firstDueDate={firstDueDate}
+          onChangeFirstDueDate={setFirstDueDate}
+          numInstallments={numInstallments}
+          onChangeNumInstallments={setNumInstallments}
+          customInstallments={customInstallments}
+          onChangeCustomInstallments={setCustomInstallments}
+          includedLessons={includedLessons}
+          onChangeIncludedLessons={setIncludedLessons}
+          includedConsultations={includedConsultations}
+          onChangeIncludedConsultations={setIncludedConsultations}
+          startDate={startDate}
+          onChangeStartDate={setStartDate}
+          endDate={endDate}
+          onChangeEndDate={setEndDate}
+          saving={saving}
+          onSave={handleCreate}
+        />
+      )}
+
+      {/* EDIT MODAL */}
+      <EditPlanModal
+        editingPlan={editingPlan}
+        onClose={() => setEditingPlan(null)}
+        canEdit={canEdit}
+        getStudentName={getStudentName}
+        editTotalAmount={editTotalAmount}
+        onChangeEditTotalAmount={setEditTotalAmount}
+        editPaymentType={editPaymentType}
+        getPaymentTypeBadgeStatus={getPaymentTypeBadgeStatus}
+        getPaymentTypeLabel={getPaymentTypeLabel}
+        editStartDate={editStartDate}
+        onChangeEditStartDate={setEditStartDate}
+        editEndDate={editEndDate}
+        onChangeEditEndDate={setEditEndDate}
+        editIncludedLessons={editIncludedLessons}
+        onChangeEditIncludedLessons={setEditIncludedLessons}
+        editUsedLessons={editUsedLessons}
+        editIncludedConsultations={editIncludedConsultations}
+        onChangeEditIncludedConsultations={setEditIncludedConsultations}
+        editUsedConsultations={editUsedConsultations}
+        editCourseType={editCourseType}
+        onChangeEditCourseType={setEditCourseType}
+        editSubscriptionType={editSubscriptionType}
+        onChangeEditSubscriptionType={setEditSubscriptionType}
+        editInstallments={editInstallments}
+        editCustomAmounts={editCustomAmounts}
+        onChangeEditCustomAmounts={setEditCustomAmounts}
+        editCustomDates={editCustomDates}
+        onChangeEditCustomDates={setEditCustomDates}
+        formatDate={formatDate}
+        daysUntilDate={daysUntilDate}
+        handleMarkPaid={handleMarkPaid}
+        sendReminder={sendReminder}
+        handleSaveEdit={handleSaveEdit}
+        handleDelete={handleDelete}
+        saving={saving}
+        printPaymentReceipt={printPaymentReceipt}
+      />
+
+      {/* DETAIL MODAL */}
+      <PlanDetailModal
+        detailPlan={detailPlan}
+        onClose={() => setDetailPlan(null)}
+        canEdit={canEdit}
+        getStudentName={getStudentName}
+        getPaymentTypeBadgeStatus={getPaymentTypeBadgeStatus}
+        getPaymentTypeLabel={getPaymentTypeLabel}
+        formatDate={formatDate}
+        detailLoading={detailLoading}
+        detailSessions={detailSessions}
+        detailTransactions={detailTransactions}
+        onEditPlan={openEditModal}
+        printPlanDetail={printPlanDetail}
+        printPaymentReceipt={printPaymentReceipt}
+      />
+    </View>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    padding: 0,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    marginTop: spacing.md,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: Platform.OS === 'web' ? spacing.lg : 60,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  headerTitle: {
+    fontSize: fontSize.title,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  addButton: {
+    padding: spacing.xs,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: spacing.lg,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: spacing.xxl,
+    gap: spacing.md,
+  },
+  emptyText: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  emptySubtext: {
+    fontSize: fontSize.md,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+
+  // Student group
+  studentGroup: {
+    marginBottom: spacing.lg,
+  },
+  studentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  studentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  studentAvatarText: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.accent,
+  },
+  studentName: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+    flex: 1,
+  },
+  planCount: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+
+  // Plan card
+  planCard: {
+    marginBottom: spacing.xs,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  planInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  planAmount: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+  },
+
+  // Plan detail rows
+  planDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  planDetailText: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  planCourseDetails: {
+    marginBottom: spacing.xs,
+  },
+
+  // Progress bars on plan cards
+  planProgressSection: {
+    marginBottom: spacing.sm,
+  },
+  planProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  planProgressLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  planProgressValue: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  progressBarContainer: {
+    marginBottom: spacing.xs,
+  },
+  progressBarTrack: {
+    height: 4,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // Installment row
+  installmentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+  },
+  installmentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  installmentAmount: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  installmentDate: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+  },
+  installmentActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  reminderBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paidBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.success + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Transfer pending
+  transferPendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  transferPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.warning + '15',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.warning + '40',
+  },
+  transferPendingText: {
+    fontSize: fontSize.xs,
+    color: colors.warning,
+    fontWeight: '700',
+  },
+  confirmTransferBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.success + '20',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.md,
+  },
+  confirmTransferText: {
+    fontSize: fontSize.xs,
+    color: colors.success,
+    fontWeight: '700',
+  },
+});

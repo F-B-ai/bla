@@ -16,6 +16,7 @@ import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { ModalHeader } from '../../components/common/ModalHeader';
 import { Badge } from '../../components/common/Badge';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { TrainingSession, Student, Collaborator } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -25,11 +26,13 @@ import {
   updateSessionStatus,
 } from '../../services/sessionService';
 import { getStudents, getCollaborators } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 
 const TIME_SLOTS = [
-  '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
-  '19:00', '20:00', '21:00',
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
+  '19:00', '19:30', '20:00', '20:30', '21:00',
 ];
 
 export const ScheduleSessionScreen: React.FC = () => {
@@ -58,10 +61,9 @@ export const ScheduleSessionScreen: React.FC = () => {
       ]);
 
       if (isCollaborator) {
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
       } else if (isManager) {
-        // Manager vede allievi assegnati direttamente o tramite assignedManagerId
-        setStudents(studs.filter((s) => s.assignedCollaboratorId === user.id || s.assignedManagerId === user.id));
+        setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id) || s.assignedManagerId === user.id));
       } else {
         setStudents(studs);
       }
@@ -271,30 +273,12 @@ export const ScheduleSessionScreen: React.FC = () => {
             <ModalHeader title="Nuova Sessione" onClose={() => { setShowModal(false); resetForm(); }} />
 
             {/* Allievo */}
-            <Text style={styles.fieldLabel}>Allievo</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.chipRow}>
-                {students.map((s) => (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[
-                      styles.chip,
-                      selectedStudentId === s.id && styles.chipActive,
-                    ]}
-                    onPress={() => setSelectedStudentId(s.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        selectedStudentId === s.id && styles.chipTextActive,
-                      ]}
-                    >
-                      {s.name} {s.surname}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <StudentSearchPicker
+              students={students}
+              selectedId={selectedStudentId}
+              onSelect={(id) => setSelectedStudentId(id)}
+              label="Allievo"
+            />
 
             {/* Collaboratore (solo owner) */}
             {isOwner && (
@@ -520,7 +504,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

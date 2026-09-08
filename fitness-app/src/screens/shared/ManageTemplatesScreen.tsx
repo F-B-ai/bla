@@ -7,8 +7,12 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { crossAlert } from '../../utils/alert';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -22,6 +26,8 @@ import {
   updateCustomTemplate,
   deleteCustomTemplate,
   CustomWorkoutTemplate,
+  getFullExerciseLibrary,
+  LibraryExercise,
 } from '../../services/programService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 
@@ -47,6 +53,7 @@ type TabMode = 'custom' | 'builtin';
 
 export const ManageTemplatesScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [customTemplates, setCustomTemplates] = useState<CustomWorkoutTemplate[]>([]);
   const [tabMode, setTabMode] = useState<TabMode>('custom');
@@ -78,6 +85,12 @@ export const ManageTemplatesScreen: React.FC = () => {
   const [exCategory, setExCategory] = useState<ExerciseCategory>('forza');
   const [exNotes, setExNotes] = useState('');
 
+  // Exercise Library
+  const [exerciseLibrary, setExerciseLibrary] = useState<LibraryExercise[]>([]);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+
   const loadTemplates = useCallback(async () => {
     setLoading(true);
     try {
@@ -90,9 +103,19 @@ export const ManageTemplatesScreen: React.FC = () => {
     }
   }, []);
 
+  const loadExerciseLibrary = useCallback(async () => {
+    try {
+      const library = await getFullExerciseLibrary();
+      setExerciseLibrary(library);
+    } catch {
+      // silently handle
+    }
+  }, []);
+
   useEffect(() => {
     loadTemplates();
-  }, [loadTemplates]);
+    loadExerciseLibrary();
+  }, [loadTemplates, loadExerciseLibrary]);
 
   const resetExForm = () => {
     setExName('');
@@ -122,6 +145,21 @@ export const ManageTemplatesScreen: React.FC = () => {
 
   const openEditModal = (template: CustomWorkoutTemplate) => {
     setEditingTemplate(template);
+    setTplName(template.name);
+    setTplDescription(template.description);
+    setTplGender(template.gender);
+    setTplCategory(template.category);
+    const exMap: Record<number, Omit<Exercise, 'id'>[]> = {};
+    for (const day of template.weeklySchedule) {
+      exMap[day.dayOfWeek] = [...day.exercises];
+    }
+    setTplExercises(exMap);
+    setTplSelectedDay(0);
+    setShowEditModal(true);
+  };
+
+  const editBuiltinTemplate = (template: WorkoutTemplate) => {
+    resetEditForm();
     setTplName(template.name);
     setTplDescription(template.description);
     setTplGender(template.gender);
@@ -313,6 +351,29 @@ export const ManageTemplatesScreen: React.FC = () => {
     return day?.exercises || [];
   };
 
+  const selectFromLibrary = (libEx: LibraryExercise) => {
+    setExName(libEx.name);
+    setExDescription(libEx.description);
+    setExSets(String(libEx.sets));
+    setExReps(libEx.reps);
+    setExRest(String(libEx.restSeconds));
+    setExCategory(libEx.category);
+    setExNotes(libEx.notes);
+    setShowLibraryPicker(false);
+    setLibrarySearch('');
+  };
+
+  const filteredLibrary = exerciseLibrary.filter((ex) => {
+    if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
+      return false;
+    }
+    if (librarySearch) {
+      const search = librarySearch.toLowerCase();
+      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+    }
+    return true;
+  });
+
   const isCustomTemplate = (t: any): t is CustomWorkoutTemplate => 'createdBy' in t;
 
   // --- Render ---
@@ -386,6 +447,15 @@ export const ManageTemplatesScreen: React.FC = () => {
 
           <View style={styles.detailActions}>
             <Button
+              title="Usa per Allievo"
+              onPress={() => {
+                navigation.navigate('Programmi', { template: viewingTemplate });
+                setViewMode('list');
+                setViewingTemplate(null);
+              }}
+              style={{ flex: 1, minWidth: 100, backgroundColor: '#4CAF50' }}
+            />
+            <Button
               title="Torna alla lista"
               onPress={() => { setViewMode('list'); setViewingTemplate(null); }}
               variant="outline"
@@ -406,11 +476,19 @@ export const ManageTemplatesScreen: React.FC = () => {
                 />
               </>
             ) : (
-              <Button
-                title="Duplica e Modifica"
-                onPress={() => { setViewMode('list'); duplicateBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
-                style={styles.detailBtn}
-              />
+              <>
+                <Button
+                  title="Modifica"
+                  onPress={() => { setViewMode('list'); editBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
+                  style={styles.detailBtn}
+                />
+                <Button
+                  title="Duplica"
+                  onPress={() => { setViewMode('list'); duplicateBuiltinTemplate(viewingTemplate as WorkoutTemplate); }}
+                  variant="outline"
+                  style={styles.detailBtn}
+                />
+              </>
             )}
           </View>
         </View>
@@ -492,7 +570,7 @@ export const ManageTemplatesScreen: React.FC = () => {
         ) : (
           <>
             <Text style={styles.builtinHint}>
-              I template predefiniti non sono modificabili, ma puoi duplicarli per creare versioni personalizzate.
+              Modifica i template predefiniti — le modifiche vengono salvate come template personalizzati.
             </Text>
             {allTemplates.map((tpl) => (
               <TouchableOpacity key={tpl.id} onPress={() => viewTemplateDetail(tpl)}>
@@ -507,9 +585,14 @@ export const ManageTemplatesScreen: React.FC = () => {
                       <Text style={styles.templateDesc} numberOfLines={2}>{tpl.description}</Text>
                       <Text style={styles.templateDays}>{tpl.weeklySchedule.length} giorni/settimana</Text>
                     </View>
-                    <TouchableOpacity style={styles.iconBtn} onPress={() => duplicateBuiltinTemplate(tpl)}>
-                      <Text style={styles.iconBtnText}>⧉</Text>
-                    </TouchableOpacity>
+                    <View style={styles.templateActions}>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => editBuiltinTemplate(tpl)}>
+                        <Text style={styles.iconBtnText}>✎</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => duplicateBuiltinTemplate(tpl)}>
+                        <Text style={styles.iconBtnText}>⧉</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </Card>
               </TouchableOpacity>
@@ -672,6 +755,16 @@ export const ManageTemplatesScreen: React.FC = () => {
               onClose={() => { setShowExForm(false); resetExForm(); }}
             />
 
+            {/* Library Picker Button */}
+            <TouchableOpacity
+              style={styles.libraryPickerToggle}
+              onPress={() => { setShowLibraryPicker(true); setLibrarySearch(''); }}
+            >
+              <Ionicons name="library-outline" size={20} color={colors.accent} />
+              <Text style={styles.libraryPickerToggleText}>Scegli dalla Libreria Esercizi</Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.accent} />
+            </TouchableOpacity>
+
             <InputField
               label="Nome esercizio"
               value={exName}
@@ -747,6 +840,78 @@ export const ManageTemplatesScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modale Libreria Esercizi */}
+      <Modal visible={showLibraryPicker} animationType="slide" transparent={false}>
+        <SafeAreaView style={styles.libraryModalContainer}>
+          <View style={styles.libraryModalHeader}>
+            <TouchableOpacity onPress={() => setShowLibraryPicker(false)} style={styles.libraryModalBack}>
+              <Ionicons name="arrow-back" size={22} color={colors.accent} />
+              <Text style={styles.libraryModalBackText}>Indietro</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.libraryModalTitle}>Libreria Esercizi</Text>
+
+          <View style={styles.libraryModalSearch}>
+            <InputField
+              label=""
+              value={librarySearch}
+              onChangeText={setLibrarySearch}
+              placeholder="Cerca esercizio..."
+            />
+          </View>
+
+          <View style={styles.libraryFilterRow}>
+            {(['all', 'male', 'female'] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.libraryFilterChip, libraryGenderFilter === f && styles.libraryFilterChipActive]}
+                onPress={() => setLibraryGenderFilter(f)}
+              >
+                <Text style={[styles.libraryFilterText, libraryGenderFilter === f && styles.libraryFilterTextActive]}>
+                  {f === 'all' ? `Tutti (${exerciseLibrary.length})` : f === 'male' ? 'Uomo' : 'Donna'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <FlatList
+            data={filteredLibrary}
+            keyExtractor={(item) => item.id}
+            style={styles.libraryFlatList}
+            renderItem={({ item: libEx }) => (
+              <TouchableOpacity
+                style={styles.libraryItem}
+                onPress={() => selectFromLibrary(libEx)}
+              >
+                <View style={styles.libraryItemLeft}>
+                  <Text style={styles.libraryItemName}>{libEx.name}</Text>
+                  <Text style={styles.libraryItemDesc} numberOfLines={2}>{libEx.description}</Text>
+                  <View style={styles.libraryItemMeta}>
+                    <Text style={styles.libraryItemBadge}>{libEx.sets}x{libEx.reps}</Text>
+                    <Text style={styles.libraryItemBadge}>Rec: {libEx.restSeconds}s</Text>
+                    <Text style={styles.libraryItemBadge}>{libEx.category}</Text>
+                    {libEx.videoUrl && (
+                      <View style={styles.libraryVideoBadge}>
+                        <Ionicons name="videocam" size={12} color={colors.white} />
+                        <Text style={styles.libraryVideoBadgeText}>Video</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="add-circle" size={26} color={colors.accent} />
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.libraryEmptyContainer}>
+                <Ionicons name="barbell-outline" size={48} color={colors.textLight} />
+                <Text style={styles.libraryEmptyText}>Nessun esercizio trovato</Text>
+              </View>
+            }
+            ItemSeparatorComponent={() => <View style={styles.libraryItemSeparator} />}
+          />
+        </SafeAreaView>
+      </Modal>
+
       <View style={styles.bottomSpacer} />
     </ScrollView>
   );
@@ -774,7 +939,7 @@ const styles = StyleSheet.create({
   // Template list
   templateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   templateGenderBadge: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  templateGenderText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.md },
+  templateGenderText: { color: colors.white, fontWeight: '700', fontSize: fontSize.md },
   templateInfo: { flex: 1 },
   templateName: { fontSize: fontSize.md, fontWeight: '700', color: colors.text },
   templateCategory: { fontSize: fontSize.xs, color: colors.accent, fontWeight: '600', marginTop: 2 },
@@ -796,7 +961,7 @@ const styles = StyleSheet.create({
   // Detail view
   detailMeta: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, alignItems: 'center' },
   genderBadge: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round },
-  genderBadgeText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  genderBadgeText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   detailCategory: { fontSize: fontSize.md, color: colors.accent, fontWeight: '600' },
   detailDays: { fontSize: fontSize.sm, color: colors.textSecondary },
   detailActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, flexWrap: 'wrap' },
@@ -816,7 +981,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success, borderRadius: 10, width: 20, height: 20,
     justifyContent: 'center', alignItems: 'center', marginTop: 4,
   },
-  dayBadgeText: { color: '#FFF', fontSize: fontSize.xs, fontWeight: '700' },
+  dayBadgeText: { color: colors.white, fontSize: fontSize.xs, fontWeight: '700' },
 
   // Exercise list
   sectionTitle: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
@@ -828,7 +993,7 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 14, backgroundColor: colors.accent,
     justifyContent: 'center', alignItems: 'center',
   },
-  exerciseNumberText: { color: '#FFF', fontWeight: '700', fontSize: fontSize.sm },
+  exerciseNumberText: { color: colors.white, fontWeight: '700', fontSize: fontSize.sm },
   exerciseInfo: { flex: 1 },
   exerciseName: { fontSize: fontSize.md, fontWeight: '600', color: colors.text },
   exerciseDetails: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
@@ -849,7 +1014,7 @@ const styles = StyleSheet.create({
   genderBtnMaleActive: { backgroundColor: '#4A90D9', borderColor: '#4A90D9' },
   genderBtnFemaleActive: { backgroundColor: '#D94A8C', borderColor: '#D94A8C' },
   genderBtnText: { fontSize: fontSize.md, color: colors.textSecondary, fontWeight: '600' },
-  genderBtnTextActive: { color: '#FFF' },
+  genderBtnTextActive: { color: colors.white },
   categoryRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.md },
   categoryChip: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: borderRadius.round,
@@ -862,7 +1027,7 @@ const styles = StyleSheet.create({
   halfField: { flex: 1 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl, padding: spacing.lg, maxHeight: '90%',
@@ -870,4 +1035,53 @@ const styles = StyleSheet.create({
   modalButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   modalButton: { flex: 1 },
   bottomSpacer: { height: spacing.xxl * 2 },
+
+  // Library picker
+  libraryPickerToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+    backgroundColor: colors.accent + '10', borderRadius: borderRadius.md,
+    borderWidth: 1, borderColor: colors.accent + '30', marginBottom: spacing.md,
+  },
+  libraryPickerToggleText: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
+  libraryModalContainer: { flex: 1, backgroundColor: colors.background },
+  libraryModalHeader: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.sm,
+  },
+  libraryModalBack: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, paddingRight: spacing.md, gap: spacing.xs,
+  },
+  libraryModalBackText: { fontSize: fontSize.md, fontWeight: '600', color: colors.accent },
+  libraryModalTitle: {
+    fontSize: fontSize.xxl, fontWeight: '700', color: colors.text, paddingHorizontal: spacing.md, paddingBottom: spacing.sm,
+  },
+  libraryModalSearch: { paddingHorizontal: spacing.md },
+  libraryFilterRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  libraryFilterChip: {
+    flex: 1, paddingVertical: spacing.sm, borderRadius: borderRadius.round,
+    borderWidth: 1, borderColor: colors.border, alignItems: 'center',
+  },
+  libraryFilterChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
+  libraryFilterText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
+  libraryFilterTextActive: { color: colors.textOnAccent },
+  libraryFlatList: { flex: 1 },
+  libraryItem: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+  },
+  libraryItemLeft: { flex: 1, marginRight: spacing.md },
+  libraryItemName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text },
+  libraryItemDesc: { fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 4, lineHeight: 18 },
+  libraryItemMeta: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs, flexWrap: 'wrap' },
+  libraryItemBadge: {
+    fontSize: fontSize.xs, color: colors.textLight, backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm, overflow: 'hidden',
+  },
+  libraryVideoBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success,
+    paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm,
+  },
+  libraryVideoBadgeText: { fontSize: fontSize.xs, color: colors.white, fontWeight: '700' },
+  libraryItemSeparator: { height: 1, backgroundColor: colors.divider, marginHorizontal: spacing.md },
+  libraryEmptyContainer: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
+  libraryEmptyText: { color: colors.textSecondary, textAlign: 'center', fontSize: fontSize.md },
 });

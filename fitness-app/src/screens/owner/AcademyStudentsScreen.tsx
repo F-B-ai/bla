@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
+import { isValidEmail } from '../../utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -81,6 +82,10 @@ export const AcademyStudentsScreen: React.FC = () => {
   const handleAddStudent = async () => {
     if (!formName.trim() || !formSurname.trim() || !formEmail.trim() || !formPassword.trim()) {
       showAlert('Errore', 'Compila tutti i campi obbligatori');
+      return;
+    }
+    if (!isValidEmail(formEmail)) {
+      showAlert('Errore', 'Inserisci un indirizzo email valido');
       return;
     }
     setSaving(true);
@@ -407,7 +412,7 @@ export const AcademyStudentsScreen: React.FC = () => {
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color="#FFF" />
+                    <ActivityIndicator size="small" color={colors.white} />
                   ) : (
                     <Text style={styles.saveBtnText}>Crea Studente</Text>
                   )}
@@ -541,7 +546,7 @@ const styles = StyleSheet.create({
   // Detail modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     padding: spacing.lg,
   },

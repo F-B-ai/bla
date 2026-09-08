@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Richieste → ESSĒRE</title>
+<style>
+  :root{
+    --fondo:#0A0A0A; --carta:#161616; --alto:#1F1F1F; --bordo:#2C2C2E;
+    --testo:#F2F2F7; --tenue:#8E8E93; --debole:#636366;
+    --acc:#D40000; --ok:#34C759; --avv:#FF9F0A;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--fondo);color:var(--testo);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:20px 16px 60px;
+  }
+  .wrap{max-width:620px;margin:0 auto}
+  h1{font-size:19px;margin:0 0 4px}
+  p.sub{color:var(--tenue);font-size:13px;margin:0 0 20px}
+  label{display:block;color:var(--tenue);font-size:12px;margin:16px 0 5px}
+  input,textarea{
+    width:100%;background:var(--alto);border:1px solid var(--bordo);border-radius:8px;
+    color:var(--testo);padding:11px;font-size:14px;font-family:inherit;
+  }
+  textarea{min-height:190px;resize:vertical;line-height:1.5}
+  button{
+    width:100%;margin-top:16px;background:var(--acc);color:#fff;border:0;border-radius:10px;
+    padding:14px;font-size:15px;font-weight:700;cursor:pointer;
+  }
+  button:disabled{opacity:.5;cursor:default}
+  .esito{margin-top:16px;padding:12px;border-radius:8px;border:1px solid var(--bordo);
+    background:var(--carta);font-size:14px;white-space:pre-wrap}
+  .esito.ok{border-color:var(--ok)}
+  .esito.no{border-color:var(--avv)}
+  .nota{color:var(--debole);font-size:12px;line-height:1.5;margin-top:22px;
+    border-top:1px solid var(--bordo);padding-top:14px}
+  code{background:var(--alto);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Richieste → ESSĒRE</h1>
+  <p class="sub">Le richieste scritte qui finiscono nella coda del titolare, che le conferma dall'app.
+    Da questa pagina non si prenota niente e non si legge niente.</p>
+
+  <label for="chiave">Chiave</label>
+  <input id="chiave" type="password" autocomplete="off" placeholder="incollala qui la prima volta">
+
+  <label for="testo">Pacchetti CAL</label>
+  <textarea id="testo" placeholder="CAL prenota
+persona: Maria Rossi
+telefono: 333 1234567
+giorno: 2026-09-02
+ora: 15:00
+tipo: visita
+note: prima volta, arriva da Instagram"></textarea>
+
+  <button id="manda">Manda nella coda</button>
+  <div id="esito" class="esito" style="display:none"></div>
+
+  <div class="nota">
+    Si possono mandare più pacchetti insieme, uno dopo l'altro (massimo 20).
+    Ogni pacchetto comincia con <code>CAL prenota</code>.
+    Il giorno va scritto <code>AAAA-MM-GG</code>, l'ora <code>HH:MM</code>.
+    Quello che manca non viene indovinato: il blocco torna indietro col motivo.
+  </div>
+</div>
+
+<script>
+(function () {
+  var K = 'essere-cal-chiave';
+  var chiave = document.getElementById('chiave');
+  var testo = document.getElementById('testo');
+  var bottone = document.getElementById('manda');
+  var esito = document.getElementById('esito');
+
+  try { chiave.value = localStorage.getItem(K) || ''; } catch (e) { /* niente memoria */ }
+
+  function mostra(classe, messaggio) {
+    esito.style.display = 'block';
+    esito.className = 'esito ' + classe;
+    esito.textContent = messaggio;
+  }
+
+  bottone.addEventListener('click', function () {
+    var k = (chiave.value || '').trim();
+    var t = testo.value || '';
+    if (!k) { mostra('no', 'Serve la chiave.'); return; }
+    if (t.indexOf('CAL') < 0) { mostra('no', 'Non c’è nessun pacchetto CAL da mandare.'); return; }
+
+    bottone.disabled = true;
+    bottone.textContent = 'Mando…';
+
+    fetch('/v1/cal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-cal-key': k },
+      body: JSON.stringify({ testo: t })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.s === 200 && res.d && res.d.ok) {
+          try { localStorage.setItem(K, k); } catch (e) { /* niente memoria */ }
+          var righe = ['Messe in coda: ' + res.d.create + '.'];
+          if (res.d.scartate) {
+            righe.push('Scartate: ' + res.d.scartate + '.');
+            (res.d.dettagli || []).forEach(function (x) {
+              righe.push('Blocco ' + x.blocco + ': ' + (x.problemi || []).join(' '));
+            });
+          }
+          mostra(res.d.scartate ? 'no' : 'ok', righe.join('\n'));
+          if (!res.d.scartate) testo.value = '';
+        } else {
+          mostra('no', (res.d && res.d.errore) || 'Non è andata: riprova.');
+        }
+      })
+      .catch(function () { mostra('no', 'Nessuna risposta dal server. Controlla la connessione.'); })
+      .then(function () { bottone.disabled = false; bottone.textContent = 'Manda nella coda'; });
+  });
+})();
+</script>
+</body>
+</html>

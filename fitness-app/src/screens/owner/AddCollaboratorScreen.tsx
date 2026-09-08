@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
-import { getFirebaseErrorMessage } from '../../utils/helpers';
+import { getFirebaseErrorMessage, isValidEmail } from '../../utils/helpers';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { InputField } from '../../components/common/InputField';
 import { Button } from '../../components/common/Button';
@@ -33,6 +33,10 @@ export const AddCollaboratorScreen: React.FC<Props> = ({ onBack }) => {
   const handleRegister = async () => {
     if (!email.trim() || !password.trim() || !name.trim() || !surname.trim()) {
       crossAlert('Errore', 'Compila tutti i campi obbligatori');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      crossAlert('Errore', 'Inserisci un indirizzo email valido');
       return;
     }
     if (password.length < 6) {

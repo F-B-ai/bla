@@ -1,7 +1,15 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Academy content: staff can upload, authenticated users can read
+    // Consente l'elenco (list) e l'eliminazione dei file agli utenti
+    // autenticati, necessario per lo strumento di gestione spazio.
+    // Coerente con le regole per-cartella già presenti (read/write a
+    // qualsiasi utente autenticato).
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Academy content
     match /academy/{courseId}/{folder}/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
@@ -21,6 +29,30 @@ service firebase.storage {
 
     // Nutrition team attachments
     match /nutritionTeam/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Body composition images
+    match /bodycomp/{studentId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // User avatars
+    match /avatars/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Exercise videos
+    match /exercise-videos/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Content uploads (video, audio, pdf)
+    match /content/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }

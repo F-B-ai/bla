@@ -1,44 +1,228 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Funzione helper: verifica se l'utente è autenticato
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Funzione helper: ottieni il ruolo dell'utente dal documento
     function getUserRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Funzione helper: verifica se è owner
+    // ACCESSO REVOCATO: un account disattivato non conta più come
+    // staff, nemmeno con una sessione già aperta sul telefono. La
+    // regola si rivaluta a ogni richiesta, quindi il taglio è
+    // immediato — non si aspetta la scadenza del token.
+    function isAttivo() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive != false;
+    }
+
     function isOwner() {
-      return isAuthenticated() && getUserRole() == 'owner';
+      return isAttivo() && getUserRole() == 'owner';
     }
 
-    // Funzione helper: verifica se è owner o manager
     function isOwnerOrManager() {
-      return isAuthenticated() && (getUserRole() == 'owner' || getUserRole() == 'manager');
+      return isAttivo() && getUserRole() in ['owner', 'manager'];
     }
 
-    // Funzione helper: verifica se è owner, manager o collaborator
     function isStaff() {
-      return isAuthenticated() && getUserRole() in ['owner', 'manager', 'collaborator'];
+      return isAttivo() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
-    // Users collection
-    match /users/{userId} {
+    // Check-in accessi palestra (QR/codice alla reception)
+    match /checkins/{checkinId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
+      allow update, delete: if isStaff();
+    }
+
+    // Stato ESSĒRE (check-in mente-corpo quotidiano)
+    match /wellnessChecks/{checkId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isStaff();
+    }
+
+    // Consensi privacy (GDPR art. 9): ognuno scrive SOLO i propri;
+    // lo staff puo' leggerli (per sapere cosa puo' fare sui dati
+    // dell'allievo); mai modificare i consensi di un altro.
+    match /consents/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || isStaff()
+      );
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Log costi/uso AI: scrive SOLO il gateway (Admin SDK).
+    // L'owner/manager li legge per il cruscotto costi.
+    match /aiUsage/{docId} {
+      allow read: if isOwnerOrManager();
+      allow write: if false;
+    }
+
+    // ============================================================
+    // DIGITAL HUMAN TWIN — log eventi append-only (M3, doc 02 §3.2)
+    // Fase 1 (transitoria): i client possono fare SOLO create su una
+    // whitelist di tipi, con validazione dura. update/delete negati a
+    // tutti: le correzioni sono un nuovo evento `event.corrected` con
+    // campo supersedes. In Fase 2 anche il create passera' dal gateway.
+    // ============================================================
+    function myPersonId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.person_id;
+    }
+
+    match /human_events/{eventId} {
+      // Lettura: staff tutto (vista coach); l'allievo solo la propria storia
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.person_id == myPersonId()
+      );
+      allow create: if isAuthenticated()
+        && request.resource.data.schema_version == 1
+        && request.resource.data.type in [
+          'person.onboarded',
+          'wellness.checkin_submitted', 'breathing.session_completed',
+          'gym.checkin',
+          'workout.started', 'workout.completed', 'workout.abandoned',
+          'body.measurement_recorded', 'body.composition_estimated',
+          'posture.assessed', 'movement.gait_assessed',
+          'movement.squat_assessed', 'mindmovement.assessed',
+          'coach.attention_handled', 'event.corrected'
+        ]
+        && request.resource.data.ts is timestamp
+        && request.resource.data.ts < request.time + duration.value(5, 'm')
+        && request.resource.data.actor_id == request.auth.uid
+        && (isStaff() || request.resource.data.person_id == myPersonId());
+      // Append-only: mai riscrivere la storia
+      allow update, delete: if false;
+    }
+
+    // Stati derivati del twin (scritti SOLO dal Brain notturno via
+    // Admin SDK): lo staff legge tutto (coda del mattino), l'allievo
+    // legge solo il proprio. Nessun client scrive mai.
+    match /twins/{personId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || personId == myPersonId()
+      );
+      allow write: if false;
+    }
+
+    // Valutazioni Mind Movement™ (metodo proprietario): somministrate
+    // dallo staff; l'allievo legge le proprie. Mai delete dai client.
+    match /mindMovementAssessments/{assessmentId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update, delete: if false;
+    }
+
+    // Scheda di onboarding: primo atto del percorso. Contiene dati
+    // di salute — la scrive lo staff nel colloquio, la legge lo staff
+    // e l'interessato. Append-only: una scheda firmata non si riscrive.
+    match /onboardings/{docId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create, update: if isStaff();
+      allow delete: if false;
+    }
+
+    // Sessioni di respiro: atto di prima persona dell'allievo.
+    // Le scrive lui, le legge lui (e lo staff che lo segue).
+    match /breathingSessions/{sessionId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isAuthenticated() &&
+        request.resource.data.studentId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Esame del Sistema Stellato (valutazione in due sessioni).
+    // Dato sanitario di categoria particolare: lo somministra lo staff,
+    // l'allievo legge solo il proprio. Append-only — un referto firmato
+    // non si riscrive: si registra una nuova sessione.
+    match /stellatoSessions/{sessionId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update, delete: if false;
+    }
+
+    // Ritratto ESSĒRE: lo genera lo staff (coach nel loop), l'allievo
+    // legge il proprio. Mai cancellabile dai client.
+    match /portraits/{personId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || personId == myPersonId()
+      );
+      allow create, update: if isStaff();
+      allow delete: if false;
+    }
+
+    // Config di istanza (licenza white-label): sola lettura dai client,
+    // scrittura solo dal fornitore via service account (Admin SDK).
+    // ECCEZIONE calIngest: lì vive l'impronta della chiave del ponte
+    // CAL e non la legge nessun client — la scrive e la verifica solo
+    // una Function con l'Admin SDK, che non passa da queste regole.
+    // (Le regole si sommano: per chiudere un documento va escluso QUI,
+    // un secondo blocco «if false» non toglierebbe niente.)
+    match /config/{docId} {
+      allow read: if isAuthenticated() && docId != 'calIngest';
+      allow write: if false;
+    }
+
+    // Eccezioni scrivibili dall'owner: info per l'Assistente e chiave AI
+    match /config/assistantInfo {
+      allow read: if isAuthenticated();
+      allow write: if isOwner();
+    }
+    match /config/aiKey {
+      allow read: if isAuthenticated();
+      allow write: if isOwner();
+    }
+
+    // Users collection — M0 hardening:
+    // - lettura: il proprio documento, lo staff (che gestisce gli allievi),
+    //   oppure i profili dello staff (gli allievi devono vedere nome/contatti
+    //   di coach e titolare per chat e pagamenti — MAI i documenti di altri
+    //   allievi, che contengono note mediche e obiettivi).
+    // - update: il proprietario NON puo' toccare ruolo, commissioni o
+    //   assegnazioni (anti scalata di privilegi); owner/manager si'.
+    //   L'eccezione hasOnly(['assignedStudents']) serve al flusso inviti
+    //   (l'allievo appena registrato si aggiunge alla lista del coach).
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isStaff() ||
+        resource.data.role in ['owner', 'manager', 'collaborator']
+      );
+      allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
-        request.auth.uid == userId || isOwnerOrManager()
+        isOwnerOrManager() ||
+        (request.auth.uid == userId &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+            ['role', 'commissionPercentage', 'managerCommissionPercentage',
+             'coachCommissionPercentage', 'managedPassword', 'person_id']
+          )) ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['assignedStudents']) ||
+        // person_id del twin (M3, doc 02 §6.1): SET-ONCE — lo scrive
+        // self o staff la prima volta, poi e' immutabile per tutti
+        // tranne owner/manager (identita' stabile = base del twin)
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['person_id']) &&
+          !('person_id' in resource.data) &&
+          (request.auth.uid == userId || isStaff()))
       );
       allow delete: if isStaff();
     }
 
     // Student invites
     match /studentInvites/{inviteId} {
-      allow read: if true; // Necessario per validare codice invito prima del login
+      allow read: if true;
       allow create: if isStaff();
       allow update: if isAuthenticated();
       allow delete: if isOwnerOrManager();
@@ -54,7 +238,7 @@ service cloud.firestore {
 
     // Workout plans
     match /workoutPlans/{planId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -69,16 +253,64 @@ service cloud.firestore {
     }
 
     // Sessions
+    // Richieste di appuntamento arrivate da WhatsApp.
+    // Non sono appuntamenti: lo diventano quando il titolare conferma
+    // e nasce una sessione. Le vede e le scrive SOLO il titolare —
+    // per decisione di Francesco tutte le chiamate arrivano a lui e a
+    // nessun collaboratore, e qui dentro ci sono nome e telefono di
+    // persone che non sono ancora allieve.
+    match /bookingRequests/{requestId} {
+      allow read, create, update, delete: if isOwner();
+    }
+
     match /sessions/{sessionId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
     }
 
-    // Payment plans
+    // Nutritionist appointments - dati sensibili
+    match /nutritionistAppointments/{appointmentId} {
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
+
+    // Body measurements - dati sanitari sensibili
+    match /bodyMeasurements/{measurementId} {
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // BIA documents - dati sanitari sensibili
+    match /biaDocuments/{docId} {
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Workout logs
+    match /workoutLogs/{logId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && (
+        isStaff() || request.resource.data.studentId == request.auth.uid
+      );
+      allow update: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isStaff();
+    }
+
+    // Payment plans - dati finanziari sensibili
     match /paymentPlans/{planId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isAuthenticated();
       allow delete: if isOwnerOrManager();
@@ -86,7 +318,7 @@ service cloud.firestore {
 
     // Collaborator earnings
     match /collaboratorEarnings/{earningId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwnerOrManager() || resource.data.collaboratorId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isOwnerOrManager();
       allow delete: if isOwner();
@@ -124,7 +356,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated();
     }
 
-    // User presence (online status)
+    // User presence
     match /userPresence/{userId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
@@ -140,17 +372,19 @@ service cloud.firestore {
       allow delete: if isOwnerOrManager();
     }
 
-    // Diary entries
+    // Diary entries - dati personali sensibili
     match /diaryEntries/{entryId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isAuthenticated() && (
+        isStaff() || request.resource.data.studentId == request.auth.uid
+      );
+      allow update: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow delete: if isStaff() || resource.data.studentId == request.auth.uid;
     }
 
-    // Postural assessments
+    // Postural assessments - dati sanitari sensibili
     match /posturalAssessments/{assessmentId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -158,7 +392,7 @@ service cloud.firestore {
 
     // Nutritional consultations
     match /nutritionalConsultations/{consultationId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
@@ -190,7 +424,7 @@ service cloud.firestore {
 
     // Academy progress
     match /academyProgress/{progressId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
@@ -206,7 +440,7 @@ service cloud.firestore {
 
     // Academy quiz attempts
     match /academyQuizAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
       allow delete: if isStaff();
@@ -231,6 +465,76 @@ service cloud.firestore {
     // Academy certificates
     match /academyCertificates/{certId} {
       allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+      allow delete: if isAuthenticated() && (
+        isStaff() || resource.data.userId == request.auth.uid
+      );
+    }
+
+    // KPI targets
+    match /kpiTargets/{targetId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwnerOrManager();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwner();
+    }
+
+    // Daily tasks
+    match /dailyTasks/{taskId} {
+      allow read: if isOwnerOrManager();
+      allow create: if isOwnerOrManager();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwnerOrManager();
+    }
+
+    // Custom workout templates
+    match /customWorkoutTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Credential change requests
+    match /credentialRequests/{requestId} {
+      allow read: if isOwnerOrManager() || resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isOwnerOrManager();
+      allow delete: if isOwner();
+    }
+
+    // Body composition estimates
+    match /bodyCompositionEstimates/{estimateId} {
+      allow read: if isStaff() || resource.data.studentId == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Gamification
+    match /gamification/{gamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isStaff();
+    }
+
+    // Nutrition team notes
+    match /nutritionTeamNotes/{noteId} {
+      allow read: if isStaff();
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();

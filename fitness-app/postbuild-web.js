@@ -2,15 +2,40 @@
 const fs = require('fs');
 const path = require('path');
 
+// --- WHITE-LABEL: risolve il brand attivo (nome + colore) dal file di
+// config, così titolo scheda, meta PWA e manifest seguono il cliente.
+// Legge src/config/brand.ts; se è un ri-export (set-brand.js) segue il
+// file brands/<cliente>.ts. Fallback a ESSĒRE se qualcosa non torna.
+function readActiveBrand() {
+  const cfgDir = path.join(__dirname, 'src', 'config');
+  let src = '';
+  try {
+    src = fs.readFileSync(path.join(cfgDir, 'brand.ts'), 'utf8');
+    const reexport = src.match(/from '\.\/brands\/([A-Za-z0-9_-]+)'/);
+    if (reexport) {
+      src = fs.readFileSync(path.join(cfgDir, 'brands', `${reexport[1]}.ts`), 'utf8');
+    }
+  } catch (_) { /* fallback sotto */ }
+  const appName = (src.match(/appName:\s*['"]([^'"]+)['"]/) || [])[1] || 'ESSĒRE';
+  const tagline = (src.match(/tagline:\s*['"]([^'"]+)['"]/) || [])[1] || '';
+  const primary = (src.match(/primary:\s*['"](#[0-9a-fA-F]{3,8})['"]/) || [])[1] || '#0D0D0D';
+  return { appName, tagline, primary };
+}
+const BRAND = readActiveBrand();
+console.log(`✓ Brand attivo per il web: ${BRAND.appName} (${BRAND.primary})`);
+
 const indexPath = path.join(__dirname, 'dist', 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
 
+// Titolo scheda browser = nome del brand attivo
+html = html.replace(/<title>[^<]*<\/title>/, `<title>${BRAND.appName}</title>`);
+
 const pwaMeta = `
     <!-- PWA Meta -->
-    <meta name="theme-color" content="#0D0D0D" />
+    <meta name="theme-color" content="${BRAND.primary}" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="ESSĒRE" />
+    <meta name="apple-mobile-web-app-title" content="${BRAND.appName}" />
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
@@ -43,7 +68,6 @@ webAssets.forEach((file) => {
   const dst = path.join(__dirname, 'dist', file);
   if (fs.existsSync(src)) {
     if (file === 'sw.js') {
-      // Inject unique build timestamp so the browser detects a new SW on every deploy
       let sw = fs.readFileSync(src, 'utf8');
       sw = sw.replace('__BUILD_TS__', buildTs);
       fs.writeFileSync(dst, sw);
@@ -54,6 +78,53 @@ webAssets.forEach((file) => {
     }
   }
 });
+
+// --- AI BIOMECHANICS: asset pose-estimation self-hostati ---
+// Il runtime WASM viene copiato da node_modules (non committato);
+// il modello .task vive in web/models (committato, 5.7MB).
+// Caricati in lazy solo dalla schermata Analisi del cammino.
+const mpRoot = path.join(__dirname, 'node_modules', '@mediapipe', 'tasks-vision');
+const wasmSrc = path.join(mpRoot, 'wasm');
+const wasmDst = path.join(__dirname, 'dist', 'wasm');
+if (fs.existsSync(wasmSrc)) {
+  fs.mkdirSync(wasmDst, { recursive: true });
+  fs.readdirSync(wasmSrc).forEach((f) => {
+    fs.copyFileSync(path.join(wasmSrc, f), path.join(wasmDst, f));
+  });
+  // Il modulo JS della libreria viene caricato a runtime con import()
+  // nativo del browser (Metro non sa trasformarlo): self-hostato qui.
+  const bundleMjs = path.join(mpRoot, 'vision_bundle.mjs');
+  if (fs.existsSync(bundleMjs)) {
+    fs.copyFileSync(bundleMjs, path.join(wasmDst, 'vision_bundle.mjs'));
+  }
+  console.log('✓ MediaPipe WASM + vision_bundle.mjs copiati in dist/wasm/');
+}
+const modelsSrc = path.join(__dirname, 'web', 'models');
+const modelsDst = path.join(__dirname, 'dist', 'models');
+if (fs.existsSync(modelsSrc)) {
+  fs.mkdirSync(modelsDst, { recursive: true });
+  fs.readdirSync(modelsSrc).forEach((f) => {
+    fs.copyFileSync(path.join(modelsSrc, f), path.join(modelsDst, f));
+  });
+  console.log('✓ Modelli pose copiati in dist/models/');
+}
+
+// --- WHITE-LABEL: allinea il manifest PWA al brand attivo (nome app
+// installata + colori splash/tema). Le icone restano quelle in web/.
+const manifestDst = path.join(__dirname, 'dist', 'manifest.json');
+if (fs.existsSync(manifestDst)) {
+  try {
+    const m = JSON.parse(fs.readFileSync(manifestDst, 'utf8'));
+    m.name = BRAND.appName;
+    m.short_name = BRAND.appName;
+    m.background_color = BRAND.primary;
+    m.theme_color = BRAND.primary;
+    fs.writeFileSync(manifestDst, JSON.stringify(m, null, 2));
+    console.log(`✓ manifest.json allineato al brand: ${BRAND.appName}`);
+  } catch (e) {
+    console.warn('manifest.json non aggiornato:', e.message);
+  }
+}
 
 // Inject safe area CSS for PWA standalone on notched iPhones
 if (!html.includes('tab-bar-bottom')) {
@@ -83,5 +154,125 @@ if (!html.includes("register('/sw.js')")) {
   html = html.replace('</body>', swScript + '\n  </body>');
 }
 
+// --- CODE PROTECTION: Anti-inspection, anti-copy ---
+const protectionScript = `
+    <script>
+    (function(){
+      // Block right-click context menu
+      document.addEventListener('contextmenu',function(e){e.preventDefault();return false});
+      // Block dev tools keyboard shortcuts
+      document.addEventListener('keydown',function(e){
+        if(e.key==='F12'){e.preventDefault();return false}
+        if((e.ctrlKey||e.metaKey)&&e.shiftKey&&/^[IJCKijck]$/.test(e.key)){e.preventDefault();return false}
+        if((e.ctrlKey||e.metaKey)&&/^[USus]$/.test(e.key)){e.preventDefault();return false}
+      });
+      // Block drag
+      document.addEventListener('dragstart',function(e){e.preventDefault();return false});
+      // Block text selection via CSS (except inputs)
+      var s=document.createElement('style');
+      s.textContent='*{-webkit-user-select:none!important;user-select:none!important}input,textarea,[contenteditable]{-webkit-user-select:text!important;user-select:text!important}';
+      document.head.appendChild(s);
+      // Override console methods
+      var _n=function(){};
+      ['log','debug','info','warn','error','table','trace','dir','group','groupEnd','clear','count','assert'].forEach(function(m){try{console[m]=_n}catch(_){}});
+    })();
+    </script>`;
+
+if (!html.includes('Anti-devtools')) {
+  html = html.replace('</head>', protectionScript + '\n  </head>');
+}
+
+// Copy public/ files to dist/ (meditazione.html, etc.)
+// NB: solo AGGIUNTE — i file già prodotti dalla pipeline (manifest.json
+// col brand attivo, sw.js con la cache version stampata) non vanno
+// sovrascritti da copie statiche datate.
+const publicDir = path.join(__dirname, 'public');
+if (fs.existsSync(publicDir)) {
+  fs.readdirSync(publicDir).forEach((file) => {
+    const src = path.join(publicDir, file);
+    const dst = path.join(__dirname, 'dist', file);
+    if (fs.statSync(src).isFile()) {
+      if (fs.existsSync(dst)) {
+        console.log(`○ public/${file} saltato (già gestito dalla build)`);
+        return;
+      }
+      fs.copyFileSync(src, dst);
+      console.log(`✓ public/${file} copied to dist/`);
+    }
+  });
+}
+
 fs.writeFileSync(indexPath, html);
 console.log('✓ PWA meta tags and service worker injected into dist/index.html');
+
+// --- OBFUSCATION: Obfuscate main JS bundle ---
+const JavaScriptObfuscator = require('javascript-obfuscator');
+const jsDir = path.join(__dirname, 'dist', '_expo', 'static', 'js', 'web');
+
+if (fs.existsSync(jsDir)) {
+  const jsFiles = fs.readdirSync(jsDir).filter((f) => f.endsWith('.js') && !f.endsWith('.map'));
+  jsFiles.forEach((file) => {
+    const filePath = path.join(jsDir, file);
+    const stat = fs.statSync(filePath);
+    if (stat.size < 100) {
+      console.log(`○ ${file} skipped (empty/stub)`);
+      return;
+    }
+    console.log(`⚡ Obfuscating ${file} (${(stat.size / 1024 / 1024).toFixed(2)} MB)...`);
+    const code = fs.readFileSync(filePath, 'utf8');
+    try {
+      const result = JavaScriptObfuscator.obfuscate(code, {
+        compact: true,
+        controlFlowFlattening: false,
+        deadCodeInjection: false,
+        debugProtection: false,
+        disableConsoleOutput: false,
+        identifierNamesGenerator: 'hexadecimal',
+        log: false,
+        numbersToExpressions: false,
+        renameGlobals: false,
+        selfDefending: false,
+        simplify: true,
+        splitStrings: false,
+        stringArray: true,
+        stringArrayCallsTransform: false,
+        stringArrayEncoding: [],
+        stringArrayIndexShift: true,
+        stringArrayRotate: true,
+        stringArrayShuffle: true,
+        stringArrayWrappersCount: 1,
+        stringArrayWrappersChainedCalls: false,
+        stringArrayWrappersType: 'variable',
+        stringArrayThreshold: 0.5,
+        transformObjectKeys: false,
+        unicodeEscapeSequence: false,
+        sourceMap: false,
+      });
+      fs.writeFileSync(filePath, result.getObfuscatedCode());
+      const newSize = fs.statSync(filePath).size;
+      console.log(`✓ ${file} obfuscated (${(newSize / 1024 / 1024).toFixed(2)} MB)`);
+    } catch (err) {
+      console.error(`✗ Failed to obfuscate ${file}:`, err.message);
+    }
+  });
+} else {
+  console.warn('⚠ JS output directory not found, skipping obfuscation');
+}
+
+// Remove any source maps
+const distDir = path.join(__dirname, 'dist');
+function removeMapFiles(dir) {
+  if (!fs.existsSync(dir)) return;
+  fs.readdirSync(dir).forEach((item) => {
+    const full = path.join(dir, item);
+    if (fs.statSync(full).isDirectory()) {
+      removeMapFiles(full);
+    } else if (item.endsWith('.map')) {
+      fs.unlinkSync(full);
+      console.log(`✓ Removed source map: ${item}`);
+    }
+  });
+}
+removeMapFiles(distDir);
+
+console.log('✓ Code protection applied: obfuscation + anti-debugging + security headers');

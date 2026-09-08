@@ -1,0 +1,384 @@
+<title>Lo stato reale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --paper:#FCFBF8; --paper-box:#F4EEE2; --paper-sunk:#F2F1ED;
+    --ink:#1A1A1A; --ink-soft:#3E3C39; --ink-faint:#6B6862;
+    --rule:#D8D4CB; --rule-soft:#E7E4DC;
+    --red:#9B1B30; --red-deep:#6E1322; --red-wash:#F6E7E7;
+    --chiuso:#1F5E43; --chiuso-wash:#E3EFE8;
+    --aperto:#8A5A12; --aperto-wash:#F5EBDC;
+    --bar:#1C1C1C; --bar-ink:#FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+      --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+      --rule:#33302A; --rule-soft:#262420;
+      --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+      --chiuso:#79BE9C; --chiuso-wash:#152520;
+      --aperto:#D9A85C; --aperto-wash:#26200F;
+      --bar:#E4E0D6; --bar-ink:#14130F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14130F; --paper-box:#221E17; --paper-sunk:#1C1B17;
+    --ink:#EDEAE2; --ink-soft:#C0BBB0; --ink-faint:#8B857A;
+    --rule:#33302A; --rule-soft:#262420;
+    --red:#E0798B; --red-deep:#F0A3B0; --red-wash:#2A1A1E;
+    --chiuso:#79BE9C; --chiuso-wash:#152520;
+    --aperto:#D9A85C; --aperto-wash:#26200F;
+    --bar:#E4E0D6; --bar-ink:#14130F;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+    font-family:Tinos,"Times New Roman",Times,serif; font-size:17.5px; line-height:1.62; }
+  .sheet { max-width:800px; margin:0 auto; padding:clamp(30px,6vw,76px) clamp(18px,5vw,52px) 100px; }
+
+  .ente { text-align:center; color:var(--red); font-weight:700; font-size:0.84rem;
+    letter-spacing:0.09em; line-height:2; text-transform:uppercase; }
+  .ente .doc { display:block; margin-top:12px; }
+  .short-rule { width:116px; height:1px; background:var(--red); border:0; margin:18px auto; }
+  h1 { font-size:clamp(2.2rem,6.6vw,3.3rem); font-weight:700; text-align:center;
+    margin:10px 0 18px; line-height:1.06; }
+  .sottotitolo { font-style:italic; text-align:center; color:var(--ink-soft);
+    font-size:1.05rem; margin:0 auto; max-width:32em; text-wrap:balance; }
+  .ink-rule { width:96px; height:1px; background:var(--rule); border:0; margin:26px auto; }
+  .firma { text-align:center; font-style:italic; line-height:1.9; }
+  .firma b { font-style:normal; font-weight:700; }
+
+  h2 { font-size:1.36rem; font-weight:700; color:var(--red); margin:56px 0 4px; line-height:1.25; }
+  .cap-rule { width:100%; height:2px; background:var(--red); border:0; margin:0 0 20px; }
+  h3 { font-size:1.04rem; font-weight:700; margin:26px 0 8px; }
+  p { margin:0 0 15px; }
+  ul,ol { margin:0 0 16px; padding-left:1.25em; }
+  li { margin-bottom:8px; }
+
+  .riquadro { border:1px solid var(--red); background:var(--paper-box);
+    padding:clamp(18px,3.2vw,26px); margin:30px 0; }
+  .riquadro h3 { margin:0 0 12px; }
+  .riquadro p:last-child { margin:0; }
+
+  /* voce debito */
+  .voce { border:1px solid var(--rule); border-radius:3px; margin:16px 0;
+    background:var(--paper-sunk); overflow:hidden; }
+  .voce-t { display:flex; gap:12px; align-items:baseline; flex-wrap:wrap;
+    padding:11px 18px; border-bottom:1px solid var(--rule); }
+  .voce-t .lug { font-family:"IBM Plex Mono",monospace; font-size:0.74rem;
+    color:var(--ink-faint); letter-spacing:0.04em; }
+  .voce-t .tit { font-weight:700; flex:1; min-width:170px; }
+  .bollo { font-family:"IBM Plex Mono",monospace; font-size:0.68rem;
+    letter-spacing:0.07em; text-transform:uppercase; padding:2px 9px;
+    border:1px solid currentColor; white-space:nowrap; }
+  .b-chiuso { color:var(--chiuso); background:var(--chiuso-wash); }
+  .b-aperto { color:var(--aperto); background:var(--aperto-wash); }
+  .voce-b { padding:14px 18px; }
+  .voce-b p { margin:0 0 10px; font-size:0.98rem; }
+  .voce-b p:last-child { margin:0; }
+  .prova { font-family:"IBM Plex Mono",monospace; font-size:0.8rem;
+    background:var(--paper); border:1px solid var(--rule); border-radius:3px;
+    padding:8px 12px; margin:10px 0 0; overflow-x:auto; white-space:pre; }
+  .quando { font-size:0.92rem; color:var(--ink-faint); font-style:italic; }
+
+  .tab-wrap { overflow-x:auto; margin:20px 0 26px; }
+  table { border-collapse:collapse; width:100%; font-size:0.92rem; }
+  thead th { background:var(--bar); color:var(--bar-ink);
+    font-family:"IBM Plex Mono",monospace; font-weight:500; font-size:0.74rem;
+    letter-spacing:0.05em; text-align:left; padding:9px 12px; }
+  td, tbody th { border-bottom:1px solid var(--rule); padding:9px 12px; vertical-align:top; text-align:left; }
+  tbody th { font-weight:700; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;
+    font-family:"IBM Plex Mono",monospace; font-size:0.86rem; }
+
+  .verifica { background:var(--paper-sunk); border-left:4px solid var(--red);
+    padding:18px 22px; margin:24px 0; }
+  .verifica p { margin:0 0 12px; }
+  .verifica p:last-child { margin:0; }
+  .verifica code { font-family:"IBM Plex Mono",monospace; font-size:0.84rem;
+    background:var(--paper); padding:1px 5px; border:1px solid var(--rule); }
+
+  .colophon { margin-top:60px; padding-top:20px; border-top:2px solid var(--red);
+    font-size:0.86rem; color:var(--ink-faint); line-height:1.7; }
+
+  @media print {
+    body { background:#fff; font-size:11pt; }
+    .sheet { padding:0; max-width:none; }
+    h2 { break-after:avoid; }
+    .voce,.riquadro,table,.verifica { break-inside:avoid; }
+  }
+</style>
+
+<div class="sheet">
+
+  <p class="ente">
+    A.S.D. Evolution Sport<br>
+    Mind Movement Lab — Gragnano (NA)
+    <span class="doc">ESSĒRE · Nota per la due diligence</span>
+  </p>
+  <hr class="short-rule">
+
+  <h1>Lo stato reale</h1>
+  <p class="sottotitolo">Che cosa dicevamo fosse rotto a luglio, che cosa è vero oggi,
+    che cosa è ancora rotto — e come verificare ogni riga da soli</p>
+
+  <hr class="ink-rule">
+  <p class="firma">
+    <b>Francesco Busanca</b><br>
+    Fondatore e Direttore Tecnico — Metodo Mind Movement
+  </p>
+
+  <div class="riquadro">
+    <h3>Perché esiste questa pagina</h3>
+    <p>Il documento di strategia di ESSĒRE, scritto a luglio, si apre con un elenco di
+      difetti gravi del nostro stesso software. Non era un gesto di modestia: erano veri,
+      e li avevamo scritti per non poterli ignorare.</p>
+    <p>Sono passate poche settimane. <strong>Tutti e cinque sono chiusi.</strong> E se ne
+      sono aperti altri, che trovate qui sotto con la stessa franchezza.</p>
+    <p>Il principio è lo stesso che regge il prodotto: ogni numero dichiara la propria
+      fonte e il proprio limite. <strong>Nessuna riga di questa pagina va creduta sulla
+      parola: accanto a ciascuna c'è come verificarla.</strong></p>
+  </div>
+
+  <!-- ============ CHIUSI ============ -->
+  <h2>I cinque debiti dichiarati a luglio</h2>
+  <hr class="cap-rule">
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="lug">luglio</span>
+      <span class="tit">Password gestite in chiaro, leggibili da ogni utente autenticato</span>
+      <span class="bollo b-chiuso">chiuso</span>
+    </div>
+    <div class="voce-b">
+      <p>Il campo è stato rimosso dal client. Non è solo tolto: un controllo automatico
+        blocca ogni modifica che lo reintroduca, quindi non può tornare per distrazione.</p>
+      <p class="prova">grep -rE "managedPassword\s*[:=]|\.managedPassword" src/
+→ nessun risultato · il controllo gira a ogni modifica proposta</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="lug">luglio</span>
+      <span class="tit">Chiave dell'intelligenza artificiale distribuita ai client</span>
+      <span class="bollo b-chiuso">chiuso</span>
+    </div>
+    <div class="voce-b">
+      <p>Rimossa. Le chiamate passano da una funzione lato server; nessuna credenziale
+        vive più nell'applicazione installata sui telefoni. Anche qui, un controllo
+        automatico impedisce che una chiave torni nel codice.</p>
+      <p class="prova">grep -rn "sk-ant-api" src/
+→ nessun risultato</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="lug">luglio</span>
+      <span class="tit">Zero test</span>
+      <span class="bollo b-chiuso">chiuso</span>
+    </div>
+    <div class="voce-b">
+      <p><strong>505 test su 24 suite</strong>, e non sono test di facciata: coprono le
+        regole del metodo — la progressione dello stimolo, il protocollo di valutazione,
+        i prezzi, l'agenda, i testi degli esercizi. Le regole vivono in codice puro e
+        testato, separate dalle schermate.</p>
+      <p>La conseguenza commerciale: quando un cliente white-label chiede se il metodo è
+        lo stesso sulla sua installazione, la risposta non è una promessa. È una suite
+        che gira.</p>
+      <p class="prova">npx jest --ci
+→ Tests: 505 passed, 505 total</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="lug">luglio</span>
+      <span class="tit">Zero integrazione e distribuzione continua</span>
+      <span class="bollo b-chiuso">chiuso</span>
+    </div>
+    <div class="voce-b">
+      <p><strong>Nove flussi automatici.</strong> Ogni modifica proposta passa da
+        controllo dei tipi, test, guardiano dei colori e ricerche di sicurezza prima di
+        poter essere accettata. La pubblicazione in produzione è deliberata: parte solo
+        se il titolo della modifica lo chiede esplicitamente.</p>
+      <p class="quando">Quest'ultima regola nasce da un incidente reale: una modifica che
+        nel testo spiegava di <em>non</em> voler pubblicare ha pubblicato, perché per
+        spiegarlo aveva dovuto nominare il comando. Ora la decisione si legge dalla sola
+        prima riga.</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="lug">luglio</span>
+      <span class="tit">Barra di navigazione da 20 voci</span>
+      <span class="bollo b-chiuso">chiuso</span>
+    </div>
+    <div class="voce-b">
+      <p>Cinque sezioni: Oggi, Allenati, Progressi, Chat, Profilo. Nessuna schermata è
+        stata eliminata — tutte restano raggiungibili in due tocchi dentro una gerarchia.</p>
+    </div>
+  </div>
+
+  <!-- ============ APERTI ============ -->
+  <h2>Che cosa è ancora aperto</h2>
+  <hr class="cap-rule">
+  <p>Chiuderne cinque non significa averli chiusi tutti. Questi sono i debiti veri di
+    oggi, in ordine di gravità, con la ragione per cui sono ancora lì.</p>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">73 vulnerabilità note nelle dipendenze</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>Quattro critiche, 28 alte, 39 medie, 2 basse. Vengono dall'albero delle
+        dipendenze di React Native ed Expo, non da codice scritto da noi. Il controllo
+        gira a ogni modifica ma <strong>non blocca ancora</strong>: bloccarlo oggi
+        fermerebbe lo sviluppo senza rendere l'applicazione più sicura, perché la
+        correzione richiede aggiornamenti a monte.</p>
+      <p class="quando">Quando si chiude: al primo aggiornamento maggiore di Expo. È la
+        prima cosa che un investimento renderebbe possibile fare bene invece che in fretta.</p>
+      <p class="prova">npm audit
+→ 73 vulnerabilità: 4 critiche, 28 alte, 39 moderate, 2 basse</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">Controllo dei tipi non bloccante</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>Il controllo gira a ogni modifica, ma il suo esito non ferma la pubblicazione.
+        La ragione è un debito ereditato su file che usano funzioni del browser dentro un
+        progetto che vive anche su telefono.</p>
+      <p class="quando">Quando si chiude: quando quei file sono separati. Il codice del
+        dominio — le regole del metodo — è già pulito: è il resto a non esserlo.</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">L'analisi posturale funziona solo nell'applicazione web</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>È il limite più importante di questa pagina, e va detto per primo a chiunque
+        valuti il prodotto. Il riconoscimento della postura dalla fotografia gira dentro
+        il browser; sull'applicazione nativa oggi non gira, e restituisce un elenco vuoto
+        invece di un risultato falso.</p>
+      <p>Non è un difetto nascosto: è scritto nel codice come scelta esplicita. Ma
+        significa che oggi <strong>la funzione più distintiva vive nella versione web</strong>.</p>
+      <p class="prova">postureMeasure.ts, riga 30
+if (Platform.OS !== 'web') return []; // pose estimation solo in PWA</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">Libreria dei filmati: 3 esercizi su 115</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>Tre esercizi hanno il film girato e il testo tecnico dettato dal direttore
+        tecnico, protetti da test che impediscono a chiunque di riscriverli. Gli altri
+        112 hanno la scheda ma non il filmato.</p>
+      <p class="quando">Quando si chiude: è lavoro di produzione, non di ingegneria. Un
+        esercizio completo richiede una sessione di ripresa e mezz'ora di lavorazione.</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">Accademia: 4 moduli certi su 22</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>L'architettura formativa è definita — tre livelli, 22 moduli, ripartizione
+        8/8/6 — e quattro moduli sono prodotti o certi. Il primo è completo di materiali
+        d'aula e prove d'esame; la sessione di docimologia per i formatori è scritta.</p>
+      <p>Va detto anche questo: <strong>il documento che elenca i 22 moduli non è
+        reperibile in forma digitale.</strong> Esiste su carta e la sua architettura è
+        ricostruita; l'elenco esatto va reinserito.</p>
+    </div>
+  </div>
+
+  <div class="voce">
+    <div class="voce-t">
+      <span class="tit">148 colori fuori dal tema centrale</span>
+      <span class="bollo b-aperto">aperto</span>
+    </div>
+    <div class="voce-b">
+      <p>Debito estetico, non funzionale, e sotto controllo: un guardiano automatico
+        impedisce che il numero cresca e accetta solo le diminuzioni. Conta perché il
+        prodotto è venduto in versione white-label, e un colore fuori dal tema è un
+        colore che non cambia quando cambia il marchio del cliente.</p>
+      <p class="prova">node scripts/check-colors.js
+→ 148 colori legacy in baseline, in diminuzione</p>
+    </div>
+  </div>
+
+  <!-- ============ COSA È VERO ============ -->
+  <h2>Che cosa è vero oggi</h2>
+  <hr class="cap-rule">
+
+  <div class="tab-wrap">
+    <table>
+      <thead><tr><th>Fatto</th><th>Come si verifica</th></tr></thead>
+      <tbody>
+        <tr><th>In produzione, non in dimostrazione</th><td>L'applicazione è pubblica e usata ogni giorno in una palestra reale. L'indirizzo si apre da qualsiasi browser.</td></tr>
+        <tr><th>Le regole del metodo sono codice testato</th><td>Progressione dello stimolo, protocollo di valutazione, sistema di profilazione, listino: dominio puro, 505 test.</td></tr>
+        <tr><th>Impianto white-label pronto</th><td>Marchio, colori e licenza sono configurazione, non codice. Esiste l'interruttore che revoca l'accesso a un cliente.</td></tr>
+        <tr><th>Il perimetro sanitario è strutturale</th><td>Dichiarato nel protocollo, applicato nel software, ed è criterio eliminatorio dell'esame di certificazione: chi lo supera non è certificato.</td></tr>
+        <tr><th>La misura dichiara il proprio limite</th><td>Undici assi di progressione dichiarano se il dato è misurato, misto o affidato all'occhio dell'operatore. Una fotografia illeggibile produce «qualità insufficiente», non un numero.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>I dati commerciali — allievi, ricavi, unit economics per palestra cliente — stanno
+    nel documento di strategia, che li dichiara come stime del fondatore. <strong>Questa
+    pagina non li ripete</strong>: si occupa solo di ciò che è verificabile senza
+    fidarsi di noi.</p>
+
+  <!-- ============ VERIFICA ============ -->
+  <h2>Come verificare tutto in dieci minuti</h2>
+  <hr class="cap-rule">
+
+  <div class="verifica">
+    <p><strong>1. Il prodotto esiste.</strong> Aprite l'indirizzo pubblico dal telefono.
+      Non è una presentazione: è l'applicazione che usano gli allievi.</p>
+    <p><strong>2. I test esistono.</strong> Clonate il repository ed eseguite
+      <code>npx jest --ci</code>. Attendetevi 505 test verdi in pochi secondi.</p>
+    <p><strong>3. I controlli automatici esistono.</strong> Guardate lo storico delle
+      modifiche proposte: ogni una porta l'esito di controllo tipi, test, guardiano
+      colori e ricerche di sicurezza.</p>
+    <p><strong>4. I difetti dichiarati qui sono reali.</strong> Eseguite
+      <code>npm audit</code> e <code>node scripts/check-colors.js</code>: devono darvi i
+      numeri di questa pagina. Se non tornano, questa pagina è vecchia — e
+      quell'informazione vale quanto le altre.</p>
+  </div>
+
+  <div class="riquadro">
+    <h3>La sola cosa che vi chiediamo di credere</h3>
+    <p>Che l'elenco dei debiti aperti sia completo. Non potete verificare un'assenza.</p>
+    <p>L'unica garanzia che possiamo offrire è il precedente: a luglio abbiamo scritto i
+      nostri cinque difetti peggiori in cima al nostro documento di strategia, quando
+      nessuno ce lo chiedeva e nessuno li avrebbe scoperti. <strong>Questa pagina è la
+      seconda volta che lo facciamo.</strong></p>
+  </div>
+
+  <div class="colophon">
+    <p><b>Verificato il 6 settembre 2026</b> sul ramo di sviluppo corrente. I comandi
+      riportati sono quelli realmente eseguiti per produrre questa pagina; i numeri sono
+      il loro esito, non una stima. Da rifare a ogni consegna a terzi: una pagina di
+      stato che invecchia diventa il contrario di ciò per cui è stata scritta.</p>
+    <p>Documento complementare al pacchetto di strategia ESSĒRE OS (otto documenti,
+      luglio 2026) e alla pagina fondativa «Human interface».</p>
+  </div>
+
+</div>

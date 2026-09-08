@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   StyleSheet,
   FlatList,
   TouchableOpacity,
   Modal,
   ScrollView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { crossAlert } from '../../utils/alert';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
@@ -19,12 +22,25 @@ import { Badge } from '../../components/common/Badge';
 import { Student, TrainingProgram, Exercise, WorkoutPlan } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
-import { createProgram, getStudentWorkoutPlans } from '../../services/programService';
+import { createProgram, getStudentWorkoutPlans, getActiveWorkoutPlan } from '../../services/programService';
+import { getStudentSessions } from '../../services/sessionService';
+import { getStudentMeasurements } from '../../services/nutritionistService';
+import { getStudentPaymentPlans } from '../../services/paymentService';
+import { printStudentProgressReport } from '../../utils/printUtils';
+import { isStudentAssignedTo } from '../../utils/helpers';
+import { NotificationPrompt } from '../../components/common/NotificationPrompt';
+import { InstallPrompt } from '../../components/common/InstallPrompt';
+import { generateAndSendRemindersForAllStudents } from '../../services/paymentReminderService';
+import { AddStudentScreen } from '../owner/AddStudentScreen';
+import { InviteStudentScreen } from '../owner/InviteStudentScreen';
 
 export const MyStudentsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, logout, isOwner, isManager } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -33,6 +49,18 @@ export const MyStudentsScreen: React.FC = () => {
   const [viewingPlan, setViewingPlan] = useState<WorkoutPlan | null>(null);
   const [historySelectedDay, setHistorySelectedDay] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) return students;
+    const q = searchQuery.toLowerCase().trim();
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.surname.toLowerCase().includes(q) ||
+        `${s.name} ${s.surname}`.toLowerCase().includes(q)
+    );
+  }, [students, searchQuery]);
 
   const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -51,10 +79,22 @@ export const MyStudentsScreen: React.FC = () => {
       // Collaborator: vede solo i propri allievi
       const myStudents = allStudents.filter(
         (s) =>
-          s.assignedCollaboratorId === user.id ||
+          isStudentAssignedTo(s, user.id) ||
           (isManager && s.assignedManagerId === user.id)
       );
       setStudents(myStudents);
+
+      Promise.all(myStudents.map((s) => getStudentPaymentPlans(s.id)))
+        .then((allPlans) => {
+          const flatPlans = allPlans.flat();
+          if (flatPlans.length > 0) {
+            generateAndSendRemindersForAllStudents(
+              flatPlans,
+              myStudents.map((s) => ({ id: s.id, name: s.name }))
+            ).catch(() => {});
+          }
+        })
+        .catch(() => {});
     } catch {
       // Silently handle
     }
@@ -68,6 +108,74 @@ export const MyStudentsScreen: React.FC = () => {
     if (!date) return '';
     const d = date.toDate ? date.toDate() : new Date(date);
     return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  const handleGenerateReport = async (student: Student) => {
+    setGeneratingReport(true);
+    try {
+      const [sessions, measurements, workoutPlan, paymentPlans] = await Promise.all([
+        getStudentSessions(student.id).catch(() => []),
+        getStudentMeasurements(student.id).catch(() => []),
+        getActiveWorkoutPlan(student.id).catch(() => null),
+        getStudentPaymentPlans(student.id).catch(() => []),
+      ]);
+
+      const planData = workoutPlan
+        ? { title: workoutPlan.title, startDate: workoutPlan.startDate, endDate: workoutPlan.endDate }
+        : null;
+
+      const toSafeDate = (d: unknown): Date => {
+        if (d instanceof Date) return d;
+        if (d && typeof d === 'object' && 'toDate' in d && typeof (d as any).toDate === 'function')
+          return (d as any).toDate();
+        if (d && typeof d === 'object' && 'seconds' in d)
+          return new Date((d as any).seconds * 1000);
+        return new Date(d as string);
+      };
+
+      const paymentData = paymentPlans.map((p: any) => {
+        const paidAmount = (p.installments || [])
+          .filter((inst: any) => inst.status === 'paid')
+          .reduce((sum: number, inst: any) => sum + (inst.amount || 0), 0);
+        return {
+          totalAmount: p.totalAmount || 0,
+          paidAmount,
+          startDate: p.startDate,
+          endDate: p.endDate,
+        };
+      });
+
+      printStudentProgressReport({
+        student: {
+          name: student.name,
+          surname: student.surname,
+          startDate: student.startDate,
+          goals: student.goals,
+          phone: student.phone,
+        },
+        sessions: sessions.map((s: any) => ({
+          date: s.date,
+          startTime: s.startTime,
+          status: s.status,
+          notes: s.notes,
+        })),
+        measurements: measurements.map((m: any) => ({
+          date: m.date,
+          weight: m.weight,
+          bodyFat: m.bodyFat,
+          muscleMass: m.muscleMass,
+          notes: m.notes,
+        })),
+        workoutPlan: planData,
+        paymentPlans: paymentData,
+      });
+    } catch {
+      crossAlert('Errore', 'Impossibile generare il report');
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const handleViewHistory = async (student: Student) => {
@@ -174,16 +282,71 @@ export const MyStudentsScreen: React.FC = () => {
             variant="outline"
             style={styles.actionButton}
           />
+          <Button
+            title="Storia"
+            onPress={() =>
+              navigation.navigate('StoriaAllievo', {
+                studentId: item.id,
+                studentName: `${item.name}${(item as any).surname ? ' ' + (item as any).surname : ''}`,
+              })
+            }
+            variant="outline"
+            style={styles.actionButton}
+          />
+          <Button
+            title="Ritratto"
+            onPress={() =>
+              navigation.navigate('RitrattoAllievo', {
+                studentId: item.id,
+                studentName: `${item.name}${(item as any).surname ? ' ' + (item as any).surname : ''}`,
+              })
+            }
+            variant="outline"
+            style={styles.actionButton}
+          />
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => handleGenerateReport(item)}
+            disabled={generatingReport}
+          >
+            <Ionicons name="document-text-outline" size={16} color={colors.accent} />
+            <Text style={styles.reportButtonText}>
+              {generatingReport ? 'Generando...' : 'Report Progressi'}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </Card>
   );
+
+  if (showAddStudent) {
+    return (
+      <AddStudentScreen
+        onBack={() => {
+          setShowAddStudent(false);
+          loadStudents();
+        }}
+      />
+    );
+  }
+
+  if (showInviteStudent) {
+    return (
+      <InviteStudentScreen
+        onBack={() => {
+          setShowInviteStudent(false);
+          loadStudents();
+        }}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <View style={styles.headerTop}>
           <View>
+            <Text style={styles.greeting}>Ciao{user?.name ? `, ${user.name}` : ''}!</Text>
             <Text style={styles.title}>I Miei Allievi</Text>
             <Text style={styles.subtitle}>{students.length} allievi assegnati</Text>
           </View>
@@ -191,10 +354,44 @@ export const MyStudentsScreen: React.FC = () => {
             <Text style={styles.logoutText}>Esci</Text>
           </TouchableOpacity>
         </View>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.addStudentButton, styles.actionHalf]} onPress={() => setShowAddStudent(true)}>
+            <Ionicons name="person-add" size={18} color={colors.textOnAccent} />
+            <Text style={styles.addStudentText}>Aggiungi</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.inviteStudentButton, styles.actionHalf]} onPress={() => setShowInviteStudent(true)}>
+            <Ionicons name="key" size={18} color={colors.accent} />
+            <Text style={styles.inviteStudentText}>Invita con Codice</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      <InstallPrompt />
+      <NotificationPrompt />
+
+      {/* Barra di ricerca */}
+      {students.length > 0 && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.textLight} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Cerca allievo per nome..."
+            placeholderTextColor={colors.textLight}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textLight} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <FlatList
-        data={students}
+        data={filteredStudents}
         renderItem={renderStudent}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -413,10 +610,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    color: colors.text,
+    paddingVertical: spacing.xs,
+  },
   header: {
     backgroundColor: colors.primary,
     padding: spacing.lg,
     paddingTop: spacing.xxl,
+  },
+  greeting: {
+    fontSize: fontSize.md,
+    color: colors.accent,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   title: {
     fontSize: fontSize.xxl,
@@ -435,6 +657,44 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  actionHalf: {
+    flex: 1,
+  },
+  addStudentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.accent,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+  },
+  addStudentText: {
+    color: colors.textOnAccent,
+    fontSize: fontSize.md,
+    fontWeight: '700',
+  },
+  inviteStudentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceLight,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  inviteStudentText: {
+    color: colors.accent,
+    fontSize: fontSize.md,
+    fontWeight: '700',
   },
   logoutText: {
     color: colors.accent,
@@ -487,6 +747,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.md,
     paddingTop: spacing.md,
@@ -496,6 +757,24 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
   },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+    flex: 1,
+  },
+  reportButtonText: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: colors.accent,
+  },
   emptyText: {
     color: colors.textSecondary,
     textAlign: 'center',
@@ -503,7 +782,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

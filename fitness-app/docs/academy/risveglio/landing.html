@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Risveglio Live &middot; L'esperienza di 3 giorni &middot; Mind Movement</title>
+<style>
+  :root{
+    --rosso:#C41E3A; --rosso2:#9E1830; --brace:#E0526A;
+    --nero:#141210; --nero2:#1e1916; --carbone:#2a2421;
+    --crema:#FAF6EE; --crema2:#F1E8DA; --bordo:#e2d8c8;
+    --testo:#2a2420; --muto:#6f675d; --chiaro:#F5EFE4;
+    --serif:Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:var(--serif);color:var(--testo);background:var(--crema);
+    font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-weight:700;line-height:1.1;letter-spacing:-.01em;margin:0;}
+  p{margin:0 0 1em;}
+  a{color:inherit;}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 28px;}
+  .narrow{max-width:760px;margin:0 auto;padding:0 28px;}
+  .eyebrow{font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--rosso);}
+  .section{padding:96px 0;}
+  .center{text-align:center;}
+
+  /* reveal */
+  .rv{opacity:0;transform:translateY(20px);transition:opacity .8s ease,transform .8s ease;}
+  .rv.in{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;} .rv{opacity:1;transform:none;transition:none;}
+    .wave path{stroke-dasharray:none !important;stroke-dashoffset:0 !important;animation:none !important;}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{background:var(--nero);color:var(--chiaro);position:relative;overflow:hidden;
+    padding:120px 0 96px;}
+  .hero::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(120% 80% at 50% -10%, rgba(196,30,58,.22), transparent 60%);}
+  .hero .wrap{position:relative;text-align:center;}
+  .hero .kicker{font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:.34em;
+    text-transform:uppercase;color:var(--brace);margin-bottom:30px;}
+  .hero h1{font-size:clamp(40px,7vw,76px);color:#fff;max-width:14ch;margin:0 auto;}
+  .hero h1 em{font-style:italic;color:var(--brace);}
+  .wave{display:block;margin:34px auto 30px;width:min(340px,70%);height:24px;}
+  .wave path{fill:none;stroke:var(--rosso);stroke-width:2.4;stroke-linecap:round;
+    stroke-dasharray:600;stroke-dashoffset:600;animation:draw 1.8s .5s ease forwards;}
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  .hero .sub{font-size:clamp(18px,2.4vw,22px);color:#d8cfc2;max-width:54ch;margin:0 auto 38px;line-height:1.55;}
+  .cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;}
+  .btn{font-family:var(--sans);font-size:15px;font-weight:600;letter-spacing:.02em;
+    text-decoration:none;padding:16px 30px;border-radius:2px;display:inline-block;
+    transition:transform .15s ease,background .2s ease,color .2s ease;}
+  .btn-primary{background:var(--rosso);color:#fff;}
+  .btn-primary:hover{background:#d8273f;transform:translateY(-2px);}
+  .btn-ghost{border:1px solid rgba(245,239,228,.4);color:var(--chiaro);}
+  .btn-ghost:hover{border-color:var(--brace);color:#fff;transform:translateY(-2px);}
+  .hero .meta{font-family:var(--sans);font-size:13px;letter-spacing:.06em;color:#9b9085;
+    margin-top:40px;text-transform:uppercase;}
+  .hero .meta b{color:#cdc3b6;font-weight:600;}
+
+  /* ---------- PROBLEMA ---------- */
+  .prob{background:var(--nero2);color:var(--chiaro);padding:80px 0;}
+  .prob h2{font-size:clamp(30px,4.5vw,46px);color:#fff;max-width:18ch;margin:0 auto .5em;}
+  .prob h2 .r{color:var(--brace);}
+  .prob p{color:#cabfb2;font-size:19px;max-width:56ch;margin:0 auto;}
+
+  /* ---------- PROMESSA ---------- */
+  .promise h2{font-size:clamp(30px,4.6vw,48px);max-width:16ch;margin:0 auto .6em;}
+  .promise .lead{font-size:21px;color:var(--muto);max-width:58ch;margin:0 auto 56px;}
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:10px;}
+  .pillar{background:#fff;border:1px solid var(--bordo);border-top:3px solid var(--rosso);
+    padding:32px 26px;}
+  .pillar .pn{font-family:var(--sans);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--rosso);}
+  .pillar h3{font-size:23px;margin:10px 0 8px;}
+  .pillar p{font-size:16px;color:var(--muto);margin:0;line-height:1.55;}
+  .quotaline{text-align:center;font-style:italic;font-size:clamp(22px,3vw,30px);
+    color:var(--rosso2);margin:60px auto 0;max-width:24ch;}
+
+  /* ---------- I TRE GIORNI (signature) ---------- */
+  .days{background:var(--nero);color:var(--chiaro);position:relative;}
+  .days .head{text-align:center;margin-bottom:64px;}
+  .days .head h2{font-size:clamp(30px,4.6vw,48px);color:#fff;}
+  .days .head p{color:#b7ac9f;max-width:50ch;margin:14px auto 0;}
+  .arc{position:relative;max-width:780px;margin:0 auto;padding-left:64px;}
+  .arc::before{content:"";position:absolute;left:23px;top:8px;bottom:8px;width:2px;
+    background:linear-gradient(var(--carbone),var(--rosso) 50%,var(--carbone));}
+  .act{position:relative;padding-bottom:56px;}
+  .act:last-child{padding-bottom:0;}
+  .act .node{position:absolute;left:-64px;top:2px;width:48px;height:48px;border-radius:50%;
+    border:2px solid var(--rosso);background:var(--nero);color:var(--brace);
+    display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;}
+  .act .day{font-family:var(--sans);font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--brace);}
+  .act h3{font-size:clamp(25px,3.4vw,33px);color:#fff;margin:6px 0 10px;}
+  .act p{color:#c5bbae;font-size:17px;max-width:52ch;margin:0 0 18px;}
+  .peak{display:inline-block;border:1px solid var(--rosso);border-left-width:4px;
+    background:rgba(196,30,58,.08);padding:13px 18px;border-radius:2px;}
+  .peak .pk{font-family:var(--sans);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--brace);display:block;margin-bottom:3px;}
+  .peak .pv{color:#fff;font-size:17px;font-weight:700;}
+  .peak .px{color:#b7ac9f;font-size:14.5px;display:block;margin-top:3px;}
+
+  /* ---------- PORTI A CASA ---------- */
+  .take h2{text-align:center;font-size:clamp(28px,4.4vw,44px);margin-bottom:48px;}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;max-width:840px;margin:0 auto;}
+  .take .item{padding:26px 28px;background:var(--crema2);border-left:4px solid var(--rosso);}
+  .take .item h3{font-size:20px;margin:0 0 6px;}
+  .take .item p{font-size:16px;color:var(--muto);margin:0;line-height:1.5;}
+
+  /* ---------- PER CHI ---------- */
+  .who{background:var(--crema2);}
+  .whogrid{display:grid;grid-template-columns:1fr 1fr;gap:30px;max-width:880px;margin:0 auto;}
+  .whocard{background:#fff;border:1px solid var(--bordo);padding:34px 30px;}
+  .whocard.no{background:transparent;border-style:dashed;}
+  .whocard h3{font-size:22px;margin:0 0 16px;}
+  .whocard.yes h3{color:var(--rosso2);}
+  .whocard.no h3{color:var(--muto);}
+  .whocard ul{list-style:none;margin:0;padding:0;}
+  .whocard li{font-size:16.5px;padding:8px 0 8px 28px;position:relative;color:var(--testo);line-height:1.45;border-bottom:1px solid var(--bordo);}
+  .whocard li:last-child{border-bottom:0;}
+  .whocard.yes li::before{content:"";position:absolute;left:0;top:13px;width:11px;height:11px;
+    background:var(--rosso);border-radius:50%;}
+  .whocard.no li{color:var(--muto);}
+  .whocard.no li::before{content:"";position:absolute;left:2px;top:18px;width:13px;height:1.5px;background:#bdb3a4;}
+
+  /* ---------- GUIDA ---------- */
+  .guide{background:var(--nero);color:var(--chiaro);}
+  .guide .inner{max-width:820px;margin:0 auto;text-align:center;}
+  .guide .eyebrow{color:var(--brace);}
+  .guide h2{font-size:clamp(28px,4.2vw,42px);color:#fff;margin:18px 0 24px;}
+  .guide p{color:#c5bbae;font-size:18px;max-width:60ch;margin:0 auto 1em;}
+  .guide .creds{font-family:var(--sans);font-size:13px;letter-spacing:.05em;color:#9b9085;
+    text-transform:uppercase;margin-top:26px;line-height:2;}
+  .guide blockquote{font-style:italic;font-size:clamp(20px,2.8vw,26px);color:var(--brace);
+    border:0;margin:34px auto 0;max-width:26ch;line-height:1.4;}
+
+  /* ---------- DETTAGLI ---------- */
+  .facts{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--bordo);
+    border:1px solid var(--bordo);max-width:900px;margin:0 auto;}
+  .fact{background:var(--crema);padding:28px 22px;text-align:center;}
+  .fact .fl{font-family:var(--sans);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--rosso);}
+  .fact .fv{font-size:21px;font-weight:700;margin-top:8px;line-height:1.3;}
+  .fact .fx{font-size:13px;color:var(--muto);margin-top:4px;}
+
+  /* ---------- INVESTIMENTO ---------- */
+  .invest{background:var(--crema2);}
+  .invest h2{text-align:center;font-size:clamp(28px,4.4vw,44px);margin-bottom:12px;}
+  .invest .note{text-align:center;color:var(--muto);font-style:italic;margin-bottom:48px;}
+  .tiers{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;max-width:840px;margin:0 auto;}
+  .tier{background:#fff;border:1px solid var(--bordo);padding:38px 32px;position:relative;}
+  .tier.feature{border:2px solid var(--rosso);}
+  .tier .badge{position:absolute;top:-12px;left:32px;background:var(--rosso);color:#fff;
+    font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    padding:5px 13px;border-radius:2px;}
+  .tier .tn{font-size:22px;font-weight:700;}
+  .tier .price{font-size:46px;font-weight:700;color:var(--rosso2);margin:8px 0 4px;letter-spacing:-.02em;}
+  .tier .price small{font-size:17px;color:var(--muto);font-weight:400;}
+  .tier ul{list-style:none;margin:18px 0 28px;padding:0;}
+  .tier li{font-size:16px;padding:9px 0 9px 26px;position:relative;color:var(--testo);border-bottom:1px solid var(--bordo);line-height:1.45;}
+  .tier li:last-child{border-bottom:0;}
+  .tier li::before{content:"";position:absolute;left:0;top:14px;width:10px;height:10px;background:var(--rosso);border-radius:50%;}
+  .tier .btn{width:100%;text-align:center;}
+  .tier.feature .btn{background:var(--rosso);color:#fff;}
+  .tier.plain .btn{background:var(--nero);color:#fff;}
+  .tier.plain .btn:hover{background:var(--carbone);transform:translateY(-2px);}
+
+  /* ---------- CTA FINALE ---------- */
+  .final{background:var(--nero);color:var(--chiaro);text-align:center;}
+  .final h2{font-size:clamp(32px,5vw,56px);color:#fff;max-width:18ch;margin:0 auto 22px;}
+  .final h2 em{font-style:italic;color:var(--brace);}
+  .final p{color:#c5bbae;max-width:50ch;margin:0 auto 36px;font-size:19px;}
+  .final .urgency{font-family:var(--sans);font-size:13px;letter-spacing:.1em;text-transform:uppercase;
+    color:#9b9085;margin-top:30px;}
+
+  /* ---------- FAQ ---------- */
+  .faq h2{text-align:center;font-size:clamp(28px,4.4vw,42px);margin-bottom:44px;}
+  .faqwrap{max-width:760px;margin:0 auto;}
+  details{border-bottom:1px solid var(--bordo);padding:8px 0;}
+  summary{font-size:19px;font-weight:700;cursor:pointer;list-style:none;padding:16px 36px 16px 0;
+    position:relative;color:var(--testo);}
+  summary::-webkit-details-marker{display:none;}
+  summary::after{content:"+";position:absolute;right:6px;top:14px;font-size:26px;color:var(--rosso);font-weight:400;transition:transform .2s ease;}
+  details[open] summary::after{content:"\2013";}
+  details p{color:var(--muto);font-size:16.5px;padding:0 36px 16px 0;margin:0;line-height:1.6;}
+
+  /* ---------- FOOTER ---------- */
+  footer{background:var(--nero2);color:#8d8377;padding:56px 0 40px;text-align:center;
+    font-family:var(--sans);font-size:13px;letter-spacing:.04em;}
+  footer .bn{font-family:var(--serif);font-size:20px;color:var(--chiaro);letter-spacing:.06em;margin-bottom:10px;}
+  footer a{color:var(--brace);text-decoration:none;}
+  footer .small{margin-top:20px;color:#6b6359;font-size:12px;}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:820px){
+    .section{padding:68px 0;}
+    .pillars,.facts,.tiers,.grid2,.whogrid{grid-template-columns:1fr;}
+    .facts{border:1px solid var(--bordo);}
+    .arc{padding-left:54px;}
+    .act .node{left:-54px;width:42px;height:42px;font-size:16px;}
+    .arc::before{left:20px;}
+    .tier .badge{left:50%;transform:translateX(-50%);}
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker rv">Esperienza Mind Movement &middot; 3 Giorni</div>
+    <h1 class="rv">Tre giorni per risvegliare il potere che &egrave; <em>gi&agrave; in te</em>.</h1>
+    <svg class="wave" viewBox="0 0 340 24" aria-hidden="true"><path d="M2 12 Q 44 -6 86 12 T 170 12 T 254 12 T 338 12"/></svg>
+    <p class="sub rv">Non un seminario che ti carica per un weekend. Un&rsquo;immersione che entra dal corpo e resta nel sistema nervoso. Corpo, respiro, mente, presenza, azione.</p>
+    <div class="cta-row rv">
+      <a class="btn btn-primary" href="#investimento">Prenota il tuo posto</a>
+      <a class="btn btn-ghost" href="#giorni">Scopri i 3 giorni</a>
+    </div>
+    <div class="meta rv"><b>Gragnano (NA)</b> &nbsp;&middot;&nbsp; Venerd&igrave;&ndash;Domenica &nbsp;&middot;&nbsp; <b>Posti limitati &mdash; numero chiuso</b></div>
+  </div>
+</header>
+
+<!-- PROBLEMA -->
+<section class="prob">
+  <div class="wrap center">
+    <h2 class="rv">La motivazione &egrave; benzina. <span class="r">E la benzina finisce.</span></h2>
+    <p class="rv">La maggior parte degli eventi lavora su un piano solo: la mente. Ti accendono, ti caricano, ti fanno urlare. Poi torni a casa e in 72 ore sei di nuovo quello di prima. Il picco svanisce perch&eacute; non &egrave; mai entrato nel corpo.</p>
+  </div>
+</section>
+
+<!-- PROMESSA -->
+<section class="section promise">
+  <div class="wrap center">
+    <div class="eyebrow rv">Perch&eacute; questo &egrave; diverso</div>
+    <h2 class="rv" style="margin-top:18px">Qui il cambiamento entra dal corpo.</h2>
+    <p class="lead rv">Il Metodo Mind Movement lavora sull&rsquo;intero asse PNEI &mdash; nervoso, endocrino, immunitario. Non genera motivazione: ricabla. Non un picco, ma una nuova linea di base. La differenza tra accendere un fuoco e diventare il fuoco.</p>
+    <div class="pillars">
+      <div class="pillar rv"><div class="pn">Fisiologia</div><h3>La precisione dell&rsquo;ingegnere</h3><p>Respiro, fascia, sistema nervoso, HRV. Capisci il <em>perch&eacute;</em>, non solo il cosa. Metodo, non dogma.</p></div>
+      <div class="pillar rv"><div class="pn">Disciplina</div><h3>La tempra del campione</h3><p>Nessun risultato vero nasce dall&rsquo;entusiasmo. Nasce dalla ripetizione coerente. Qui impari a presentarti.</p></div>
+      <div class="pillar rv"><div class="pn">Coscienza</div><h3>Lo spazio della presenza</h3><p>Il piano che gli altri non toccano: la mente che si dissolve, e il potere che agisce attraverso il silenzio.</p></div>
+    </div>
+    <p class="quotaline rv">Non vendiamo il picco. Insegniamo la quota.</p>
+  </div>
+</section>
+
+<!-- I TRE GIORNI -->
+<section class="section days" id="giorni">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow rv">L&rsquo;arco dei tre giorni</div>
+      <h2 class="rv" style="margin-top:16px">Un&rsquo;unica onda.</h2>
+      <p class="rv">Si scende nel corpo, si attraversa la mente, si risale nell&rsquo;azione. Ogni giorno ha un&rsquo;esperienza-cardine che lascia un segno fisico, non un ricordo.</p>
+    </div>
+    <div class="arc">
+      <div class="act rv">
+        <div class="node">1</div>
+        <div class="day">Giorno 1</div>
+        <h3>Il Corpo che Parla</h3>
+        <p>Si comincia dove tutti gli altri saltano. Si scioglie la corazza fasciale che tiene anni di tensione, si torna a sentire, si impara a guidare il proprio respiro.</p>
+        <div class="peak"><span class="pk">Esperienza-cardine</span><span class="pv">La Traversata</span><span class="px">Un viaggio di respiro connesso. Il tuo &laquo;firewalk&raquo;, ma che passa dalla carne &mdash; pi&ugrave; profondo, e pi&ugrave; sicuro.</span></div>
+      </div>
+      <div class="act rv">
+        <div class="node">2</div>
+        <div class="day">Giorno 2</div>
+        <h3>La Mente che si Dissolve</h3>
+        <p>Con il corpo aperto, si lavora sulla mente. Si smontano le credenze ereditate, si interroga l&rsquo;identit&agrave;, si entra nello spazio della presenza.</p>
+        <div class="peak"><span class="pk">Esperienza-cardine</span><span class="pv">La Cerimonia del Lasciar Andare</span><span class="px">La morte simbolica del vecchio s&eacute;. Si scrive ci&ograve; che si lascia, e lo si consegna al fuoco.</span></div>
+      </div>
+      <div class="act rv">
+        <div class="node">3</div>
+        <div class="day">Giorno 3</div>
+        <h3>Il Potere Incarnato</h3>
+        <p>L&rsquo;onda risale. Ci&ograve; che &egrave; stato sciolto e ricodificato diventa visione, piano e azione. Esci gi&agrave; in movimento.</p>
+        <div class="peak"><span class="pk">Esperienza-cardine</span><span class="pv">Il Gesto Irreversibile</span><span class="px">Davanti al cerchio compi l&rsquo;azione che cambia la traiettoria. Ci&ograve; che &egrave; dichiarato non torna indietro.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PORTI A CASA -->
+<section class="section take">
+  <div class="wrap">
+    <h2 class="rv">Cosa porti a casa</h2>
+    <div class="grid2">
+      <div class="item rv"><h3>Il Rito del Potere</h3><p>La sequenza mattutina di 30 minuti, gi&agrave; praticata e padroneggiata in aula.</p></div>
+      <div class="item rv"><h3>Il Protocollo dei 40 giorni</h3><p>La mappa per fissare nel sistema nervoso ci&ograve; che &egrave; cambiato.</p></div>
+      <div class="item rv"><h3>L&rsquo;app ESS&Emacr;RE</h3><p>Per misurare HRV, sonno e costanza. La prova oggettiva che il lavoro tiene.</p></div>
+      <div class="item rv"><h3>Una sessione di follow-up</h3><p>A 30 giorni, per riportare il gruppo nel cerchio e consolidare.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PER CHI -->
+<section class="section who">
+  <div class="wrap">
+    <div class="center" style="margin-bottom:44px">
+      <div class="eyebrow rv">Onestamente</div>
+      <h2 class="rv" style="font-size:clamp(28px,4.4vw,42px);margin-top:14px">Non &egrave; per tutti.</h2>
+    </div>
+    <div class="whogrid">
+      <div class="whocard yes rv">
+        <h3>&Egrave; per te se</h3>
+        <ul>
+          <li>Sei stanco di rimandare la versione di te che gi&agrave; intravedi</li>
+          <li>Sei un atleta, un professionista o un operatore del settore che vuole strumenti veri</li>
+          <li>Vuoi capire il <em>meccanismo</em>, non ricevere uno slogan</li>
+          <li>Sei pronto a entrare nel corpo, non solo a parlarne</li>
+        </ul>
+      </div>
+      <div class="whocard no rv">
+        <h3>Non &egrave; per te se</h3>
+        <ul>
+          <li>Cerchi una carica usa e getta per il weekend</li>
+          <li>Vuoi restare spettatore senza metterti in gioco</li>
+          <li>Cerchi magia o scorciatoie senza disciplina</li>
+          <li>Non sei disposto a compiere un gesto reale</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GUIDA -->
+<section class="section guide">
+  <div class="wrap">
+    <div class="inner">
+      <div class="eyebrow rv">La guida</div>
+      <h2 class="rv">Francesco Busanca</h2>
+      <p class="rv">Campione di bodybuilding natural e ingegnere biomedico, Francesco ha costruito il Metodo Mind Movement all&rsquo;incrocio tra scienza del corpo e pratiche di coscienza: PNEI, anatomia fasciale, respiro, PNL, presenza. Non un motivatore: un regista dello stato.</p>
+      <div class="creds rv">Titoli Italiani, Europei e Mondiali Natural (INBA/PNBA)<br>Vice Mr. Olympia Natural &middot; Fondatore del Metodo Mind Movement</div>
+      <blockquote class="rv">&laquo;Il potere non lo ricevi da me. Lo riconosci in te.&raquo;</blockquote>
+    </div>
+  </div>
+</section>
+
+<!-- DETTAGLI -->
+<section class="section">
+  <div class="wrap">
+    <div class="center" style="margin-bottom:42px">
+      <div class="eyebrow rv">I dettagli</div>
+    </div>
+    <div class="facts rv">
+      <div class="fact"><div class="fl">Durata</div><div class="fv">3 giorni</div><div class="fx">~9:00 &ndash; 19:00</div></div>
+      <div class="fact"><div class="fl">Dove</div><div class="fv">Mind Movement Lab</div><div class="fx">Gragnano (NA)</div></div>
+      <div class="fact"><div class="fl">Gruppo</div><div class="fv">12&ndash;25</div><div class="fx">numero chiuso</div></div>
+      <div class="fact"><div class="fl">Quando</div><div class="fv">Ven &ndash; Dom</div><div class="fx">date in calendario</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- INVESTIMENTO -->
+<section class="section invest" id="investimento">
+  <div class="wrap">
+    <h2 class="rv">L&rsquo;investimento</h2>
+    <p class="note rv">Tre giorni che valgono pi&ugrave; di un anno di buoni propositi.</p>
+    <div class="tiers">
+      <div class="tier plain rv">
+        <div class="tn">Esperienza</div>
+        <div class="price">&euro;690</div>
+        <ul>
+          <li>I 3 giorni completi di immersione</li>
+          <li>Le tre esperienze-cardine</li>
+          <li>Il Rito del Potere + Protocollo 40 giorni</li>
+          <li>Quaderno del partecipante e materiali</li>
+          <li>Pranzi consapevoli inclusi</li>
+        </ul>
+        <a class="btn" href="#prenota">Prenota l&rsquo;Esperienza</a>
+      </div>
+      <div class="tier feature rv">
+        <div class="badge">Pi&ugrave; scelto</div>
+        <div class="tn">Esperienza + Percorso</div>
+        <div class="price">&euro;990</div>
+        <ul>
+          <li>Tutto ci&ograve; che include l&rsquo;Esperienza</li>
+          <li>Accesso completo all&rsquo;app ESS&Emacr;RE (HRV)</li>
+          <li>Sessione di follow-up individuale a 30 giorni</li>
+          <li>30 giorni di accompagnamento sul protocollo</li>
+          <li>Accesso prioritario alle edizioni future</li>
+        </ul>
+        <a class="btn" href="#prenota">Scegli il Percorso</a>
+      </div>
+    </div>
+    <p class="note rv" style="margin-top:34px;font-size:15px">Possibilit&agrave; di pagamento in due soluzioni. Posti riservati con acconto.</p>
+  </div>
+</section>
+
+<!-- CTA FINALE -->
+<section class="section final" id="prenota">
+  <div class="wrap">
+    <h2 class="rv">Il momento non arriva. <em>Lo decidi.</em></h2>
+    <p class="rv">Il gruppo &egrave; a numero chiuso: l&rsquo;intimit&agrave; del cerchio &egrave; parte del metodo. Quando i posti finiscono, si apre la lista d&rsquo;attesa per l&rsquo;edizione successiva.</p>
+    <div class="cta-row rv" style="justify-content:center">
+      <a class="btn btn-primary" href="#">Prenota il tuo posto</a>
+      <a class="btn btn-ghost" href="#">Parla con noi su WhatsApp</a>
+    </div>
+    <div class="urgency rv">Posti limitati &middot; numero chiuso &middot; conferma con acconto</div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section faq">
+  <div class="wrap">
+    <h2 class="rv">Domande frequenti</h2>
+    <div class="faqwrap rv">
+      <details><summary>Devo avere gi&agrave; esperienza di respiro o meditazione?</summary><p>No. Tutto viene guidato passo dopo passo, dal corpo alla presenza, nel rispetto del livello di ciascuno. Non serve preparazione: serve disponibilit&agrave;.</p></details>
+      <details><summary>&Egrave; sicuro? Ci sono controindicazioni?</summary><p>S&igrave;, &egrave; condotto da un professionista con assistenti formati. Prima dell&rsquo;evento ricevi un breve questionario sanitario. Le sessioni di respiro intenso sono controindicate in gravidanza, patologie cardiovascolari, ipertensione non controllata, epilessia, glaucoma e disturbi psichiatrici acuti: in questi casi si pratica la versione dolce. Nulla &egrave; obbligatorio.</p></details>
+      <details><summary>Devo essere allenato fisicamente?</summary><p>No. Il lavoro &egrave; sul corpo, ma non &egrave; una prova atletica. &Egrave; movimento, respiro e ascolto, adatti a qualsiasi condizione di partenza.</p></details>
+      <details><summary>Posso pagare a rate?</summary><p>S&igrave;, &egrave; previsto il pagamento in due soluzioni. Il posto si riserva con un acconto.</p></details>
+      <details><summary>E se non posso nelle date in calendario?</summary><p>Iscriviti alla lista d&rsquo;attesa: ti avvisiamo per primo all&rsquo;apertura dell&rsquo;edizione successiva.</p></details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="bn">Risveglio Live</div>
+    <div>Metodo Mind Movement &middot; A.S.D. Evolution Sport &middot; Gragnano (NA)</div>
+    <div style="margin-top:8px"><a href="#">Scrivici</a> &middot; <a href="#">Instagram</a> &middot; <a href="#">WhatsApp</a></div>
+    <div class="small">&copy; A.S.D. Evolution Sport &mdash; Mind Movement Lab. Tutti i diritti riservati.</div>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var els = document.querySelectorAll('.rv');
+    if(reduce || !('IntersectionObserver' in window)){
+      els.forEach(function(e){e.classList.add('in');}); return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target);} });
+    }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){ io.observe(e); });
+  })();
+</script>
+</body>
+</html>

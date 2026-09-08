@@ -39,7 +39,7 @@ import { AcademyCertificate, AcademyRating } from '../../types';
 
 const CATEGORY_CONFIG: Record<AcademyCourseCategory, { label: string; color: string; icon: string }> = {
   mind: { label: 'Mind', color: '#9C27B0', icon: 'bulb-outline' },
-  movement: { label: 'Movement', color: '#D40000', icon: 'fitness-outline' },
+  movement: { label: 'Movement', color: colors.accent, icon: 'fitness-outline' },
   nutrition: { label: 'Nutrizione', color: '#4CAF50', icon: 'nutrition-outline' },
   lifestyle: { label: 'Lifestyle', color: '#FF9800', icon: 'sunny-outline' },
   recovery: { label: 'Recovery', color: '#2196F3', icon: 'medkit-outline' },
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   logoFB: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: colors.white,
     letterSpacing: 1,
   },
   headerTitle: {
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1189,7 +1189,7 @@ const styles = StyleSheet.create({
   // Rating modal
   ratingOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: colors.overlayDark,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,
@@ -1247,7 +1247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ratingSendText: {
-    color: '#FFF',
+    color: colors.white,
     fontWeight: '700',
   },
   // Certificate modal

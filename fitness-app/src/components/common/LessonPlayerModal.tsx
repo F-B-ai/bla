@@ -357,9 +357,9 @@ export const LessonPlayerModal: React.FC<Props> = ({
           <View style={styles.audioControls}>
             <TouchableOpacity onPress={toggleAudioPlayback} style={styles.audioPlayBtn}>
               {isLoading ? (
-                <ActivityIndicator size="small" color="#FFF" />
+                <ActivityIndicator size="small" color={colors.white} />
               ) : (
-                <Ionicons name={isPlaying ? 'pause' : 'play'} size={32} color="#FFF" />
+                <Ionicons name={isPlaying ? 'pause' : 'play'} size={32} color={colors.white} />
               )}
             </TouchableOpacity>
           </View>
@@ -459,7 +459,7 @@ export const LessonPlayerModal: React.FC<Props> = ({
                         <Ionicons
                           name={isCorrect ? 'checkmark' : isWrong ? 'close' : 'ellipse'}
                           size={12}
-                          color="#FFF"
+                          color={colors.white}
                         />
                       )}
                     </View>
@@ -646,7 +646,7 @@ export const LessonPlayerModal: React.FC<Props> = ({
                 style={styles.completeButton}
                 onPress={() => onComplete(lesson)}
               >
-                <Ionicons name="checkmark-circle-outline" size={20} color="#FFF" />
+                <Ionicons name="checkmark-circle-outline" size={20} color={colors.white} />
                 <Text style={styles.completeButtonText}>Segna come completata</Text>
               </TouchableOpacity>
             )}
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   videoContainer: {
     width: '100%',
     height: VIDEO_HEIGHT,
-    backgroundColor: '#000',
+    backgroundColor: colors.black,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   playYoutubeBtnText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   completeButtonText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
@@ -1006,7 +1006,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   quizSubmitText: {
-    color: '#FFF',
+    color: colors.white,
     fontSize: fontSize.md,
     fontWeight: '700',
   },
