@@ -38,6 +38,7 @@ Vedi [`moduli/README.md`](./moduli/README.md).
 | `modulo-a01-*.html` | Modulo proposto e materiali d'aula. **Non è il Modulo 1 reale**: vedi sotto |
 | **`i-22-moduli.md`** | **La griglia completa: 22 moduli, 3 livelli, 5 aree, 280 h, con il materiale agganciato riga per riga.** È il documento di riferimento dell'Accademia |
 | `i-22-moduli-ricostruzione.html` | Ricostruzione fatta prima che i documenti rientrassero. **Superata**, tenuta come storia |
+| **`principio-fondativo.md`** | **Non interpretare, incarnare.** Il criterio da cui discendono Reel, Academy, perimetro e standard di lavoro. Nessun contenuto esce se lo contraddice |
 | `pagina-fondativa-human-interface.html` | Definizione fondativa di ESSĒRE |
 | `nota-due-diligence-stato-reale.html` | Stato verificabile del sistema, per chi valuta |
 
