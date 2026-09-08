@@ -210,11 +210,37 @@ vero**. Nello standard a 9 blocchi questo ricade su tre blocchi in particolare �
 la pratica guidata con i dosaggi, i casi con ragionamento, e la verifica — e su
 ciò che ESSĒRE deve mettere in mano al diplomato il giorno dopo l'esame.
 
+### ⚠️ Correzione dell'8 settembre — gli impianti erano tre, non due
+
+Alla domanda «l'Academy è stata ricostruita perfettamente?» la risposta è **no**,
+e questo è il punto in cui va scritto.
+
+`moduli/manuale-definitivo-mma.docx` era stato catalogato al decimo rientro come
+«tutte le specializzazioni in un volume». Riletto, è un **terzo impianto
+d'Accademia**: dieci moduli numerati, manifesto, promessa a 7/30/90/180 giorni,
+indice proprio. Non è una raccolta: è un curriculum. `moduli-avanzati-di-specializzazione.docx`
+ne è la versione precedente — stessi dieci titoli, un terzo in meno di testo.
+
+La decisione presa sopra **non cambia**: l'Academy resta quella a 22 moduli su
+tre livelli. Cambia il conto di che cosa esiste già scritto:
+
+| | Blueprint | Manuale Definitivo | Strategico + Operativo 03 |
+|---|---|---|---|
+| Moduli | 12 | 10 | **22** ← adottato |
+| Natura | che cosa si **studia** | che cosa si **fa** | impianto di certificazione |
+| Stato | tutti e 12 scritti | scritto, ~97.900 car | titoli mai rientrati |
+
+**12 + 10 = 22.** L'aritmetica salta all'occhio, ma resta un'ipotesi: nessuno
+dei 55 documenti dell'archivio contiene la stringa «22 moduli». Si verifica in
+un modo solo — il **capitolo 1 del Documento operativo 03**. Se regge, non c'è
+un solo modulo da scrivere da zero e la rimappatura è catalogazione pura.
+Se non regge, si scopre quali dei 22 non hanno ancora un testo dietro.
+
 Il documento qui sotto resta come storia del confronto.
 
 ---
 
-## ~~Due architetture in conflitto~~ — risolto sopra
+## ~~Due architetture in conflitto~~ — erano tre, vedi sopra
 
 Con il rientro del **Blueprint formativo** è emerso il problema più grosso
 dell'archivio, e non è un problema di file mancanti: è che **coesistono due

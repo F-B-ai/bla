@@ -475,3 +475,76 @@ Due no, e sono quelli che distinguono una scheda da un elenco di esercizi:
   come campo: sono la traduzione operativa del perimetro)
 
 Sono due campi, e renderebbero la scheda dell'app conforme al metodo.
+
+---
+
+## Undicesimo rientro — il Modulo 04 è completo, e c'è una terza Accademia
+
+Cinque documenti nuovi su tredici mandati: gli altri otto erano già in archivio
+e il confronto per checksum li ha riconosciuti. Fra i riconosciuti, **due erano
+archiviati in `docs/comunicazione/`** e non qui — i due Super Prompt Grok. Non
+sono doppioni: sono materiale di comunicazione, e stanno dove devono stare.
+
+### Il kit del Modulo 04 non ha più buchi
+
+`modulo-04-allegati/` conteneva 04, 05 e 06. Sono arrivati **01, 02, 03 e 07**:
+
+| File | Che cos'è |
+|---|---|
+| `01-workbook-esperienziale.docx` | **32 esercizi**, schede di autovalutazione, journaling guidato · ~42.700 car |
+| `02-scheda-milton-model.docx` | I pattern del Milton Model in scheda operativa |
+| `03-template-storytelling.docx` | Template per costruire la storia in aula |
+| `07-griglia-valutazione-performance.docx` | La griglia con cui si valuta il partecipante |
+
+Con 04 (metafore isomorfiche), 05 (protocollo 30 giorni) e 06 (schede VAK), la
+serie **01→07 è chiusa, senza salti**. È il primo modulo dell'archivio che ha
+manuale + workbook + schede + protocollo + griglia di valutazione: cioè che
+soddisfa lo standard a 9 blocchi **e** il vincolo del Direttore Tecnico — chi
+supera l'esame ha in mano qualcosa da usare il lunedì mattina.
+
+Il manuale del modulo esiste in due ampiezze: `modulo-pnl-carisma-versione-base.docx`
+(~31.200 car) e `modulo-pnl-carisma-versione-avanzata.docx` (~68.800 car).
+
+### La terza architettura — che finora non avevamo visto
+
+`manuale-definitivo-mma.docx` era stato archiviato al decimo rientro come
+«tutte le specializzazioni in un volume». Non è così: è un'**Accademia
+strutturata a dieci moduli numerati**, con un manifesto, una promessa a
+7/30/90/180 giorni e un indice proprio.
+
+| # | Modulo del Manuale Definitivo |
+|---|---|
+| 1 | Posturologia Integrata Mind Movement |
+| 2 | Pattern di Movimento: il codice sorgente del gesto umano |
+| 3 | Myofascial Release Mind Movement |
+| 4 | Neuro-Somatic Repatterning |
+| 5 | Breathwork Mind Movement |
+| 6 | Qi Gong Mind Movement |
+| 7 | Biomeccanica della Coscienza |
+| 8 | **Assessment completo: la scheda Mind Movement** |
+| 9 | Flow State Training |
+| 10 | PNEI in Movimento |
+
+`moduli-avanzati-di-specializzazione.docx` ha **gli stessi dieci titoli** in
+~62.600 caratteri contro ~97.900: è la versione precedente dello stesso impianto,
+non un secondo corpus. Restano quindi **tre** architetture, non quattro:
+
+| | Blueprint | Manuale Definitivo | Strategico 01/02 + Operativo 03 |
+|---|---|---|---|
+| Moduli | 12 | 10 | **22** ← adottato |
+| Natura | che cosa si **studia** | che cosa si **fa** | impianto di certificazione |
+| Materiale | 01-05 singoli + 06-12 in un volume + 3 manuali docente | un volume (+ la versione breve) | titoli nel cap. 1, non rientrato |
+
+**12 + 10 = 22.** È un'aritmetica che salta all'occhio e non va scambiata per
+una scoperta: nessuno dei 55 documenti dell'archivio contiene la stringa «22
+moduli». È un'**ipotesi**, e si verifica in un modo solo — il capitolo 1
+dell'Operativo 03. Se regge, la rimappatura è già fatta e non c'è un solo modulo
+da scrivere da zero.
+
+### Un prezzo che non è a listino
+
+`squadra/proposta-partnership-giuseppe-calabrese.docx` dice che il modulo PNL &
+Carisma vale **400 € a partecipante**, gruppi da 10-15, **48 ore su 3 weekend**,
+margine netto dichiarato 70-80%. È un'unità di vendita diversa dai 1.500 /
+2.500 / 5.000 della Rotta: lì si vende un **livello**, qui un **modulo singolo**.
+Vanno riconciliati prima che escano insieme.

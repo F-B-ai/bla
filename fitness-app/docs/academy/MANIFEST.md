@@ -9,10 +9,14 @@ cosa sola: sapere che cosa non serve rimandare.
 > tre volte e il Qi Gong due: in archivio ce n'è una copia sola. Nel dubbio,
 > manda.
 
-**23 documenti in archivio**, al 6 settembre 2026.
+**28 documenti in archivio**, all'8 settembre 2026.
 
 | Nome con cui l'hai mandato | Dove sta ora |
 |---|---|
+| `01_Workbook_Esperienziale.docx` | `docs/academy/moduli/modulo-04-allegati/01-workbook-esperienziale.docx` |
+| `02_Scheda_Milton_Model.docx` | `docs/academy/moduli/modulo-04-allegati/02-scheda-milton-model.docx` |
+| `03_Template_Storytelling.docx` | `docs/academy/moduli/modulo-04-allegati/03-template-storytelling.docx` |
+| `07_Griglia_Valutazione_Performance.docx` | `docs/academy/moduli/modulo-04-allegati/07-griglia-valutazione-performance.docx` |
 | `Anatomy_Trains_Figures.jsx` | `docs/academy/moduli/anatomy-trains-figure.jsx` |
 | `ESSERE_Processo_di_Vendita_e_Inquadramento_Societario.pdf` | `docs/academy/strategici/02-processo-vendita-e-inquadramento-societario.pdf` |
 | `ESSERE_Valutazione_Due_Sessioni_e_Sistema_Stellato.pdf` | `docs/academy/valutazione-due-sessioni-e-sistema-stellato.pdf` |
@@ -26,10 +30,12 @@ cosa sola: sapere che cosa non serve rimandare.
 | `Mind_Movement_QiGong_COMPLETE.docx` | `docs/academy/moduli/modulo-integrativo-qi-gong.docx` |
 | `Mind_Movement_QiGong_Module.docx` | `docs/academy/moduli/modulo-qi-gong-versione-breve.docx` |
 | `Modulo_SCOLIOSI_Trattamento_Completo.docx` | `docs/academy/moduli/manuale-specialistico-scoliosi.docx` |
+| `Proposta_Giuseppe.docx` | `docs/academy/squadra/proposta-partnership-giuseppe-calabrese.docx` |
 | `RISVEGLIO_I_IlCorpoCheParla.docx` | `docs/academy/moduli/risveglio-i-il-corpo-che-parla.docx` |
 | `RISVEGLIO_LIVE_Quaderno_Partecipante.pdf` | `docs/academy/moduli/risveglio-live-quaderno-partecipante.pdf` |
 | `Scheda_Onboarding_Nuovo_Allievo_MindMovementLab.docx` | `docs/academy/moduli/scheda-onboarding-nuovo-allievo.docx` |
 | `Scheda_Transizione_SitUp_Academy.pdf` | `docs/academy/strategici/scheda-transizione-situp-academy.pdf` |
+| `Super_Prompt_Grok_AURORA_e_Guida_Operativa.docx` | `docs/comunicazione/super-prompt-grok-aurora.docx` |
 | `Super_Prompt_Grok_Mind_Movement_Academy.docx` | `docs/comunicazione/super-prompt-grok-stories-e-reel.docx` |
 | `essereassistenzahome.html` | `docs/comunicazione/mockup-assistenza-home.html` |
 | `esserespot.mp4` | `docs/comunicazione/essere-spot.mp4` |
