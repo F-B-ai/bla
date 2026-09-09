@@ -7,8 +7,11 @@ import { InputField } from '../../../components/common/InputField';
 import { ModalHeader } from '../../../components/common/ModalHeader';
 import { Button } from '../../../components/common/Button';
 import { StudentSearchPicker } from '../../../components/common/StudentSearchPicker';
+import {
+  PERSONE_POSSIBILI, incassoSeduta, confrontaConIndividuale, controllaGruppo,
+} from '../../../domain/gruppo';
 
-type AppointmentKind = 'training' | 'nutrition';
+type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
 type AppointmentItem = {
   id: string;
@@ -23,6 +26,8 @@ type AppointmentItem = {
   notes: string;
   sessionCost?: number;
   isCountedAsCompleted: boolean;
+  persone?: number;
+  quotaPersona?: number;
 };
 
 const TIME_SLOTS = [
@@ -56,6 +61,14 @@ export interface AppointmentModalProps {
   setFormCost: (v: string) => void;
   formNotes: string;
   setFormNotes: (v: string) => void;
+  /** solo per il personal di gruppo: quante persone, 2-5 */
+  formPersone: number;
+  setFormPersone: (v: number) => void;
+  /** solo per il personal di gruppo: quanto paga ciascuna, a seduta */
+  formQuota: string;
+  setFormQuota: (v: string) => void;
+  /** tariffa individuale del conduttore, per il confronto */
+  prezzoIndividuale: number;
   students: Student[];
   collaborators: Collaborator[];
   canSeeAll: boolean;
@@ -87,6 +100,11 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   setFormCost,
   formNotes,
   setFormNotes,
+  formPersone,
+  setFormPersone,
+  formQuota,
+  setFormQuota,
+  prezzoIndividuale,
   students,
   collaborators,
   canSeeAll,
@@ -131,8 +149,96 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   <Text style={{ ...styles.typeChipText, ...(formKind === 'nutrition' ? { color: colors.success } : {}) }}>Nutrizione</Text>
                 </TouchableOpacity>
               </View>
+              <View style={styles.typeRow}>
+                <TouchableOpacity
+                  style={{
+                    ...styles.typeChip,
+                    ...(formKind === 'consulenza' ? styles.typeChipActive : {}),
+                  }}
+                  onPress={() => setFormKind('consulenza')}
+                >
+                  <Ionicons name="chatbubbles-outline" size={16} color={formKind === 'consulenza' ? colors.accent : colors.textSecondary} />
+                  <Text style={{ ...styles.typeChipText, ...(formKind === 'consulenza' ? { color: colors.accent } : {}) }}>Consulenza</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    ...styles.typeChip,
+                    ...(formKind === 'gruppo' ? styles.typeChipActive : {}),
+                  }}
+                  onPress={() => setFormKind('gruppo')}
+                >
+                  <Ionicons name="people-outline" size={16} color={formKind === 'gruppo' ? colors.accent : colors.textSecondary} />
+                  <Text style={{ ...styles.typeChipText, ...(formKind === 'gruppo' ? { color: colors.accent } : {}) }}>Gruppo</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
+
+          {/* --- personal di gruppo: quante persone, e quanto paga ciascuna --- */}
+          {formKind === 'gruppo' && (() => {
+            const quota = parseFloat((formQuota || '').replace(',', '.'));
+            const seduta = { persone: formPersone, quotaPersona: quota };
+            const ok = controllaGruppo(seduta).valido;
+            const conf = ok ? confrontaConIndividuale(seduta, prezzoIndividuale) : null;
+            return (
+              <View style={styles.gruppoBox}>
+                <Text style={styles.fieldLabel}>Quante persone</Text>
+                <View style={styles.typeRow}>
+                  {PERSONE_POSSIBILI.map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={{
+                        ...styles.personaChip,
+                        ...(formPersone === n ? styles.typeChipActive : {}),
+                      }}
+                      onPress={() => setFormPersone(n)}
+                    >
+                      <Text
+                        style={{
+                          ...styles.typeChipText,
+                          ...(formPersone === n ? { color: colors.accent } : {}),
+                        }}
+                      >
+                        {n}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <InputField
+                  label="Quota a persona (€)"
+                  value={formQuota}
+                  onChangeText={setFormQuota}
+                  keyboardType="decimal-pad"
+                  placeholder="25"
+                />
+
+                {ok && conf && (
+                  <>
+                    <Text style={styles.gruppoTotale}>
+                      La seduta vale {incassoSeduta(seduta)} € in tutto
+                      · questa persona ne paga {quota}
+                    </Text>
+                    <Text
+                      style={{
+                        ...styles.gruppoNota,
+                        ...(conf.esito === 'non_conviene' ? { color: colors.error } : {}),
+                      }}
+                    >
+                      {conf.spiegazione}
+                    </Text>
+                  </>
+                )}
+
+                <Text style={styles.gruppoAiuto}>
+                  Nel costo di questo appuntamento entra la quota di questa persona,
+                  non l'incasso del gruppo. Per gli altri partecipanti si crea un
+                  appuntamento ciascuno: così ognuno ha la sua storia, e il totale
+                  torna da solo.
+                </Text>
+              </View>
+            );
+          })()}
 
           {/* Student */}
           <StudentSearchPicker
@@ -365,6 +471,37 @@ const styles = StyleSheet.create({
   },
   typeChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + '15' },
   typeChipActiveGreen: { borderColor: colors.success, backgroundColor: colors.success + '15' },
+  gruppoBox: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  personaChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  gruppoTotale: {
+    color: colors.text,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  gruppoNota: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    marginTop: 2,
+  },
+  gruppoAiuto: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    marginTop: spacing.sm,
+    lineHeight: 16,
+  },
   typeChipText: { fontSize: fontSize.md, fontWeight: '600', color: colors.textSecondary },
   chipRow: { flexDirection: 'row', gap: spacing.sm, paddingBottom: spacing.sm },
   chip: {

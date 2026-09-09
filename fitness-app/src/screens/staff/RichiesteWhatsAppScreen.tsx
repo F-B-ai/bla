@@ -17,7 +17,7 @@ import {
 } from '../../domain/agenda';
 import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
-  leggiImpegni, getOspitiConfermati, RichiestaSalvata,
+  leggiImpegni, getOspitiConfermati, eliminaRichiesta, RichiestaSalvata,
 } from '../../services/agendaRequestService';
 import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
 
@@ -228,6 +228,35 @@ export function RichiesteWhatsAppScreen() {
     } finally {
       setLavoro(false);
     }
+  };
+
+  // Le consulenze che non si sono mai concretizzate restano in coda
+  // per sempre: hanno un posto in agenda che nessuno occuperà. Questo
+  // le toglie di mezzo davvero — non le archivia, le cancella.
+  const elimina = (r: RichiestaSalvata) => {
+    crossAlert(
+      'Eliminare la richiesta?',
+      `${r.persona} — ${dataBreve(r.giorno)} alle ${r.ora}.\n\n`
+      + 'Sparisce dalla lista e libera il posto in agenda. Non si torna indietro.',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            setLavoro(true);
+            try {
+              await eliminaRichiesta(r.id);
+              await carica();
+            } catch {
+              crossAlert('Errore', 'Non riesco a eliminare la richiesta');
+            } finally {
+              setLavoro(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const rifiuta = async (r: RichiestaSalvata, motivo: string) => {
@@ -559,6 +588,16 @@ export function RichiesteWhatsAppScreen() {
                 <Ionicons name="link" size={17} color={colors.textOnAccent} />
                 <Text style={s.btnPrimarioTxt}>Collega e metti in agenda</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.btnElimina}
+                onPress={() => elimina(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+                <Text style={s.btnEliminaTxt}>Non se n'è fatto nulla: elimina</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </>
@@ -725,6 +764,19 @@ const s = StyleSheet.create({
     paddingVertical: 11, marginTop: spacing.sm,
   },
   btnSecondarioTxt: { color: colors.accent, fontWeight: '700', fontSize: fontSize.sm },
+  btnElimina: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  btnEliminaTxt: {
+    color: colors.error,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+  },
   btnTerziario: {
     borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md,
     paddingVertical: 12, paddingHorizontal: spacing.md, marginTop: spacing.md,

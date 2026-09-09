@@ -96,6 +96,22 @@ export interface TrainingSession {
   /** true quando la seduta ha già scalato una lezione dal percorso:
    *  impedisce di toglierne una seconda se si rimarca «completata». */
   planDecremented?: boolean;
+  /**
+   * Che seduta è. Assente = individuale: le sedute registrate prima
+   * che questo campo esistesse restano quello che erano.
+   *  · 'consulenza' — si parla, non si allena. Scala dal percorso
+   *    consulenze, non dalle lezioni.
+   *  · 'gruppo' — personal da 2 a 5 persone, ognuna con la sua quota.
+   */
+  tipoSeduta?: 'individuale' | 'consulenza' | 'gruppo';
+  /** solo per 'gruppo': quante persone si allenano insieme, 2-5 */
+  persone?: number;
+  /**
+   * solo per 'gruppo': quanto paga QUESTA persona a seduta.
+   * `sessionCost` porta lo stesso numero: nel conto di un allievo non
+   * entra mai l'incasso dell'intero gruppo. Vedi domain/gruppo.ts.
+   */
+  quotaPersona?: number;
 }
 
 // --- Programma di allenamento ---

@@ -73,6 +73,8 @@ import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequ
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard } from './calendar/AppointmentCard';
+import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
+import { conduttore } from '../../domain/protocollo';
 import { TaskModal } from './calendar/TaskModal';
 import { AppointmentModal } from './calendar/AppointmentModal';
 import { StudentDetailModal } from './calendar/StudentDetailModal';
@@ -89,7 +91,18 @@ const TIME_SLOTS = [
   '19:00', '19:30', '20:00', '20:30', '21:00',
 ];
 
-type AppointmentKind = 'training' | 'nutrition';
+type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
+
+/** La tariffa di riferimento per capire se il gruppo conviene.
+ *  Vive nel listino di domain/protocollo.ts, non qui. */
+const PREZZO_SEDUTA_INDIVIDUALE = conduttore('francesco').prezzo;
+
+const ETICHETTA_SEDUTA: Record<AppointmentKind, string> = {
+  training: 'Sessione',
+  nutrition: 'Consulenza nutrizionale',
+  consulenza: 'Consulenza',
+  gruppo: 'Personal di gruppo',
+};
 
 type AppointmentItem = {
   id: string;
@@ -197,6 +210,9 @@ export const CalendarScreen: React.FC = () => {
   const [formStartTime, setFormStartTime] = useState('09:00');
   const [formEndTime, setFormEndTime] = useState('10:00');
   const [formCost, setFormCost] = useState('');
+  // personal di gruppo: quante persone e quanto paga ciascuna
+  const [formPersone, setFormPersone] = useState(2);
+  const [formQuota, setFormQuota] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formCustomDate, setFormCustomDate] = useState('');
 
@@ -529,6 +545,8 @@ export const CalendarScreen: React.FC = () => {
     setFormEndTime('10:00');
     setFormCost('');
     setFormNotes('');
+    setFormPersone(2);
+    setFormQuota('');
     setEditingItem(null);
   };
 
@@ -562,7 +580,7 @@ export const CalendarScreen: React.FC = () => {
     setSaving(true);
     try {
       if (editingItem) {
-        if (editingItem.kind === 'training') {
+        if (editingItem.kind !== 'nutrition') {
           await updateSession(editingItem.id, {
             studentId: formStudentId,
             collaboratorId: staffId,
@@ -587,7 +605,33 @@ export const CalendarScreen: React.FC = () => {
       } else {
         const isPastDate = new Date(formDate) < new Date(toDateStr(new Date()));
         const appointmentStatus = isPastDate ? 'completed' : 'scheduled';
-        if (formKind === 'training') {
+        if (formKind === 'gruppo') {
+          // Nel costo entra la QUOTA di questa persona, mai l'incasso
+          // del gruppo: vedi domain/gruppo.ts. Gli altri partecipanti
+          // hanno un appuntamento ciascuno, e il totale torna da solo.
+          const quota = parseFloat((formQuota || '').replace(',', '.'));
+          const seduta = { persone: formPersone, quotaPersona: quota };
+          const esito = controllaGruppo(seduta);
+          if (!esito.valido) {
+            crossAlert('Gruppo da completare', esito.problemi.join('\n'));
+            setSaving(false);
+            return;
+          }
+          await createSession({
+            studentId: formStudentId,
+            collaboratorId: staffId,
+            date: new Date(formDate),
+            startTime: formStartTime,
+            endTime: formEndTime,
+            status: appointmentStatus,
+            notes: formNotes,
+            sessionCost: costoPerAllievo(seduta),
+            isCountedAsCompleted: isPastDate,
+            tipoSeduta: 'gruppo',
+            persone: formPersone,
+            quotaPersona: costoPerAllievo(seduta),
+          });
+        } else if (formKind === 'training' || formKind === 'consulenza') {
           await createSession({
             studentId: formStudentId,
             collaboratorId: staffId,
@@ -598,6 +642,7 @@ export const CalendarScreen: React.FC = () => {
             notes: formNotes,
             sessionCost: cost,
             isCountedAsCompleted: isPastDate,
+            tipoSeduta: formKind === 'consulenza' ? 'consulenza' : 'individuale',
           });
         } else {
           await createAppointment({
@@ -620,7 +665,7 @@ export const CalendarScreen: React.FC = () => {
               type: 'income',
               category: 'student_payment',
               amount: cost,
-              description: `${formKind === 'training' ? 'Sessione' : 'Consulenza'} - ${getStudentName(formStudentId)} (${new Date(formDate).toLocaleDateString('it-IT')})`,
+              description: `${ETICHETTA_SEDUTA[formKind]} - ${getStudentName(formStudentId)} (${new Date(formDate).toLocaleDateString('it-IT')})`,
               date: new Date(formDate),
               collaboratorId: staffId,
               studentId: formStudentId,
@@ -667,7 +712,7 @@ export const CalendarScreen: React.FC = () => {
       const inclL = plan.includedLessons || 0;
       const usedC = plan.usedConsultations || 0;
       const inclC = plan.includedConsultations || 0;
-      if (kind === 'training') {
+      if (kind === 'training' || kind === 'gruppo') {
         if (inclL > 0 && usedL < inclL) {
           await decrementPlanLesson(plan.id, usedL);
         }
@@ -1913,6 +1958,11 @@ export const CalendarScreen: React.FC = () => {
         setFormCost={setFormCost}
         formNotes={formNotes}
         setFormNotes={setFormNotes}
+        formPersone={formPersone}
+        setFormPersone={setFormPersone}
+        formQuota={formQuota}
+        setFormQuota={setFormQuota}
+        prezzoIndividuale={PREZZO_SEDUTA_INDIVIDUALE}
         students={students}
         collaborators={collaborators}
         canSeeAll={canSeeAll}
