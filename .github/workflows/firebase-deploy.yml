@@ -154,6 +154,19 @@ jobs:
                 npx firebase-tools deploy --only firestore:rules,firestore:indexes --project essere-3fe6f --non-interactive)
         working-directory: fitness-app
 
+      # Le regole di Storage non venivano pubblicate da nessuna parte: si
+      # aggiornavano solo a mano, e per questo erano rimaste aperte a
+      # chiunque fosse autenticato senza che nessuno se ne accorgesse.
+      # Adesso viaggiano con le altre.
+      - name: Deploy Storage rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
+        run: |
+          npx firebase-tools deploy --only storage --project essere-3fe6f --non-interactive \
+            || (echo "retry tra 10s…" && sleep 10 && \
+                npx firebase-tools deploy --only storage --project essere-3fe6f --non-interactive)
+        working-directory: fitness-app
+
       - name: Cleanup key
         if: always()
         run: rm -f /tmp/firebase_sa.json
