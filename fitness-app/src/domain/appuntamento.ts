@@ -104,3 +104,63 @@ export const nomeOspiteValido = (input?: string | null): string | null => {
   if (!/[a-zA-ZÀ-ÿ]/.test(n)) return null;
   return n;
 };
+
+// ------------------------------------------------------------
+// COME SI LEGGE UN APPUNTAMENTO, IN UN POSTO SOLO
+// ------------------------------------------------------------
+//
+// Prima di questo blocco c'erano VENTITRÉ confronti sparsi del tipo
+// `kind === 'training'`, scritti quando i tipi erano due soltanto.
+// Aggiunti consulenza e gruppo, ognuno di quei confronti diventava
+// una domanda sbagliata: una consulenza non è «training», quindi
+// finiva nel ramo della nutrizione — e non si poteva più completare,
+// annullare né cancellare.
+//
+// La duplicazione era il difetto. Qui vivono le uniche tre domande
+// che quei ventitré punti facevano davvero.
+
+/**
+ * È salvato come sessione di allenamento?
+ *
+ * Vero per allenamento, consulenza e gruppo: sono tutti TrainingSession
+ * con un marcatore diverso. Falso solo per la nutrizione, che ha una
+ * collezione sua. È la domanda che serviva a completare, annullare e
+ * cancellare — e che veniva posta come «è training?».
+ */
+export const eSessione = (tipo: TipoAppuntamento): boolean => tipo !== 'nutrition';
+
+/**
+ * Da che percorso si scala.
+ * La consulenza scala dalle consulenze; allenamento e gruppo dalle
+ * lezioni. Prima il gruppo finiva fra le consulenze per esclusione.
+ */
+export const tipoPercorso = (tipo: TipoAppuntamento): 'lezione' | 'consulenza' =>
+  tipo === 'consulenza' || tipo === 'nutrition' ? 'consulenza' : 'lezione';
+
+export type Tonalita = 'accento' | 'verde' | 'ambra';
+
+export interface Aspetto {
+  etichetta: string;
+  icona: string;
+  tonalita: Tonalita;
+}
+
+/** Come si mostra, ovunque. Una voce per tipo, nessuna esclusa. */
+export const ASPETTO: Record<TipoAppuntamento, Aspetto> = {
+  training: { etichetta: 'Training', icona: 'barbell', tonalita: 'accento' },
+  nutrition: { etichetta: 'Nutrizione', icona: 'nutrition', tonalita: 'verde' },
+  consulenza: { etichetta: 'Consulenza', icona: 'chatbubbles', tonalita: 'ambra' },
+  gruppo: { etichetta: 'Gruppo', icona: 'people', tonalita: 'ambra' },
+};
+
+export const aspetto = (tipo: TipoAppuntamento): Aspetto =>
+  ASPETTO[tipo] || ASPETTO.training;
+
+/** Il tipo salvato su una sessione, riletto. Assente = allenamento. */
+export const tipoDaSeduta = (
+  tipoSeduta?: 'individuale' | 'consulenza' | 'gruppo' | null
+): TipoAppuntamento => {
+  if (tipoSeduta === 'consulenza') return 'consulenza';
+  if (tipoSeduta === 'gruppo') return 'gruppo';
+  return 'training';
+};

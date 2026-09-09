@@ -255,7 +255,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
           {/* --- consulenza: quasi sempre è il primo contatto, e la
                  persona in anagrafica non c'è ancora --- */}
-          {formKind === 'consulenza' && !formStudentId && (
+          {formKind === 'consulenza' && !formStudentId && isOwner && (
             <View style={styles.ospiteBox}>
               <InputField
                 label="Oppure: chi viene"

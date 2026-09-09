@@ -474,11 +474,27 @@ export const registerStudentWithInvite = async (
     });
   }
 
-  // Segna l'invito come usato
-  await updateDoc(doc(db, 'studentInvites', invite.id), {
-    isUsed: true,
-    usedAt: Timestamp.now(),
-  });
+  // Segna l'invito come usato.
+  //
+  // NON puo' far fallire una registrazione gia' andata a buon fine.
+  // Il 9 settembre 2026 la nuova regola Firestore ha iniziato a
+  // rifiutare questa scrittura quando l'allievo si registrava con
+  // un'email diversa da quella dell'invito — e siccome la riga non era
+  // protetta, l'errore arrivava DOPO che account e profilo erano gia'
+  // stati creati: l'utente vedeva «errore» ed esisteva davvero.
+  //
+  // A monte l'email adesso e' precompilata e bloccata, quindi il caso
+  // non dovrebbe presentarsi. Ma un aggiornamento di servizio non deve
+  // mai poter distruggere una cosa gia' riuscita.
+  try {
+    await updateDoc(doc(db, 'studentInvites', invite.id), {
+      isUsed: true,
+      usedAt: Timestamp.now(),
+    });
+  } catch {
+    // L'invito resta segnato come non usato: lo staff lo elimina a mano.
+    // La registrazione, che e' la cosa che conta, e' andata a buon fine.
+  }
 
   return { id: uid, ...studentData };
 };

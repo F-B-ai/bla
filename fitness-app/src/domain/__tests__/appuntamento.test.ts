@@ -93,3 +93,86 @@ describe('un nome scritto a mano è un nome vero', () => {
     expect(nomeOspiteValido('Niccolò Aversa')).toBe('Niccolò Aversa');
   });
 });
+
+// ============================================================
+// LE VENTITRÉ DOMANDE SBAGLIATE
+// ------------------------------------------------------------
+// Nel calendario c'erano 23 confronti «kind === 'training'», scritti
+// quando i tipi erano due. Con consulenza e gruppo ognuno diventava
+// una domanda sbagliata: una consulenza non è training, quindi finiva
+// nel ramo della nutrizione e non si poteva più completare, annullare
+// né cancellare. Questi test tengono chiuse quelle strade.
+// ============================================================
+
+import {
+  eSessione, tipoPercorso, aspetto, ASPETTO, tipoDaSeduta, TipoAppuntamento,
+} from '../appuntamento';
+
+const TUTTI: TipoAppuntamento[] = ['training', 'nutrition', 'consulenza', 'gruppo'];
+
+describe('che cosa è salvato come sessione', () => {
+  // Il difetto vero: completare, annullare e cancellare passavano da
+  // «è training?». Una consulenza è una sessione quanto un allenamento.
+  it('allenamento, consulenza e gruppo sono sessioni', () => {
+    expect(eSessione('training')).toBe(true);
+    expect(eSessione('consulenza')).toBe(true);
+    expect(eSessione('gruppo')).toBe(true);
+  });
+
+  it('solo la nutrizione non lo è: ha una collezione sua', () => {
+    expect(eSessione('nutrition')).toBe(false);
+  });
+});
+
+describe('da che percorso si scala', () => {
+  it('la consulenza scala dalle consulenze', () => {
+    expect(tipoPercorso('consulenza')).toBe('consulenza');
+    expect(tipoPercorso('nutrition')).toBe('consulenza');
+  });
+
+  // Prima il gruppo finiva fra le consulenze per esclusione: era il
+  // ramo «tutto ciò che non è training».
+  it('il gruppo scala dalle lezioni, non dalle consulenze', () => {
+    expect(tipoPercorso('gruppo')).toBe('lezione');
+    expect(tipoPercorso('training')).toBe('lezione');
+  });
+});
+
+describe('come si mostra', () => {
+  it('ogni tipo ha etichetta, icona e tonalità: nessuno escluso', () => {
+    TUTTI.forEach((t) => {
+      const a = aspetto(t);
+      expect(a.etichetta.length).toBeGreaterThan(2);
+      expect(a.icona.length).toBeGreaterThan(2);
+      expect(['accento', 'verde', 'ambra']).toContain(a.tonalita);
+    });
+  });
+
+  it('nessun tipo si mostra col nome di un altro', () => {
+    const etichette = TUTTI.map((t) => aspetto(t).etichetta);
+    expect(new Set(etichette).size).toBe(TUTTI.length);
+  });
+
+  it('la tabella copre esattamente i tipi esistenti', () => {
+    expect(Object.keys(ASPETTO).sort()).toEqual([...TUTTI].sort());
+  });
+
+  it('un tipo sconosciuto non fa esplodere niente', () => {
+    expect(aspetto('boh' as TipoAppuntamento).etichetta).toBe('Training');
+  });
+});
+
+describe('il tipo si rilegge da ciò che è salvato', () => {
+  // Il primo difetto trovato: tipoSeduta si scriveva e non si rileggeva
+  // mai, quindi una consulenza ricaricando l'agenda tornava «Training».
+  it('consulenza e gruppo si ritrovano', () => {
+    expect(tipoDaSeduta('consulenza')).toBe('consulenza');
+    expect(tipoDaSeduta('gruppo')).toBe('gruppo');
+  });
+
+  it('le sedute di prima, senza marcatore, restano allenamenti', () => {
+    expect(tipoDaSeduta('individuale')).toBe('training');
+    expect(tipoDaSeduta(undefined)).toBe('training');
+    expect(tipoDaSeduta(null)).toBe('training');
+  });
+});

@@ -45,6 +45,10 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
         return;
       }
       setInvite(foundInvite);
+      // L'invito e' intestato a un'email precisa, e la regola Firestore
+      // consente di marcarlo usato solo a quella. Precompilarla evita che
+      // l'allievo ne scriva un'altra e la registrazione si inceppi in fondo.
+      if (foundInvite.email) setEmail(foundInvite.email);
       setStep('register');
     } catch {
       crossAlert('Errore', 'Impossibile verificare il codice. Riprova.');
@@ -136,13 +140,20 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
             </View>
 
             <InputField
-              label="Email *"
+              label={invite?.email ? 'Email (dell\'invito)' : 'Email *'}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               placeholder="la.tua@email.com"
+              editable={!invite?.email}
             />
+            {!!invite?.email && (
+              <Text style={styles.notaEmail}>
+                L'invito è intestato a questo indirizzo. Se è sbagliato, chiedi
+                al tuo coach un invito nuovo.
+              </Text>
+            )}
             <InputField
               label="Password *"
               value={password}
@@ -200,6 +211,13 @@ export const RegisterStudentScreen: React.FC<Props> = ({ onBack }) => {
 };
 
 const styles = StyleSheet.create({
+  notaEmail: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.primary,

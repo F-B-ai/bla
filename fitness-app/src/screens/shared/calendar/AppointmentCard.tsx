@@ -5,6 +5,10 @@ import { colors } from '../../../config/theme';
 import { crossAlert } from '../../../utils/alert';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
+import { aspetto, eSessione } from '../../../domain/appuntamento';
+import { etichettaGruppo } from '../../../domain/gruppo';
+
+const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
@@ -21,6 +25,8 @@ export type AppointmentItem = {
   notes: string;
   sessionCost?: number;
   isCountedAsCompleted: boolean;
+  persone?: number;
+  quotaPersona?: number;
 };
 
 export interface AppointmentCardProps {
@@ -75,7 +81,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       return;
     }
     const studentName = getStudentName(item.studentId).split(' ')[0];
-    const tipo = item.kind === 'training' ? 'allenamento' : 'nutrizione';
+    const tipo = aspetto(item.kind).etichetta.toLowerCase();
     const dateLabel = item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
     const message = `Ciao ${studentName}! Ti ricordiamo il tuo appuntamento di ${tipo} il ${dateLabel} alle ${item.startTime}. A presto! - ESSĒRE`;
     const cleanPhone = phone.replace(/[^0-9+]/g, '');
@@ -88,13 +94,19 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       <View style={styles.cardHeader}>
         <View style={styles.kindBadge}>
           <Ionicons
-            name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+            name={aspetto(item.kind).icona as never}
             size={14}
-            color={item.kind === 'training' ? colors.accent : colors.success}
+            color={TONO[aspetto(item.kind).tonalita]}
           />
-          <Text style={{ ...styles.kindText, color: item.kind === 'training' ? colors.accent : colors.success }}>
-            {item.kind === 'training' ? 'Training' : 'Nutrizione'}
+          <Text style={{ ...styles.kindText, color: TONO[aspetto(item.kind).tonalita] }}>
+            {aspetto(item.kind).etichetta}
           </Text>
+          {item.kind === 'gruppo' && !!item.persone && !!item.quotaPersona && (
+            <Text style={{ ...styles.kindText, color: colors.textSecondary }}>
+              {' · '}
+              {etichettaGruppo({ persone: item.persone, quotaPersona: item.quotaPersona })}
+            </Text>
+          )}
         </View>
         <Badge status={item.status} />
       </View>

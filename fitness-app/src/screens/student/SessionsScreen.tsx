@@ -19,6 +19,9 @@ import {
   cancelAppointment,
 } from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
+import { aspetto, eSessione, tipoDaSeduta } from '../../domain/appuntamento';
+
+const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
 const CANCELLATION_HOURS = 10;
 
@@ -33,7 +36,7 @@ const toSafeDate = (d: unknown): Date => {
 
 type UnifiedItem = {
   id: string;
-  kind: 'training' | 'nutrition';
+  kind: 'training' | 'nutrition' | 'consulenza' | 'gruppo';
   date: Date;
   startTime: string;
   endTime: string;
@@ -49,7 +52,7 @@ const toUnified = (
   const items: UnifiedItem[] = [];
   sessions.forEach((s) => {
     items.push({
-      id: s.id, kind: 'training',
+      id: s.id, kind: tipoDaSeduta(s.tipoSeduta),
       date: toSafeDate(s.date),
       startTime: s.startTime, endTime: s.endTime,
       status: s.status, notes: s.notes,
@@ -120,7 +123,7 @@ export const SessionsScreen: React.FC = () => {
             text: 'Annulla comunque',
             style: 'destructive',
             onPress: async () => {
-              if (item.kind === 'training') await cancelSession(item.id, item.date);
+              if (eSessione(item.kind)) await cancelSession(item.id, item.date);
               else await cancelAppointment(item.id, item.date);
               await loadData();
               crossAlert('Sessione annullata', 'Annullata con meno di 10 ore di preavviso: sarà conteggiata.');
@@ -136,7 +139,7 @@ export const SessionsScreen: React.FC = () => {
       {
         text: 'Sì, annulla',
         onPress: async () => {
-          if (item.kind === 'training') await cancelSession(item.id, item.date);
+          if (eSessione(item.kind)) await cancelSession(item.id, item.date);
           else await cancelAppointment(item.id, item.date);
           await loadData();
           crossAlert('Fatto', 'Appuntamento annullato con successo');
@@ -156,12 +159,12 @@ export const SessionsScreen: React.FC = () => {
           <View style={{ flex: 1 }}>
             <View style={styles.kindRow}>
               <Ionicons
-                name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+                name={aspetto(item.kind).icona as never}
                 size={14}
-                color={item.kind === 'training' ? colors.accent : colors.success}
+                color={TONO[aspetto(item.kind).tonalita]}
               />
-              <Text style={[styles.kindLabel, { color: item.kind === 'training' ? colors.accent : colors.success }]}>
-                {item.kind === 'training' ? 'Training' : 'Nutrizione'}
+              <Text style={[styles.kindLabel, { color: TONO[aspetto(item.kind).tonalita] }]}>
+                {aspetto(item.kind).etichetta}
               </Text>
             </View>
             <Text style={styles.sessionDate}>

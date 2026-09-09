@@ -76,6 +76,7 @@ import { AppointmentCard } from './calendar/AppointmentCard';
 import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
+  eSessione, tipoPercorso, aspetto, tipoDaSeduta,
 } from '../../domain/appuntamento';
 import { creaOspite } from '../../services/agendaRequestService';
 import { conduttore } from '../../domain/protocollo';
@@ -101,6 +102,8 @@ type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
  *  Vive nel listino di domain/protocollo.ts, non qui. */
 const PREZZO_SEDUTA_INDIVIDUALE = conduttore('francesco').prezzo;
 
+const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
+
 const ETICHETTA_SEDUTA: Record<AppointmentKind, string> = {
   training: 'Sessione',
   nutrition: 'Consulenza nutrizionale',
@@ -121,6 +124,8 @@ type AppointmentItem = {
   notes: string;
   sessionCost?: number;
   isCountedAsCompleted: boolean;
+  persone?: number;
+  quotaPersona?: number;
   /** la seduta ha già scalato dal percorso */
   planDecremented?: boolean;
 };
@@ -351,7 +356,7 @@ export const CalendarScreen: React.FC = () => {
     sessions.forEach((s) => {
       const d = toSafeDate(s.date);
       items.push({
-        id: s.id, kind: 'training', studentId: s.studentId, staffId: s.collaboratorId,
+        id: s.id, kind: tipoDaSeduta(s.tipoSeduta), persone: s.persone, quotaPersona: s.quotaPersona, studentId: s.studentId, staffId: s.collaboratorId,
         date: d, dateStr: toDateStr(d), startTime: s.startTime, endTime: s.endTime,
         status: s.status, notes: s.notes, sessionCost: s.sessionCost,
         isCountedAsCompleted: s.isCountedAsCompleted,
@@ -444,7 +449,7 @@ export const CalendarScreen: React.FC = () => {
       sess.forEach((s) => {
         const d = toSafeDate(s.date);
         items.push({
-          id: s.id, kind: 'training', studentId: s.studentId, staffId: s.collaboratorId,
+          id: s.id, kind: tipoDaSeduta(s.tipoSeduta), persone: s.persone, quotaPersona: s.quotaPersona, studentId: s.studentId, staffId: s.collaboratorId,
           date: d, dateStr: toDateStr(d), startTime: s.startTime, endTime: s.endTime,
           status: s.status, notes: s.notes, sessionCost: s.sessionCost,
           isCountedAsCompleted: s.isCountedAsCompleted,
@@ -513,7 +518,7 @@ export const CalendarScreen: React.FC = () => {
       if (!a.isCountedAsCompleted && a.status !== 'completed') return;
       const id = a.staffId || 'unknown';
       if (!map[id]) map[id] = { name: getStaffName(id) || 'Sconosciuto', training: 0, nutrition: 0 };
-      if (a.kind === 'training') map[id].training++;
+      if (eSessione(a.kind)) map[id].training++;
       else map[id].nutrition++;
     });
     if (user) {
@@ -597,6 +602,14 @@ export const CalendarScreen: React.FC = () => {
     // agenda e compare fra gli «Ospiti da collegare»: quando la persona
     // si iscrive la si aggancia e diventa una sessione vera.
     if (controllo.esito === 'ospite') {
+      if (!isOwner) {
+        crossAlert(
+          'Serve il titolare',
+          'Una consulenza con chi non è ancora in anagrafica la può fissare solo '
+          + 'il titolare. Scegli un allievo dall\'elenco, oppure chiedi a lui.'
+        );
+        return;
+      }
       const nome = nomeOspiteValido(formNomeOspite);
       if (!nome) {
         crossAlert('Manca qualcosa', 'Scrivi il nome della persona.');
@@ -764,7 +777,7 @@ export const CalendarScreen: React.FC = () => {
       const inclL = plan.includedLessons || 0;
       const usedC = plan.usedConsultations || 0;
       const inclC = plan.includedConsultations || 0;
-      if (kind === 'training' || kind === 'gruppo') {
+      if (tipoPercorso(kind) === 'lezione') {
         if (inclL > 0 && usedL < inclL) {
           await decrementPlanLesson(plan.id, usedL);
         }
@@ -785,17 +798,17 @@ export const CalendarScreen: React.FC = () => {
         text: 'Completato',
         onPress: async () => {
           try {
-            if (item.kind === 'training') await updateSessionStatus(item.id, 'completed');
+            if (eSessione(item.kind)) await updateSessionStatus(item.id, 'completed');
             else await updateAppointmentStatus(item.id, 'completed');
 
             // Si scala dal percorso, e si DICE che cosa è successo:
             // prima, se il percorso non copriva oggi, non scalava
             // niente e nessuno lo sapeva.
-            const tipoPiano = item.kind === 'training' ? 'lezione' : 'consulenza';
+            const tipoPiano = tipoPercorso(item.kind);
             const gia = giaScalata(!!item.planDecremented, tipoPiano);
             const esito = gia || await scalaDalPercorso(item.studentId, tipoPiano);
             if (esito.esito === 'scalata') {
-              if (item.kind === 'training') {
+              if (eSessione(item.kind)) {
                 await updateSession(item.id, { planDecremented: true });
               } else {
                 await updateAppointment(item.id, { planDecremented: true });
@@ -846,7 +859,7 @@ export const CalendarScreen: React.FC = () => {
               style: 'destructive',
               onPress: async () => {
                 try {
-                  if (item.kind === 'training') await cancelSession(item.id, item.date);
+                  if (eSessione(item.kind)) await cancelSession(item.id, item.date);
                   else await cancelAppointment(item.id, item.date);
                   await decrementStudentPlan(item.studentId, item.kind);
                   const dateLabel = item.date.toLocaleDateString('it-IT');
@@ -876,10 +889,10 @@ export const CalendarScreen: React.FC = () => {
         onPress: async () => {
           try {
             if (isStaff) {
-              if (item.kind === 'training') await updateSessionStatus(item.id, 'cancelled_by_student');
+              if (eSessione(item.kind)) await updateSessionStatus(item.id, 'cancelled_by_student');
               else await updateAppointmentStatus(item.id, 'cancelled');
             } else {
-              if (item.kind === 'training') await cancelSession(item.id, item.date);
+              if (eSessione(item.kind)) await cancelSession(item.id, item.date);
               else await cancelAppointment(item.id, item.date);
             }
             const dateLabel = item.date.toLocaleDateString('it-IT');
@@ -916,7 +929,7 @@ export const CalendarScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (item.kind === 'training') await deleteSession(item.id);
+            if (eSessione(item.kind)) await deleteSession(item.id);
             else await deleteAppointment(item.id);
             loadData();
           } catch { crossAlert('Errore', 'Impossibile eliminare'); }
@@ -1078,7 +1091,7 @@ export const CalendarScreen: React.FC = () => {
     const isToday = dateStr === todayStr;
     const dayItems = appointmentsByDate[dateStr] || [];
     const dayTaskItems = tasksByDate[dateStr] || [];
-    const hasTraining = dayItems.some((a) => a.kind === 'training');
+    const hasTraining = dayItems.some((a) => eSessione(a.kind));
     const hasNutrition = dayItems.some((a) => a.kind === 'nutrition');
     const hasTasks = isOwner && dayTaskItems.length > 0;
 
@@ -1180,7 +1193,7 @@ export const CalendarScreen: React.FC = () => {
     >
       <View style={{
         ...styles.agendaTimeCol,
-        borderLeftColor: item.kind === 'training' ? colors.accent : colors.success,
+        borderLeftColor: TONO[aspetto(item.kind).tonalita],
       }}>
         <Text style={styles.agendaTime}>{item.startTime}</Text>
         <Text style={styles.agendaTimeSep}>
@@ -1191,9 +1204,9 @@ export const CalendarScreen: React.FC = () => {
         <Text style={styles.agendaStudentName}>{getStudentName(item.studentId)}</Text>
         <View style={styles.agendaMetaRow}>
           <Ionicons
-            name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+            name={aspetto(item.kind).icona as never}
             size={12}
-            color={item.kind === 'training' ? colors.accent : colors.success}
+            color={TONO[aspetto(item.kind).tonalita]}
           />
           <Text style={styles.agendaKind}>
             {item.date.toLocaleDateString('it-IT', { weekday: 'long' })}
@@ -1218,7 +1231,7 @@ export const CalendarScreen: React.FC = () => {
       >
         <View style={{
           ...styles.agendaTimeCol,
-          borderLeftColor: item.kind === 'training' ? colors.accent : colors.success,
+          borderLeftColor: TONO[aspetto(item.kind).tonalita],
         }}>
           <Text style={styles.agendaTime}>{item.startTime}</Text>
           <Text style={styles.agendaTimeSep}>-</Text>
@@ -1228,12 +1241,12 @@ export const CalendarScreen: React.FC = () => {
           <Text style={styles.agendaStudentName}>{getStudentName(item.studentId)}</Text>
           <View style={styles.agendaMetaRow}>
             <Ionicons
-              name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+              name={aspetto(item.kind).icona as never}
               size={12}
-              color={item.kind === 'training' ? colors.accent : colors.success}
+              color={TONO[aspetto(item.kind).tonalita]}
             />
             <Text style={styles.agendaKind}>
-              {item.kind === 'training' ? 'Training' : 'Nutrizione'}
+              {aspetto(item.kind).etichetta}
             </Text>
             {staffName ? <Text style={styles.agendaStaff}> · {staffName}</Text> : null}
           </View>
@@ -1613,7 +1626,7 @@ export const CalendarScreen: React.FC = () => {
               {scheduledToday.map((appt) => {
                 const top = getTimeOffset(appt.startTime);
                 const height = getBlockHeight(appt.startTime, appt.endTime);
-                const isTraining = appt.kind === 'training';
+                const isTraining = eSessione(appt.kind);
                 return (
                   <View
                     key={`appt-${appt.id}`}

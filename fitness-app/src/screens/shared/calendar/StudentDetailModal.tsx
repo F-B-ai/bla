@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../../config/theme';
 import { ModalHeader } from '../../../components/common/ModalHeader';
 import { Badge } from '../../../components/common/Badge';
+import { aspetto, eSessione } from '../../../domain/appuntamento';
+
+const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
@@ -20,6 +23,8 @@ type AppointmentItem = {
   notes: string;
   sessionCost?: number;
   isCountedAsCompleted: boolean;
+  persone?: number;
+  quotaPersona?: number;
 };
 
 export interface StudentDetailModalProps {
@@ -84,9 +89,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               <View key={item.id} style={styles.miniCard}>
                 <View style={styles.miniCardLeft}>
                   <Ionicons
-                    name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+                    name={aspetto(item.kind).icona as never}
                     size={14}
-                    color={item.kind === 'training' ? colors.accent : colors.success}
+                    color={TONO[aspetto(item.kind).tonalita]}
                   />
                   <Text style={styles.miniCardDate}>
                     {item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
@@ -107,9 +112,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               <View key={item.id} style={styles.miniCard}>
                 <View style={styles.miniCardLeft}>
                   <Ionicons
-                    name={item.kind === 'training' ? 'barbell' : 'nutrition'}
+                    name={aspetto(item.kind).icona as never}
                     size={14}
-                    color={item.kind === 'training' ? colors.accent : colors.success}
+                    color={TONO[aspetto(item.kind).tonalita]}
                   />
                   <Text style={styles.miniCardDate}>
                     {item.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
