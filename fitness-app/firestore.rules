@@ -220,12 +220,44 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // Student invites
+    // ============================================================
+    // INVITI ALLIEVO
+    // ------------------------------------------------------------
+    // Qui c'era «allow read: if true». Chiunque, senza autenticarsi,
+    // poteva scaricare l'elenco degli invitati — nome, cognome, email
+    // — e i codici con cui ci si registra. Verificato in produzione
+    // l'8 settembre 2026: HTTP 200 su richiesta anonima.
+    //
+    // Serviva davvero una lettura senza credenziali, perché il codice
+    // va validato prima che la persona esista come utente. Ma serviva
+    // UNA lettura di UN codice, non l'elenco: adesso la fa la Cloud
+    // Function validaInvito, che risponde un codice per volta e
+    // restituisce solo i campi necessari a completare la
+    // registrazione. Da fuori, questa collezione non si legge più.
+    // ============================================================
     match /studentInvites/{inviteId} {
-      allow read: if true;
+      allow read: if isStaff();
       allow create: if isStaff();
-      allow update: if isAuthenticated();
+
+      // L'allievo appena registrato marca usato SOLO il proprio
+      // invito, e solo quei due campi. Prima bastava essere
+      // autenticati per modificare l'invito di chiunque.
+      allow update: if isStaff() || (
+        isAuthenticated() &&
+        resource.data.email == request.auth.token.email &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['isUsed', 'usedAt']) &&
+        request.resource.data.isUsed == true
+      );
+
       allow delete: if isOwnerOrManager();
+    }
+
+    // Conteggio dei tentativi di validazione: lo scrive e lo legge
+    // solo la Cloud Function, con privilegi di amministratore. Da
+    // client non si tocca, in nessun modo.
+    match /inviteAttempts/{chiave} {
+      allow read, write: if false;
     }
 
     // Training programs

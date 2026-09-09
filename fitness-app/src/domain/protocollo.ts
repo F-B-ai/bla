@@ -26,6 +26,8 @@ import { Quadro, Traccia } from './humanInterface';
 //    documento del cliente li riporta uno per uno.
 // ============================================================
 
+import { controllaGruppo, incassoSeduta } from './gruppo';
+
 export const PROTOCOLLO_VERSION = 1;
 
 // ------------------------------------------------------------
@@ -257,6 +259,24 @@ export interface VoceSedute {
   quante: number;
 }
 
+/**
+ * Sedute di personal di gruppo dentro il programma di UNA persona.
+ *
+ * Attenzione al numero che entra qui: nel programma di un allievo va
+ * la SUA quota, non l'incasso del gruppo. Se ci finisse l'incasso,
+ * gli staremmo chiedendo di pagare anche per gli altri. La regola
+ * vive in domain/gruppo.ts, con i suoi test.
+ */
+export interface VoceGruppo {
+  conduttore: Conduttore;
+  /** quante sedute di gruppo */
+  quante: number;
+  /** quante persone si allenano insieme, 2-5 */
+  persone: number;
+  /** quanto paga ciascuna, a seduta */
+  quotaPersona: number;
+}
+
 export interface RigaPiano {
   descrizione: string;
   quante: number;
@@ -275,6 +295,12 @@ export interface PianoLavoro {
   /** rate concordate, se il pagamento è dilazionato */
   numeroRate?: number;
   importoRata?: number;
+  /**
+   * Quanto incassa lo studio dalle sedute di gruppo di questo piano,
+   * contando TUTTE le persone. Non entra in totaleEuro: quello è ciò
+   * che paga questo allievo. Serve al titolare, non alla proposta.
+   */
+  incassoStudioGruppi?: number;
 }
 
 const arrotonda2 = (n: number): number => Math.round(n * 100) / 100;
@@ -286,6 +312,8 @@ const arrotonda2 = (n: number): number => Math.round(n * 100) / 100;
  */
 export const componiPiano = (input: {
   voci: VoceSedute[];
+  /** sedute di personal di gruppo, se ce ne sono */
+  gruppi?: VoceGruppo[];
   seduteASettimana?: number;
   /** true = la valutazione è già stata pagata e non rientra nel totale */
   valutazioneGiaPagata?: boolean;
@@ -302,7 +330,29 @@ export const componiPiano = (input: {
     };
   });
 
-  const totaleSedute = voci.reduce((s, v) => s + v.quante, 0);
+  // I gruppi: nel piano entra la QUOTA di questa persona, mai
+  // l'incasso del gruppo. L'incasso si calcola a parte, e sta fuori
+  // dal totale che l'allievo si vede scritto.
+  const gruppi = (input.gruppi || []).filter(
+    (g) => g.quante > 0 && controllaGruppo({ persone: g.persone, quotaPersona: g.quotaPersona }).valido
+  );
+  gruppi.forEach((g) => {
+    const c = conduttore(g.conduttore);
+    righe.push({
+      descrizione: `Personal di gruppo (${g.persone} persone) con ${c.nome}`,
+      quante: g.quante,
+      prezzoUnitario: arrotonda2(g.quotaPersona),
+      totale: arrotonda2(g.quante * g.quotaPersona),
+    });
+  });
+  const incassoStudioGruppi = gruppi.length > 0
+    ? arrotonda2(gruppi.reduce((s, g) => s + g.quante * incassoSeduta({
+      persone: g.persone, quotaPersona: g.quotaPersona,
+    }), 0))
+    : undefined;
+
+  const totaleSedute = voci.reduce((s, v) => s + v.quante, 0)
+    + gruppi.reduce((s, g) => s + g.quante, 0);
   const totaleSeduteEuro = arrotonda2(righe.reduce((s, r) => s + r.totale, 0));
   const valutazioneEuro = input.valutazioneGiaPagata ? 0 : PREZZO_VALUTAZIONE;
   const totaleEuro = arrotonda2(totaleSeduteEuro + valutazioneEuro);
@@ -322,6 +372,7 @@ export const componiPiano = (input: {
     settimane,
     numeroRate: rate,
     importoRata: rate ? arrotonda2(totaleEuro / rate) : undefined,
+    incassoStudioGruppi,
   };
 };
 

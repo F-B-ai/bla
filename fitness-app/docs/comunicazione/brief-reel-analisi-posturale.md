@@ -3,6 +3,12 @@
 Mind Movement Lab · A.S.D. Evolution Sport, Gragnano (NA)
 6 Reel verticali sull'analisi posturale di ESSĒRE
 
+> ⚠️ **SUPERATO dai copioni.** Gli script vivi stanno in
+> [`copioni-serie-A-essere.md`](./copioni-serie-A-essere.md). Questo file resta
+> per la provenienza tecnica. Il 9 settembre 2026 è stata corretta qui dentro una
+> frase falsa sulla privacy delle foto: se ne trovi traccia altrove, prevale il
+> copione.
+>
 > **Come si usa questo file.** È scritto per essere **incollato intero** a chi
 > gira e a chi monta: è autosufficiente, non serve leggere altro. Gli script
 > completi con la provenienza tecnica di ogni affermazione stanno nell'artifact
@@ -92,20 +98,20 @@ artificiale. Cerca il corpo e ci mette sopra trentatré punti: occhi, orecchie,
 spalle, anche, ginocchia, caviglie.
 Noi non li usiamo tutti. Ne usiamo dieci, quelli che servono a misurare quello
 che ci interessa. Il resto sarebbe rumore.
-E qui la cosa che conta di più: quella foto non lascia il tuo telefono. Il
-calcolo avviene dentro il dispositivo, non su un server. Non la carichiamo da
-nessuna parte.
+E qui la cosa che conta di più: il calcolo lo fa il tuo telefono, non un server.
+La foto invece la conserviamo noi, protetta, perché fra sei mesi tu possa vedere
+il confronto. È tua: la chiedi e te la do, la cancelli e sparisce.
 Il risultato non è la foto. Sono dieci punti e degli angoli.
 
 **Visual**
 - Francesco di spalle che scatta la foto
 - La foto diventa scheletro: i punti compaiono a uno a uno
 - I dieci punti usati si accendono, gli altri sbiadiscono
-- Sulla frase della privacy: la foto con un lucchetto, dentro la sagoma del telefono
+- Sulla frase della conservazione: lo storico con due valutazioni a confronto
 
 **Didascalia**
-Trentatré punti, dieci usati, zero foto caricate su un server. La misura si fa
-dentro il tuo telefono. #analisiposturale #mindmovement #screening
+Trentatré punti, dieci usati. Il calcolo lo fa il tuo telefono. La foto la
+conserviamo protetta perché tu possa vedere il confronto fra sei mesi. #analisiposturale #mindmovement #screening
 
 ---
 

@@ -6,7 +6,7 @@ import { crossAlert } from '../../../utils/alert';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 
-type AppointmentKind = 'training' | 'nutrition';
+type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
 export type AppointmentItem = {
   id: string;

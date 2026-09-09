@@ -1,60 +1,137 @@
 rules_version = '2';
+
+// ============================================================
+// REGOLE SUI FILE — chi vede le foto degli allievi
+// ------------------------------------------------------------
+// Fino al 9 settembre 2026 la prima regola di questo file era:
+//
+//     match /{allPaths=**} {
+//       allow read, write: if request.auth != null;
+//     }
+//
+// Un carattere jolly su TUTTO il bucket. In Storage le regole si
+// sommano: bastava che una corrispondenza concedesse l'accesso, e
+// quella lo concedeva a chiunque fosse autenticato. Le regole per
+// cartella scritte sotto erano decorative — non restringevano nulla.
+//
+// Vuol dire che QUALSIASI allievo, col suo accesso normale, poteva
+// leggere, sovrascrivere e cancellare le foto posturali di tutti
+// gli altri, i documenti BIA, le foto della composizione corporea.
+//
+// Le foto del corpo di una persona sono dati personali. Questa non
+// era una svista di configurazione: era la porta di casa aperta.
+//
+// LA REGOLA ADESSO: nessun carattere jolly permissivo. Ogni cartella
+// dice chi legge e chi scrive, e il caso non previsto è NEGATO.
+//
+// Il ruolo si legge da Firestore. Costa una lettura per richiesta ed
+// è il prezzo giusto: senza, «staff» sarebbe una parola senza prova.
+// ============================================================
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Consente l'elenco (list) e l'eliminazione dei file agli utenti
-    // autenticati, necessario per lo strumento di gestione spazio.
-    // Coerente con le regole per-cartella già presenti (read/write a
-    // qualsiasi utente autenticato).
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+
+    function autenticato() {
+      return request.auth != null;
     }
 
-    // Academy content
-    match /academy/{courseId}/{folder}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+    function ruolo() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.role;
     }
 
-    // Postural images
+    function attivo() {
+      return autenticato() && firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.isActive != false;
+    }
+
+    // Chi lavora nello studio. Un accesso disattivato non è più staff,
+    // nemmeno con una sessione già aperta: stessa regola di Firestore.
+    function staff() {
+      return attivo() && ruolo() in ['owner', 'manager', 'collaborator'];
+    }
+
+    function titolare() {
+      return attivo() && ruolo() in ['owner', 'manager'];
+    }
+
+    // La persona stessa, e nessun altro.
+    function propria(uid) {
+      return autenticato() && request.auth.uid == uid;
+    }
+
+    // ----------------------------------------------------------
+    // I DATI DEL CORPO — foto posturali, BIA, composizione
+    // ----------------------------------------------------------
+    // Le carica lo staff dalla schermata di valutazione. L'allievo
+    // può vedere le proprie e nient'altro. Cancella solo il titolare.
+
     match /postural/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if staff() || propria(studentId);
+      allow write: if staff();
+      allow delete: if titolare();
     }
 
-    // BIA documents
     match /bia/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if staff() || propria(studentId);
+      allow write: if staff();
+      allow delete: if titolare();
     }
 
-    // Nutrition team attachments
-    match /nutritionTeam/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    // Body composition images
     match /bodycomp/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if staff() || propria(studentId);
+      allow write: if staff();
+      allow delete: if titolare();
     }
 
-    // User avatars
+    // ----------------------------------------------------------
+    // L'IMMAGINE DI SÉ
+    // ----------------------------------------------------------
+    // L'avatar si vede negli elenchi, quindi lo legge chi è dentro.
+    // Lo cambia solo la persona, o lo staff per suo conto.
+
     match /avatars/{userId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if autenticato();
+      allow write: if propria(userId) || staff();
+      allow delete: if propria(userId) || titolare();
     }
 
-    // Exercise videos
+    // ----------------------------------------------------------
+    // I MATERIALI — li pubblica lo studio, li legge chi è dentro
+    // ----------------------------------------------------------
+
+    match /academy/{courseId}/{folder}/{fileName} {
+      allow read: if autenticato();
+      allow write, delete: if staff();
+    }
+
     match /exercise-videos/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if autenticato();
+      allow write, delete: if staff();
     }
 
-    // Content uploads (video, audio, pdf)
     match /content/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if autenticato();
+      allow write, delete: if staff();
+    }
+
+    // Allegati del team nutrizionale: non li legge l'allievo.
+    match /nutritionTeam/{fileName} {
+      allow read, write: if staff();
+      allow delete: if titolare();
+    }
+
+    // ----------------------------------------------------------
+    // LO STRUMENTO DI GESTIONE SPAZIO
+    // ----------------------------------------------------------
+    // Serviva un elenco su tutto il bucket, ed è per quello che
+    // esisteva il carattere jolly. Adesso l'elenco c'è ancora, ma
+    // solo per il titolare: non per «chiunque sia autenticato».
+
+    match /{allPaths=**} {
+      allow read, write, delete: if titolare();
     }
   }
 }

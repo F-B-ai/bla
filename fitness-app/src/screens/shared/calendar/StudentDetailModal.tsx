@@ -5,7 +5,7 @@ import { colors, spacing, fontSize, borderRadius } from '../../../config/theme';
 import { ModalHeader } from '../../../components/common/ModalHeader';
 import { Badge } from '../../../components/common/Badge';
 
-type AppointmentKind = 'training' | 'nutrition';
+type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
 type AppointmentItem = {
   id: string;
