@@ -74,6 +74,10 @@ import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard } from './calendar/AppointmentCard';
 import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
+import {
+  controllaAppuntamento, messaggioMancante, nomeOspiteValido,
+} from '../../domain/appuntamento';
+import { creaOspite } from '../../services/agendaRequestService';
 import { conduttore } from '../../domain/protocollo';
 import { TaskModal } from './calendar/TaskModal';
 import { AppointmentModal } from './calendar/AppointmentModal';
@@ -213,6 +217,8 @@ export const CalendarScreen: React.FC = () => {
   // personal di gruppo: quante persone e quanto paga ciascuna
   const [formPersone, setFormPersone] = useState(2);
   const [formQuota, setFormQuota] = useState('');
+  // consulenza con chi non è ancora in anagrafica
+  const [formNomeOspite, setFormNomeOspite] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formCustomDate, setFormCustomDate] = useState('');
 
@@ -547,6 +553,7 @@ export const CalendarScreen: React.FC = () => {
     setFormNotes('');
     setFormPersone(2);
     setFormQuota('');
+    setFormNomeOspite('');
     setEditingItem(null);
   };
 
@@ -570,8 +577,53 @@ export const CalendarScreen: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!formStudentId || !formDate || !user) {
-      crossAlert('Errore', 'Seleziona allievo e data');
+    if (!user) return;
+
+    // Chiedere «seleziona l'allievo» per OGNI tipo era una porta chiusa:
+    // una consulenza e' quasi sempre il primo contatto, e la persona in
+    // anagrafica non c'e' ancora. Vedi domain/appuntamento.ts.
+    const controllo = controllaAppuntamento({
+      tipo: formKind,
+      studentId: formStudentId,
+      nomeOspite: formNomeOspite,
+      data: formDate,
+    });
+    if (controllo.esito === 'incompleto') {
+      crossAlert('Manca qualcosa', messaggioMancante(controllo));
+      return;
+    }
+
+    // Consulenza senza allievo: si salva come OSPITE. Occupa il posto in
+    // agenda e compare fra gli «Ospiti da collegare»: quando la persona
+    // si iscrive la si aggancia e diventa una sessione vera.
+    if (controllo.esito === 'ospite') {
+      const nome = nomeOspiteValido(formNomeOspite);
+      if (!nome) {
+        crossAlert('Manca qualcosa', 'Scrivi il nome della persona.');
+        return;
+      }
+      setSaving(true);
+      try {
+        await creaOspite({
+          persona: nome,
+          giorno: formDate,
+          ora: formStartTime,
+          tipo: 'consulenza',
+          note: formNotes,
+          creataDa: user.id,
+        });
+        crossAlert(
+          'Ospite in agenda',
+          `${nome} ha il suo posto. Quando si iscrive lo colleghi da Richieste WhatsApp.`
+        );
+        resetForm();
+        setShowModal(false);
+        loadData();
+      } catch {
+        crossAlert('Errore', 'Impossibile salvare');
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
@@ -1963,6 +2015,8 @@ export const CalendarScreen: React.FC = () => {
         formQuota={formQuota}
         setFormQuota={setFormQuota}
         prezzoIndividuale={PREZZO_SEDUTA_INDIVIDUALE}
+        formNomeOspite={formNomeOspite}
+        setFormNomeOspite={setFormNomeOspite}
         students={students}
         collaborators={collaborators}
         canSeeAll={canSeeAll}

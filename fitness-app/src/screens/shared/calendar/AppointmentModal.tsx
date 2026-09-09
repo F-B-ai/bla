@@ -69,6 +69,9 @@ export interface AppointmentModalProps {
   setFormQuota: (v: string) => void;
   /** tariffa individuale del conduttore, per il confronto */
   prezzoIndividuale: number;
+  /** solo per la consulenza: il nome di chi viene, se non è in anagrafica */
+  formNomeOspite: string;
+  setFormNomeOspite: (v: string) => void;
   students: Student[];
   collaborators: Collaborator[];
   canSeeAll: boolean;
@@ -105,6 +108,8 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   formQuota,
   setFormQuota,
   prezzoIndividuale,
+  formNomeOspite,
+  setFormNomeOspite,
   students,
   collaborators,
   canSeeAll,
@@ -245,8 +250,27 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             students={students}
             selectedId={formStudentId}
             onSelect={(id) => setFormStudentId(id)}
-            label="Allievo"
+            label={formKind === 'consulenza' ? 'Allievo (se è già in anagrafica)' : 'Allievo'}
           />
+
+          {/* --- consulenza: quasi sempre è il primo contatto, e la
+                 persona in anagrafica non c'è ancora --- */}
+          {formKind === 'consulenza' && !formStudentId && (
+            <View style={styles.ospiteBox}>
+              <InputField
+                label="Oppure: chi viene"
+                value={formNomeOspite}
+                onChangeText={setFormNomeOspite}
+                placeholder="Nome e cognome"
+              />
+              <Text style={styles.ospiteAiuto}>
+                Se la persona non è ancora in anagrafica scrivi solo il nome:
+                l'appuntamento occupa il posto in agenda come ospite. Quando si
+                iscrive la colleghi da «Richieste WhatsApp», e diventa una
+                sessione vera con la sua scheda.
+              </Text>
+            </View>
+          )}
 
           {/* Staff picker (owner/manager only) */}
           {canSeeAll && (
@@ -471,6 +495,18 @@ const styles = StyleSheet.create({
   },
   typeChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + '15' },
   typeChipActiveGreen: { borderColor: colors.success, backgroundColor: colors.success + '15' },
+  ospiteBox: {
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  ospiteAiuto: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
   gruppoBox: {
     backgroundColor: colors.surfaceLight,
     borderRadius: borderRadius.md,

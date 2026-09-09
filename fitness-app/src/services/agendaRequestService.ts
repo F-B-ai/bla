@@ -100,6 +100,48 @@ export const salvaRichiesta = async (
   return docRef.id;
 };
 
+/**
+ * Un appuntamento per chi in anagrafica non c'è ancora.
+ *
+ * Nasce dalla consulenza: quasi sempre è il primo contatto, e chiedere
+ * «seleziona l'allievo» a chi allievo non è ancora era una porta
+ * chiusa. L'ospite occupa il posto in agenda come tutti gli altri, e
+ * compare fra gli «Ospiti da collegare»: il giorno che la persona si
+ * iscrive, la si aggancia e diventa una sessione vera.
+ *
+ * È lo stesso meccanismo che il ponte WhatsApp usa da sempre — qui
+ * si arriva allo stesso stato partendo dall'agenda invece che da una
+ * richiesta ricevuta.
+ */
+export const creaOspite = async (input: {
+  persona: string;
+  giorno: string;
+  ora: string;
+  tipo: TipoImpegno;
+  note?: string;
+  telefono?: string;
+  creataDa: string;
+}): Promise<string> => {
+  const docRef = await addDoc(collection(db, RICHIESTE), {
+    persona: input.persona,
+    telefono: input.telefono || '',
+    whatsapp: '',
+    giorno: input.giorno,
+    ora: input.ora,
+    tipo: input.tipo,
+    note: input.note || '',
+    // Nasce gia' confermato: non e' una richiesta da valutare, e'
+    // un appuntamento che il titolare ha appena fissato.
+    stato: 'confermata' as StatoRichiesta,
+    ospite: true,
+    creataDa: input.creataDa,
+    canale: 'agenda',
+    creataIl: Timestamp.now(),
+    chiusaIl: Timestamp.now(),
+  });
+  return docRef.id;
+};
+
 export const getRichieste = async (maxResults = 100): Promise<RichiestaSalvata[]> => {
   const snap = await getDocs(query(
     collection(db, RICHIESTE),
