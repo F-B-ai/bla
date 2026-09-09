@@ -106,6 +106,7 @@ jobs:
         run: |
           npx jest --ci --silent
           node scripts/check-colors.js
+          node scripts/check-rules.js
         working-directory: fitness-app
 
       - name: Build web app (brand ESSĒRE)

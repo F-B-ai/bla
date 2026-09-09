@@ -174,10 +174,12 @@ misure a distanza di mesi, una sotto l'altra.
 # A-01 — «Trentatré punti» · 38 s
 
 **Luogo:** sala attrezzi.
-**Provenienza:** modello di pose detection, 33 landmark, **10 usati**. Il calcolo
-avviene **sul dispositivo**: la foto non viene caricata su un server.
-**Linea rossa:** la frase sulla privacy è vera e va detta esattamente così. Non
-va rafforzata («nessuno vedrà mai i tuoi dati») né indebolita.
+**Provenienza:** modello di pose detection, 33 landmark, **10 usati**. Il
+riconoscimento e il calcolo degli angoli avvengono **sul dispositivo**. La foto
+viene poi caricata su Firebase Storage (`posturalService.ts`) e conservata.
+**Linea rossa:** ⚠️ **non dire mai che la foto non lascia il telefono.** Non è
+vero. La frase sulla conservazione va detta esattamente come è scritta: non va
+rafforzata («nessuno vedrà mai i tuoi dati») né ammorbidita.
 
 ### SCENA 1 · 0:00–0:05 · GANCIO
 **Inquadratura:** primo piano, fisso. Nessuna grafica.
@@ -200,11 +202,22 @@ scheletro: **i punti compaiono a uno a uno** mentre li nomina.
 > che ci interessa. Il resto sarebbe rumore.»
 
 ### SCENA 4 · 0:21–0:32 · LA COSA CHE CONTA
-**Inquadratura:** la foto con un lucchetto, **dentro** la sagoma del telefono.
+**Inquadratura:** il telefono che calcola, poi lo storico con due valutazioni a
+confronto a distanza di mesi.
 **Dice:**
-> «E qui la cosa che conta di più: quella foto non lascia il tuo telefono. Il
-> calcolo avviene dentro il dispositivo, non su un server. Non la carichiamo da
-> nessuna parte.»
+> «E qui la cosa che conta di più: **il calcolo lo fa il tuo telefono**, non un
+> server. La foto invece la conserviamo noi, protetta, perché fra sei mesi tu
+> possa vedere il confronto. È tua: la chiedi e te la do, la cancelli e sparisce.»
+
+> ⚠️ **Questa scena è stata corretta il 9 settembre 2026.** La versione precedente
+> diceva *«quella foto non lascia il tuo telefono, non la carichiamo da nessuna
+> parte»*. **Era falsa**: `posturalService.ts` carica ogni foto su Firebase
+> Storage, in `postural/{id-allievo}/`. Il riconoscimento dei 33 punti avviene
+> davvero sul dispositivo — quella metà era vera — ma la foto viene conservata.
+>
+> Non si torna alla vecchia frase per nessun motivo. Era esattamente il tipo di
+> affermazione che il principio fondativo vieta: bella, forte, e non sostenibile
+> con un file.
 
 ### SCENA 5 · 0:32–0:38
 **Inquadratura:** lo schermo con dieci punti e i valori in gradi.
@@ -214,8 +227,9 @@ scheletro: **i punti compaiono a uno a uno** mentre li nomina.
 **Sovrimpressione finale:** *screening posturale*
 
 **Didascalia**
-> Trentatré punti, dieci usati, zero foto caricate su un server. La misura si fa
-> dentro il tuo telefono.
+> Trentatré punti, dieci usati. Il calcolo lo fa il tuo telefono. La foto la
+> conserviamo protetta perché tu possa vedere il confronto fra sei mesi — ed è
+> tua: la chiedi o la cancelli quando vuoi.
 > #analisiposturale #mindmovement #screening
 
 ---

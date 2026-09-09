@@ -15,7 +15,8 @@
     "build:web": "expo export --platform web && cp web/manifest.json web/icon-192.png web/icon-512.png web/Ionicons.ttf web/sw.js web/cal.html dist/ && cp -r web/video dist/video && node postbuild-web.js",
     "serve": "node serve.js",
     "serve:80": "PORT=80 node serve.js",
-    "check:colors": "node scripts/check-colors.js"
+    "check:colors": "node scripts/check-colors.js",
+    "check:rules": "node scripts/check-rules.js"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",

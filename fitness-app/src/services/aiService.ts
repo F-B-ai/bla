@@ -16,6 +16,10 @@ export type PostureMetricsInput = PostureMetrics;
 const API_URL = 'https://api.anthropic.com/v1/messages';
 // M1 — AI Gateway server-side: la chiave Anthropic vive in Secret Manager,
 // il modello viene scelto dal server in base alla feature (03 §0.3).
+import {
+  leggiGuastoGateway, guastoDiRete, messaggioGuasto,
+} from '../domain/guastoAI';
+
 const AI_GATEWAY_URL = 'https://europe-west1-essere-3fe6f.cloudfunctions.net/aiMessages';
 const AI_KEY_STORAGE = '@essère_ai_key';
 
@@ -136,7 +140,19 @@ export const callClaude = async (
         const err = await gwRes.json().catch(() => ({}));
         throw new Error(`AI_FATAL: ${err?.message || 'Richiesta non consentita.'}`);
       }
-      // 404 (gateway non ancora deployato) o 5xx → si tenta il ramo legacy
+      // Il 503 (e il 500 che parla di fatturazione) NON si nascondono
+      // dietro il ramo legacy: sono la firma del servizio spento, e il
+      // 9 settembre 2026 il client li ha buttati via mostrando
+      // «controlla la connessione internet» mentre la connessione
+      // andava benissimo. Vedi domain/guastoAI.ts.
+      if (gwRes.status === 503 || gwRes.status >= 500) {
+        const corpo = await gwRes.text().catch(() => '');
+        const g = leggiGuastoGateway(gwRes.status, corpo);
+        if (g === 'servizio_sospeso' || g === 'credito_esaurito') {
+          throw new Error('AI_FATAL: ' + messaggioGuasto(g));
+        }
+      }
+      // 404 (gateway non ancora deployato) → si tenta il ramo legacy
     }
   } catch (e) {
     const msg = (e as Error)?.message || '';
@@ -182,9 +198,14 @@ export const callClaude = async (
       }),
     });
   } catch (networkError) {
-    throw new Error(
-      'Impossibile connettersi al server AI. Controlla la connessione internet e riprova.'
-    );
+    // Prima diceva sempre «controlla la connessione internet», anche
+    // quando la connessione era perfetta e il servizio era spento.
+    // Adesso lo chiede al dispositivo, e se la rete c'è non dà la
+    // colpa all'utente.
+    const online = typeof navigator !== 'undefined' && 'onLine' in navigator
+      ? (navigator as { onLine?: boolean }).onLine
+      : undefined;
+    throw new Error(messaggioGuasto(guastoDiRete(online)));
   }
 
   if (!response.ok) {
