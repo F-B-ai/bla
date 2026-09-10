@@ -20,6 +20,7 @@ legge da qui. Se un contenuto non è qui, non si gira.
 | File | Che cos'è | Per chi |
 |---|---|---|
 | [`piano-reel-completo.md`](./piano-reel-completo.md) | **Le due serie, l'ordine di pubblicazione su dieci settimane, le regole non negoziabili.** Si legge per primo | tutti |
+| [`piano-di-ripresa.md`](./piano-di-ripresa.md) | **L'ordine con cui si GIRA**: nove blocchi di set, cosa preparare prima, cosa è bloccato. Si tiene in mano sul set | chi gira |
 | [`copioni-serie-A-essere.md`](./copioni-serie-A-essere.md) | Dieci copioni ESSĒRE, **parola per parola e scena per scena** | chi gira, chi monta |
 | [`copioni-serie-B-mestiere.md`](./copioni-serie-B-mestiere.md) | Dieci copioni Mestiere, parola per parola e scena per scena | chi gira, chi monta |
 | [`brief-reel-analisi-posturale.md`](./brief-reel-analisi-posturale.md) | Il brief originale dei primi sei. **Superato dai copioni**, tenuto per la provenienza tecnica | archivio |
