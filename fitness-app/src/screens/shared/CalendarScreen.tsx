@@ -78,6 +78,9 @@ import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
   eSessione, tipoPercorso, aspetto, tipoDaSeduta,
 } from '../../domain/appuntamento';
+import {
+  componiGiornata, riepilogoGiornata, VoceGiornata,
+} from '../../domain/giornata';
 import { creaOspite } from '../../services/agendaRequestService';
 import { conduttore } from '../../domain/protocollo';
 import { TaskModal } from './calendar/TaskModal';
@@ -1155,6 +1158,107 @@ export const CalendarScreen: React.FC = () => {
 
   // Render compact appointment row for agenda
   /** Un ospite confermato: ha il posto, non ha ancora la scheda. */
+  // ------------------------------------------------------------
+  // LA GIORNATA IN UNA LISTA SOLA
+  // ------------------------------------------------------------
+  // Prima gli appuntamenti stavano in una sezione, gli ospiti
+  // appiccicati in coda a quella sezione invece che al loro orario, e
+  // i task in una sezione tutta loro. Per sapere che cosa succede
+  // alle 15:00 bisognava guardare in tre posti.
+  // L'ordine lo decide domain/giornata.ts, ed e' lo stesso in tutte
+  // e tre le viste.
+
+  const giornataDi = useCallback((dataStr: string): VoceGiornata[] => componiGiornata({
+    appuntamenti: filteredAppointments
+      .filter((a) => a.dateStr === dataStr && a.status !== 'cancelled_by_student')
+      .map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        status: a.status,
+        nomeAllievo: getStudentName(a.studentId),
+        note: a.notes,
+      })),
+    ospiti: ospiti.filter((o) => o.giorno === dataStr).map((o) => ({
+      id: o.id, persona: o.persona, ora: o.ora, tipo: o.tipo, telefono: o.telefono,
+    })),
+    task: (tasksByDate[dataStr] || []).map((t) => ({
+      id: t.id, title: t.title, description: t.description,
+      startTime: t.startTime, isCompleted: t.isCompleted, priority: t.priority,
+    })),
+  }), [filteredAppointments, ospiti, tasksByDate, getStudentName]);
+
+  const apriVoce = (v: VoceGiornata) => {
+    if (v.genere === 'task') { openEditTask(v.fonte as DailyTask); return; }
+    if (v.genere === 'ospite') { navigation.navigate('Richieste'); return; }
+    const a = filteredAppointments.find((x: AppointmentItem) => x.id === v.id);
+    if (a) openEdit(a);
+  };
+
+  // La giornata di oggi, in una sequenza sola: appuntamenti, ospiti e
+  // task mescolati in ordine di orario. Stessa fonte per tutte e tre
+  // le viste — vedi domain/giornata.ts.
+  const giornataOggi = useMemo(() => giornataDi(todayStr), [giornataDi, todayStr]);
+  // Il giorno scelto nel calendario, stessa composizione.
+  const giornataScelta = useMemo(
+    () => giornataDi(selectedDate),
+    [giornataDi, selectedDate]
+  );
+  const riepilogoOggi = useMemo(() => riepilogoGiornata(giornataOggi), [giornataOggi]);
+
+  /** Una riga della giornata: appuntamento, ospite o task, stessa forma. */
+  const renderVoce = (v: VoceGiornata, conData = false) => {
+    const tono = v.genere === 'task'
+      ? colors.info
+      : v.genere === 'ospite'
+        ? colors.warning
+        : TONO[aspetto(v.tipo || 'training').tonalita];
+    const icona = v.genere === 'task'
+      ? (v.completato ? 'checkmark-circle' : 'checkbox-outline')
+      : v.genere === 'ospite'
+        ? 'person-add-outline'
+        : aspetto(v.tipo || 'training').icona;
+    return (
+      <TouchableOpacity
+        key={`${v.genere}-${v.id}`}
+        style={styles.agendaRow}
+        onPress={() => apriVoce(v)}
+        activeOpacity={0.85}
+      >
+        <View style={{ ...styles.agendaTimeCol, borderLeftColor: tono }}>
+          <Text style={styles.agendaTime}>{v.ora || '—'}</Text>
+          {conData ? (
+            <Text style={styles.agendaTimeSep}>
+              {(() => {
+                const f = v.fonte as { dateStr?: string; giorno?: string; date?: Date };
+                const g = f?.dateStr || f?.giorno;
+                if (!g) return '';
+                return new Date(g + 'T00:00:00')
+                  .toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+              })()}
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.agendaInfo}>
+          <Text
+            style={{
+              ...styles.agendaStudentName,
+              ...(v.completato ? { textDecorationLine: 'line-through' as const, color: colors.textLight } : {}),
+            }}
+          >
+            {v.titolo}
+          </Text>
+          <View style={styles.agendaMetaRow}>
+            <Ionicons name={icona as never} size={12} color={tono} />
+            <Text style={{ ...styles.agendaKind, color: tono }}>{v.sottotitolo}</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+      </TouchableOpacity>
+    );
+  };
+
   const renderOspiteRow = (o: RichiestaSalvata, conData = false) => (
     <TouchableOpacity
       key={o.id}
@@ -1442,15 +1546,15 @@ export const CalendarScreen: React.FC = () => {
           <View style={styles.agendaSection}>
             <View style={styles.agendaSectionHeader}>
               <Ionicons name="time-outline" size={18} color={colors.accent} />
-              <Text style={styles.agendaSectionTitle}>Appuntamenti di Oggi</Text>
-              <Text style={styles.agendaSectionCount}>{scheduledToday.length}</Text>
+              <Text style={styles.agendaSectionTitle}>La giornata di oggi</Text>
+              <Text style={styles.agendaSectionCount}>{giornataOggi.length}</Text>
             </View>
-            {scheduledToday.length === 0 && ospitiOggi.length === 0 ? (
-              <Text style={styles.agendaEmpty}>Nessun appuntamento programmato per oggi</Text>
+            {giornataOggi.length === 0 ? (
+              <Text style={styles.agendaEmpty}>Giornata libera</Text>
             ) : (
               <>
-                {scheduledToday.map(renderAgendaRow)}
-                {ospitiOggi.map((o) => renderOspiteRow(o))}
+                <Text style={styles.agendaRiepilogo}>{riepilogoOggi.frase}</Text>
+                {giornataOggi.map((v) => renderVoce(v))}
               </>
             )}
           </View>
@@ -1470,12 +1574,14 @@ export const CalendarScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Owner tasks section */}
+          {/* I task ora vivono dentro «La giornata di oggi», al loro
+              orario. Questa sezione resta solo per aggiungerne di
+              nuovi e per rivedere quelli gia' fatti. */}
           {isOwner && (
             <View style={styles.agendaSection}>
               <View style={styles.agendaSectionHeader}>
                 <Ionicons name="checkbox-outline" size={18} color={colors.info} />
-                <Text style={styles.agendaSectionTitle}>Task di Oggi</Text>
+                <Text style={styles.agendaSectionTitle}>Task — aggiungi o rivedi</Text>
                 <Text style={styles.agendaSectionCount}>
                   {pendingTasks.length}{completedTasks.length > 0 ? ` + ${completedTasks.length} ✓` : ''}
                 </Text>
@@ -1622,10 +1728,21 @@ export const CalendarScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* Appointment blocks */}
-              {scheduledToday.map((appt) => {
+              {/* I blocchi: TUTTO cio' che ha un'ora — appuntamenti,
+                  ospiti e task. Prima c'erano solo gli appuntamenti, e
+                  una consulenza a un ospite non compariva da nessuna
+                  parte in questa vista. */}
+              {giornataOggi.filter((v) => !!v.ora).map((voce) => {
+                const appt = {
+                  id: voce.id,
+                  startTime: voce.ora,
+                  // Chi non dichiara una fine occupa un'ora: e' la durata
+                  // di riferimento dello studio, non un'invenzione.
+                  endTime: voce.oraFine || undefined,
+                  kind: voce.tipo || 'training',
+                };
                 const top = getTimeOffset(appt.startTime);
-                const height = getBlockHeight(appt.startTime, appt.endTime);
+                const height = getBlockHeight(appt.startTime, appt.endTime || appt.startTime);
                 const isTraining = eSessione(appt.kind);
                 return (
                   <View
@@ -1644,12 +1761,14 @@ export const CalendarScreen: React.FC = () => {
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={styles.tlBlockTime}>{appt.startTime} - {appt.endTime}</Text>
-                    <Text style={styles.tlBlockTitle} numberOfLines={1}>
-                      {isTraining ? '🏋️' : '🥗'} {getStudentName(appt.studentId)}
+                    <Text style={styles.tlBlockTime}>
+                      {appt.endTime ? `${appt.startTime} - ${appt.endTime}` : appt.startTime}
                     </Text>
-                    {getStaffName(appt.staffId) ? (
-                      <Text style={styles.tlBlockSub} numberOfLines={1}>{getStaffName(appt.staffId)}</Text>
+                    <Text style={styles.tlBlockTitle} numberOfLines={1}>
+                      {voce.titolo}
+                    </Text>
+                    {voce.sottotitolo ? (
+                      <Text style={styles.tlBlockSub} numberOfLines={1}>{voce.sottotitolo}</Text>
                     ) : null}
                   </View>
                 );
@@ -1695,15 +1814,19 @@ export const CalendarScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Tasks without time */}
-          {isOwner && noTimeTasks.length > 0 && (
+          {/* La giornata per intero, in ordine. La timeline qui sopra
+              da' la forma delle ore; questa da' il colpo d'occhio, e
+              contiene TUTTO — appuntamenti, ospiti e task, compresi
+              quelli senza orario. */}
+          {giornataOggi.length > 0 && (
             <View style={styles.agendaSection}>
               <View style={styles.agendaSectionHeader}>
-                <Ionicons name="list-outline" size={18} color={colors.textSecondary} />
-                <Text style={styles.agendaSectionTitle}>Task senza orario</Text>
-                <Text style={styles.agendaSectionCount}>{noTimeTasks.length}</Text>
+                <Ionicons name="list-outline" size={18} color={colors.accent} />
+                <Text style={styles.agendaSectionTitle}>Tutta la giornata</Text>
+                <Text style={styles.agendaSectionCount}>{giornataOggi.length}</Text>
               </View>
-              {noTimeTasks.map(renderTaskCard)}
+              <Text style={styles.agendaRiepilogo}>{riepilogoOggi.frase}</Text>
+              {giornataOggi.map((v) => renderVoce(v))}
             </View>
           )}
 
@@ -1931,18 +2054,25 @@ export const CalendarScreen: React.FC = () => {
               </View>
             )}
 
+            {/* Il giorno scelto per intero, in ordine di orario:
+                appuntamenti, ospiti e task insieme. */}
+            {giornataScelta.length > 0 && (
+              <View style={styles.agendaSection}>
+                <View style={styles.agendaSectionHeader}>
+                  <Ionicons name="list-outline" size={18} color={colors.accent} />
+                  <Text style={styles.agendaSectionTitle}>Tutta la giornata</Text>
+                  <Text style={styles.agendaSectionCount}>{giornataScelta.length}</Text>
+                </View>
+                <Text style={styles.agendaRiepilogo}>
+                  {riepilogoGiornata(giornataScelta).frase}
+                </Text>
+                {giornataScelta.map((v) => renderVoce(v))}
+              </View>
+            )}
+
             {/* Tasks for selected day (owner only) */}
             {isOwner && (
               <View style={styles.dayTasksSection}>
-                {selectedDayTasks.length > 0 && (
-                  <>
-                    <View style={styles.dayTasksHeader}>
-                      <Ionicons name="checkbox-outline" size={16} color={colors.info} />
-                      <Text style={styles.dayTasksTitle}>Task</Text>
-                    </View>
-                    {selectedDayTasks.map(renderTaskCard)}
-                  </>
-                )}
                 <TouchableOpacity style={styles.addTaskBtn} onPress={openCreateTask}>
                   <Ionicons name="add-circle" size={18} color={colors.info} />
                   <Text style={styles.addTaskText}>Aggiungi Task</Text>
@@ -2444,6 +2574,11 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
     paddingVertical: spacing.md,
+  },
+  agendaRiepilogo: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
   },
   agendaRow: {
     flexDirection: 'row',
