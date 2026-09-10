@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,6 +30,10 @@ import {
   LibraryExercise,
 } from '../../services/programService';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
+import {
+  GRUPPI, GruppoMuscolare, dividiPerMuscolo, conteggioPerMuscolo,
+  gruppo as gruppoDi,
+} from '../../domain/muscoli';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -90,6 +94,7 @@ export const ManageTemplatesScreen: React.FC = () => {
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const [librarySearch, setLibrarySearch] = useState('');
   const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+  const [libraryMuscolo, setLibraryMuscolo] = useState<GruppoMuscolare | 'tutti'>('tutti');
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -363,16 +368,47 @@ export const ManageTemplatesScreen: React.FC = () => {
     setLibrarySearch('');
   };
 
+  // Stessa divisione per muscolo della schermata Scheda: due
+  // librerie che si comportano in modo diverso sono due librerie da
+  // imparare. Le funzioni sono le stesse — vivono in domain/muscoli.
+  const perMuscolo = useMemo(
+    () => conteggioPerMuscolo(
+      exerciseLibrary,
+      libraryGenderFilter === 'all' ? 'tutti' : libraryGenderFilter
+    ),
+    [exerciseLibrary, libraryGenderFilter]
+  );
+
+  const muscoloAttivo: GruppoMuscolare | 'tutti' =
+    libraryMuscolo !== 'tutti' && !(perMuscolo[libraryMuscolo] > 0)
+      ? 'tutti'
+      : libraryMuscolo;
+
   const filteredLibrary = exerciseLibrary.filter((ex) => {
     if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
       return false;
     }
+    if (muscoloAttivo !== 'tutti' && ex.muscolo !== muscoloAttivo) {
+      return false;
+    }
     if (librarySearch) {
       const search = librarySearch.toLowerCase();
-      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+      return ex.name.toLowerCase().includes(search)
+        || ex.category.toLowerCase().includes(search)
+        || gruppoDi(ex.muscolo).nome.toLowerCase().includes(search);
     }
     return true;
   });
+
+  const sezioniLibreria = useMemo(
+    () => dividiPerMuscolo(filteredLibrary, 'tutti'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [exerciseLibrary, libraryGenderFilter, muscoloAttivo, librarySearch]
+  );
+
+  const listaLibreria = muscoloAttivo === 'tutti'
+    ? sezioniLibreria.flatMap((s) => s.esercizi)
+    : filteredLibrary;
 
   const isCustomTemplate = (t: any): t is CustomWorkoutTemplate => 'createdBy' in t;
 
@@ -874,11 +910,62 @@ export const ManageTemplatesScreen: React.FC = () => {
             ))}
           </View>
 
+          {/* Il muscolo: la categoria con cui si cerca davvero un
+              esercizio. Identica a quella della schermata Scheda. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.muscoloRow}
+            contentContainerStyle={styles.muscoloRowInner}
+          >
+            <TouchableOpacity
+              style={[styles.muscoloChip, muscoloAttivo === 'tutti' && styles.libraryFilterChipActive]}
+              onPress={() => setLibraryMuscolo('tutti')}
+            >
+              <Text style={[styles.libraryFilterText, muscoloAttivo === 'tutti' && styles.libraryFilterTextActive]}>
+                Tutti i muscoli
+              </Text>
+            </TouchableOpacity>
+            {GRUPPI.filter((g) => (perMuscolo[g.id] || 0) > 0).map((g) => (
+              <TouchableOpacity
+                key={g.id}
+                style={[styles.muscoloChip, muscoloAttivo === g.id && styles.libraryFilterChipActive]}
+                onPress={() => setLibraryMuscolo(g.id)}
+              >
+                <Ionicons
+                  name={g.icona as never}
+                  size={13}
+                  color={muscoloAttivo === g.id ? colors.textOnAccent : colors.textSecondary}
+                />
+                <Text style={[styles.libraryFilterText, muscoloAttivo === g.id && styles.libraryFilterTextActive]}>
+                  {' '}{g.nome} ({perMuscolo[g.id]})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {muscoloAttivo !== 'tutti' && (
+            <Text style={styles.muscoloSpiega}>{gruppoDi(muscoloAttivo).cosaAllena}</Text>
+          )}
+
           <FlatList
-            data={filteredLibrary}
+            data={listaLibreria}
             keyExtractor={(item) => item.id}
             style={styles.libraryFlatList}
-            renderItem={({ item: libEx }) => (
+            renderItem={({ item: libEx, index }) => (
+              <>
+                {muscoloAttivo === 'tutti' && (() => {
+                  const primoDelGruppo = index === 0
+                    || listaLibreria[index - 1]?.muscolo !== libEx.muscolo;
+                  if (!primoDelGruppo) return null;
+                  const g = gruppoDi(libEx.muscolo);
+                  return (
+                    <View style={styles.muscoloSezione}>
+                      <Ionicons name={g.icona as never} size={15} color={colors.accent} />
+                      <Text style={styles.muscoloSezioneTxt}>{g.nome}</Text>
+                    </View>
+                  );
+                })()}
               <TouchableOpacity
                 style={styles.libraryItem}
                 onPress={() => selectFromLibrary(libEx)}
@@ -900,6 +987,7 @@ export const ManageTemplatesScreen: React.FC = () => {
                 </View>
                 <Ionicons name="add-circle" size={26} color={colors.accent} />
               </TouchableOpacity>
+              </>
             )}
             ListEmptyComponent={
               <View style={styles.libraryEmptyContainer}>
@@ -1065,6 +1153,40 @@ const styles = StyleSheet.create({
   libraryFilterText: { fontSize: fontSize.sm, color: colors.textSecondary, fontWeight: '600' },
   libraryFilterTextActive: { color: colors.textOnAccent },
   libraryFlatList: { flex: 1 },
+  // stesse misure della schermata Scheda: due librerie identiche
+  muscoloChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  muscoloRow: { marginBottom: spacing.sm },
+  muscoloRowInner: { paddingHorizontal: spacing.md, gap: spacing.xs, alignItems: 'center' },
+  muscoloSpiega: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    lineHeight: 16,
+  },
+  muscoloSezione: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  muscoloSezioneTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.accent,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   libraryItem: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, paddingHorizontal: spacing.md,
   },
