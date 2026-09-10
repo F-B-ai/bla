@@ -14,6 +14,7 @@ import {
 import { db } from '../config/firebase';
 import { TrainingProgram, WorkoutPlan, Exercise, ExerciseCategory } from '../types';
 import { allDefaultExercises, DefaultExercise } from '../data/defaultExercises';
+import { GruppoMuscolare } from '../domain/muscoli';
 import { fondiConCanone } from '../domain/filmEsercizio';
 
 const PROGRAMS_COLLECTION = 'trainingPrograms';
@@ -270,6 +271,8 @@ export interface LibraryExercise {
   videoAltLabel?: string;
   imageUrl?: string;
   gender: 'male' | 'female' | 'unisex';
+  /** il gruppo muscolare: la categoria con cui si cerca davvero */
+  muscolo: GruppoMuscolare;
   fromFirestore: boolean;
 }
 
@@ -314,6 +317,11 @@ export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
       videoAltLabel: conFilm.videoAltLabel,
       imageUrl: ex.imageUrl,
       gender: (ex as any).gender || 'unisex',
+      // Un esercizio salvato dal coach puo' non avere il gruppo: si
+      // eredita dal canone se il nome coincide, altrimenti finisce in
+      // «Da classificare», dove si vede e si sistema.
+      muscolo: ((ex as any).muscolo as GruppoMuscolare)
+        || canone?.muscolo || 'daClassificare',
       fromFirestore: true,
     });
   }
@@ -336,6 +344,7 @@ export const getFullExerciseLibrary = async (): Promise<LibraryExercise[]> => {
       videoUrlAlt: def.videoUrlAlt,
       videoAltLabel: def.videoAltLabel,
       gender: def.gender,
+      muscolo: def.muscolo,
       fromFirestore: false,
     });
   }

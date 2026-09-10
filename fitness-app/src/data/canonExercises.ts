@@ -1,4 +1,5 @@
 import type { DefaultExercise } from './defaultExercises';
+import { GruppoMuscolare } from '../domain/muscoli';
 
 // ============================================================
 // CANONE ALLIEVO — le schede esercizio dettate da Francesco
@@ -63,6 +64,7 @@ const inclinata = (gradi: 15 | 30 | 45): DefaultExercise => ({
     : 'Stesso schema dei 30°: cambia solo l\'inclinazione della panca. '
       + 'Il filmato è girato a 30°. Gomito almeno 30–40° sotto il livello della spalla.',
   gender: 'unisex',
+    muscolo: 'pettorali' as GruppoMuscolare,
   videoUrl: `${FILM}/panca-inclinata-30.mp4`,
   videoLabel: 'Film donna',
   videoUrlAlt: `${FILM}/panca-inclinata-30-uomo.mp4`,
@@ -79,6 +81,7 @@ export const canonExercises: DefaultExercise[] = [
     category: 'forza',
     notes: 'Dietro appoggiano i metatarsi, non il dorso del piede. Anca flessa: senza flessione non preallunghi gluteo e femorali.',
     gender: 'unisex',
+    muscolo: 'quadricipiti' as GruppoMuscolare,
     videoUrl: `${FILM}/affondo-bulgaro-40.mp4`,
     videoLabel: 'Film donna',
   },
@@ -95,6 +98,7 @@ export const canonExercises: DefaultExercise[] = [
     notes: 'Prima si deprimono le scapole, poi si tira: invertire l\'ordine espone il cingolo omero-scapolare. '
       + 'Cosce libere, MAI sotto i rulli. Niente ROM concentrico completo: il gran dorsale cifotizza.',
     gender: 'unisex',
+    muscolo: 'dorsali' as GruppoMuscolare,
     // Film donna: cosce libere, rulli NON usati — come nel testo.
     videoUrl: `${FILM}/lat-machine-prona.mp4`,
     videoLabel: 'Film donna',

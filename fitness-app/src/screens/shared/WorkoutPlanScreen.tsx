@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,9 @@ import { StudentSearchPicker } from '../../components/common/StudentSearchPicker
 import { useAuth } from '../../hooks/useAuth';
 import { createWorkoutPlan, updateWorkoutPlan, getActiveWorkoutPlan, getStudentWorkoutPlans, addExerciseToLibrary } from '../../services/programService';
 import { getFullExerciseLibrary, LibraryExercise } from '../../services/programService';
+import {
+  GRUPPI, GruppoMuscolare, dividiPerMuscolo, conteggioPerMuscolo, gruppo as gruppoDi,
+} from '../../domain/muscoli';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { createNotification } from '../../services/notificationService';
@@ -156,6 +159,8 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);
   const [librarySearch, setLibrarySearch] = useState('');
   const [libraryGenderFilter, setLibraryGenderFilter] = useState<'all' | 'male' | 'female'>('all');
+  // Il muscolo è la categoria con cui si cerca davvero un esercizio.
+  const [libraryMuscolo, setLibraryMuscolo] = useState<GruppoMuscolare | 'tutti'>('tutti');
   // Ogni esercizio nuovo entra in libreria di default: la libreria è
   // il patrimonio dello studio, non deve dipendere da una spunta.
   const [saveToLibrary, setSaveToLibrary] = useState(true);
@@ -539,12 +544,31 @@ export const WorkoutPlanScreen: React.FC = () => {
     if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
       return false;
     }
+    if (libraryMuscolo !== 'tutti' && ex.muscolo !== libraryMuscolo) {
+      return false;
+    }
     if (librarySearch) {
       const search = librarySearch.toLowerCase();
-      return ex.name.toLowerCase().includes(search) || ex.category.toLowerCase().includes(search);
+      return ex.name.toLowerCase().includes(search)
+        || ex.category.toLowerCase().includes(search)
+        || gruppoDi(ex.muscolo).nome.toLowerCase().includes(search);
     }
     return true;
   });
+
+  // Quanti esercizi ha ogni gruppo per il sesso scelto: il numero
+  // accanto al nome dice subito dove la libreria è ricca e dove no.
+  const perMuscolo = useMemo(
+    () => conteggioPerMuscolo(exerciseLibrary, libraryGenderFilter === 'all' ? 'tutti' : libraryGenderFilter),
+    [exerciseLibrary, libraryGenderFilter]
+  );
+
+  // Con «tutti i muscoli» la lista esce divisa in sezioni, una per
+  // gruppo, nell'ordine con cui si compone una scheda.
+  const sezioniLibreria = useMemo(
+    () => dividiPerMuscolo(filteredLibrary, 'tutti'),
+    [filteredLibrary]
+  );
 
   const addExercise = async () => {
     if (!exName || !exSets || !exReps) {
@@ -2043,11 +2067,70 @@ export const WorkoutPlanScreen: React.FC = () => {
             ))}
           </View>
 
+          {/* IL MUSCOLO — la categoria con cui si cerca davvero un
+              esercizio. Prima la libreria era ordinata per tipo
+              (forza, cardio), che non e' come si pensa quando si
+              scrive una scheda. */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.muscoloRow}
+            contentContainerStyle={styles.muscoloRowInner}
+          >
+            <TouchableOpacity
+              style={[styles.libraryFilterChip, libraryMuscolo === 'tutti' && styles.libraryFilterChipActive]}
+              onPress={() => setLibraryMuscolo('tutti')}
+            >
+              <Text style={[styles.libraryFilterText, libraryMuscolo === 'tutti' && styles.libraryFilterTextActive]}>
+                Tutti i muscoli
+              </Text>
+            </TouchableOpacity>
+            {GRUPPI.filter((g) => (perMuscolo[g.id] || 0) > 0).map((g) => (
+              <TouchableOpacity
+                key={g.id}
+                style={[styles.libraryFilterChip, libraryMuscolo === g.id && styles.libraryFilterChipActive]}
+                onPress={() => setLibraryMuscolo(g.id)}
+              >
+                <Ionicons
+                  name={g.icona as never}
+                  size={13}
+                  color={libraryMuscolo === g.id ? colors.textOnAccent : colors.textSecondary}
+                />
+                <Text style={[styles.libraryFilterText, libraryMuscolo === g.id && styles.libraryFilterTextActive]}>
+                  {' '}{g.nome} ({perMuscolo[g.id]})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {libraryMuscolo !== 'tutti' && (
+            <Text style={styles.muscoloSpiega}>{gruppoDi(libraryMuscolo).cosaAllena}</Text>
+          )}
+
           <FlatList
-            data={filteredLibrary}
+            data={libraryMuscolo === 'tutti'
+              ? sezioniLibreria.flatMap((s) => s.esercizi)
+              : filteredLibrary}
             keyExtractor={(item) => item.id}
             style={styles.libraryFlatList}
-            renderItem={({ item: libEx }) => (
+            renderItem={({ item: libEx, index }) => (
+              <>
+                {libraryMuscolo === 'tutti' && (() => {
+                  // L'intestazione compare al primo esercizio di ogni
+                  // gruppo: cosi' la lista resta una sola e si legge
+                  // come un indice.
+                  const piatta = sezioniLibreria.flatMap((s) => s.esercizi);
+                  const primoDelGruppo = index === 0
+                    || piatta[index - 1]?.muscolo !== libEx.muscolo;
+                  if (!primoDelGruppo) return null;
+                  const g = gruppoDi(libEx.muscolo);
+                  return (
+                    <View style={styles.muscoloSezione}>
+                      <Ionicons name={g.icona as never} size={15} color={colors.accent} />
+                      <Text style={styles.muscoloSezioneTxt}>{g.nome}</Text>
+                    </View>
+                  );
+                })()}
               <TouchableOpacity
                 style={styles.libraryItem}
                 onPress={() => selectFromLibrary(libEx)}
@@ -2093,6 +2176,7 @@ export const WorkoutPlanScreen: React.FC = () => {
                 </View>
                 <Ionicons name="add-circle" size={26} color={colors.accent} />
               </TouchableOpacity>
+              </>
             )}
             ListEmptyComponent={
               <View style={styles.libraryEmptyContainer}>
@@ -2111,6 +2195,36 @@ export const WorkoutPlanScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  muscoloRow: {
+    marginBottom: spacing.sm,
+  },
+  muscoloRowInner: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  muscoloSpiega: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    lineHeight: 16,
+  },
+  muscoloSezione: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  muscoloSezioneTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: colors.accent,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
