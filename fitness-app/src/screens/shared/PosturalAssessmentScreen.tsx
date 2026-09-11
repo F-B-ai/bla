@@ -34,6 +34,10 @@ import {
 import { analyzePostureWithAI, comparePostureWithAI, AIPosturalAnalysis, AIPosturalComparison, ensureAIApiKey } from '../../services/aiService';
 import { measurePostureFromPhotos } from '../../services/postureMeasure';
 import { useAuth } from '../../hooks/useAuth';
+import {
+  classificaErrore, messaggioCaricamento, perIlRegistro,
+  EsitoFoto, Vista,
+} from '../../domain/caricamentoFoto';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 
@@ -323,14 +327,24 @@ export const PosturalAssessmentScreen: React.FC = () => {
       const isLocalUri = (uri: string) =>
         uri.startsWith('file://') || uri.startsWith('blob:') || uri.startsWith('data:');
 
-      // Upload non bloccante: se lo Storage è pieno/quota superata, la
-      // valutazione viene comunque salvata senza la foto che non è stata caricata.
-      let uploadFailed = false;
-      const tryUpload = async (uri: string, view: 'front' | 'side_left' | 'side_right' | 'back') => {
+      // Il caricamento non blocca il salvataggio: le osservazioni sono
+      // il lavoro vero e non si perdono per una foto. Ma l'errore NON si
+      // butta più via: si classifica e si racconta com'è. Il vecchio
+      // codice diceva sempre «spazio esaurito» — ed è per quello che un
+      // permesso negato è rimasto invisibile per due giorni.
+      const esiti: EsitoFoto[] = [];
+      const tryUpload = async (uri: string, view: Vista) => {
         try {
-          return await uploadPosturalImage(selectedStudentId, uri, view);
-        } catch {
-          uploadFailed = true;
+          const url = await uploadPosturalImage(selectedStudentId, uri, view);
+          esiti.push({ vista: view, ok: true });
+          return url;
+        } catch (err) {
+          esiti.push({
+            vista: view,
+            ok: false,
+            motivo: classificaErrore(err),
+            dettaglio: err instanceof Error ? err.message : String(err),
+          });
           return '';
         }
       };
@@ -390,20 +404,26 @@ export const PosturalAssessmentScreen: React.FC = () => {
         aiExerciseProgram: aiResult?.exerciseProgram || [],
       });
 
-      crossAlert(
-        'Successo',
-        uploadFailed
-          ? 'Valutazione salvata! Le foto non sono state caricate perché lo spazio di archiviazione è esaurito. Tutti i dati e l\'analisi sono stati salvati.'
-          : 'Valutazione posturale salvata!'
-      );
-      setSelectedStudentId('');
-      setFrontImage(null);
-      setSideLeftImage(null);
-      setSideRightImage(null);
-      setBackImage(null);
-      setFindings([]);
-      setOverallNotes('');
-      setAiResult(null);
+      const msg = messaggioCaricamento(esiti);
+      if (msg.tieniLeFoto) {
+        // eslint-disable-next-line no-console
+        console.warn('[foto posturali]', perIlRegistro(esiti));
+      }
+      crossAlert(msg.titolo, msg.testo);
+
+      // Se una foto non è salita, le immagini restano in schermata: chi
+      // ha appena fotografato una persona non la rifotografa perché il
+      // modulo si è svuotato da solo. Si risolve e si ripreme Salva.
+      if (!msg.tieniLeFoto) {
+        setSelectedStudentId('');
+        setFrontImage(null);
+        setSideLeftImage(null);
+        setSideRightImage(null);
+        setBackImage(null);
+        setFindings([]);
+        setOverallNotes('');
+        setAiResult(null);
+      }
     } catch (err) {
       crossAlert('Errore', `Impossibile salvare: ${err instanceof Error ? err.message : 'Errore sconosciuto'}`);
     } finally {

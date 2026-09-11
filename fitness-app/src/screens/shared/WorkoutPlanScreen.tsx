@@ -32,6 +32,8 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { createNotification } from '../../services/notificationService';
+import { salvaBozza, leggiBozza, scartaBozza } from '../../services/bozzaService';
+import { etichettaSalvataggio, descriviBozza, contaEsercizi } from '../../domain/bozzaScheda';
 import {
   suggestWorkoutProgression,
   suggestExercises,
@@ -69,6 +71,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exercises, setExercises] = useState<Record<number, Exercise[]>>({});
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  // La rete che impedisce di perdere il lavoro: vedi domain/bozzaScheda.
+  const [bozzaAlle, setBozzaAlle] = useState<number | null>(null);
+  const [bozzaChiesta, setBozzaChiesta] = useState(false);
 
   // Editing state
   const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
@@ -857,7 +862,69 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExercises({});
     setSelectedStudentId('');
     setSelectedDay(0);
+    // Il lavoro è stato pubblicato (o buttato apposta): la rete si
+    // toglie, altrimenti alla prossima apertura ripropone roba morta.
+    setBozzaAlle(null);
+    if (user?.id) scartaBozza(user.id);
   };
+
+  // ------------------------------------------------------------
+  // LA BOZZA
+  // ------------------------------------------------------------
+  // Si salva da sola a ogni modifica, con un secondo e mezzo di
+  // attesa per non scrivere a ogni lettera digitata. Non ogni tre
+  // minuti: tre minuti di lavoro perso è comunque lavoro perso, e un
+  // salvataggio che passa dalla rete fallisce proprio quando la rete
+  // va male — cioè quando serve.
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (contaEsercizi(exercises) === 0) return;
+    const attesa = setTimeout(() => {
+      salvaBozza(user.id, {
+        allievoId: selectedStudentId,
+        titolo: planTitle,
+        giornoScelto: selectedDay,
+        eserciziPerGiorno: exercises,
+        pianoInModificaId: editingPlan?.id,
+      }).then((quando) => { if (quando) setBozzaAlle(quando); });
+    }, 1500);
+    return () => clearTimeout(attesa);
+  }, [user?.id, selectedStudentId, planTitle, selectedDay, exercises, editingPlan?.id]);
+
+  // Alla prima apertura: se c'è del lavoro non finito, si chiede.
+  // Non si ripristina di nascosto — ritrovarsi una scheda a metà
+  // senza averla chiesta confonde più che aiutare.
+  useEffect(() => {
+    if (!user?.id || bozzaChiesta) return;
+    setBozzaChiesta(true);
+    leggiBozza(user.id).then((b) => {
+      if (!b) return;
+      const nome = students.find((st) => st.id === b.allievoId);
+      const chi = nome ? `${nome.name || ''} ${(nome as any).surname || ''}`.trim() : null;
+      crossAlert(
+        'Hai del lavoro non finito',
+        `${descriviBozza(b, chi)}\n\nVuoi riprenderlo da dove l'avevi lasciato?`,
+        [
+          {
+            text: 'Scarta',
+            style: 'destructive',
+            onPress: () => { scartaBozza(user.id); },
+          },
+          {
+            text: 'Riprendi',
+            onPress: () => {
+              setSelectedStudentId(b.allievoId || '');
+              setPlanTitle(b.titolo || '');
+              setSelectedDay(b.giornoScelto || 0);
+              setExercises((b.eserciziPerGiorno || {}) as Record<number, Exercise[]>);
+              setBozzaAlle(b.salvataAlle);
+            },
+          },
+        ]
+      );
+    });
+  }, [user?.id, bozzaChiesta, students]);
 
   const savePlan = async () => {
     if (!planTitle || !user) {
@@ -1131,6 +1198,17 @@ export const WorkoutPlanScreen: React.FC = () => {
             ))
           )}
         </View>
+
+        {/* La riga che dice che la rete c'è. Non è decorazione: senza,
+            «si salva da solo» è una promessa che nessuno può verificare. */}
+        {bozzaAlle !== null && (
+          <View style={styles.bozzaRiga}>
+            <Ionicons name="cloud-done-outline" size={15} color={colors.success} />
+            <Text style={styles.bozzaTesto}>
+              {etichettaSalvataggio(bozzaAlle)} su questo dispositivo. Se esci, la ritrovi.
+            </Text>
+          </View>
+        )}
 
         <Button
           title={saving ? 'Salvataggio...' : editingPlan ? 'Aggiorna Programmazione' : 'Salva e Invia Programmazione'}
@@ -2213,6 +2291,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.round,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  bozzaRiga: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  bozzaTesto: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
   },
   muscoloRow: {
     marginBottom: spacing.sm,

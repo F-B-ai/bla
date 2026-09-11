@@ -21,7 +21,8 @@ import {
   StorageFile,
   FREE_TIER_BYTES,
 } from '../../services/storageService';
-import { nomeCartella, spiegaScansione } from '../../domain/cartelleStorage';
+import { nomeCartella, spiegaScansione, descriviFile, leggiPercorso } from '../../domain/cartelleStorage';
+import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
 
 // Le icone stanno qui perché sono una scelta di schermata. I NOMI no:
 // quelli vengono da domain/cartelleStorage, che è la stessa fonte da cui
@@ -57,6 +58,8 @@ export const StorageManagementScreen: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   // La riga che spiega una scansione parziale, al posto della finestra d'errore
   const [avviso, setAvviso] = useState('');
+  // id → nome, per non mostrare codici a chi deve decidere cosa cancellare
+  const [nomi, setNomi] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +84,30 @@ export const StorageManagementScreen: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // L'elenco delle persone serve per tradurre gli id nei percorsi.
+  // Si carica una volta sola e non blocca niente: se non arriva, i file
+  // restano leggibili e la riga dice «Persona non più in elenco».
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([getStudents(), getCollaborators(), getManagers(), getOwner()])
+      .then(([allievi, coach, manager, titolare]) => {
+        if (!vivo) return;
+        const mappa: Record<string, string> = {};
+        [...allievi, ...coach, ...manager, ...(titolare ? [titolare] : [])]
+          .forEach((p: any) => {
+            if (p?.id) mappa[p.id] = `${p.name || ''} ${p.surname || ''}`.trim() || p.email || p.id;
+          });
+        setNomi(mappa);
+      })
+      .catch(() => { /* senza nomi la schermata funziona lo stesso */ });
+    return () => { vivo = false; };
+  }, []);
+
+  const nomePersona = useCallback((percorso: string): string | null => {
+    const id = leggiPercorso(percorso).personaId;
+    return id ? (nomi[id] ?? null) : null;
+  }, [nomi]);
 
   const used = useMemo(() => totalSize(files), [files]);
   const folders = useMemo(() => summarizeByFolder(files), [files]);
@@ -267,27 +294,34 @@ export const StorageManagementScreen: React.FC = () => {
                           </TouchableOpacity>
                         </View>
 
-                        {/* Elenco file */}
-                        {folderFiles.map((file) => (
+                        {/* Elenco file. In cima va CHI, non il nome del file:
+                            «front_1757606400000.jpg» non dice a nessuno di chi
+                            sia quella foto, e una foto di cui non sai di chi è
+                            non la cancelli mai. */}
+                        {folderFiles.map((file) => {
+                          const chi = descriviFile(file.path, nomePersona(file.path));
+                          return (
                           <View key={file.path} style={styles.fileRow}>
                             <View style={styles.fileInfo}>
                               <Text style={styles.fileName} numberOfLines={1}>
-                                {file.name}
+                                {chi || file.name}
                               </Text>
                               <Text style={styles.fileMeta}>
+                                {chi ? `${file.name} · ` : ''}
                                 {formatDate(file.created)} · {formatBytes(file.size)}
                               </Text>
                             </View>
                             <TouchableOpacity
                               style={styles.deleteFileBtn}
-                              onPress={() => confirmDelete([file.path], `il file "${file.name}"`)}
+                              onPress={() => confirmDelete([file.path], chi ? `la foto di ${chi}` : `il file "${file.name}"`)}
                               disabled={deleting}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Ionicons name="trash" size={16} color={colors.error} />
                             </TouchableOpacity>
                           </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     )}
                   </View>

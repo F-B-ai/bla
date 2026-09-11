@@ -86,6 +86,101 @@ export const nomeCartella = (id: string): string =>
 export const sensibile = (id: string): boolean =>
   PER_ID.get(id)?.sensibile === true;
 
+// ============================================================
+// DI CHI È QUESTA FOTO
+// ------------------------------------------------------------
+// Il titolare, l'11 settembre 2026:
+//
+//   «Fai in modo, se ci sono, riferimenti precisi a quelle foto —
+//    cioè di chi sono — non messe così e io che devo indovinare.»
+//
+// Aveva ragione: la schermata mostrava `front_1757606400000.jpg`
+// dentro una cartella chiamata come un codice di venti caratteri.
+// Per sapere di chi fosse una foto bisognava andare a cercare l'id
+// dell'allievo da un'altra parte. Nessuno lo fa — e quindi nessuno
+// cancella niente, e lo spazio cresce.
+//
+// I percorsi veri sono fatti così:
+//   postural/{idAllievo}/{vista}_{quando}.jpg
+//   bia/{idAllievo}/{nomefile}
+//   bodycomp/{idAllievo}/{nomefile}
+//   avatars/{idPersona}/{nomefile}
+//
+// Qui il percorso si legge. Il nome della persona lo mette la
+// schermata, che ha l'elenco: questo modulo non sa chi sia nessuno.
+// ============================================================
+
+/** Le cartelle in cui il secondo pezzo del percorso è una persona. */
+export const CARTELLE_PER_PERSONA = ['postural', 'bia', 'bodycomp', 'avatars'];
+
+const VISTE: Record<string, string> = {
+  front: 'Frontale',
+  side_left: 'Laterale SX',
+  side_right: 'Laterale DX',
+  back: 'Posteriore',
+};
+
+export interface FileLetto {
+  /** la cartella di primo livello */
+  cartella: string;
+  /** l'id della persona, quando il percorso ce l'ha */
+  personaId?: string;
+  /** «Frontale», «Laterale SX»… quando il nome del file lo dice */
+  vista?: string;
+  /** la data ricavata dal nome del file, quando c'è */
+  quando?: Date;
+}
+
+/**
+ * Legge un percorso dello Storage e ne ricava quello che si può.
+ * Non inventa: i campi che il percorso non dice restano assenti.
+ */
+export const leggiPercorso = (percorso: string): FileLetto => {
+  const pezzi = (percorso || '').split('/').filter(Boolean);
+  const cartella = pezzi[0] || '';
+  const out: FileLetto = { cartella };
+
+  if (CARTELLE_PER_PERSONA.includes(cartella) && pezzi.length >= 3) {
+    out.personaId = pezzi[1];
+  }
+
+  const nomeFile = pezzi[pezzi.length - 1] || '';
+
+  // `side_left_1757606400000.jpg` → vista + istante
+  const m = nomeFile.match(/^(front|side_left|side_right|back)_(\d{10,})\./);
+  if (m) {
+    out.vista = VISTE[m[1]];
+    const n = Number(m[2]);
+    // millisecondi da epoch: si accettano solo date credibili
+    if (n > 1000000000000 && n < 4000000000000) out.quando = new Date(n);
+  }
+  return out;
+};
+
+/**
+ * La riga che si legge sotto il nome del file: chi, che vista, quando.
+ * `nome` lo passa la schermata; se non lo conosce, si dice così invece
+ * di mostrare un codice.
+ */
+export const descriviFile = (
+  percorso: string,
+  nome?: string | null
+): string => {
+  const l = leggiPercorso(percorso);
+  const pezzi: string[] = [];
+
+  if (l.personaId) {
+    pezzi.push(nome && nome.trim() ? nome.trim() : 'Persona non più in elenco');
+  }
+  if (l.vista) pezzi.push(l.vista);
+  if (l.quando) {
+    pezzi.push(l.quando.toLocaleDateString('it-IT', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    }));
+  }
+  return pezzi.join(' · ');
+};
+
 // ------------------------------------------------------------
 // Che cosa raccontare quando una cartella non si apre
 // ------------------------------------------------------------

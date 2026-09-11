@@ -3,6 +3,7 @@ import path from 'path';
 import {
   CARTELLE, PREFISSI, cartella, nomeCartella, sensibile,
   eNegato, spiegaScansione, EsitoScansione,
+  leggiPercorso, descriviFile,
 } from '../cartelleStorage';
 
 // ============================================================
@@ -80,6 +81,72 @@ describe('l\'elenco sta al passo con storage.rules', () => {
   it('e non ci sono cartelle inventate che le regole non conoscono', () => {
     const inventate = PREFISSI.filter((p) => !dichiarate.includes(p));
     expect(inventate).toEqual([]);
+  });
+});
+
+// ============================================================
+// «DI CHI SONO, NON MESSE COSÌ CHE IO DEVO INDOVINARE»
+// ------------------------------------------------------------
+// La schermata mostrava `front_1757606400000.jpg` dentro una cartella
+// chiamata come un codice. Per sapere di chi fosse una foto serviva
+// andarla a cercare altrove — quindi nessuno cancellava niente.
+// ============================================================
+
+describe('leggere un percorso dello Storage', () => {
+  it('da una foto posturale ricava persona, vista e data', () => {
+    const l = leggiPercorso('postural/abc123/side_left_1757606400000.jpg');
+    expect(l.cartella).toBe('postural');
+    expect(l.personaId).toBe('abc123');
+    expect(l.vista).toBe('Laterale SX');
+    expect(l.quando).toBeInstanceOf(Date);
+  });
+
+  it('riconosce tutte e quattro le viste', () => {
+    const v = (n: string) => leggiPercorso(`postural/x/${n}_1757606400000.jpg`).vista;
+    expect(v('front')).toBe('Frontale');
+    expect(v('side_right')).toBe('Laterale DX');
+    expect(v('back')).toBe('Posteriore');
+  });
+
+  it('un file senza vista nel nome non se la inventa', () => {
+    const l = leggiPercorso('bia/abc123/referto.pdf');
+    expect(l.personaId).toBe('abc123');
+    expect(l.vista).toBeUndefined();
+    expect(l.quando).toBeUndefined();
+  });
+
+  it('nelle cartelle che non sono per persona non cerca una persona', () => {
+    expect(leggiPercorso('content/volantino.pdf').personaId).toBeUndefined();
+    expect(leggiPercorso('exercise-videos/squat.mp4').personaId).toBeUndefined();
+  });
+
+  it('un numero che non è una data credibile viene scartato', () => {
+    expect(leggiPercorso('postural/x/front_1234567890.jpg').quando).toBeUndefined();
+  });
+
+  it('un percorso storto non fa esplodere niente', () => {
+    expect(leggiPercorso('').cartella).toBe('');
+    expect(leggiPercorso('postural').personaId).toBeUndefined();
+  });
+});
+
+describe('la riga che si legge sotto il file', () => {
+  it('mette il nome della persona, non il suo codice', () => {
+    const r = descriviFile('postural/abc123/front_1757606400000.jpg', 'Marco Rossi');
+    expect(r).toContain('Marco Rossi');
+    expect(r).not.toContain('abc123');
+    expect(r).toContain('Frontale');
+  });
+
+  // Un allievo cancellato lascia i file: il codice non aiuta nessuno.
+  it('se la persona non è più in elenco lo dice, invece del codice', () => {
+    const r = descriviFile('postural/abc123/front_1757606400000.jpg', null);
+    expect(r).toContain('Persona non più in elenco');
+    expect(r).not.toContain('abc123');
+  });
+
+  it('per un file senza persona non scrive una riga vuota con i puntini', () => {
+    expect(descriviFile('content/volantino.pdf')).toBe('');
   });
 });
 
