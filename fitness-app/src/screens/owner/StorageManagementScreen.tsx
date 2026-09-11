@@ -21,18 +21,30 @@ import {
   StorageFile,
   FREE_TIER_BYTES,
 } from '../../services/storageService';
+import { nomeCartella, spiegaScansione, descriviFile, leggiPercorso } from '../../domain/cartelleStorage';
+import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
 
-const FOLDER_LABELS: Record<string, { label: string; icon: string }> = {
-  postural: { label: 'Foto Posturali', icon: 'body' },
-  content: { label: 'Contenuti', icon: 'folder' },
-  nutritionTeam: { label: 'Note Team Nutrizione', icon: 'nutrition' },
-  avatars: { label: 'Foto Profilo', icon: 'person-circle' },
-  bodyComposition: { label: 'Composizione Corporea', icon: 'scan' },
-  '(root)': { label: 'Altri file', icon: 'document' },
+// Le icone stanno qui perché sono una scelta di schermata. I NOMI no:
+// quelli vengono da domain/cartelleStorage, che è la stessa fonte da cui
+// il servizio prende i prefissi. Prima erano scritti due volte, e infatti
+// erano già divergenti — c'era «bodyComposition», mentre la cartella vera
+// (quella dichiarata in storage.rules) si chiama «bodycomp».
+const ICONE: Record<string, string> = {
+  postural: 'body',
+  bia: 'pulse',
+  bodycomp: 'scan',
+  avatars: 'person-circle',
+  academy: 'school',
+  'exercise-videos': 'videocam',
+  content: 'folder',
+  nutritionTeam: 'nutrition',
+  '(root)': 'document',
 };
 
-const folderInfo = (folder: string) =>
-  FOLDER_LABELS[folder] || { label: folder, icon: 'folder-outline' };
+const folderInfo = (folder: string) => ({
+  label: folder === '(root)' ? 'Altri file' : nomeCartella(folder),
+  icon: ICONE[folder] || 'folder-outline',
+});
 
 const formatDate = (d: Date | null): string =>
   d ? d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
@@ -44,16 +56,26 @@ export const StorageManagementScreen: React.FC = () => {
   const [scanCount, setScanCount] = useState(0);
   const [expandedFolder, setExpandedFolder] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // La riga che spiega una scansione parziale, al posto della finestra d'errore
+  const [avviso, setAvviso] = useState('');
+  // id → nome, per non mostrare codici a chi deve decidere cosa cancellare
+  const [nomi, setNomi] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setScanCount(0);
+    setAvviso('');
     try {
-      const all = await listAllFiles((c) => setScanCount(c));
-      setFiles(all);
+      const esito = await listAllFiles((c) => setScanCount(c));
+      setFiles(esito.file);
+      // Una cartella negata non è più un errore che nasconde tutto:
+      // si mostra quello che c'è e si dice, in italiano, che cosa manca.
+      setAvviso(spiegaScansione(esito));
     } catch (err) {
+      // Qui ci si arriva solo se salta tutto, non per una cartella sola.
       const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
-      crossAlert('Errore', `Impossibile leggere lo spazio di archiviazione.\n\nDettaglio: ${msg}`);
+      setAvviso(`Non sono riuscito a leggere lo spazio di archiviazione. Dettaglio: ${msg}`);
+      setFiles([]);
     } finally {
       setLoading(false);
     }
@@ -62,6 +84,30 @@ export const StorageManagementScreen: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // L'elenco delle persone serve per tradurre gli id nei percorsi.
+  // Si carica una volta sola e non blocca niente: se non arriva, i file
+  // restano leggibili e la riga dice «Persona non più in elenco».
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([getStudents(), getCollaborators(), getManagers(), getOwner()])
+      .then(([allievi, coach, manager, titolare]) => {
+        if (!vivo) return;
+        const mappa: Record<string, string> = {};
+        [...allievi, ...coach, ...manager, ...(titolare ? [titolare] : [])]
+          .forEach((p: any) => {
+            if (p?.id) mappa[p.id] = `${p.name || ''} ${p.surname || ''}`.trim() || p.email || p.id;
+          });
+        setNomi(mappa);
+      })
+      .catch(() => { /* senza nomi la schermata funziona lo stesso */ });
+    return () => { vivo = false; };
+  }, []);
+
+  const nomePersona = useCallback((percorso: string): string | null => {
+    const id = leggiPercorso(percorso).personaId;
+    return id ? (nomi[id] ?? null) : null;
+  }, [nomi]);
 
   const used = useMemo(() => totalSize(files), [files]);
   const folders = useMemo(() => summarizeByFolder(files), [files]);
@@ -145,6 +191,15 @@ export const StorageManagementScreen: React.FC = () => {
           </View>
         ) : (
           <>
+            {/* La scansione è andata a metà: si dice quale cartella manca,
+                invece di una finestra d'errore che nasconde tutto il resto. */}
+            {avviso !== '' && (
+              <View style={styles.avvisoBox}>
+                <Ionicons name="information-circle" size={18} color={colors.warning} />
+                <Text style={styles.avvisoText}>{avviso}</Text>
+              </View>
+            )}
+
             {/* Riepilogo spazio */}
             <View style={styles.usageCard}>
               <View style={styles.usageRow}>
@@ -239,27 +294,34 @@ export const StorageManagementScreen: React.FC = () => {
                           </TouchableOpacity>
                         </View>
 
-                        {/* Elenco file */}
-                        {folderFiles.map((file) => (
+                        {/* Elenco file. In cima va CHI, non il nome del file:
+                            «front_1757606400000.jpg» non dice a nessuno di chi
+                            sia quella foto, e una foto di cui non sai di chi è
+                            non la cancelli mai. */}
+                        {folderFiles.map((file) => {
+                          const chi = descriviFile(file.path, nomePersona(file.path));
+                          return (
                           <View key={file.path} style={styles.fileRow}>
                             <View style={styles.fileInfo}>
                               <Text style={styles.fileName} numberOfLines={1}>
-                                {file.name}
+                                {chi || file.name}
                               </Text>
                               <Text style={styles.fileMeta}>
+                                {chi ? `${file.name} · ` : ''}
                                 {formatDate(file.created)} · {formatBytes(file.size)}
                               </Text>
                             </View>
                             <TouchableOpacity
                               style={styles.deleteFileBtn}
-                              onPress={() => confirmDelete([file.path], `il file "${file.name}"`)}
+                              onPress={() => confirmDelete([file.path], chi ? `la foto di ${chi}` : `il file "${file.name}"`)}
                               disabled={deleting}
                               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
                               <Ionicons name="trash" size={16} color={colors.error} />
                             </TouchableOpacity>
                           </View>
-                        ))}
+                          );
+                        })}
                       </View>
                     )}
                   </View>
@@ -311,6 +373,23 @@ const styles = StyleSheet.create({
   loadingBox: { alignItems: 'center', paddingVertical: spacing.xxl, gap: spacing.md },
   loadingText: { color: colors.textSecondary, fontSize: fontSize.md },
 
+  avvisoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  avvisoText: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 19,
+  },
   usageCard: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,

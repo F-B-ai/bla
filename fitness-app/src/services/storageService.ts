@@ -5,6 +5,7 @@ import {
   deleteObject,
 } from 'firebase/storage';
 import { storage } from '../config/firebase';
+import { PREFISSI, eNegato, EsitoScansione } from '../domain/cartelleStorage';
 
 export interface StorageFile {
   path: string;
@@ -28,14 +29,32 @@ const topLevelFolder = (fullPath: string): string => {
   return idx === -1 ? '(root)' : fullPath.substring(0, idx);
 };
 
-// Elenca ricorsivamente tutti i file nello Storage con dimensione e data
+/**
+ * Elenca i file dello Storage, **una cartella per volta**.
+ *
+ * Non si parte più dalla radice del bucket: quell'elenco riusciva solo
+ * grazie al carattere jolly che concedeva tutto a chiunque avesse fatto
+ * login — la stessa regola che lasciava a ogni allievo le foto posturali
+ * di tutti gli altri. Chiusa quella, la radice dà `storage/unauthorized`,
+ * ed è giusto così: elencare l'intero bucket è un potere che abbiamo
+ * tolto apposta e non rimettiamo dentro per una schermata di servizio.
+ *
+ * Le cartelle che l'App usa sono dichiarate in `domain/cartelleStorage`,
+ * e un test le tiene allineate a `storage.rules`.
+ *
+ * Una cartella che i permessi non lasciano aprire **non fa più fallire
+ * tutto**: si segna e si va avanti. Chi guarda vede il totale di quello
+ * che si è potuto leggere, e la riga che dice che cosa manca.
+ */
 export const listAllFiles = async (
   onProgress?: (count: number) => void
-): Promise<StorageFile[]> => {
+): Promise<EsitoScansione<StorageFile>> => {
   const files: StorageFile[] = [];
+  const negate: string[] = [];
+  const fallite: string[] = [];
 
   const walk = async (prefixPath: string): Promise<void> => {
-    const dirRef = prefixPath === '' ? ref(storage) : ref(storage, prefixPath);
+    const dirRef = ref(storage, prefixPath);
     const res = await listAll(dirRef);
 
     // File in questa cartella
@@ -63,8 +82,17 @@ export const listAllFiles = async (
     }
   };
 
-  await walk('');
-  return files;
+  // Una cartella per volta, e l'errore di una non ferma le altre.
+  for (const prefisso of PREFISSI) {
+    try {
+      await walk(prefisso);
+    } catch (err) {
+      if (eNegato(err)) negate.push(prefisso);
+      else fallite.push(prefisso);
+    }
+  }
+
+  return { file: files, negate, fallite };
 };
 
 export const summarizeByFolder = (files: StorageFile[]): StorageFolderSummary[] => {

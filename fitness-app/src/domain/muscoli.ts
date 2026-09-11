@@ -14,7 +14,27 @@
 // aggiunge qui e compare ovunque.
 // ============================================================
 
-export const MUSCOLI_VERSION = 1;
+// ------------------------------------------------------------
+// Due gruppi tolti, il 10 settembre 2026, per decisione di metodo
+// ------------------------------------------------------------
+//
+// **Lombari.** Parole del titolare: «i lombari non vanno mai
+// allenati, sono già di per sé dei muscoli che tendono ad
+// arretrarsi». In un lavoro che nasce posturale, aggiungere tono a
+// una catena già accorciata è lavorare contro il proprio obiettivo:
+// il controllo della zona si costruisce dal centro (addome, respiro,
+// anca), non caricando gli estensori. Il gruppo non esiste più.
+//
+// **Polpacci.** «Li dobbiamo fare un discorso a parte.» Non è un
+// rifiuto, è un rinvio: il polpaccio nel nostro metodo entra come
+// pompa venosa, non come muscolo da ipertrofia. Per questo l'unico
+// esercizio rimasto — il calf raise in piedi delle schede drenanti —
+// vive sotto «Decongestione», che è la funzione che gli diamo. Il
+// giorno che il discorso a parte si fa, il gruppo torna qui.
+//
+// Chi legge fra sei mesi e non trova i polpacci: non è una svista.
+
+export const MUSCOLI_VERSION = 2;
 
 export type GruppoMuscolare =
   | 'pettorali'
@@ -25,12 +45,14 @@ export type GruppoMuscolare =
   | 'glutei'
   | 'quadricipiti'
   | 'femorali'
-  | 'polpacci'
   | 'addome'
-  | 'lombari'
   | 'totalBody'
   | 'cardio'
   | 'mobilita'
+  /** sequenze di scarico e ritorno venoso: il polpaccio come pompa */
+  | 'decongestione'
+  /** protocolli pensati sul corpo della donna, ciclo compreso */
+  | 'protocolliDonna'
   /** l'esercizio aggiunto dal coach senza scegliere un gruppo */
   | 'daClassificare';
 
@@ -38,7 +60,8 @@ export interface Gruppo {
   id: GruppoMuscolare;
   nome: string;
   /** dove sta nel corpo: serve a raggrupparli nella schermata */
-  zona: 'Parte superiore' | 'Parte inferiore' | 'Centro' | 'Generale' | 'Da sistemare';
+  zona: 'Parte superiore' | 'Parte inferiore' | 'Centro' | 'Generale'
+    | 'Protocolli' | 'Da sistemare';
   icona: string;
   /** una riga che dice che cosa ci si allena, per chi non è del mestiere */
   cosaAllena: string;
@@ -67,20 +90,24 @@ export const GRUPPI: Gruppo[] = [
     cosaAllena: 'Estensione del ginocchio: squat, pressa, affondi frontali.' },
   { id: 'femorali', nome: 'Femorali', zona: 'Parte inferiore', icona: 'walk-outline',
     cosaAllena: 'Catena posteriore della coscia: stacco rumeno, leg curl, good morning.' },
-  { id: 'polpacci', nome: 'Polpacci', zona: 'Parte inferiore', icona: 'footsteps-outline',
-    cosaAllena: 'Flessione plantare: calf raise in tutte le varianti.' },
 
   { id: 'addome', nome: 'Addome e core', zona: 'Centro', icona: 'shield-outline',
     cosaAllena: 'Flessione, rotazione e soprattutto anti-movimento: plank, crunch, hollow.' },
-  { id: 'lombari', nome: 'Lombari', zona: 'Centro', icona: 'shield-half-outline',
-    cosaAllena: 'Estensori della colonna e controllo del bacino.' },
 
   { id: 'totalBody', nome: 'Total body', zona: 'Generale', icona: 'flash-outline',
     cosaAllena: 'Esercizi che non appartengono a un muscolo solo: stacco, swing, burpees.' },
   { id: 'cardio', nome: 'Cardio', zona: 'Generale', icona: 'heart-outline',
-    cosaAllena: 'Lavoro sulla capacità: vogatore, cyclette, camminata, salti.' },
+    cosaAllena: 'Capacità e metodo: LISS, Zona 2, HIIT, Tabata, fartlek, EMOM, circuiti.' },
   { id: 'mobilita', nome: 'Mobilità e respiro', zona: 'Generale', icona: 'leaf-outline',
     cosaAllena: 'Articolarità, scarico e respiro: la parte che quasi nessuno programma.' },
+
+  // I protocolli non sono esercizi singoli: sono sequenze che si
+  // prendono intere. Stanno in fondo perché si aggiungono alla
+  // seduta, non la compongono.
+  { id: 'decongestione', nome: 'Decongestione e scarico', zona: 'Protocolli', icona: 'water-outline',
+    cosaAllena: 'Ritorno venoso e linfatico: pompa del piede, antigravitario, respiro diaframmatico.' },
+  { id: 'protocolliDonna', nome: 'Protocolli donna', zona: 'Protocolli', icona: 'female-outline',
+    cosaAllena: 'Sequenze sul corpo della donna: pavimento pelvico, fasi del ciclo, post-parto, menopausa.' },
 
   // Ultimo apposta: chi non ha scelto un gruppo finisce qui, in fondo
   // e ben visibile. Un esercizio senza muscolo non si nasconde dentro
@@ -90,6 +117,10 @@ export const GRUPPI: Gruppo[] = [
 ];
 
 const PER_ID = new Map(GRUPPI.map((g) => [g.id, g]));
+
+/** Vero solo per un gruppo che esiste davvero oggi. */
+export const noto = (id?: GruppoMuscolare | string | null): boolean =>
+  !!id && PER_ID.has(id as GruppoMuscolare);
 
 export const gruppo = (id?: GruppoMuscolare | null): Gruppo =>
   (id && PER_ID.get(id)) || GRUPPI[GRUPPI.length - 1];
@@ -103,7 +134,27 @@ export const ordineGruppo = (id?: GruppoMuscolare | null): number => {
 };
 
 export const ZONE: Gruppo['zona'][] =
-  ['Parte superiore', 'Parte inferiore', 'Centro', 'Generale', 'Da sistemare'];
+  ['Parte superiore', 'Parte inferiore', 'Centro', 'Generale', 'Protocolli', 'Da sistemare'];
+
+/**
+ * I gruppi tolti per decisione di metodo, con il perché.
+ * Serve a chi domani si chiede «e i polpacci?»: la risposta è qui,
+ * non in un commento perso a metà file.
+ */
+export const GRUPPI_RITIRATI: { id: string; nome: string; perche: string }[] = [
+  {
+    id: 'lombari',
+    nome: 'Lombari',
+    perche: 'I lombari non si allenano: tendono già ad arretrarsi. '
+      + 'Il controllo della zona si costruisce da addome, respiro e anca.',
+  },
+  {
+    id: 'polpacci',
+    nome: 'Polpacci',
+    perche: 'Discorso a parte, rinviato. Nel metodo il polpaccio entra come '
+      + 'pompa venosa: quel lavoro vive sotto «Decongestione e scarico».',
+  },
+];
 
 // ------------------------------------------------------------
 // Dividere la libreria
@@ -151,7 +202,12 @@ export const dividiPerMuscolo = <T extends EsercizioDaDividere>(
   const per = new Map<GruppoMuscolare, T[]>();
 
   lista.forEach((e) => {
-    const id = e.muscolo || 'daClassificare';
+    // Un gruppo che non esiste più — «polpacci» salvato in Firestore
+    // prima che venisse ritirato, o un refuso — finisce in «Da
+    // classificare», dove si vede e si sistema. Sparire, no: un
+    // esercizio salvato dal coach non può svanire dalla sua libreria
+    // perché nel frattempo abbiamo cambiato idea sulle categorie.
+    const id = noto(e.muscolo) ? e.muscolo! : 'daClassificare';
     if (!per.has(id)) per.set(id, []);
     per.get(id)!.push(e);
   });

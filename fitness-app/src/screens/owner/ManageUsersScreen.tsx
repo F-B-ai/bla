@@ -18,6 +18,7 @@ import { getCollaborators, getStudents, getManagers, getOwner, deleteUser, toggl
 import { isStudentAssignedTo, getStudentCoachIds } from '../../utils/helpers';
 import { Collaborator, Student, Manager, Owner, CredentialChangeRequest } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { allineaRuoliNeiToken } from '../../services/adminAuthService';
 import { AddCollaboratorScreen } from './AddCollaboratorScreen';
 import { AddStudentScreen } from './AddStudentScreen';
 import { AddManagerScreen } from './AddManagerScreen';
@@ -43,6 +44,7 @@ export const ManageUsersScreen: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [owner, setOwner] = useState<Owner | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [allineando, setAllineando] = useState(false);
   const [activeTab, setActiveTab] = useState<'managers' | 'collaborators' | 'nutritionists' | 'students'>(
     isCollaborator ? 'students' : 'collaborators'
   );
@@ -73,6 +75,28 @@ export const ManageUsersScreen: React.FC = () => {
   const canCreateCoach = isOwner;
   const canCreateStudent = isOwner || isManager || isCollaborator;
   const canDeleteUsers = isOwner || isManager;
+
+  // Riscrive il ruolo di ogni persona dentro il suo token di accesso.
+  // È la manovra che rimette in piedi i permessi sui file dopo un
+  // cambio di ruolo — o dopo che quei permessi hanno smesso di
+  // funzionare, come l'11 settembre.
+  const allineaRuoli = async () => {
+    setAllineando(true);
+    try {
+      const quanti = await allineaRuoliNeiToken();
+      crossAlert(
+        'Ruoli allineati',
+        `Aggiornati ${quanti} accessi.\n\nAdesso esci e rientra: il permesso nuovo vale dal rientro. ` +
+        'Chi è già dentro lo riceve entro un\'ora, o subito se esce e rientra anche lui.'
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Errore sconosciuto';
+      crossAlert('Non riuscito', msg);
+    } finally {
+      setAllineando(false);
+    }
+  };
+
 
   const loadData = useCallback(async () => {
     try {
@@ -378,6 +402,35 @@ export const ManageUsersScreen: React.FC = () => {
           {managers.length} manager · {collaborators.filter((c) => c.collaboratorType !== 'nutritionist').length} coach · {collaborators.filter((c) => c.collaboratorType === 'nutritionist').length} nutrizionisti · {students.length} allievi
         </Text>
       </View>
+
+      {/* ------------------------------------------------------------
+          I RUOLI DENTRO I TOKEN
+          Le regole sui file leggono il ruolo dal token di accesso, non
+          da Firestore: quella lettura, da dentro le regole, in
+          produzione non funziona. Finché il token non porta il ruolo,
+          per i FILE una persona vale quanto un allievo qualsiasi — e
+          questo vale anche per il titolare.
+          ------------------------------------------------------------ */}
+      {isOwner && (
+        <View style={styles.manutenzioneBox}>
+          <View style={styles.manutenzioneTesta}>
+            <Ionicons name="key-outline" size={18} color={colors.accent} />
+            <Text style={styles.manutenzioneTitolo}>Ruoli e permessi sui file</Text>
+          </View>
+          <Text style={styles.manutenzioneTesto}>
+            Scrive il ruolo di ogni persona dentro il suo accesso. Serve dopo aver
+            cambiato un ruolo, e ogni volta che il caricamento delle foto viene
+            rifiutato. Dopo, esci e rientra: il permesso nuovo vale dal rientro.
+          </Text>
+          <Button
+            title={allineando ? 'Allineamento…' : 'Allinea i ruoli'}
+            onPress={allineaRuoli}
+            disabled={allineando}
+            variant="outline"
+            style={styles.manutenzioneBtn}
+          />
+        </View>
+      )}
 
       {/* Pulsanti azione in base al ruolo */}
       <View style={styles.actions}>
@@ -1186,6 +1239,35 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     borderBottomLeftRadius: borderRadius.xl,
     borderBottomRightRadius: borderRadius.xl,
+  },
+  manutenzioneBox: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  manutenzioneTesta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  manutenzioneTitolo: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  manutenzioneTesto: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: spacing.sm,
+  },
+  manutenzioneBtn: {
+    alignSelf: 'flex-start',
   },
   title: {
     fontSize: fontSize.title,

@@ -1,6 +1,11 @@
 import { ExerciseCategory } from '../types';
 import { GruppoMuscolare } from '../domain/muscoli';
+import { AVVISO_RESPIRO } from '../domain/perimetro';
 import { canonExercises } from './canonExercises';
+// La v3 vive in un file suo perché questo era già lungo abbastanza.
+// Prende il tipo da qui con un import di solo tipo: si cancella in
+// compilazione, quindi il cerchio fra i due file non esiste a runtime.
+import { esercizi2026 } from './esercizi2026';
 
 export interface DefaultExercise {
   name: string;
@@ -319,9 +324,13 @@ export const maleExercises: DefaultExercise[] = [
     reps: '12-15',
     restSeconds: 60,
     category: 'forza',
-    notes: 'Massima escursione: stiramento in basso, contrazione completa in alto.',
-    gender: 'male',
-    muscolo: 'polpacci',
+    notes: 'Massima escursione: stiramento in basso, contrazione completa in alto. Nelle schede drenanti si usa leggero e ad alte ripetizioni: qui il polpaccio è una pompa, non un muscolo da far crescere.',
+    gender: 'unisex',
+    // L'unico calf rimasto, e non per l'ipertrofia: è la pompa
+    // muscolare del ritorno venoso, il «secondo cuore» delle schede
+    // Gambe Leggere. L'allenamento del polpaccio come gruppo è
+    // rinviato — vedi GRUPPI_RITIRATI in domain/muscoli.ts.
+    muscolo: 'decongestione',
   },
   {
     name: 'Panca presa stretta',
@@ -382,7 +391,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 90,
     category: 'forza',
     notes: 'Stringi i glutei al massimo in alto. Fermo 2 secondi in cima.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -404,7 +413,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 60,
     category: 'forza',
     notes: 'Passo lungo per coinvolgere maggiormente i glutei.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -415,7 +424,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 45,
     category: 'forza',
     notes: 'L\'elastico aumenta l\'attivazione dei glutei medi.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -426,7 +435,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 45,
     category: 'forza',
     notes: 'Movimento lento e controllato. Non inarcare la schiena.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -437,7 +446,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 45,
     category: 'forza',
     notes: 'Contrai i glutei durante il movimento. Fase eccentrica lenta.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -536,7 +545,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 60,
     category: 'funzionale',
     notes: 'Spingi con il tallone del piede sulla panca. Non spingere con il piede a terra.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -547,7 +556,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 30,
     category: 'forza',
     notes: 'Fondamentale per attivare il gluteo medio. Fianchi stabili.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -558,7 +567,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 30,
     category: 'forza',
     notes: 'Contrai il gluteo in alto. Non inarcare la schiena.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -569,7 +578,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 30,
     category: 'forza',
     notes: 'Lavora sul gluteo medio. Mantieni il core stabile.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -602,7 +611,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 60,
     category: 'forza',
     notes: 'Ottimo per gluteo medio e interno coscia. Busto eretto.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -613,7 +622,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 45,
     category: 'forza',
     notes: 'Per il focus glutei mantieni la schiena leggermente arrotondata e spingi con i fianchi.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -624,7 +633,7 @@ export const femaleExercises: DefaultExercise[] = [
     restSeconds: 45,
     category: 'forza',
     notes: 'Progressione del ponte classico. Fianchi allineati durante la salita.',
-    gender: 'female',
+    gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -871,7 +880,7 @@ export const maleExercisesExtra: DefaultExercise[] = [
     name: 'Affondi inversi con bilanciere',
     description: 'Bilanciere sulle spalle come nello squat. Fai un passo indietro e scendi finché il ginocchio posteriore sfiora il pavimento, poi risali spingendo sul tallone della gamba avanti. Più stabile e più sicuro per le ginocchia dell\'affondo in avanti.',
     sets: 3, reps: '8-10 per gamba', restSeconds: 120, category: 'forza',
-    notes: 'Busto verticale, passo abbastanza lungo da tenere la tibia avanti verticale.', gender: 'male',
+    notes: 'Busto verticale, passo abbastanza lungo da tenere la tibia avanti verticale.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -920,7 +929,7 @@ export const maleExercisesExtra: DefaultExercise[] = [
     name: 'Vogatore (remoergometro)',
     description: 'Sequenza: spinta di gambe, apertura del busto, tirata delle braccia al costato — e ritorno in ordine inverso. Gambe 60%, busto 30%, braccia 10%. Cardio totale a impatto zero sulle articolazioni.',
     sets: 1, reps: '10-20 min', restSeconds: 0, category: 'cardio',
-    notes: 'Le braccia tirano per ultime: chi tira prima con le braccia rema male.', gender: 'male',
+    notes: 'Le braccia tirano per ultime: chi tira prima con le braccia rema male.', gender: 'unisex',
     muscolo: 'cardio',
   },
 ];
@@ -934,49 +943,49 @@ export const femaleExercisesExtra: DefaultExercise[] = [
     name: 'Hip thrust monopodalico',
     description: 'Schiena appoggiata alla panca, un piede a terra e l\'altra gamba sollevata. Spingi sul tallone a terra portando il bacino in massima estensione, strizza il gluteo 2 secondi in alto, scendi in controllo. Doppia intensità per lato, zero bilanciere.',
     sets: 3, reps: '10-12 per gamba', restSeconds: 90, category: 'forza',
-    notes: 'Mento verso il petto e costole chiuse: spinge il gluteo, non la lombare.', gender: 'female',
+    notes: 'Mento verso il petto e costole chiuse: spinge il gluteo, non la lombare.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Frog pump con manubrio',
     description: 'Sdraiata, piante dei piedi unite e ginocchia aperte a farfalla, manubrio sul bacino. Spingi il bacino verso l\'alto strizzando i glutei, piccola pausa in cima, scendi senza appoggiare del tutto. Pompaggio mirato del grande gluteo.',
     sets: 3, reps: '15-20', restSeconds: 60, category: 'forza',
-    notes: 'Serie lunghe e bruciore: qui si cerca il pump.', gender: 'female',
+    notes: 'Serie lunghe e bruciore: qui si cerca il pump.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Glute bridge march',
     description: 'Dalla posizione di ponte glutei alto, solleva un ginocchio verso il petto senza far scendere o ruotare il bacino, riappoggia e alterna. Glutei e core anti-rotazione insieme.',
     sets: 3, reps: '10-12 per gamba', restSeconds: 60, category: 'funzionale',
-    notes: 'Il bacino resta una tavola: se balla, rallenta.', gender: 'female',
+    notes: 'Il bacino resta una tavola: se balla, rallenta.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Pull-through al cavo',
     description: 'Di spalle al cavo basso, corda tra le gambe. Cerniera d\'anca: fianchi indietro con schiena neutra finché senti allungare i femorali, poi estendi i fianchi strizzando i glutei a fine corsa. Insegna lo stacco senza caricare la schiena.',
     sets: 3, reps: '12-15', restSeconds: 90, category: 'forza',
-    notes: 'Sono i fianchi che vanno avanti e indietro, le braccia solo corde.', gender: 'female',
+    notes: 'Sono i fianchi che vanno avanti e indietro, le braccia solo corde.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Stacco sumo con bilanciere',
     description: 'Piedi molto larghi, punte aperte, presa al centro del bilanciere a braccia verticali. Spingi il pavimento con le gambe tenendo il petto alto e il bilanciere rasente al corpo, blocca in piedi strizzando i glutei. Meno stress lombare dello stacco classico.',
     sets: 4, reps: '6-8', restSeconds: 150, category: 'forza',
-    notes: 'Ginocchia che seguono le punte: apri, non chiudere.', gender: 'female',
+    notes: 'Ginocchia che seguono le punte: apri, non chiudere.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Abduzioni anca al cavo in piedi',
     description: 'Cavigliera al cavo basso, fianco al cavo. Porta la gamba esterna lateralmente in alto tenendo il busto fermo, torna in controllo resistendo al cavo. Medio gluteo in isolamento: la chiave dei fianchi stabili.',
     sets: 3, reps: '12-15 per gamba', restSeconds: 60, category: 'forza',
-    notes: 'Poco peso e niente inclinazioni del busto: il movimento è solo dell\'anca.', gender: 'female',
+    notes: 'Poco peso e niente inclinazioni del busto: il movimento è solo dell\'anca.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Affondi laterali',
     description: 'Passo laterale ampio: scendi piegando la gamba d\'appoggio e tenendo l\'altra tesa, bacino indietro e petto alto. Risali spingendo sul tallone e torna al centro. Interno coscia e glutei su un piano che si allena poco.',
     sets: 3, reps: '10 per lato', restSeconds: 90, category: 'forza',
-    notes: 'Il ginocchio che si piega resta in linea con la punta del piede.', gender: 'female',
+    notes: 'Il ginocchio che si piega resta in linea con la punta del piede.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
@@ -990,21 +999,21 @@ export const femaleExercisesExtra: DefaultExercise[] = [
     name: 'Step-up laterale su box',
     description: 'Di fianco a un box basso, sali di lato spingendo solo sulla gamba sul box, senza slancio dell\'altra. Scendi in controllo frenando. Glutei e stabilità del ginocchio sul piano frontale.',
     sets: 3, reps: '10 per gamba', restSeconds: 90, category: 'funzionale',
-    notes: 'La gamba a terra è solo un appoggio: non deve spingere.', gender: 'female',
+    notes: 'La gamba a terra è solo un appoggio: non deve spingere.', gender: 'unisex',
     muscolo: 'glutei',
   },
   {
     name: 'Camminata in salita su tapis roulant',
     description: 'Pendenza 10-15%, velocità 5-6.5 km/h, senza appoggiarsi ai corrimano. Passo naturale e braccia che oscillano. Il cardio più sottovalutato: glutei e femorali lavorano a ogni passo, impatto minimo.',
     sets: 1, reps: '20-30 min', restSeconds: 0, category: 'cardio',
-    notes: 'Mani libere: aggrapparsi cancella metà del lavoro.', gender: 'female',
+    notes: 'Mani libere: aggrapparsi cancella metà del lavoro.', gender: 'unisex',
     muscolo: 'cardio',
   },
   {
     name: 'Jumping jack',
     description: 'Salta aprendo gambe e braccia sopra la testa, richiudi con un secondo saltello. Ritmo costante, atterraggi morbidi sull\'avampiede. Riscaldamento e condizionamento a corpo libero.',
     sets: 3, reps: '30-45 sec', restSeconds: 45, category: 'cardio',
-    notes: 'Atterra morbida: il rumore dei piedi è il tuo feedback.', gender: 'female',
+    notes: 'Atterra morbida: il rumore dei piedi è il tuo feedback.', gender: 'unisex',
     muscolo: 'cardio',
   },
   {
@@ -1081,8 +1090,11 @@ export const femaleExercisesExtra: DefaultExercise[] = [
     name: 'Bird dog',
     description: 'In quadrupedia, distendi contemporaneamente braccio e gamba opposti fino alla linea del busto, pausa di 2 secondi senza ruotare il bacino, torna e alterna. Stabilità di colonna e coordinazione.',
     sets: 3, reps: '8-10 per lato', restSeconds: 45, category: 'posturale',
-    notes: 'Immagina un bicchiere pieno sulla schiena: non deve cadere.', gender: 'female',
-    muscolo: 'lombari',
+    notes: 'Immagina un bicchiere pieno sulla schiena: non deve cadere.', gender: 'unisex',
+    // Non è lavoro sui lombari: è anti-rotazione. La schiena qui non
+    // si muove, si oppone. Per questo è rimasto quando il gruppo
+    // «lombari» è stato ritirato — cambia il nome, non l'esercizio.
+    muscolo: 'addome',
   },
   {
     name: 'Hollow hold',
@@ -1095,35 +1107,39 @@ export const femaleExercisesExtra: DefaultExercise[] = [
     name: 'Gatto-cammello (mobilità colonna)',
     description: 'In quadrupedia, alterna lentamente massima flessione della colonna (schiena a cupola, mento al petto) e massima estensione (pancia giù, sguardo avanti), seguendo il respiro. Vertebra per vertebra.',
     sets: 2, reps: '10-12 cicli', restSeconds: 30, category: 'mobilita',
-    notes: 'Lentezza: ogni ciclo dura almeno 4-5 secondi.', gender: 'female',
+    notes: 'Lentezza: ogni ciclo dura almeno 4-5 secondi.', gender: 'unisex',
     muscolo: 'mobilita',
   },
   {
     name: 'Respirazione diaframmatica',
     description: 'Sdraiata o seduta comoda, una mano sul petto e una sulla pancia. Inspira dal naso gonfiando SOLO la pancia (la mano sul petto resta ferma), espira lentamente dalla bocca sgonfiandola, più lunga dell\'inspiro. Il diaframma che si muove è una pompa per la circolazione profonda e un interruttore di calma.',
     sets: 1, reps: '10 respiri lenti', restSeconds: 0, category: 'posturale',
-    notes: 'Espiro più lungo dell\'inspiro: è lì che il corpo si rilassa.', gender: 'female',
+    notes: `Espiro più lungo dell'inspiro: è lì che il corpo si rilassa. ${AVVISO_RESPIRO}`,
+    gender: 'unisex',
     muscolo: 'mobilita',
   },
   {
     name: 'Scarico gambe al muro',
     description: 'Sdraiata a terra con i glutei vicini al muro e le gambe distese in verticale appoggiate alla parete. Braccia rilassate, respira con calma per 3-5 minuti. La posizione favorisce il ritorno dei liquidi dalle gambe: perfetta a fine seduta o la sera.',
     sets: 1, reps: '3-5 min', restSeconds: 0, category: 'stretching',
-    notes: 'Se i femorali tirano, allontana un po\' i glutei dal muro.', gender: 'female',
-    muscolo: 'mobilita',
+    notes: `Se i femorali tirano, allontana un po' i glutei dal muro. ${AVVISO_RESPIRO}`,
+    gender: 'unisex',
+    // Sta con la decongestione, non con la mobilità: qui non si
+    // guadagna articolarità, si aiuta il ritorno venoso.
+    muscolo: 'decongestione',
   },
   {
     name: 'Pedalata dolce su cyclette',
     description: 'Sella regolata con il ginocchio quasi disteso nel punto più basso. Pedala a resistenza leggera e cadenza fluida (60-80 giri), respirando con facilità: deve essere una conversazione, non una gara. Movimento circolare continuo che pompa senza affaticare.',
     sets: 1, reps: '15-25 min', restSeconds: 0, category: 'cardio',
-    notes: 'Leggera davvero: qui l\'obiettivo è far circolare, non consumare.', gender: 'female',
+    notes: 'Leggera davvero: qui l\'obiettivo è far circolare, non consumare.', gender: 'unisex',
     muscolo: 'cardio',
   },
   {
     name: 'Stretching flessori dell\'anca',
     description: 'In affondo con ginocchio posteriore a terra, bacino in leggera retroversione: spingi dolcemente i fianchi in avanti finché senti allungare la parte anteriore dell\'anca posteriore. Tieni 30-40 secondi respirando, poi cambia lato. L\'antidoto alle ore da seduti.',
     sets: 2, reps: '30-40 sec per lato', restSeconds: 20, category: 'stretching',
-    notes: 'La retroversione del bacino È lo stretching: senza, si allunga poco.', gender: 'female',
+    notes: 'La retroversione del bacino È lo stretching: senza, si allunga poco.', gender: 'unisex',
     muscolo: 'mobilita',
   },
 ];
@@ -1134,64 +1150,16 @@ export const femaleExercisesExtra: DefaultExercise[] = [
 // ESERCIZI PER GRUPPO MUSCOLARE — UOMO (30)
 // ------------------------------------------------------------
 // Aggiunti il 10 settembre 2026, quando la libreria è stata
-// riordinata per muscolo. Scelti dove il catalogo era scoperto:
-// polpacci e lombari avevano UN esercizio in tutto, i femorali sei.
+// riordinata per muscolo. Scelti dove il catalogo era scoperto —
+// i femorali, per esempio, avevano sei esercizi in tutto.
 // Le immagini e i filmati li aggiunge il direttore tecnico.
+//
+// Nota: quel giorno erano trenta. Poi il titolare ha ritirato due
+// gruppi (polpacci e lombari) e quei sette sono usciti da qui.
 // ============================================================
 
 export const maleExercisesGruppi: DefaultExercise[] = [
-  // ---------- POLPACCI ----------
-  {
-    name: 'Calf raise seduto alla macchina',
-    description: 'Seduto, ginocchia a novanta e cuscinetto sulle cosce, avampiedi sulla pedana. Scendi lentamente fino a sentire il tendine allungarsi, poi sali fino alla massima punta e fermati un istante. Col ginocchio piegato il gastrocnemio si accorcia e lavora il soleo: è l\'unico modo di allenarlo davvero.',
-    sets: 4, reps: '15-20', restSeconds: 60, category: 'forza',
-    notes: 'Fermata di un secondo in alto e una discesa lenta: il polpaccio cresce lì, non nei rimbalzi.',
-    gender: 'male', muscolo: 'polpacci',
-  },
-  {
-    name: 'Calf raise alla pressa',
-    description: 'Sulla pressa, avampiedi sul bordo basso della pedana e ginocchia quasi distese. Spingi con le punte fino alla massima estensione, poi lascia scendere i talloni sotto il livello della pedana. Il carico è alto e la schiena resta scarica: la variante più sicura per andare pesante.',
-    sets: 4, reps: '12-15', restSeconds: 75, category: 'forza',
-    notes: 'Ginocchia morbide ma ferme: se si piegano, spingi con le cosce.',
-    gender: 'male', muscolo: 'polpacci',
-  },
-  {
-    name: 'Calf raise monopodalico con manubrio',
-    description: 'Un piede sul bordo di un gradino, manubrio nella mano dello stesso lato, l\'altra mano che tiene l\'equilibrio. Sali sulla punta e scendi sotto il livello del gradino, lentamente. Un lato per volta smaschera l\'asimmetria che il bipodalico nasconde.',
-    sets: 3, reps: '12-15 per lato', restSeconds: 60, category: 'forza',
-    notes: 'Comincia dal lato debole e fai allo stesso numero anche il forte.',
-    gender: 'male', muscolo: 'polpacci',
-  },
-  {
-    name: 'Donkey calf raise',
-    description: 'Busto flesso in avanti appoggiato a un supporto, avampiedi su un rialzo, carico sui fianchi. Sali sulle punte con le anche flesse: la posizione mette il gastrocnemio in pre-allungamento e rende ogni ripetizione più profonda.',
-    sets: 3, reps: '15-20', restSeconds: 60, category: 'forza',
-    notes: 'Schiena piatta, non curva: ci si appoggia, non ci si accascia.',
-    gender: 'male', muscolo: 'polpacci',
-  },
 
-  // ---------- LOMBARI ----------
-  {
-    name: 'Iperestensioni a 45 gradi',
-    description: 'Cuscinetto appena sotto le creste iliache, piedi bloccati, mani al petto. Scendi flettendo dalle anche tenendo la schiena in linea, risali fino ad allineare tronco e gambe. Non oltre: l\'iperestensione lombare non aggiunge lavoro, aggiunge compressione.',
-    sets: 3, reps: '12-15', restSeconds: 75, category: 'forza',
-    notes: 'Ci si ferma in linea, mai sopra: l\'esercizio finisce dove finisce la linea.',
-    gender: 'male', muscolo: 'lombari',
-  },
-  {
-    name: 'Good morning seduto con bilanciere',
-    description: 'Seduto sulla panca con il bilanciere sui trapezi, flettiti in avanti dalle anche mantenendo la curva lombare, fino a dove la schiena regge. Da seduto i femorali sono fuori gioco e il lavoro resta tutto sugli estensori della colonna.',
-    sets: 3, reps: '10-12', restSeconds: 90, category: 'forza',
-    notes: 'Carico leggero e ampiezza onesta: qui non si va a cercare il record.',
-    gender: 'male', muscolo: 'lombari',
-  },
-  {
-    name: 'Reverse hyper su panca',
-    description: 'Prono sulla panca con il bacino sul bordo e le mani che tengono, gambe libere. Solleva le gambe estese fino alla linea del tronco contraendo glutei e lombari, scendi in controllo. Il carico sulla colonna è minimo: adatto anche nelle settimane di scarico.',
-    sets: 3, reps: '15-20', restSeconds: 60, category: 'funzionale',
-    notes: 'Sali con i glutei, non con lo slancio: se ondeggi, rallenta.',
-    gender: 'male', muscolo: 'lombari',
-  },
 
   // ---------- FEMORALI ----------
   {
@@ -1369,7 +1337,7 @@ export const maleExercisesGruppi: DefaultExercise[] = [
     description: 'Dopo cinque minuti di riscaldamento, alterna un minuto a ritmo alto e due di camminata, per il numero di giri stabilito. Chiudi con cinque minuti facili. Gli intervalli costruiscono capacità senza le ore che la corsa continua richiede.',
     sets: 1, reps: '6-10 intervalli', restSeconds: 0, category: 'cardio',
     notes: 'Il minuto alto è alto per te: si misura sul respiro, non sulla velocità del vicino.',
-    gender: 'male', muscolo: 'cardio',
+    gender: 'unisex', muscolo: 'cardio',
   },
 ];
 
@@ -1389,42 +1357,42 @@ export const femaleExercisesGruppi: DefaultExercise[] = [
     description: 'Schiena appoggiata alla panca sotto le scapole, bilanciere del multipower sulle anche con il cuscinetto. Spingi con i talloni fino ad allineare tronco e cosce, ferma un istante in alto, scendi in controllo. La guida del multipower toglie l\'equilibrio dall\'equazione e lascia solo il carico.',
     sets: 4, reps: '10-12', restSeconds: 90, category: 'forza',
     notes: 'In alto costole basse e bacino in retroversione: la spinta finisce lì, non nella schiena.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
   {
     name: 'Ponte glutei con piedi su rialzo',
     description: 'Sdraiata, talloni su un box o una panca bassa, ginocchia a novanta. Spingi il bacino in alto contraendo i glutei e scendi senza appoggiare. Il rialzo aumenta l\'ampiezza dell\'estensione d\'anca e allunga il tempo sotto tensione.',
     sets: 3, reps: '15-20', restSeconds: 60, category: 'funzionale',
     notes: 'Spingi con i talloni: se senti i quadricipiti, i piedi sono troppo vicini.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
   {
     name: 'Abduzione in piedi con elastico',
     description: 'Elastico sopra le ginocchia o alle caviglie, gambe leggermente flesse. Porta una gamba lateralmente contrastando l\'elastico, torna senza rilasciare del tutto. Il medio gluteo è il muscolo che tiene il bacino in linea quando cammini: si allena così, non con lo squat.',
     sets: 3, reps: '15-20 per lato', restSeconds: 45, category: 'funzionale',
     notes: 'Il busto non si inclina dal lato opposto: se lo fa, l\'elastico è troppo duro.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
   {
     name: 'Kickback in quadrupedia con cavigliera',
     description: 'A quattro appoggi, cavigliera alla gamba che lavora. Estendi l\'anca portando il tallone verso l\'alto senza inarcare la schiena, ferma in alto, torna in controllo. Ampiezza piccola e contrazione vera valgono più di un calcio alto.',
     sets: 3, reps: '15 per lato', restSeconds: 45, category: 'funzionale',
     notes: 'Se la schiena si inarca, l\'anca ha finito la sua corsa: fermati lì.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
   {
     name: 'Squat bulgaro con busto inclinato',
     description: 'Piede posteriore su una panca, manubri ai fianchi, busto inclinato in avanti di circa trenta gradi. Scendi con il ginocchio anteriore verso il pavimento e risali spingendo dal tallone. L\'inclinazione del busto sposta il lavoro dal quadricipite al gluteo.',
     sets: 3, reps: '10-12 per gamba', restSeconds: 90, category: 'forza',
     notes: 'Busto inclinato ma schiena dritta: è una flessione d\'anca, non una curva.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
   {
     name: 'Camminata laterale con elastico (monster walk)',
     description: 'Elastico sopra le ginocchia, mezzo squat mantenuto, passi laterali senza mai avvicinare del tutto i piedi. Avanti e indietro per la distanza stabilita. Brucia dopo pochi metri, e brucia esattamente dove deve.',
     sets: 3, reps: '10-12 passi per direzione', restSeconds: 45, category: 'funzionale',
     notes: 'Ginocchia sempre spinte in fuori contro l\'elastico, mai cedute all\'interno.',
-    gender: 'female', muscolo: 'glutei',
+    gender: 'unisex', muscolo: 'glutei',
   },
 
   // ---------- FEMORALI ----------
@@ -1480,44 +1448,7 @@ export const femaleExercisesGruppi: DefaultExercise[] = [
     gender: 'female', muscolo: 'quadricipiti',
   },
 
-  // ---------- POLPACCI ----------
-  {
-    name: 'Calf raise su step a corpo libero',
-    description: 'Avampiedi sul bordo di uno step, talloni nel vuoto. Sali sulle punte fino in cima, fermati, scendi sotto il livello dello step sentendo l\'allungamento. Il polpaccio ha bisogno dell\'ampiezza intera: sul pavimento piatto ne fai metà.',
-    sets: 4, reps: '15-20', restSeconds: 45, category: 'funzionale',
-    notes: 'Discesa lenta di due secondi: è lì che l\'esercizio funziona.',
-    gender: 'female', muscolo: 'polpacci',
-  },
-  {
-    name: 'Calf raise seduta con manubrio',
-    description: 'Seduta, manubrio sulle cosce vicino alle ginocchia, avampiedi su un rialzo. Sali sulle punte e scendi lentamente. Il ginocchio piegato mette fuori gioco il gastrocnemio e lascia lavorare il soleo, che regge tutte le ore in piedi.',
-    sets: 3, reps: '15-20', restSeconds: 45, category: 'forza',
-    notes: 'Il manubrio sta sulle cosce, non sulle ginocchia.',
-    gender: 'female', muscolo: 'polpacci',
-  },
-  {
-    name: 'Calf raise monopodalico',
-    description: 'Su un piede sul bordo di uno step, mano al muro per l\'equilibrio. Sali e scendi lentamente, un lato per volta. Con il solo peso del corpo su una gamba il carico raddoppia, e le differenze fra destra e sinistra vengono a galla.',
-    sets: 3, reps: '12-15 per lato', restSeconds: 45, category: 'funzionale',
-    notes: 'Stesso numero da tutte e due le parti, deciso dal lato debole.',
-    gender: 'female', muscolo: 'polpacci',
-  },
 
-  // ---------- LOMBARI ----------
-  {
-    name: 'Iperestensioni a 45 gradi a corpo libero',
-    description: 'Cuscinetto sotto le creste iliache, mani incrociate al petto. Scendi flettendo dalle anche con la schiena in linea e risali fino ad allineare tronco e gambe, senza superare la linea. Costruisce la resistenza degli estensori, che è ciò che manca a chi sta seduta tutto il giorno.',
-    sets: 3, reps: '12-15', restSeconds: 60, category: 'posturale',
-    notes: 'Ci si ferma in linea. Andare oltre non allena di più, comprime di più.',
-    gender: 'female', muscolo: 'lombari',
-  },
-  {
-    name: 'Superman a terra',
-    description: 'Prona, braccia distese avanti. Solleva insieme braccia, petto e gambe di pochi centimetri, tieni due secondi, scendi. Ampiezza piccola e contrazione vera: non è un esercizio di flessibilità, è di resistenza.',
-    sets: 3, reps: '10-15', restSeconds: 45, category: 'posturale',
-    notes: 'Sguardo al pavimento: se alzi il mento, la cervicale paga per la lombare.',
-    gender: 'female', muscolo: 'lombari',
-  },
 
   // ---------- ADDOME ----------
   {
@@ -1596,14 +1527,14 @@ export const femaleExercisesGruppi: DefaultExercise[] = [
     description: 'Salti bassi sull\'avampiede, polsi che girano e non le braccia. Alterna trenta secondi di lavoro e trenta di pausa per il numero di giri stabilito. Coordinazione, polpacci e capacità in tre metri quadrati.',
     sets: 1, reps: '8-12 giri da 30 secondi', restSeconds: 30, category: 'cardio',
     notes: 'Non è adatto a tutti: se hai dolore a ginocchia o caviglie, si sostituisce con la camminata.',
-    gender: 'female', muscolo: 'cardio',
+    gender: 'unisex', muscolo: 'cardio',
   },
   {
     name: 'Camminata veloce all\'aperto',
     description: 'Trenta o quaranta minuti a passo sostenuto, braccia libere di oscillare, respiro dal naso finché regge. Il carico più basso e la costanza più alta: è l\'attività che nessuno programma e che cambia i numeri nel tempo.',
     sets: 1, reps: '30-40 minuti', restSeconds: 0, category: 'cardio',
     notes: 'Il ritmo giusto è quello in cui riesci a parlare ma non a cantare.',
-    gender: 'female', muscolo: 'cardio',
+    gender: 'unisex', muscolo: 'cardio',
   },
 
   // ---------- MOBILITÀ ----------
@@ -1612,7 +1543,7 @@ export const femaleExercisesGruppi: DefaultExercise[] = [
     description: 'Foam roller sotto la parte alta della schiena, in orizzontale, mani dietro la nuca. Lascia scendere le spalle e apri il torace respirando lentamente, poi risali. Sposta il roller di pochi centimetri e ripeti. È l\'antidoto alle ore passate seduta davanti a uno schermo.',
     sets: 3, reps: '5 respiri per posizione', restSeconds: 30, category: 'mobilita',
     notes: 'Non arrivare al collo: il roller resta sotto le scapole. Se gira la testa, fermati.',
-    gender: 'female', muscolo: 'mobilita',
+    gender: 'unisex', muscolo: 'mobilita',
   },
 ];
 
@@ -1624,4 +1555,8 @@ export const allDefaultExercises: DefaultExercise[] = [
   ...femaleExercisesExtra,
   ...maleExercisesGruppi,
   ...femaleExercisesGruppi,
+  // v3, 10 settembre 2026: 30 uomo distribuiti su tutti i gruppi,
+  // 30 donna sulla zona gluteo-femorale, i metodi cardio con il loro
+  // nome, e i protocolli di decongestione e per la donna.
+  ...esercizi2026,
 ];

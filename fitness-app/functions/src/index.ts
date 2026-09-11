@@ -99,7 +99,13 @@ export const setUserClaims = onCall({region: "europe-west1"}, async (request) =>
     throw new HttpsError("invalid-argument", "Ruolo non valido.");
   }
 
-  await authAdmin.setCustomUserClaims(targetUserId, {role});
+  // Il ruolo viaggia nel token: le regole di Storage lo leggono da lì,
+  // perché la lettura di Firestore da dentro quelle regole non funziona
+  // in produzione (11 set 2026). Insieme al ruolo va anche «attivo»:
+  // senza, un accesso disattivato resterebbe staff fino alla scadenza.
+  const doc = await db.collection("users").doc(targetUserId).get();
+  const attivo = doc.exists ? doc.data()?.isActive !== false : true;
+  await authAdmin.setCustomUserClaims(targetUserId, {role, attivo});
   return {success: true};
 });
 
@@ -116,7 +122,8 @@ export const migrateUserClaims = onCall({region: "europe-west1"}, async (request
     const role = userDoc.data().role;
     if (role) {
       try {
-        await authAdmin.setCustomUserClaims(userDoc.id, {role});
+        const attivo = userDoc.data().isActive !== false;
+        await authAdmin.setCustomUserClaims(userDoc.id, {role, attivo});
         migrated++;
       } catch {
         // User might not exist in Auth anymore

@@ -32,6 +32,8 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { createNotification } from '../../services/notificationService';
+import { salvaBozza, leggiBozza, scartaBozza } from '../../services/bozzaService';
+import { etichettaSalvataggio, descriviBozza, contaEsercizi } from '../../domain/bozzaScheda';
 import {
   suggestWorkoutProgression,
   suggestExercises,
@@ -69,6 +71,9 @@ export const WorkoutPlanScreen: React.FC = () => {
   const [exercises, setExercises] = useState<Record<number, Exercise[]>>({});
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  // La rete che impedisce di perdere il lavoro: vedi domain/bozzaScheda.
+  const [bozzaAlle, setBozzaAlle] = useState<number | null>(null);
+  const [bozzaChiesta, setBozzaChiesta] = useState(false);
 
   // Editing state
   const [editingPlan, setEditingPlan] = useState<WorkoutPlan | null>(null);
@@ -540,11 +545,28 @@ export const WorkoutPlanScreen: React.FC = () => {
     setLibrarySearch('');
   };
 
+  // Quanti esercizi ha ogni gruppo per il sesso scelto: il numero
+  // accanto al nome dice subito dove la libreria è ricca e dove no.
+  const perMuscolo = useMemo(
+    () => conteggioPerMuscolo(exerciseLibrary, libraryGenderFilter === 'all' ? 'tutti' : libraryGenderFilter),
+    [exerciseLibrary, libraryGenderFilter]
+  );
+
+  // Il muscolo scelto può restare appeso: chi seleziona «Protocolli
+  // donna» e poi passa a «Uomo» vedrebbe sparire la pillola ma non
+  // il filtro, e si ritroverebbe una lista vuota senza sapere
+  // perché. Qui il filtro si azzera da solo. È derivato e non un
+  // effetto, così non c'è un fotogramma con la lista sbagliata.
+  const muscoloAttivo: GruppoMuscolare | 'tutti' =
+    libraryMuscolo !== 'tutti' && !(perMuscolo[libraryMuscolo] > 0)
+      ? 'tutti'
+      : libraryMuscolo;
+
   const filteredLibrary = exerciseLibrary.filter((ex) => {
     if (libraryGenderFilter !== 'all' && ex.gender !== libraryGenderFilter && ex.gender !== 'unisex') {
       return false;
     }
-    if (libraryMuscolo !== 'tutti' && ex.muscolo !== libraryMuscolo) {
+    if (muscoloAttivo !== 'tutti' && ex.muscolo !== muscoloAttivo) {
       return false;
     }
     if (librarySearch) {
@@ -555,13 +577,6 @@ export const WorkoutPlanScreen: React.FC = () => {
     }
     return true;
   });
-
-  // Quanti esercizi ha ogni gruppo per il sesso scelto: il numero
-  // accanto al nome dice subito dove la libreria è ricca e dove no.
-  const perMuscolo = useMemo(
-    () => conteggioPerMuscolo(exerciseLibrary, libraryGenderFilter === 'all' ? 'tutti' : libraryGenderFilter),
-    [exerciseLibrary, libraryGenderFilter]
-  );
 
   // Con «tutti i muscoli» la lista esce divisa in sezioni, una per
   // gruppo, nell'ordine con cui si compone una scheda.
@@ -847,7 +862,69 @@ export const WorkoutPlanScreen: React.FC = () => {
     setExercises({});
     setSelectedStudentId('');
     setSelectedDay(0);
+    // Il lavoro è stato pubblicato (o buttato apposta): la rete si
+    // toglie, altrimenti alla prossima apertura ripropone roba morta.
+    setBozzaAlle(null);
+    if (user?.id) scartaBozza(user.id);
   };
+
+  // ------------------------------------------------------------
+  // LA BOZZA
+  // ------------------------------------------------------------
+  // Si salva da sola a ogni modifica, con un secondo e mezzo di
+  // attesa per non scrivere a ogni lettera digitata. Non ogni tre
+  // minuti: tre minuti di lavoro perso è comunque lavoro perso, e un
+  // salvataggio che passa dalla rete fallisce proprio quando la rete
+  // va male — cioè quando serve.
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (contaEsercizi(exercises) === 0) return;
+    const attesa = setTimeout(() => {
+      salvaBozza(user.id, {
+        allievoId: selectedStudentId,
+        titolo: planTitle,
+        giornoScelto: selectedDay,
+        eserciziPerGiorno: exercises,
+        pianoInModificaId: editingPlan?.id,
+      }).then((quando) => { if (quando) setBozzaAlle(quando); });
+    }, 1500);
+    return () => clearTimeout(attesa);
+  }, [user?.id, selectedStudentId, planTitle, selectedDay, exercises, editingPlan?.id]);
+
+  // Alla prima apertura: se c'è del lavoro non finito, si chiede.
+  // Non si ripristina di nascosto — ritrovarsi una scheda a metà
+  // senza averla chiesta confonde più che aiutare.
+  useEffect(() => {
+    if (!user?.id || bozzaChiesta) return;
+    setBozzaChiesta(true);
+    leggiBozza(user.id).then((b) => {
+      if (!b) return;
+      const nome = students.find((st) => st.id === b.allievoId);
+      const chi = nome ? `${nome.name || ''} ${(nome as any).surname || ''}`.trim() : null;
+      crossAlert(
+        'Hai del lavoro non finito',
+        `${descriviBozza(b, chi)}\n\nVuoi riprenderlo da dove l'avevi lasciato?`,
+        [
+          {
+            text: 'Scarta',
+            style: 'destructive',
+            onPress: () => { scartaBozza(user.id); },
+          },
+          {
+            text: 'Riprendi',
+            onPress: () => {
+              setSelectedStudentId(b.allievoId || '');
+              setPlanTitle(b.titolo || '');
+              setSelectedDay(b.giornoScelto || 0);
+              setExercises((b.eserciziPerGiorno || {}) as Record<number, Exercise[]>);
+              setBozzaAlle(b.salvataAlle);
+            },
+          },
+        ]
+      );
+    });
+  }, [user?.id, bozzaChiesta, students]);
 
   const savePlan = async () => {
     if (!planTitle || !user) {
@@ -1121,6 +1198,17 @@ export const WorkoutPlanScreen: React.FC = () => {
             ))
           )}
         </View>
+
+        {/* La riga che dice che la rete c'è. Non è decorazione: senza,
+            «si salva da solo» è una promessa che nessuno può verificare. */}
+        {bozzaAlle !== null && (
+          <View style={styles.bozzaRiga}>
+            <Ionicons name="cloud-done-outline" size={15} color={colors.success} />
+            <Text style={styles.bozzaTesto}>
+              {etichettaSalvataggio(bozzaAlle)} su questo dispositivo. Se esci, la ritrovi.
+            </Text>
+          </View>
+        )}
 
         <Button
           title={saving ? 'Salvataggio...' : editingPlan ? 'Aggiorna Programmazione' : 'Salva e Invia Programmazione'}
@@ -2078,44 +2166,44 @@ export const WorkoutPlanScreen: React.FC = () => {
             contentContainerStyle={styles.muscoloRowInner}
           >
             <TouchableOpacity
-              style={[styles.libraryFilterChip, libraryMuscolo === 'tutti' && styles.libraryFilterChipActive]}
+              style={[styles.muscoloChip, muscoloAttivo === 'tutti' && styles.libraryFilterChipActive]}
               onPress={() => setLibraryMuscolo('tutti')}
             >
-              <Text style={[styles.libraryFilterText, libraryMuscolo === 'tutti' && styles.libraryFilterTextActive]}>
+              <Text style={[styles.libraryFilterText, muscoloAttivo === 'tutti' && styles.libraryFilterTextActive]}>
                 Tutti i muscoli
               </Text>
             </TouchableOpacity>
             {GRUPPI.filter((g) => (perMuscolo[g.id] || 0) > 0).map((g) => (
               <TouchableOpacity
                 key={g.id}
-                style={[styles.libraryFilterChip, libraryMuscolo === g.id && styles.libraryFilterChipActive]}
+                style={[styles.muscoloChip, muscoloAttivo === g.id && styles.libraryFilterChipActive]}
                 onPress={() => setLibraryMuscolo(g.id)}
               >
                 <Ionicons
                   name={g.icona as never}
                   size={13}
-                  color={libraryMuscolo === g.id ? colors.textOnAccent : colors.textSecondary}
+                  color={muscoloAttivo === g.id ? colors.textOnAccent : colors.textSecondary}
                 />
-                <Text style={[styles.libraryFilterText, libraryMuscolo === g.id && styles.libraryFilterTextActive]}>
+                <Text style={[styles.libraryFilterText, muscoloAttivo === g.id && styles.libraryFilterTextActive]}>
                   {' '}{g.nome} ({perMuscolo[g.id]})
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
-          {libraryMuscolo !== 'tutti' && (
-            <Text style={styles.muscoloSpiega}>{gruppoDi(libraryMuscolo).cosaAllena}</Text>
+          {muscoloAttivo !== 'tutti' && (
+            <Text style={styles.muscoloSpiega}>{gruppoDi(muscoloAttivo).cosaAllena}</Text>
           )}
 
           <FlatList
-            data={libraryMuscolo === 'tutti'
+            data={muscoloAttivo === 'tutti'
               ? sezioniLibreria.flatMap((s) => s.esercizi)
               : filteredLibrary}
             keyExtractor={(item) => item.id}
             style={styles.libraryFlatList}
             renderItem={({ item: libEx, index }) => (
               <>
-                {libraryMuscolo === 'tutti' && (() => {
+                {muscoloAttivo === 'tutti' && (() => {
                   // L'intestazione compare al primo esercizio di ogni
                   // gruppo: cosi' la lista resta una sola e si legge
                   // come un indice.
@@ -2195,6 +2283,27 @@ export const WorkoutPlanScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  muscoloChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bozzaRiga: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  bozzaTesto: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+  },
   muscoloRow: {
     marginBottom: spacing.sm,
   },
