@@ -6,3 +6,5 @@ dist/
 firebase-sa-key.json
 sa-key.json
 functions/lib/
+firestore-debug.log
+ui-debug.log
