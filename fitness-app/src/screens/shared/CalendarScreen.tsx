@@ -53,6 +53,7 @@ import {
   deleteAppointment,
 } from '../../services/nutritionistService';
 import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
+import { soloSePersonali, spiegaFiltro } from '../../domain/filtroStaff';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   createTask,
@@ -397,17 +398,33 @@ export const CalendarScreen: React.FC = () => {
 
   const selectedDayItems = appointmentsByDate[selectedDate] || [];
 
+  // I task sono la lista personale del titolare. Guardando la giornata
+  // di un'altra persona NON sono suoi, e non devono comparire: prima
+  // restavano in pagina sotto l'intestazione di un collaboratore, e
+  // facevano credere che fossero cose sue. Vedi domain/filtroStaff.
+  const tasksVisibili = useMemo(
+    () => soloSePersonali(tasks, selectedStaffId, user?.id),
+    [tasks, selectedStaffId, user?.id]
+  );
+
+  // Gli ospiti arrivano dalle richieste WhatsApp, che per decisione
+  // dichiarata arrivano solo al titolare. Stessa regola.
+  const ospitiVisibili = useMemo(
+    () => soloSePersonali(ospiti, selectedStaffId, user?.id),
+    [ospiti, selectedStaffId, user?.id]
+  );
+
   // Tasks grouped by date
   const tasksByDate = useMemo(() => {
     const map: Record<string, DailyTask[]> = {};
-    tasks.forEach((t) => {
+    tasksVisibili.forEach((t) => {
       const d = toSafeDate(t.date);
       const ds = toDateStr(d);
       if (!map[ds]) map[ds] = [];
       map[ds].push(t);
     });
     return map;
-  }, [tasks]);
+  }, [tasksVisibili]);
 
   const selectedDayTasks = tasksByDate[selectedDate] || [];
 
@@ -424,6 +441,13 @@ export const CalendarScreen: React.FC = () => {
     });
     return list;
   }, [canSeeAll, user, collaborators, managers]);
+
+  // Che cosa si sta guardando, detto a parole.
+  const avvisoFiltro = useMemo(() => spiegaFiltro(
+    selectedStaffId,
+    staffList.find((p) => p.id === selectedStaffId)?.name,
+    user?.id
+  ), [selectedStaffId, staffList, user?.id]);
 
   const getStudentName = (id: string) => {
     const s = students.find((st) => st.id === id);
@@ -1075,14 +1099,14 @@ export const CalendarScreen: React.FC = () => {
   // Gli ospiti confermati (persone non ancora in anagrafica) valgono
   // come impegni: si vedono anche qui, non solo nel calendario.
   const ospitiOggi = useMemo(
-    () => ospiti.filter((o) => o.giorno === todayStr),
-    [ospiti, todayStr]
+    () => ospitiVisibili.filter((o) => o.giorno === todayStr),
+    [ospitiVisibili, todayStr]
   );
   const ospitiProssimi = useMemo(
-    () => ospiti.filter((o) => o.giorno > todayStr)
+    () => ospitiVisibili.filter((o) => o.giorno > todayStr)
       .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora))
       .slice(0, 12),
-    [ospiti, todayStr]
+    [ospitiVisibili, todayStr]
   );
   const todayTasks = tasksByDate[todayStr] || [];
 
@@ -1180,14 +1204,14 @@ export const CalendarScreen: React.FC = () => {
         nomeAllievo: getStudentName(a.studentId),
         note: a.notes,
       })),
-    ospiti: ospiti.filter((o) => o.giorno === dataStr).map((o) => ({
+    ospiti: ospitiVisibili.filter((o) => o.giorno === dataStr).map((o) => ({
       id: o.id, persona: o.persona, ora: o.ora, tipo: o.tipo, telefono: o.telefono,
     })),
     task: (tasksByDate[dataStr] || []).map((t) => ({
       id: t.id, title: t.title, description: t.description,
       startTime: t.startTime, isCompleted: t.isCompleted, priority: t.priority,
     })),
-  }), [filteredAppointments, ospiti, tasksByDate, getStudentName]);
+  }), [filteredAppointments, ospitiVisibili, tasksByDate, getStudentName]);
 
   const apriVoce = (v: VoceGiornata) => {
     if (v.genere === 'task') { openEditTask(v.fonte as DailyTask); return; }
@@ -1541,6 +1565,17 @@ export const CalendarScreen: React.FC = () => {
               </>
             )}
           </View>
+
+          {/* Una schermata filtrata deve dire che è filtrata: senza, chi
+              la guarda crede di vedere tutto — ed è l'equivoco che ha
+              fatto sospettare al titolare che i collaboratori vedessero
+              le sue cose. */}
+          {avvisoFiltro !== '' && (
+            <View style={styles.filtroAvviso}>
+              <Ionicons name="eye-outline" size={16} color={colors.info} />
+              <Text style={styles.filtroAvvisoTxt}>{avvisoFiltro}</Text>
+            </View>
+          )}
 
           {/* Today's appointments */}
           <View style={styles.agendaSection}>
@@ -2539,6 +2574,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  filtroAvviso: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.info,
+    backgroundColor: colors.surface,
+  },
+  filtroAvvisoTxt: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    lineHeight: 17,
   },
   agendaSection: {
     marginHorizontal: spacing.md,
