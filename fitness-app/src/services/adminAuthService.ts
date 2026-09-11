@@ -66,6 +66,29 @@ export const adminDeleteAuthUser = async (targetUserId: string): Promise<void> =
   }
 };
 
+/**
+ * Riscrive il ruolo di ogni persona dentro il suo token di accesso.
+ *
+ * Serve perché le regole dei file leggono il ruolo dal token, non da
+ * Firestore: la lettura di Firestore da dentro quelle regole non
+ * funziona in produzione, e finché il token non porta il ruolo, per i
+ * file una persona vale quanto un allievo qualsiasi — titolare compreso.
+ *
+ * ⚠️ Il token si aggiorna solo al rinnovo: dopo questa operazione si
+ * esce e si rientra, oppure si aspetta la scadenza (un'ora).
+ *
+ * Solo il titolare può eseguirla.
+ */
+export const allineaRuoliNeiToken = async (): Promise<number> => {
+  try {
+    const fn = httpsCallable(functions, 'migrateUserClaims');
+    const res = await fn({});
+    return (res.data as { migrated?: number })?.migrated ?? 0;
+  } catch (err) {
+    throw translateError(err);
+  }
+};
+
 /** Pulizia one-shot dei campi managedPassword residui (solo owner). */
 export const cleanAllManagedPasswords = async (): Promise<number> => {
   try {

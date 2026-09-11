@@ -35,16 +35,57 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function ruolo() {
-      return firestore.get(
-        /databases/(default)/documents/users/$(request.auth.uid)
-      ).data.role;
+    // ----------------------------------------------------------
+    // DA DOVE ARRIVA IL RUOLO — 11 settembre 2026
+    // ----------------------------------------------------------
+    // Fino a stamattina il ruolo si leggeva da Firestore, da dentro
+    // queste regole. Sembrava la scelta giusta: una lettura per
+    // richiesta, e «staff» diventava una parola con una prova.
+    //
+    // In produzione quella lettura NON funziona. Il documento c'è —
+    // l'App lo legge, e infatti mostra al titolare le schermate da
+    // titolare — ma da qui dentro la chiamata non torna. Il risultato
+    // è che ogni regola che dipendeva dal ruolo ha detto NO a tutti,
+    // titolare compreso, dal 9 settembre.
+    //
+    // Si vedeva così: le cartelle aperte a «chiunque è autenticato»
+    // rispondevano, tutte le altre no. Esattamente il profilo di un
+    // allievo, addosso al proprietario dello studio.
+    //
+    // Adesso il ruolo viaggia nel token di accesso, come custom claim.
+    // Non costa letture, non dipende da un servizio che parla con un
+    // altro, e non può fallire a metà: o il token ce l'ha, o no.
+    //
+    // Il ripiego su Firestore resta scritto sotto, ma si valuta SOLO
+    // se il claim manca: le regole vanno in corto circuito, quindi
+    // con il claim presente quella riga non viene nemmeno eseguita.
+    // Serve per chi non ha ancora rinnovato il token.
+    //
+    // ⚠️ Un claim cambia solo quando il token si rinnova. Dopo aver
+    // assegnato i ruoli si esce e si rientra, oppure si aspetta l'ora
+    // di scadenza del token.
+
+    function haClaim() {
+      return autenticato() && 'role' in request.auth.token;
     }
 
+    function ruolo() {
+      return haClaim()
+        ? request.auth.token.role
+        : firestore.get(
+            /databases/(default)/documents/users/$(request.auth.uid)
+          ).data.role;
+    }
+
+    // Un accesso disattivato non è più staff, nemmeno con una sessione
+    // già aperta. Nel claim il campo si chiama «attivo»; se non c'è —
+    // token vecchio — non blocca, e il ripiego guarda Firestore.
     function attivo() {
-      return autenticato() && firestore.get(
-        /databases/(default)/documents/users/$(request.auth.uid)
-      ).data.isActive != false;
+      return haClaim()
+        ? request.auth.token.get('attivo', true) != false
+        : autenticato() && firestore.get(
+            /databases/(default)/documents/users/$(request.auth.uid)
+          ).data.isActive != false;
     }
 
     // Chi lavora nello studio. Un accesso disattivato non è più staff,
