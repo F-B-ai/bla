@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   ActivityIndicator, StyleSheet,
@@ -14,7 +14,14 @@ import {
   SEZIONI, CHECKLIST, INTRO_SCHEDA, Campo,
 } from '../../data/onboardingForm';
 import { valutaOnboarding, Risposte } from '../../domain/onboarding';
-import { saveOnboarding, getOnboarding } from '../../services/onboardingService';
+import {
+  saveOnboarding, getOnboarding, elencaInteressati,
+  cancellaInteressato, collegaAllievo, SchedaOnboarding,
+} from '../../services/onboardingService';
+import {
+  TipoSoggetto, controllaSoggetto, descriviScadenza, scaduta,
+  confermaCancellazione, confermaCollegamento,
+} from '../../domain/interessato';
 
 // ============================================================
 // SCHEDA ONBOARDING — si compila DURANTE il colloquio
@@ -34,6 +41,18 @@ export function OnboardingScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [giaFatta, setGiaFatta] = useState<Date | null>(null);
+  // Di chi è questa scheda: un allievo con un account, o una persona
+  // venuta in consulenza che deve ancora decidere. Vedi domain/interessato.
+  const [tipo, setTipo] = useState<TipoSoggetto>('allievo');
+  const [ospiteNome, setOspiteNome] = useState('');
+  const [ospiteTelefono, setOspiteTelefono] = useState('');
+  const [interessati, setInteressati] = useState<SchedaOnboarding[]>([]);
+
+  const ricaricaInteressati = useCallback(() => {
+    elencaInteressati().then(setInteressati).catch(() => setInteressati([]));
+  }, []);
+
+  useEffect(() => { ricaricaInteressati(); }, [ricaricaInteressati]);
 
   useEffect(() => {
     getStudents().then(setStudents)
@@ -64,20 +83,95 @@ export function OnboardingScreen() {
     });
 
   const salva = async () => {
-    if (!student || !user) { crossAlert('Errore', 'Seleziona un allievo'); return; }
+    if (!user) return;
+    const soggetto = tipo === 'allievo'
+      ? { tipo, studentId: student?.id, nome: student ? `${student.name} ${student.surname}` : '' }
+      : { tipo, nome: ospiteNome, telefono: ospiteTelefono };
+    const controllo = controllaSoggetto(soggetto);
+    if (!controllo.ok) { crossAlert('Manca qualcosa', controllo.problemi.join('\n')); return; }
     if (esito.compilati === 0) { crossAlert('Errore', 'Compila almeno un campo'); return; }
     setSaving(true);
     try {
       await saveOnboarding({
-        studentId: student.id,
-        studentName: `${student.name} ${student.surname}`,
+        tipoSoggetto: tipo,
+        studentId: tipo === 'allievo' ? student!.id : undefined,
+        studentName: tipo === 'allievo' ? `${student!.name} ${student!.surname}` : undefined,
+        ospiteNome: tipo === 'interessato' ? ospiteNome : undefined,
+        ospiteTelefono: tipo === 'interessato' ? ospiteTelefono : undefined,
         coachId: user.id,
         risposte, checklist, noteCoach: note || undefined,
       });
-      crossAlert('Scheda salvata', 'Il percorso è aperto: da adesso il gemello ha un inizio.');
+      crossAlert(
+        'Scheda salvata',
+        tipo === 'allievo'
+          ? 'Il percorso è aperto: da adesso il gemello ha un inizio.'
+          : 'Salvata come consulenza. Non è stato creato nessun allievo.\n\n'
+            + 'Se la persona entra, la colleghi al suo profilo e diventa il primo '
+            + 'atto del suo percorso. Se non entra, la cancelli.'
+      );
+      if (tipo === 'interessato') {
+        setOspiteNome(''); setOspiteTelefono('');
+        setRisposte({}); setChecklist([]); setNote('');
+        ricaricaInteressati();
+      }
     } catch {
       crossAlert('Errore', 'Salvataggio non riuscito');
     } finally { setSaving(false); }
+  };
+
+  // ----------------------------------------------------------
+  // Che cosa fare di una consulenza, dopo
+  // ----------------------------------------------------------
+
+  const cancella = (sch: SchedaOnboarding) => {
+    const nome = sch.ospiteNome || 'questa persona';
+    crossAlert('Cancellare la scheda?', confermaCancellazione(nome), [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Cancella',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancellaInteressato(sch.id);
+            ricaricaInteressati();
+          } catch {
+            crossAlert('Errore', 'Non sono riuscito a cancellarla.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const collega = (sch: SchedaOnboarding) => {
+    if (!student) {
+      crossAlert(
+        'Scegli prima l\'allievo',
+        'Passa a «Allievo registrato» in alto, cerca la persona nell\'elenco, '
+        + 'poi torna qui e premi «Collega».'
+      );
+      return;
+    }
+    const nomeAllievo = `${student.name} ${student.surname}`;
+    crossAlert(
+      'Collegare la scheda?',
+      confermaCollegamento(sch.ospiteNome || 'questa persona', nomeAllievo),
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Collega',
+          onPress: async () => {
+            try {
+              await collegaAllievo(sch.id, student.id, nomeAllievo);
+              ricaricaInteressati();
+              crossAlert('Collegata', `La consulenza è diventata il primo atto del percorso di ${nomeAllievo}.`);
+            } catch (err) {
+              const m = err instanceof Error ? err.message : 'Errore sconosciuto';
+              crossAlert('Non riuscito', m);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderCampo = (c: Campo) => {
@@ -155,16 +249,106 @@ export function OnboardingScreen() {
 
   return (
     <ScrollView style={s.wrap} contentContainerStyle={{ padding: spacing.md, paddingBottom: 60 }}>
-      <StudentSearchPicker
-        students={students}
-        selectedId={student?.id}
-        onSelect={(id) => setStudent(students.find((x) => x.id === id) || null)}
-        label="Allievo" placeholder="Cerca allievo…"
-      />
+      {/* ------------------------------------------------------------
+          DI CHI È QUESTA SCHEDA
+          L'onboarding si fa DURANTE la consulenza, cioè prima che la
+          persona decida. Prima pretendeva un account: costringeva a
+          registrare come allievo chi magari non lo sarebbe diventato.
+          ------------------------------------------------------------ */}
+      <View style={s.soggettoRiga}>
+        {(['allievo', 'interessato'] as TipoSoggetto[]).map((t) => (
+          <TouchableOpacity
+            key={t}
+            style={[s.soggettoChip, tipo === t && s.soggettoChipOn]}
+            onPress={() => setTipo(t)}
+          >
+            <Ionicons
+              name={t === 'allievo' ? 'person' : 'chatbubbles-outline'}
+              size={15}
+              color={tipo === t ? colors.textOnAccent : colors.textSecondary}
+            />
+            <Text style={[s.soggettoTxt, tipo === t && s.soggettoTxtOn]}>
+              {t === 'allievo' ? 'Allievo registrato' : 'Consulenza'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      {student && (
+      {tipo === 'allievo' ? (
+        <StudentSearchPicker
+          students={students}
+          selectedId={student?.id}
+          onSelect={(id) => setStudent(students.find((x) => x.id === id) || null)}
+          label="Allievo" placeholder="Cerca allievo…"
+        />
+      ) : (
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Persona in consulenza</Text>
+          <Text style={s.muted}>
+            Non viene creato nessun allievo. Se entra nel programma colleghi la
+            scheda al suo profilo; se non entra, la cancelli.
+          </Text>
+          <TextInput
+            style={s.inputRiga}
+            value={ospiteNome}
+            onChangeText={setOspiteNome}
+            placeholder="Nome e cognome"
+            placeholderTextColor={colors.textLight}
+          />
+          <TextInput
+            style={s.inputRiga}
+            value={ospiteTelefono}
+            onChangeText={setOspiteTelefono}
+            placeholder="Telefono (facoltativo, ma serve per richiamarla)"
+            placeholderTextColor={colors.textLight}
+            keyboardType="phone-pad"
+          />
+        </View>
+      )}
+
+      {/* ------------------------------------------------------------
+          LE CONSULENZE IN SOSPESO
+          Una scheda non collegata contiene dati di salute di una
+          persona che non è un cliente. Tenerli «per sicurezza» per
+          sempre non è prudenza: è il contrario. La cancellazione resta
+          una scelta umana, ma la scadenza si vede.
+          ------------------------------------------------------------ */}
+      {interessati.length > 0 && (
+        <View style={[s.card, { borderColor: colors.warning }]}>
+          <Text style={[s.cardTitle, { color: colors.warning }]}>
+            Consulenze in sospeso ({interessati.length})
+          </Text>
+          <Text style={s.muted}>
+            Persone che hanno fatto la consulenza e non sono (ancora) allievi.
+          </Text>
+          {interessati.map((sch) => (
+            <View key={sch.id} style={s.interessatoRiga}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.interessatoNome}>
+                  {sch.ospiteNome || 'Senza nome'}
+                  {sch.ospiteTelefono ? ` · ${sch.ospiteTelefono}` : ''}
+                </Text>
+                <Text style={[
+                  s.interessatoScad,
+                  scaduta(sch.date) && { color: colors.error },
+                ]}>
+                  {sch.date.toLocaleDateString('it-IT')} — {descriviScadenza(sch.date)}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => collega(sch)} style={s.interessatoBtn}>
+                <Ionicons name="link-outline" size={17} color={colors.accent} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => cancella(sch)} style={s.interessatoBtn}>
+                <Ionicons name="trash-outline" size={17} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {(tipo === 'interessato' || student) && (
         <>
-          {giaFatta && (
+          {tipo === 'allievo' && giaFatta && (
             <View style={[s.card, { borderColor: colors.info }]}>
               <Text style={[s.cardTitle, { color: colors.info }]}>Scheda già compilata</Text>
               <Text style={s.muted}>
@@ -284,6 +468,30 @@ export function OnboardingScreen() {
 }
 
 const s = StyleSheet.create({
+  interessatoRiga: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1, borderTopColor: colors.border,
+    marginTop: spacing.sm,
+  },
+  interessatoNome: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text },
+  interessatoScad: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
+  interessatoBtn: { padding: spacing.xs },
+  soggettoRiga: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
+  soggettoChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, paddingVertical: spacing.sm, borderRadius: borderRadius.round,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  soggettoChipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  soggettoTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.textSecondary },
+  soggettoTxtOn: { color: colors.textOnAccent },
+  inputRiga: {
+    backgroundColor: colors.background, borderRadius: borderRadius.md,
+    borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    fontSize: fontSize.md, color: colors.text, marginTop: spacing.sm,
+  },
   wrap: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   card: {

@@ -121,12 +121,21 @@ service cloud.firestore {
     // Scheda di onboarding: primo atto del percorso. Contiene dati
     // di salute — la scrive lo staff nel colloquio, la legge lo staff
     // e l'interessato. Append-only: una scheda firmata non si riscrive.
+    // La scheda di onboarding si fa DURANTE la consulenza, quindi anche
+    // a chi non è ancora un allievo: in quel caso `studentId` è vuoto e
+    // `tipoSoggetto` vale 'interessato'.
+    //
+    // Le schede degli ALLIEVI restano incancellabili: sono il primo atto
+    // del loro percorso. Quelle degli interessati si cancellano, e devono
+    // potersi cancellare — chi non è entrato non deve lasciare i suoi
+    // dati di salute in casa nostra. La decisione è del titolare.
     match /onboardings/{docId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.studentId == request.auth.uid
       );
       allow create, update: if isStaff();
-      allow delete: if false;
+      allow delete: if isOwnerOrManager()
+        && resource.data.tipoSoggetto == 'interessato';
     }
 
     // Sessioni di respiro: atto di prima persona dell'allievo.
