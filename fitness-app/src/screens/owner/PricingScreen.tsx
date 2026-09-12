@@ -19,7 +19,7 @@ import { createPaymentPlan } from '../../services/paymentService';
 import { createNotification } from '../../services/notificationService';
 import { crossAlert } from '../../utils/alert';
 import { Student } from '../../types';
-import { PricingTier, TIERS } from '../../data/pricingData';
+import { PricingTier, TIERS, QUOTA_ISCRIZIONE } from '../../data/pricingData';
 
 const ACCENT = colors.accent;
 const GOLD = '#C5A55A';
@@ -202,7 +202,7 @@ export const PricingScreen: React.FC = () => {
         <View style={styles.registrationNote}>
           <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
           <Text style={styles.registrationText}>
-            Quota di iscrizione: <Text style={styles.bold}>€35</Text> (una tantum)
+            Quota di iscrizione: <Text style={styles.bold}>€{QUOTA_ISCRIZIONE}</Text> (una tantum)
           </Text>
         </View>
 
@@ -254,29 +254,41 @@ export const PricingScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* --- Analisi Posturale --- */}
+        {/* --- La valutazione Mind Movement ---
+             Questa scheda era scritta a mano e vendeva ancora l'«Analisi
+             Posturale Singola» a €49, mentre il pulsante sotto creava già
+             il piano da €150: la carta diceva una cosa e il tasto ne
+             faceva un'altra. Adesso legge dal listino, che è l'unico
+             posto dove il prezzo è scritto. */}
         <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
           <Ionicons name="body" size={22} color={colors.info} />
-          <Text style={styles.sectionTitle}>Analisi Posturale</Text>
+          <Text style={styles.sectionTitle}>Valutazione Mind Movement™</Text>
         </View>
 
         <View style={styles.posturalCard}>
           <View style={styles.posturalRow}>
             <View style={styles.posturalLeft}>
-              <Text style={styles.posturalTitle}>Analisi Posturale Singola</Text>
-              <Text style={styles.posturalDesc}>Senza programma di allenamento</Text>
+              <Text style={styles.posturalTitle}>{posturalTier.title}</Text>
+              <Text style={styles.posturalDesc}>{posturalTier.priceNote}</Text>
             </View>
             <View style={styles.posturalPricing}>
-              <Text style={styles.posturalOldPrice}>€100</Text>
-              <Text style={styles.posturalNewPrice}>€49</Text>
+              <Text style={styles.posturalNewPrice}>{posturalTier.priceLabel}</Text>
             </View>
           </View>
+          <View style={styles.posturalDivider} />
+          {posturalTier.features.map((f) => (
+            <View key={f} style={styles.posturalFeatureRow}>
+              <Ionicons name="checkmark-circle" size={15} color={colors.info} />
+              <Text style={styles.posturalFeatureTxt}>{f}</Text>
+            </View>
+          ))}
           <View style={styles.posturalDivider} />
           <View style={styles.posturalBonusRow}>
             <Ionicons name="star" size={18} color={GREEN} />
             <Text style={styles.posturalBonusText}>
-              Con qualsiasi abbonamento, l'analisi posturale è{' '}
-              <Text style={[styles.bold, { color: GREEN }]}>GRATUITA</Text> come bonus!
+              Compresa nei piani{' '}
+              <Text style={[styles.bold, { color: GREEN }]}>annuali PREMIUM</Text>.
+              Con gli altri piani si acquista a parte.
             </Text>
           </View>
           <TouchableOpacity
@@ -285,7 +297,7 @@ export const PricingScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             <Ionicons name="add-circle" size={18} color={colors.white} />
-            <Text style={styles.createBtnText}>Crea Piano Posturale</Text>
+            <Text style={styles.createBtnText}>Crea Valutazione Mind Movement</Text>
           </TouchableOpacity>
         </View>
 
@@ -678,6 +690,18 @@ const styles = StyleSheet.create({
     fontSize: fontSize.hero,
     fontWeight: '800',
     color: colors.info,
+  },
+  posturalFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  posturalFeatureTxt: {
+    flex: 1,
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 19,
   },
   posturalDivider: {
     height: 1,
