@@ -101,27 +101,87 @@
     }, 8000);
   </script>
   <script>
-    // Register service worker with auto-update
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(reg) {
-          // Track if SW was already controlling the page (not first install)
-          var hasController = !!navigator.serviceWorker.controller;
-          // Check for updates every 60 seconds
-          setInterval(function() { reg.update(); }, 60000);
-          // When a new SW is found and activated, reload to get latest version
-          // Skip reload on first install to avoid interrupting font loading
-          reg.addEventListener('updatefound', function() {
-            var newWorker = reg.installing;
-            newWorker.addEventListener('statechange', function() {
-              if (newWorker.state === 'activated' && hasController) {
-                window.location.reload();
-              }
+    // ============================================================
+    // AGGIORNAMENTO — dirlo, invece di sperare in un ricaricamento
+    // ------------------------------------------------------------
+    // Il 12 settembre 2026 il titolare ha guardato una schermata senza
+    // il pulsante che gli avevo appena pubblicato. Il pulsante c'era, in
+    // rete, da nove minuti: era la sua App a eseguire ancora il codice
+    // vecchio, e niente glielo diceva.
+    //
+    // Il meccanismo di prima aveva due buchi:
+    //  1. `hasController` si leggeva al caricamento della pagina. Se quel
+    //     caricamento non aveva un service worker attivo, la variabile
+    //     restava falsa PER SEMPRE, e il ricaricamento non avveniva mai.
+    //  2. il controllo girava solo su un timer, e iOS sospende i timer di
+    //     una PWA in secondo piano. Tornando sull'App si continuava con
+    //     il codice vecchio finché il timer non si svegliava.
+    //
+    // Adesso: si controlla anche quando l'App torna in primo piano, e
+    // quando c'è una versione nuova COMPARE UNA RIGA che lo dice. Non si
+    // ricarica di nascosto: un ricaricamento a sorpresa mentre stai
+    // scrivendo una scheda è peggio del problema che risolve.
+    // ============================================================
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+
+      function mostraAvviso() {
+        if (document.getElementById('essere-aggiornamento')) return;
+        var b = document.createElement('div');
+        b.id = 'essere-aggiornamento';
+        b.setAttribute('role', 'status');
+        b.style.cssText = [
+          'position:fixed', 'left:16px', 'right:16px',
+          'bottom:calc(env(safe-area-inset-bottom, 0px) + 84px)',
+          'z-index:2147483647', 'display:flex', 'align-items:center', 'gap:10px',
+          'padding:12px 16px', 'border-radius:14px',
+          'background:#1c1c1e', 'border:1px solid #E63946',
+          'box-shadow:0 8px 24px rgba(0,0,0,.45)',
+          'font:600 14px/1.35 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+          'color:#fff', 'cursor:pointer'
+        ].join(';');
+        b.innerHTML =
+          '<span style="font-size:18px;line-height:1">↻</span>' +
+          '<span style="flex:1">C’è una versione nuova dell’App.' +
+          '<br><span style="font-weight:400;opacity:.75">Tocca qui per aggiornare.</span></span>';
+        b.addEventListener('click', function () {
+          b.style.opacity = '.5';
+          window.location.reload();
+        });
+        document.body.appendChild(b);
+      }
+
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+          // Una versione nuova già pronta e in attesa: lo si dice subito.
+          if (reg.waiting && navigator.serviceWorker.controller) mostraAvviso();
+
+          reg.addEventListener('updatefound', function () {
+            var nuovo = reg.installing;
+            if (!nuovo) return;
+            // Si legge QUI se la pagina è già controllata, non dentro lo
+            // statechange: il service worker fa `skipWaiting` e `claim`, e
+            // dopo l'attivazione il controller esiste SEMPRE — anche alla
+            // prima installazione. Leggerlo dopo vorrebbe dire annunciare
+            // «versione nuova» a chi apre l'App per la prima volta.
+            // (Trovato dal controllo in Chromium, non a ragionamento.)
+            var eAggiornamento = !!navigator.serviceWorker.controller;
+            nuovo.addEventListener('statechange', function () {
+              if (nuovo.state === 'installed' && eAggiornamento) mostraAvviso();
             });
           });
-        });
+
+          var controlla = function () { try { reg.update(); } catch (e) {} };
+          setInterval(controlla, 60000);
+          // iOS sospende i timer in secondo piano: il controllo che conta
+          // è quello al rientro.
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') controlla();
+          });
+          window.addEventListener('focus', controlla);
+        }).catch(function () { /* senza service worker l'App funziona lo stesso */ });
       });
-    }
+    })();
   </script>
 </body>
 </html>
