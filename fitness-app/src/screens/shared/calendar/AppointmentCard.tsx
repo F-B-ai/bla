@@ -7,6 +7,7 @@ import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { aspetto, eSessione } from '../../../domain/appuntamento';
 import { etichettaGruppo } from '../../../domain/gruppo';
+import { restaDaScalare } from '../../../domain/piani';
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -27,6 +28,10 @@ export type AppointmentItem = {
   isCountedAsCompleted: boolean;
   persone?: number;
   quotaPersona?: number;
+  /** la seduta ha già scalato dal percorso */
+  planDecremented?: boolean;
+  /** si è provato a scalare e non si è potuto: vedi domain/piani.ts */
+  scaloDaFare?: boolean;
 };
 
 export interface AppointmentCardProps {
@@ -48,6 +53,8 @@ export interface AppointmentCardProps {
   onComplete: (item: AppointmentItem) => void;
   onCancel: (item: AppointmentItem) => void;
   onDelete: (item: AppointmentItem) => void;
+  /** riprova a scalare dal percorso una seduta rimasta in sospeso */
+  onScala: (item: AppointmentItem) => void;
   onStudentDetail: (studentId: string) => void;
   styles: Record<string, any>;
 }
@@ -65,6 +72,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onComplete,
   onCancel,
   onDelete,
+  onScala,
   onStudentDetail,
   styles,
 }) => {
@@ -72,6 +80,11 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const isFuture = item.date >= new Date();
   const canStudentCancel = isScheduled && isFuture;
   const canStaffAct = isScheduled;
+  // Una seduta registrata in ritardo che non ha trovato un percorso da
+  // scalare resta qui, con il suo pulsante, finché non si sistema.
+  // Prima non c'era nessun pulsante e nessun segno: la seduta era
+  // «completata» e il percorso intatto, e non si poteva più rimediare.
+  const daScalare = !isStudent && restaDaScalare(item);
   const staffName = getStaffName(item.staffId);
 
   const handleWhatsAppReminder = () => {
@@ -138,6 +151,26 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               </Text>
             );
           })()}
+        </View>
+      )}
+
+      {/* Seduta registrata, percorso non toccato: si dice e si rimedia */}
+      {daScalare && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          marginTop: 8, paddingVertical: 8, paddingHorizontal: 10,
+          borderRadius: 8, backgroundColor: colors.surfaceLight,
+          borderLeftWidth: 3, borderLeftColor: colors.warning,
+        }}>
+          <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+          <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+            Non è stata scalata dal percorso.
+          </Text>
+          <TouchableOpacity onPress={() => onScala(item)}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>
+              Scala dal percorso
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 

@@ -18,9 +18,38 @@
 //    lezione è normale, non è un errore.
 //  · Mai due volte la stessa lezione: chi ha già scalato porta
 //    il segno, e il secondo tocco non fa niente.
+//
+// ------------------------------------------------------------
+// 12 SETTEMBRE 2026 — LA SECONDA COPIA
+// ------------------------------------------------------------
+// Il titolare:
+//
+//   «Quando metto un appuntamento passato, questo non viene
+//    scalato dal piano.»
+//
+// Aveva ragione, e il difetto era esattamente quello che questo
+// file era nato per chiudere — solo che viveva in una SECONDA
+// copia. Chi segnava «completata» una seduta già in agenda
+// passava di qui. Chi invece REGISTRAVA una seduta già avvenuta
+// (data nel passato) passava per una funzione privata dentro la
+// schermata Agenda, scritta prima, che:
+//
+//   · cercava solo un percorso attivo OGGI, e se non lo trovava
+//     usciva in silenzio — ed è il caso normale, perché una
+//     seduta di agosto si registra a settembre;
+//   · non lasciava alcun segno, quindi nessuno poteva rimediare;
+//   · scriveva l'errore su console.error, che su un telefono
+//     non lo legge nessuno.
+//
+// La stessa cosa scritta in due posti diverge sempre. Quella
+// copia è stata cancellata: adesso c'è una strada sola.
+//
+// E una seduta passata si scala dal percorso valido **il giorno
+// in cui è avvenuta**, non oggi: una lezione di agosto la paga
+// il pacchetto di agosto.
 // ============================================================
 
-export const PIANI_VERSION = 1;
+export const PIANI_VERSION = 2;
 
 export type TipoImpegnoPiano = 'lezione' | 'consulenza';
 
@@ -63,15 +92,33 @@ const usate = (p: PianoScalabile, t: TipoImpegnoPiano): number =>
 const haPosto = (p: PianoScalabile, t: TipoImpegnoPiano): boolean =>
   incluse(p, t) > 0 && usate(p, t) < incluse(p, t);
 
-const copreOggi = (p: PianoScalabile, oggi: Date): boolean => {
+const copre = (p: PianoScalabile, quando: Date): boolean => {
   const i = p.inizio instanceof Date ? p.inizio.getTime() : NaN;
   const f = p.fine instanceof Date ? p.fine.getTime() : NaN;
   if (isNaN(i) || isNaN(f)) return false;
   const fineGiornata = new Date(
     p.fine.getFullYear(), p.fine.getMonth(), p.fine.getDate(), 23, 59, 59, 999
   ).getTime();
-  return i <= oggi.getTime() && fineGiornata >= oggi.getTime();
+  return i <= quando.getTime() && fineGiornata >= quando.getTime();
 };
+
+const MESI = [
+  'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
+];
+
+/** «5 settembre». Scritto a mano: non dipende da Intl né dalla lingua del telefono. */
+export const giorno = (d: Date): string =>
+  d instanceof Date && !isNaN(d.getTime())
+    ? `${d.getDate()} ${MESI[d.getMonth()]}`
+    : 'quel giorno';
+
+const stessoGiorno = (a: Date, b: Date): boolean =>
+  a instanceof Date && b instanceof Date
+  && !isNaN(a.getTime()) && !isNaN(b.getTime())
+  && a.getFullYear() === b.getFullYear()
+  && a.getMonth() === b.getMonth()
+  && a.getDate() === b.getDate();
 
 const piuRecente = (a: PianoScalabile, b: PianoScalabile): number => {
   const ca = a.creatoIl?.getTime() ?? a.inizio?.getTime() ?? 0;
@@ -84,17 +131,25 @@ const parola = (t: TipoImpegnoPiano): string =>
 
 /**
  * Quale piano paga questa lezione.
- *  1. Un piano che copre oggi e ha ancora posti.
+ *  1. Un piano che copre il giorno della seduta e ha ancora posti.
  *  2. Altrimenti il più recente con posti, anche se il periodo non
- *     comprende oggi: un percorso creato DOPO la lezione è normale.
+ *     lo comprende: un percorso creato DOPO la lezione è normale.
  *  3. Altrimenti si dice perché non si è potuto scalare.
+ *
+ * @param quando il giorno in cui la seduta è avvenuta. Per una seduta
+ *   di oggi è adesso; per una registrata dopo è la sua data, perché
+ *   una lezione di agosto la paga il pacchetto di agosto.
+ * @param oggi serve solo a scegliere le parole del messaggio
+ *   («oggi» invece di «il 5 agosto»).
  */
 export const scegliPiano = (
   piani: PianoScalabile[],
   tipo: TipoImpegnoPiano,
-  oggi: Date = new Date()
+  quando: Date = new Date(),
+  oggi: Date = quando
 ): Scelta => {
   const lista = (piani || []).filter(Boolean);
+  const quel = stessoGiorno(quando, oggi) ? 'oggi' : `il ${giorno(quando)}`;
 
   if (!lista.length) {
     return {
@@ -104,7 +159,7 @@ export const scegliPiano = (
     };
   }
 
-  const attivi = lista.filter((p) => copreOggi(p, oggi));
+  const attivi = lista.filter((p) => copre(p, quando));
   const attivoConPosto = attivi.filter((p) => haPosto(p, tipo)).sort(piuRecente)[0];
   if (attivoConPosto) {
     const restanti = incluse(attivoConPosto, tipo) - usate(attivoConPosto, tipo) - 1;
@@ -118,14 +173,14 @@ export const scegliPiano = (
   }
 
   const fuoriConPosto = lista
-    .filter((p) => !copreOggi(p, oggi) && haPosto(p, tipo))
+    .filter((p) => !copre(p, quando) && haPosto(p, tipo))
     .sort(piuRecente)[0];
   if (fuoriConPosto) {
     const restanti = incluse(fuoriConPosto, tipo) - usate(fuoriConPosto, tipo) - 1;
     return {
       piano: fuoriConPosto, esito: 'scalata', fuoriPeriodo: true,
       restanti,
-      messaggio: `Scalata dal percorso (il cui periodo non comprende oggi): `
+      messaggio: `Scalata dal percorso (il cui periodo non comprende ${quel}): `
         + `${usate(fuoriConPosto, tipo) + 1} di ${incluse(fuoriConPosto, tipo)} usate, `
         + `ne ${restanti === 1 ? 'resta 1' : `restano ${restanti}`}. `
         + 'Se le date del percorso sono sbagliate, correggile.',
@@ -157,3 +212,51 @@ export const giaScalata = (marcata: boolean, tipo: TipoImpegnoPiano): Scelta | n
         + `non tolgo una seconda ${parola(tipo)}.`,
     }
     : null;
+
+// ------------------------------------------------------------
+// LA SEDUTA REGISTRATA DOPO
+// ------------------------------------------------------------
+
+export interface Avviso {
+  titolo: string;
+  testo: string;
+}
+
+/**
+ * Che cosa legge il coach quando registra una seduta già avvenuta.
+ *
+ * Prima leggeva «Appuntamento passato registrato!» — un punto
+ * esclamativo che diceva che era andato tutto bene, mentre il
+ * percorso non era stato toccato. Adesso la frase dice tutte e due
+ * le cose, e quando non ha scalato dice anche come si rimedia.
+ */
+export const registrazionePassata = (
+  scelta: Scelta,
+  quando: Date
+): Avviso => {
+  const scalata = scelta.esito === 'scalata';
+  return {
+    titolo: scalata ? 'Seduta registrata' : 'Registrata, ma NON scalata',
+    testo: `Seduta del ${giorno(quando)} registrata in agenda.\n\n`
+      + scelta.messaggio
+      + (scalata
+        ? ''
+        : '\n\nLa seduta resta segnata «da scalare»: quando il percorso '
+          + 'è a posto, riaprila e tocca «Scala dal percorso».'),
+  };
+};
+
+/**
+ * Questa seduta deve ancora scalare dal percorso?
+ *
+ * Vale SOLO per le sedute che portano il segno `scaloDaFare`, messo
+ * nel momento in cui un tentativo di scalare è fallito. Le sedute
+ * chiuse prima del 12 settembre 2026 non hanno nessuno dei due campi:
+ * non si può sapere se abbiano scalato, e riproporle tutte con un
+ * pulsante «Scala» significherebbe invitare a scalare due volte.
+ * Nel dubbio, non si tocca.
+ */
+export const restaDaScalare = (s: {
+  scaloDaFare?: boolean;
+  planDecremented?: boolean;
+}): boolean => s.scaloDaFare === true && s.planDecremented !== true;

@@ -62,18 +62,15 @@ import {
   updateTask,
   deleteTask,
 } from '../../services/taskService';
+import { scalaDalPercorso } from '../../services/paymentService';
 import {
-  getActiveStudentPlan,
-  decrementPlanLesson,
-  decrementPlanConsultation,
-  scalaDalPercorso,
-} from '../../services/paymentService';
-import { giaScalata } from '../../domain/piani';
+  giaScalata, registrazionePassata, giorno, Avviso,
+} from '../../domain/piani';
 import { createNotification } from '../../services/notificationService';
 import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequestService';
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
-import { AppointmentCard } from './calendar/AppointmentCard';
+import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
 import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
@@ -115,24 +112,10 @@ const ETICHETTA_SEDUTA: Record<AppointmentKind, string> = {
   gruppo: 'Personal di gruppo',
 };
 
-type AppointmentItem = {
-  id: string;
-  kind: AppointmentKind;
-  studentId: string;
-  staffId: string;
-  date: Date;
-  dateStr: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  notes: string;
-  sessionCost?: number;
-  isCountedAsCompleted: boolean;
-  persone?: number;
-  quotaPersona?: number;
-  /** la seduta ha già scalato dal percorso */
-  planDecremented?: boolean;
-};
+// Il tipo vive insieme alla scheda che lo disegna: erano due copie
+// identiche, e due copie identiche divergono sempre — questa non
+// aveva `planDecremented`, e la scheda non poteva sapere se una
+// seduta avesse scalato.
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -365,6 +348,7 @@ export const CalendarScreen: React.FC = () => {
         status: s.status, notes: s.notes, sessionCost: s.sessionCost,
         isCountedAsCompleted: s.isCountedAsCompleted,
         planDecremented: s.planDecremented,
+        scaloDaFare: s.scaloDaFare,
       });
     });
     nutritionAppts.forEach((a) => {
@@ -376,6 +360,7 @@ export const CalendarScreen: React.FC = () => {
         status: a.status, notes: a.notes, sessionCost: a.sessionCost,
         isCountedAsCompleted: a.isCountedAsCompleted,
         planDecremented: a.planDecremented,
+        scaloDaFare: a.scaloDaFare,
       });
     });
     items.sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -697,6 +682,14 @@ export const CalendarScreen: React.FC = () => {
       } else {
         const isPastDate = new Date(formDate) < new Date(toDateStr(new Date()));
         const appointmentStatus = isPastDate ? 'completed' : 'scheduled';
+        // Una seduta registrata in ritardo nasce «da scalare»: il
+        // segno si toglie solo quando il percorso è stato davvero
+        // toccato, poche righe più sotto. Se il salvataggio riesce e
+        // lo scalo no, la seduta resta lì a dirlo.
+        const segnoScalo = isPastDate
+          ? { planDecremented: false, scaloDaFare: true }
+          : {};
+        let nuovoId = '';
         if (formKind === 'gruppo') {
           // Nel costo entra la QUOTA di questa persona, mai l'incasso
           // del gruppo: vedi domain/gruppo.ts. Gli altri partecipanti
@@ -709,7 +702,7 @@ export const CalendarScreen: React.FC = () => {
             setSaving(false);
             return;
           }
-          await createSession({
+          nuovoId = await createSession({
             studentId: formStudentId,
             collaboratorId: staffId,
             date: new Date(formDate),
@@ -722,9 +715,10 @@ export const CalendarScreen: React.FC = () => {
             tipoSeduta: 'gruppo',
             persone: formPersone,
             quotaPersona: costoPerAllievo(seduta),
+            ...segnoScalo,
           });
         } else if (formKind === 'training' || formKind === 'consulenza') {
-          await createSession({
+          nuovoId = await createSession({
             studentId: formStudentId,
             collaboratorId: staffId,
             date: new Date(formDate),
@@ -735,9 +729,10 @@ export const CalendarScreen: React.FC = () => {
             sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             tipoSeduta: formKind === 'consulenza' ? 'consulenza' : 'individuale',
+            ...segnoScalo,
           });
         } else {
-          await createAppointment({
+          nuovoId = await createAppointment({
             studentId: formStudentId,
             nutritionistId: staffId,
             date: new Date(formDate),
@@ -748,10 +743,20 @@ export const CalendarScreen: React.FC = () => {
             sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             createdAt: new Date(),
+            ...segnoScalo,
           });
         }
+        let avvisoPassata: Avviso | null = null;
         if (isPastDate) {
-          await decrementStudentPlan(formStudentId, formKind);
+          // Si scala dal percorso valido il giorno della SEDUTA, non
+          // oggi: una lezione di agosto la paga il pacchetto di agosto.
+          const esito = await scalaSeduta(formStudentId, formKind, new Date(formDate));
+          avvisoPassata = esito.avviso;
+          if (esito.scalata) {
+            const segno = { planDecremented: true, scaloDaFare: false };
+            if (formKind === 'nutrition') await updateAppointment(nuovoId, segno);
+            else await updateSession(nuovoId, segno);
+          }
           if (cost && cost > 0) {
             await addTransaction({
               type: 'income',
@@ -764,7 +769,11 @@ export const CalendarScreen: React.FC = () => {
             });
           }
         }
-        crossAlert('Successo', isPastDate ? 'Appuntamento passato registrato!' : 'Appuntamento creato!');
+        // Prima qui c'era «Appuntamento passato registrato!» — un
+        // punto esclamativo che diceva che era andato tutto bene
+        // mentre il percorso non era stato toccato.
+        if (avvisoPassata) crossAlert(avvisoPassata.titolo, avvisoPassata.testo);
+        else crossAlert('Successo', 'Appuntamento creato!');
         if (!isPastDate) {
           const studentName = getStudentName(formStudentId);
           const dateLabel = new Date(formDate).toLocaleDateString('it-IT');
@@ -796,25 +805,58 @@ export const CalendarScreen: React.FC = () => {
     }
   };
 
-  const decrementStudentPlan = async (studentId: string, kind: AppointmentKind) => {
+  // ------------------------------------------------------------
+  // Qui viveva `decrementStudentPlan`: la SECONDA copia dello scalo,
+  // quella che serviva gli appuntamenti registrati con una data
+  // passata. Cercava un percorso attivo OGGI — e una seduta di
+  // agosto registrata a settembre non ne ha uno — quindi usciva
+  // zitta senza scalare niente, scrivendo al massimo su console.
+  // È il difetto che il titolare ha visto il 12 settembre 2026.
+  // Adesso c'è una strada sola: `scalaDalPercorso`. Vedi piani.ts.
+  // ------------------------------------------------------------
+
+  /**
+   * Scala una seduta già avvenuta e DICE com'è andata.
+   * Restituisce se il percorso è stato davvero toccato, perché è
+   * quello che va scritto sulla seduta.
+   */
+  const scalaSeduta = async (
+    studentId: string,
+    kind: AppointmentKind,
+    quando: Date
+  ): Promise<{ scalata: boolean; avviso: Avviso }> => {
     try {
-      const plan = await getActiveStudentPlan(studentId);
-      if (!plan) return;
-      const usedL = plan.usedLessons || 0;
-      const inclL = plan.includedLessons || 0;
-      const usedC = plan.usedConsultations || 0;
-      const inclC = plan.includedConsultations || 0;
-      if (tipoPercorso(kind) === 'lezione') {
-        if (inclL > 0 && usedL < inclL) {
-          await decrementPlanLesson(plan.id, usedL);
-        }
-      } else {
-        if (inclC > 0 && usedC < inclC) {
-          await decrementPlanConsultation(plan.id, usedC);
-        }
-      }
-    } catch (err) {
-      console.error('Errore aggiornamento piano:', err);
+      const esito = await scalaDalPercorso(studentId, tipoPercorso(kind), quando);
+      return {
+        scalata: esito.esito === 'scalata',
+        avviso: registrazionePassata(esito, quando),
+      };
+    } catch {
+      // Un errore di rete non deve passare per «tutto a posto»:
+      // la seduta resta segnata da scalare, e si può riprovare.
+      return {
+        scalata: false,
+        avviso: {
+          titolo: 'Registrata, ma NON scalata',
+          testo: `Seduta del ${giorno(quando)} registrata in agenda, ma non sono `
+            + 'riuscito a leggere il percorso.\n\nLa seduta resta segnata '
+            + '«da scalare»: riaprila e tocca «Scala dal percorso».',
+        },
+      };
+    }
+  };
+
+  /** Il pulsante «Scala dal percorso» su una seduta rimasta in sospeso. */
+  const handleScala = async (item: AppointmentItem) => {
+    try {
+      const { scalata, avviso } = await scalaSeduta(item.studentId, item.kind, item.date);
+      const segno = { planDecremented: scalata, scaloDaFare: !scalata };
+      if (eSessione(item.kind)) await updateSession(item.id, segno);
+      else await updateAppointment(item.id, segno);
+      crossAlert(avviso.titolo, avviso.testo);
+      loadData();
+    } catch {
+      crossAlert('Errore', 'Impossibile aggiornare la seduta.');
     }
   };
 
@@ -831,15 +873,22 @@ export const CalendarScreen: React.FC = () => {
             // Si scala dal percorso, e si DICE che cosa è successo:
             // prima, se il percorso non copriva oggi, non scalava
             // niente e nessuno lo sapeva.
+            // `item.date` e non «adesso»: una seduta della settimana
+            // scorsa segnata oggi la paga il percorso di quel giorno.
             const tipoPiano = tipoPercorso(item.kind);
             const gia = giaScalata(!!item.planDecremented, tipoPiano);
-            const esito = gia || await scalaDalPercorso(item.studentId, tipoPiano);
+            const esito = gia
+              || await scalaDalPercorso(item.studentId, tipoPiano, item.date);
             if (esito.esito === 'scalata') {
-              if (eSessione(item.kind)) {
-                await updateSession(item.id, { planDecremented: true });
-              } else {
-                await updateAppointment(item.id, { planDecremented: true });
-              }
+              const segno = { planDecremented: true, scaloDaFare: false };
+              if (eSessione(item.kind)) await updateSession(item.id, segno);
+              else await updateAppointment(item.id, segno);
+            } else if (esito.esito !== 'gia_scalata') {
+              // Non ha scalato: la seduta se lo porta scritto, e resta
+              // il pulsante per riprovare quando il percorso è a posto.
+              const segno = { scaloDaFare: true };
+              if (eSessione(item.kind)) await updateSession(item.id, segno);
+              else await updateAppointment(item.id, segno);
             }
             crossAlert(
               esito.esito === 'scalata' ? 'Seduta completata' : 'Seduta completata — attenzione',
@@ -888,14 +937,23 @@ export const CalendarScreen: React.FC = () => {
                 try {
                   if (eSessione(item.kind)) await cancelSession(item.id, item.date);
                   else await cancelAppointment(item.id, item.date);
-                  await decrementStudentPlan(item.studentId, item.kind);
+                  // Annullata tardi = eseguita, quindi si scala. Anche
+                  // qui passava per la copia muta: se non scalava,
+                  // l'allievo non pagava e nessuno se ne accorgeva.
+                  const { scalata } = await scalaSeduta(item.studentId, item.kind, item.date);
+                  const segno = { planDecremented: scalata, scaloDaFare: !scalata };
+                  if (eSessione(item.kind)) await updateSession(item.id, segno);
+                  else await updateAppointment(item.id, segno);
                   const dateLabel = item.date.toLocaleDateString('it-IT');
                   getOwner().then((owner) => {
                     if (owner) createNotification(
                       owner.id,
                       'session_cancelled',
                       'Appuntamento annullato (tardivo)',
-                      `${getStudentName(item.studentId)} ha annullato l'appuntamento del ${dateLabel} a meno di 10 ore. Sessione addebitata.`
+                      `${getStudentName(item.studentId)} ha annullato l'appuntamento del ${dateLabel} a meno di 10 ore. `
+                      + (scalata
+                        ? 'Sessione addebitata e scalata dal percorso.'
+                        : 'Sessione addebitata, ma NON scalata dal percorso: aprila in agenda e tocca «Scala dal percorso».')
                     ).catch(() => {});
                   }).catch(() => {});
                   loadData();
@@ -1173,6 +1231,7 @@ export const CalendarScreen: React.FC = () => {
       calcEarnings={calcEarnings}
       onEdit={openEdit}
       onComplete={handleComplete}
+      onScala={handleScala}
       onCancel={handleCancel}
       onDelete={handleDelete}
       onStudentDetail={setStudentDetailId}
