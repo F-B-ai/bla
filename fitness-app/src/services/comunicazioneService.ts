@@ -64,6 +64,8 @@ export interface DaInviare {
   autoreNome: string;
   /** gli id di chi la riceve: li sceglie la schermata, non questo file */
   destinatariIds: string[];
+  /** una prova su di sé: resta in bacheca ma si riconosce a colpo d'occhio */
+  prova?: boolean;
 }
 
 export interface EsitoInvio {
@@ -93,6 +95,7 @@ export const inviaComunicazione = async (
     quanti: dati.destinatariIds.length,
     createdAt: Timestamp.now(),
   };
+  if (dati.prova) documento.prova = true;
   if (dati.allegato) documento.allegato = dati.allegato;
 
   const creata = await addDoc(collection(db, COMUNICAZIONI), documento);
@@ -156,6 +159,7 @@ export const leggiComunicazioni = async (
       autoreNome: (x.autoreNome as string) || '',
       destinatari: (x.destinatari as Comunicazione['destinatari']) || 'allievi',
       quanti: (x.quanti as number) || 0,
+      prova: x.prova === true,
       createdAt: daTimestamp(x.createdAt),
     };
   });

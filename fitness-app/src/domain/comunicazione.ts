@@ -44,6 +44,8 @@ export interface Comunicazione {
   destinatari: 'allievi' | 'staff' | 'tutti';
   /** quante persone l'hanno ricevuta nel momento dell'invio */
   quanti: number;
+  /** una prova mandata solo a sé stessi: si riconosce e si butta */
+  prova?: boolean;
   createdAt: Date;
 }
 
@@ -163,14 +165,26 @@ export const controllaComunicazione = (bozza: {
 export const confermaInvio = (
   quanti: number,
   tipo: TipoComunicazione,
-  conAllegato: boolean
+  conAllegato: boolean,
+  prova = false
 ): string => {
+  const che = tipo === 'urgente' ? 'un avviso URGENTE' : `un ${tipo}`;
+  const con = conAllegato ? ' con l\'allegato' : '';
+
+  // La prova non è un invio più piccolo: è un'altra cosa, e il testo
+  // deve dirlo senza ambiguità. Chi sta provando non deve leggere
+  // «non si richiama indietro» e spaventarsi, e chi sta per mandare a
+  // tutti non deve leggere un testo rassicurante.
+  if (prova) {
+    return `Arriva solo a te: ${che}${con}.\n\n`
+      + 'Serve a vedere com\'è fatta prima di mandarla davvero. '
+      + 'Resta in bacheca segnata come PROVA, e puoi toglierla quando vuoi.';
+  }
+
   if (quanti === 0) {
     return 'Non c\'è nessun allievo attivo a cui mandarla.';
   }
   const persone = quanti === 1 ? '1 allievo' : `${quanti} allievi`;
-  const che = tipo === 'urgente' ? 'un avviso URGENTE' : `un ${tipo}`;
-  const con = conAllegato ? ' con l\'allegato' : '';
   return `Stai per mandare ${che}${con} a ${persone}.\n\n`
     + 'Una volta partita, la comunicazione non si richiama indietro.';
 };

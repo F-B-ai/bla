@@ -130,6 +130,43 @@ describe('la conferma prima di premere', () => {
   });
 });
 
+// ============================================================
+// «COME FACCIO A INVIARLA SOLO A ME?»
+// ------------------------------------------------------------
+// Domanda del titolare, il 12 settembre, dopo che gli avevo detto di
+// provarla su sé stesso — senza avergliene dato il modo. La prova non
+// è un invio più piccolo: è un'altra cosa, e il testo deve dirlo.
+// ============================================================
+
+describe('la prova su di sé', () => {
+  it('dice che arriva SOLO a te', () => {
+    expect(confermaInvio(1, 'avviso', false, true)).toContain('solo a te');
+  });
+
+  // Chi sta provando non deve leggere una frase che spaventa.
+  it('e NON dice «non si richiama indietro»: non serve a nessuno qui', () => {
+    expect(confermaInvio(1, 'avviso', false, true))
+      .not.toContain('non si richiama indietro');
+  });
+
+  it('spiega a che cosa serve, e che resta segnata come prova', () => {
+    const c = confermaInvio(1, 'annuncio', false, true);
+    expect(c).toContain('prima di mandarla davvero');
+    expect(c).toContain('PROVA');
+  });
+
+  it('l\'allegato viene nominato anche nella prova', () => {
+    expect(confermaInvio(1, 'avviso', true, true)).toContain('allegato');
+  });
+
+  // L'invio vero non deve MAI leggersi come una prova.
+  it('l\'invio a tutti resta severo: nessuna frase rassicurante', () => {
+    const c = confermaInvio(47, 'avviso', false, false);
+    expect(c).toContain('non si richiama indietro');
+    expect(c).not.toContain('solo a te');
+  });
+});
+
 describe('come si legge nell\'elenco di chi la riceve', () => {
   it('tipo, autore, allegato e data', () => {
     const r = descriviComunicazione({

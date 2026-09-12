@@ -133,24 +133,27 @@ export const ComunicazioniScreen: React.FC = () => {
   // Inviare
   // ----------------------------------------------------------
 
-  const invia = async () => {
+  const invia = async (prova = false) => {
     if (!user) return;
     if (!controllo.ok) {
       crossAlert('Manca qualcosa', controllo.problemi.join('\n'));
       return;
     }
-    if (destinatari.length === 0) {
+    // Una prova va a una persona sola: sé stessi. Quindi il controllo
+    // «non c'è nessun allievo» non la riguarda.
+    if (!prova && destinatari.length === 0) {
       crossAlert('Nessun destinatario', 'Non c\'è nessun allievo attivo a cui mandarla.');
       return;
     }
+    const aChi = prova ? [user.id] : destinatari.map((a) => a.id);
 
     crossAlert(
       'Conferma invio',
-      confermaInvio(destinatari.length, tipo, !!allegatoLocale || !!allegato),
+      confermaInvio(aChi.length, tipo, !!allegatoLocale || !!allegato, prova),
       [
         { text: 'Annulla', style: 'cancel' },
         {
-          text: 'Invia a tutti',
+          text: prova ? 'Mandala a me' : 'Invia a tutti',
           onPress: async () => {
             setInviando(true);
             try {
@@ -179,14 +182,19 @@ export const ComunicazioniScreen: React.FC = () => {
                 allegato: finale,
                 autoreId: user.id,
                 autoreNome: `${user.name || ''} ${(user as { surname?: string }).surname || ''}`.trim(),
-                destinatariIds: destinatari.map((a) => a.id),
+                destinatariIds: aChi,
+                prova,
               });
 
               // Quante sono arrivate e quante no: non si nasconde.
               crossAlert(
-                esito.nonConsegnate === 0 ? 'Inviata' : 'Inviata, ma non a tutti',
                 esito.nonConsegnate === 0
-                  ? `Arrivata a ${esito.consegnate} allievi.`
+                  ? (prova ? 'Prova inviata' : 'Inviata')
+                  : 'Inviata, ma non a tutti',
+                esito.nonConsegnate === 0
+                  ? (prova
+                    ? 'Guarda la campanella: la vedrai come la vedrà un allievo.'
+                    : `Arrivata a ${esito.consegnate} allievi.`)
                   : `Arrivata a ${esito.consegnate} allievi. `
                     + `Per ${esito.nonConsegnate} la notifica non è partita — `
                     + 'la comunicazione è comunque in bacheca e la vedranno aprendola.'
@@ -335,9 +343,21 @@ export const ComunicazioniScreen: React.FC = () => {
           </View>
         )}
 
+        {/* Prima la prova, e non è cortesia: è che «mandalo a tutti» è
+            un tasto che non si annulla, e chi non ha mai visto com'è
+            fatta deve poterla vedere senza rischiare ottanta persone. */}
+        <TouchableOpacity
+          style={styles.provaBtn}
+          onPress={() => invia(true)}
+          disabled={inviando || caricando}
+        >
+          <Ionicons name="flask-outline" size={17} color={colors.accent} />
+          <Text style={styles.provaTxt}>Provala su di me</Text>
+        </TouchableOpacity>
+
         <Button
           title={inviando ? 'Invio…' : `Invia a ${destinatari.length} allievi`}
-          onPress={invia}
+          onPress={() => invia(false)}
           loading={inviando}
           disabled={inviando || caricando}
           style={styles.inviaBtn}
@@ -361,6 +381,7 @@ export const ComunicazioniScreen: React.FC = () => {
             <View style={styles.storicoTesta}>
               <View style={[styles.pallino, { backgroundColor: COLORE_TIPO[c.tipo] }]} />
               <Text style={styles.storicoTitolo} numberOfLines={1}>{c.titolo}</Text>
+              {c.prova && <Text style={styles.provaTag}>PROVA</Text>}
               {isOwner && (
                 <TouchableOpacity onPress={() => elimina(c)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="trash-outline" size={17} color={colors.error} />
@@ -384,7 +405,9 @@ export const ComunicazioniScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <Text style={styles.storicoQuanti}>
-              Mandata a {c.quanti} {c.quanti === 1 ? 'allievo' : 'allievi'}
+              {c.prova
+                ? 'Prova: arrivata solo a te'
+                : `Mandata a ${c.quanti} ${c.quanti === 1 ? 'allievo' : 'allievi'}`}
             </Text>
           </View>
         ))
@@ -481,7 +504,29 @@ const styles = StyleSheet.create({
     borderColor: colors.warning,
   },
   problemaTxt: { fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: 18 },
-  inviaBtn: { marginTop: spacing.lg },
+  provaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.round,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  provaTxt: { fontSize: fontSize.sm, fontWeight: '600', color: colors.accent },
+  provaTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.warning,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  inviaBtn: { marginTop: spacing.sm },
   sezione: {
     flexDirection: 'row',
     alignItems: 'center',
