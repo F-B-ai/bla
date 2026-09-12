@@ -96,6 +96,11 @@ export interface TrainingSession {
   /** true quando la seduta ha già scalato una lezione dal percorso:
    *  impedisce di toglierne una seconda se si rimarca «completata». */
   planDecremented?: boolean;
+  /** true quando si è PROVATO a scalare e non si è potuto (percorso
+   *  mancante, esaurito, senza lezioni incluse). È il segno che fa
+   *  comparire «Scala dal percorso» sulla seduta: senza, una seduta
+   *  registrata in ritardo restava zoppa e nessuno lo sapeva. */
+  scaloDaFare?: boolean;
   /**
    * Che seduta è. Assente = individuale: le sedute registrate prima
    * che questo campo esistesse restano quello che erano.
@@ -440,6 +445,9 @@ export interface NutritionistAppointment {
   createdAt: Date;
   /** true quando la visita ha già scalato una consulenza dal percorso */
   planDecremented?: boolean;
+  /** true quando si è provato a scalare e non si è potuto: vedi
+   *  TrainingSession.scaloDaFare */
+  scaloDaFare?: boolean;
 }
 
 export interface BodyMeasurement {

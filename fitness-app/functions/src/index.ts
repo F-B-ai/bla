@@ -37,7 +37,28 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
     throw new HttpsError("invalid-argument", "targetUserId e newEmail sono obbligatori.");
   }
 
-  await authAdmin.updateUser(targetUserId, {email: newEmail});
+  try {
+    await authAdmin.updateUser(targetUserId, {email: newEmail});
+  } catch (err) {
+    const codice = (err as {code?: string})?.code || "";
+    if (codice === "auth/user-not-found") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Questa persona non ha ancora un accesso: è in anagrafica ma non ha " +
+        "mai completato la registrazione."
+      );
+    }
+    if (codice === "auth/email-already-exists") {
+      throw new HttpsError(
+        "already-exists",
+        "Questa email è già usata da un altro account."
+      );
+    }
+    throw new HttpsError(
+      "internal",
+      `Non sono riuscito a cambiare l'email: ${codice || String(err)}`
+    );
+  }
   await db.collection("users").doc(targetUserId).update({email: newEmail});
 
   return {success: true};
@@ -57,7 +78,28 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
     throw new HttpsError("invalid-argument", "La password deve avere almeno 6 caratteri.");
   }
 
-  await authAdmin.updateUser(targetUserId, {password: newPassword});
+  // L'errore vero non si perde in un `internal`: il caso di gran lunga
+  // più frequente è che la persona sia in anagrafica ma non abbia mai
+  // completato la registrazione — non c'è nessuna password da cambiare,
+  // e dirlo così è tutt'altra cosa che «operazione fallita».
+  try {
+    await authAdmin.updateUser(targetUserId, {password: newPassword});
+  } catch (err) {
+    const codice = (err as {code?: string})?.code || "";
+    if (codice === "auth/user-not-found") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Questa persona non ha ancora un accesso: è in anagrafica ma non ha " +
+        "mai completato la registrazione, quindi non c'è una password da " +
+        "cambiare. Mandale l'invito, oppure usa «Invia link reimpostazione " +
+        "password»."
+      );
+    }
+    throw new HttpsError(
+      "internal",
+      `Non sono riuscito a cambiare la password: ${codice || String(err)}`
+    );
+  }
 
   return {success: true};
 });

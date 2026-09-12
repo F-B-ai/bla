@@ -61,15 +61,94 @@ Schermate da avere pronte e aperte, ognuna in una scheda:
 | A-09 | La schermata di check-in al QR |
 | A-10 | La schermata del respiro che salva sul gemello |
 
+**Queste otto righe si registrano, non si filmano** — registrazione schermo di
+iOS, la sera prima, insieme all'account. Vedi la sezione «Con che cosa si gira».
+
 > ⚠️ **A-07 è l'unico che potrebbe non esistere ancora.** Il pezzo mostra «un
 > punto solo, poi il secondo punto, e la linea». Se nell'account dimostrativo
 > non ci sono **due valutazioni a distanza di tempo**, quel grafico non c'è, e
 > sul set non lo inventi. Va creato prima, con due date diverse. Se non si
 > riesce, A-07 slitta e si gira dopo: è in settimana 7, non c'è fretta.
 
+---
+
+## 📱 Con che cosa si gira — e come si fa con una camera sola
+
+Il problema, posto dal titolare l'11 settembre: *«Nel primo copione io devo
+usare il telefono, ma le riprese le faccio con il telefono stesso.»*
+
+Vero: la camera migliore che c'è è l'**iPhone 15 Pro Max**, ed è lo stesso
+telefono che in A-03 deve stare in mano. Ecco come si risolve, e non è un
+compromesso.
+
+### 1. Le schermate NON si filmano: si registrano
+
+Per ogni scena in cui si vede l'App, **non serve inquadrare un dispositivo.**
+Si usa la **registrazione schermo di iOS**, e il video si monta sopra il girato.
+
+È **meglio** che filmare uno schermo, non un ripiego:
+
+| Filmare uno schermo | Registrare lo schermo |
+|---|---|
+| riflessi, bande di moiré | immagine pulita |
+| messa a fuoco che balla | nitida sempre |
+| serve un secondo dispositivo in campo | non serve niente |
+
+Le registrazioni si fanno **la sera prima, insieme all'account dimostrativo**.
+Dieci minuti, e coprono A-01, A-02, A-04, A-05, A-06, A-07, A-08, A-10 — cioè
+quasi tutta la serie A.
+
+> ⚠️ **Notifiche silenziate prima di registrare.** Una notifica che entra
+> durante una registrazione schermo costringe a rifarla.
+
+### 2. La camera è sempre l'iPhone 15 Pro Max
+
+Non per snobismo verso l'iPad: perché si girano **diciotto Reel in un giorno e
+si pubblicano in dieci settimane**. Se due pezzi hanno una resa diversa si
+vede — e si vede proprio nel confronto fra A-03 e B-03, che devono sembrare
+girati nello stesso momento.
+
+**Una camera sola, per tutto.** L'iPad non entra mai come camera.
+
+### 3. Il telefono in mano di A-03: un telefono qualsiasi
+
+Nella **SCENA 4** — quella che al montaggio non si taglia — il telefono
+**esce dall'inquadratura**. Non se ne vede mai lo schermo.
+
+Serve solo che sia *un telefono*: uno vecchio in un cassetto, quello di
+qualcun altro, uno spento. **Non deve avere ESSĒRE installato e non deve
+essere acceso.** Nessuno lo saprà mai.
+
+Stessa cosa per **A-09**: il telefono che inquadra il QR può essere qualunque.
+
+Se non c'è un secondo telefono, **l'iPad può fare da oggetto di scena**: un
+tablet che si posa mentre si dice *«questa cosa la deve vedere un ortopedico»*
+funziona uguale — forse meglio, sembra più uno strumento di lavoro.
+
+### 4. L'iPad serve, ma come gobbo
+
+**Sotto la camera, appena fuori campo, con il copione aperto.**
+
+Diciotto copioni a memoria in una giornata sono la cosa che fa rifare le
+riprese venti volte. Con il testo appena sotto l'obiettivo lo sguardo resta in
+camera e si gira in metà tempo.
+
+### 5. Le schermate NON si generano con l'AI
+
+Il principio fondativo dice: *«questa affermazione la posso sostenere con un
+numero, un file o una misura?»* Una schermata inventata è esattamente ciò che
+quel principio esclude — e chiunque usi ESSĒRE vedrebbe che non è ESSĒRE.
+
+Le registrazioni schermo sono vere e costano dieci minuti.
+
+---
+
 ### Il resto della roba
 
 - Microfono a clip **carico**, più la batteria di scorta
+- **Un treppiede**, o un appoggio stabile all'altezza degli occhi
+- **Un secondo telefono** (oggetto di scena per A-03 e A-09 — può essere spento)
+- **L'iPad**, come gobbo sotto la camera
 - Telefono con **batteria piena** e **notifiche silenziate** (una notifica che
   entra durante una ripresa dello schermo costringe a rifare la scena)
 - Un filo a piombo da muratore

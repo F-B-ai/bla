@@ -1,5 +1,6 @@
 import {
   scegliPiano, giaScalata, PianoScalabile, PIANI_VERSION,
+  registrazionePassata, restaDaScalare, giorno,
 } from '../piani';
 
 // ============================================================
@@ -144,8 +145,123 @@ describe('mai due volte la stessa lezione', () => {
   });
 });
 
+// ============================================================
+// «QUANDO METTO UN APPUNTAMENTO PASSATO, QUESTO NON VIENE
+//  SCALATO DAL PIANO» — 12 settembre 2026
+// ------------------------------------------------------------
+// La seconda copia. Registrare una seduta già avvenuta passava
+// per un'altra funzione, che cercava un percorso attivo OGGI e
+// usciva zitta se non lo trovava. Questi test difendono la
+// strada unica.
+// ============================================================
+
+describe('una seduta passata la paga il percorso di QUEL giorno', () => {
+  const AGOSTO = new Date(2026, 7, 10, 18, 0, 0); // la seduta
+  const SETTEMBRE = new Date(2026, 8, 12, 12, 0, 0); // il giorno in cui la registro
+
+  const pacchettoAgosto = piano({
+    id: 'agosto', inizio: new Date(2026, 7, 1), fine: new Date(2026, 7, 31),
+  });
+  const pacchettoSettembre = piano({
+    id: 'settembre', inizio: new Date(2026, 8, 1), fine: new Date(2026, 8, 30),
+    creatoIl: new Date(2026, 8, 1),
+  });
+
+  it('scala dal pacchetto di agosto, non da quello in corso', () => {
+    const s = scegliPiano(
+      [pacchettoAgosto, pacchettoSettembre], 'lezione', AGOSTO, SETTEMBRE
+    );
+    expect(s.esito).toBe('scalata');
+    expect(s.piano!.id).toBe('agosto');
+    expect(s.fuoriPeriodo).toBe(false);
+  });
+
+  // IL DIFETTO: prima qui non succedeva niente, in silenzio. Il
+  // percorso di agosto era chiuso, quello attivo oggi non c'era.
+  it('se il pacchetto di quel giorno non esiste più, scala lo stesso e lo dice', () => {
+    const s = scegliPiano([pacchettoSettembre], 'lezione', AGOSTO, SETTEMBRE);
+    expect(s.esito).toBe('scalata');
+    expect(s.fuoriPeriodo).toBe(true);
+    expect(s.messaggio).toContain('10 agosto');
+  });
+
+  it('senza nessun percorso non resta zitto', () => {
+    const s = scegliPiano([], 'lezione', AGOSTO, SETTEMBRE);
+    expect(s.esito).toBe('nessun_piano');
+    expect(s.messaggio).toContain('non è stata scalata');
+  });
+
+  it('per una seduta di oggi le parole restano quelle di prima', () => {
+    const fuori = piano({ inizio: new Date(2026, 8, 20), fine: new Date(2026, 9, 20) });
+    const s = scegliPiano([fuori], 'lezione', SETTEMBRE, SETTEMBRE);
+    expect(s.messaggio).toContain('non comprende oggi');
+  });
+});
+
+describe('la frase che legge il coach dopo aver registrato una seduta passata', () => {
+  const QUANDO = new Date(2026, 7, 10);
+
+  it('quando ha scalato, dice che cosa ha scalato', () => {
+    const s = scegliPiano([piano()], 'lezione', QUANDO, QUANDO);
+    const a = registrazionePassata(s, QUANDO);
+    expect(a.titolo).toBe('Seduta registrata');
+    expect(a.testo).toContain('10 agosto');
+    expect(a.testo).toContain('1 di 10');
+  });
+
+  // Prima diceva «Appuntamento passato registrato!» anche quando il
+  // percorso non era stato toccato.
+  it('quando NON ha scalato, il titolo stesso lo dice', () => {
+    const s = scegliPiano([], 'lezione', QUANDO, QUANDO);
+    const a = registrazionePassata(s, QUANDO);
+    expect(a.titolo).toContain('NON scalata');
+    expect(a.testo).toContain('non è stata scalata');
+  });
+
+  it('e spiega come si rimedia, invece di lasciarti lì', () => {
+    const s = scegliPiano([piano({ lezioniUsate: 10 })], 'lezione', QUANDO, QUANDO);
+    const a = registrazionePassata(s, QUANDO);
+    expect(a.testo).toContain('Scala dal percorso');
+    expect(a.testo).toContain('da scalare');
+  });
+
+  it('quando ha scalato non propone rimedi che non servono', () => {
+    const s = scegliPiano([piano()], 'lezione', QUANDO, QUANDO);
+    expect(registrazionePassata(s, QUANDO).testo).not.toContain('Scala dal percorso');
+  });
+});
+
+describe('quali sedute mostrano il pulsante «Scala dal percorso»', () => {
+  it('quella che ha provato e non ci è riuscita', () => {
+    expect(restaDaScalare({ scaloDaFare: true })).toBe(true);
+  });
+
+  it('non quella che ha già scalato', () => {
+    expect(restaDaScalare({ scaloDaFare: true, planDecremented: true })).toBe(false);
+  });
+
+  // Le sedute chiuse prima del 12 settembre 2026 non hanno nessuno dei
+  // due campi: non si sa se abbiano scalato, e proporre il pulsante su
+  // tutte vorrebbe dire invitare a scalare due volte.
+  it('e MAI una seduta vecchia, di cui non sappiamo niente', () => {
+    expect(restaDaScalare({})).toBe(false);
+    expect(restaDaScalare({ planDecremented: false })).toBe(false);
+  });
+});
+
+describe('le date si scrivono in italiano, senza dipendere dal telefono', () => {
+  it('giorno e mese per esteso', () => {
+    expect(giorno(new Date(2026, 8, 5))).toBe('5 settembre');
+    expect(giorno(new Date(2026, 0, 31))).toBe('31 gennaio');
+  });
+
+  it('una data storta non lascia un buco nella frase', () => {
+    expect(giorno(new Date('boh'))).toBe('quel giorno');
+  });
+});
+
 describe('versione', () => {
   it('tracciata', () => {
-    expect(PIANI_VERSION).toBe(1);
+    expect(PIANI_VERSION).toBe(2);
   });
 });

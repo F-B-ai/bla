@@ -9,8 +9,10 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { ICONE_ALLEGATO, NOMI_ALLEGATO, TipoAllegato } from '../../domain/comunicazione';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { crossAlert } from '../../utils/alert';
@@ -160,6 +162,11 @@ export const NotificationsScreen: React.FC = () => {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+// L'indirizzo dell'allegato viaggia dentro la notifica (vedi
+// comunicazioneService): niente letture in più per mostrarlo.
+const allegatoDi = (n: { data?: Record<string, string> }): string | null =>
+  (n.data?.allegatoUrl && String(n.data.allegatoUrl)) || null;
+
   const renderNotification = ({ item }: { item: AppNotification }) => {
     const iconName = getNotificationIcon(item.type) as any;
     const iconColor = getNotificationColor(item.type);
@@ -183,6 +190,28 @@ export const NotificationsScreen: React.FC = () => {
           <Text style={styles.notifBody} numberOfLines={3}>
             {item.body}
           </Text>
+          {/* Una comunicazione dalla bacheca può portarsi dietro una foto,
+              un video o un audio: si apre da qui, con un tocco. */}
+          {allegatoDi(item) && (
+            <TouchableOpacity
+              style={styles.allegatoRiga}
+              onPress={() => {
+                const url = allegatoDi(item)!;
+                handleMarkRead(item);
+                Linking.openURL(url).catch(() =>
+                  crossAlert('Errore', 'Non riesco ad aprire l\'allegato.'));
+              }}
+            >
+              <Ionicons
+                name={(ICONE_ALLEGATO[(item.data?.allegatoTipo as TipoAllegato)] || 'attach') as any}
+                size={15}
+                color={colors.accent}
+              />
+              <Text style={styles.allegatoTxt}>
+                Apri {NOMI_ALLEGATO[(item.data?.allegatoTipo as TipoAllegato)]?.toLowerCase() || 'allegato'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         <TouchableOpacity
           style={styles.deleteBtn}
@@ -392,6 +421,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     color: colors.textLight,
     marginLeft: spacing.sm,
+  },
+  allegatoRiga: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  allegatoTxt: {
+    fontSize: 12,
+    color: colors.accent,
+    fontWeight: '600',
   },
   notifBody: {
     fontSize: fontSize.sm,
