@@ -65,6 +65,8 @@ export const CARTELLE: CartellaStorage[] = [
     contenuto: 'I materiali pubblicati dallo studio.' },
   { id: 'nutritionTeam', nome: 'Team nutrizione', sensibile: true,
     contenuto: 'Gli allegati del team nutrizionale: non li legge l\'allievo.' },
+  { id: 'comunicazioni', nome: 'Allegati delle comunicazioni', sensibile: false,
+    contenuto: 'Foto, video e audio mandati a tutti gli allievi dalla bacheca.' },
 ];
 
 export const PREFISSI: string[] = CARTELLE.map((c) => c.id);

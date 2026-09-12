@@ -503,6 +503,18 @@ service cloud.firestore {
     }
 
     // Notifications
+    // ----------------------------------------------------------
+    // LA BACHECA — un messaggio a tutti gli allievi
+    // ----------------------------------------------------------
+    // La scrive lo staff, la legge chi è dentro. Si cancella solo dal
+    // titolare: una comunicazione tolta dalla bacheca sparisce per
+    // tutti, e non è una decisione da collaboratore.
+    match /comunicazioni/{comunicazioneId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+      allow delete: if isOwnerOrManager();
+    }
+
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.userId == request.auth.uid
