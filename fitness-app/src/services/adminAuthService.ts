@@ -1,4 +1,5 @@
 import { httpsCallable } from 'firebase/functions';
+import { spiegaErroreAdmin } from '../domain/erroreAdmin';
 import { functions } from '../config/firebase';
 
 // ============================================================
@@ -12,26 +13,16 @@ import { functions } from '../config/firebase';
 // sono attive, gli errori vengono tradotti in un messaggio chiaro.
 // ============================================================
 
-const FUNCTIONS_NOT_READY =
-  'Questa operazione richiede le Cloud Functions (piano Blaze) non ancora attive. ' +
-  'In alternativa usa "Invia link reimpostazione password".';
-
-const translateError = (err: unknown): Error => {
-  const e = err as { code?: string; message?: string };
-  const code = e?.code || '';
-  if (
-    code.includes('not-found') ||
-    code.includes('unavailable') ||
-    code.includes('internal') ||
-    (e?.message || '').includes('fetch')
-  ) {
-    return new Error(FUNCTIONS_NOT_READY);
-  }
-  if (code.includes('permission-denied')) {
-    return new Error('Non hai i permessi per questa operazione.');
-  }
-  return new Error(e?.message || 'Operazione non riuscita');
-};
+// Prima qui c'era un solo messaggio buono per tutto: «le Cloud
+// Functions (piano Blaze) non sono attive». Ci finiva dentro anche il
+// codice `internal`, che è quello che una Function restituisce quando
+// il SUO codice fallisce — cioè praticamente ogni errore vero.
+//
+// Le Functions erano attive e rispondevano. Quel messaggio non è mai
+// stato vero, e mandava a cercare nel posto sbagliato.
+// La classificazione vive in domain/erroreAdmin.
+const translateError = (err: unknown): Error =>
+  new Error(spiegaErroreAdmin(err));
 
 export const adminSetUserEmail = async (
   targetUserId: string,
