@@ -108,6 +108,48 @@ export const elencaInteressati = async (): Promise<SchedaOnboarding[]> => {
 };
 
 /**
+ * Riapre una scheda: serve perché la valutazione Mind Movement si fa in
+ * DUE sessioni, e fra la prima e la seconda passano dei giorni.
+ */
+export const leggiScheda1 = async (id: string): Promise<SchedaOnboarding | null> => {
+  try {
+    const d = await getDoc(doc(db, COLLECTION, id));
+    return d.exists() ? leggiScheda(d.id, d.data()) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Aggiorna una consulenza già aperta, invece di crearne una seconda.
+ *
+ * Per un ALLIEVO ogni salvataggio crea una versione nuova e la
+ * precedente resta: è la sua storia. Per una consulenza no — è un
+ * lavoro in corso su due sedute, e due copie della stessa persona
+ * nell'elenco delle consulenze in sospeso sono solo confusione.
+ */
+export const aggiornaInteressato = async (
+  schedaId: string,
+  input: {
+    ospiteNome?: string;
+    ospiteTelefono?: string;
+    risposte: Risposte;
+    checklist: string[];
+    noteCoach?: string;
+  }
+): Promise<void> => {
+  await updateDoc(doc(db, COLLECTION, schedaId), {
+    ospiteNome: input.ospiteNome?.trim() || null,
+    ospiteTelefono: input.ospiteTelefono?.trim() || null,
+    risposte: input.risposte,
+    checklist: input.checklist,
+    noteCoach: input.noteCoach || null,
+    esitoSnapshot: valutaOnboarding(input.risposte),
+    aggiornataIl: Timestamp.now(),
+  });
+};
+
+/**
  * Cancella la scheda di un interessato.
  *
  * Le schede degli ALLIEVI non si cancellano — né da qui né dalle

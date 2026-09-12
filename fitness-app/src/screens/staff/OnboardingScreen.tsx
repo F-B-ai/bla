@@ -16,7 +16,7 @@ import {
 import { valutaOnboarding, Risposte } from '../../domain/onboarding';
 import {
   saveOnboarding, getOnboarding, elencaInteressati,
-  cancellaInteressato, collegaAllievo, SchedaOnboarding,
+  cancellaInteressato, collegaAllievo, aggiornaInteressato, SchedaOnboarding,
 } from '../../services/onboardingService';
 import {
   TipoSoggetto, controllaSoggetto, descriviScadenza, scaduta,
@@ -47,6 +47,9 @@ export function OnboardingScreen() {
   const [ospiteNome, setOspiteNome] = useState('');
   const [ospiteTelefono, setOspiteTelefono] = useState('');
   const [interessati, setInteressati] = useState<SchedaOnboarding[]>([]);
+  // Quale consulenza si sta modificando. Se è aperta, salvare AGGIORNA
+  // quella invece di crearne una seconda con lo stesso nome.
+  const [schedaApertaId, setSchedaApertaId] = useState<string | null>(null);
 
   const ricaricaInteressati = useCallback(() => {
     elencaInteressati().then(setInteressati).catch(() => setInteressati([]));
@@ -92,6 +95,21 @@ export function OnboardingScreen() {
     if (esito.compilati === 0) { crossAlert('Errore', 'Compila almeno un campo'); return; }
     setSaving(true);
     try {
+      if (tipo === 'interessato' && schedaApertaId) {
+        await aggiornaInteressato(schedaApertaId, {
+          ospiteNome, ospiteTelefono, risposte, checklist,
+          noteCoach: note || undefined,
+        });
+        crossAlert(
+          'Consulenza aggiornata',
+          `Le risposte di ${ospiteNome || 'questa persona'} sono state aggiornate. `
+          + 'Puoi riaprirla quando vuoi, anche fra qualche giorno.'
+        );
+        ricaricaInteressati();
+        setSaving(false);
+        return;
+      }
+
       await saveOnboarding({
         tipoSoggetto: tipo,
         studentId: tipo === 'allievo' ? student!.id : undefined,
@@ -112,6 +130,7 @@ export function OnboardingScreen() {
       if (tipo === 'interessato') {
         setOspiteNome(''); setOspiteTelefono('');
         setRisposte({}); setChecklist([]); setNote('');
+        setSchedaApertaId(null);
         ricaricaInteressati();
       }
     } catch {
@@ -122,6 +141,28 @@ export function OnboardingScreen() {
   // ----------------------------------------------------------
   // Che cosa fare di una consulenza, dopo
   // ----------------------------------------------------------
+
+  /**
+   * Riapre una consulenza. Serve per la valutazione in due sessioni:
+   * fra la prima e la seconda passano dei giorni, e le risposte della
+   * prima non si riscrivono a memoria.
+   */
+  const apri = (sch: SchedaOnboarding) => {
+    setTipo('interessato');
+    setSchedaApertaId(sch.id);
+    setOspiteNome(sch.ospiteNome || '');
+    setOspiteTelefono(sch.ospiteTelefono || '');
+    setRisposte(sch.risposte || {});
+    setChecklist(sch.checklist || []);
+    setNote(sch.noteCoach || '');
+    setAperta('anagrafica');
+  };
+
+  const chiudiScheda = () => {
+    setSchedaApertaId(null);
+    setOspiteNome(''); setOspiteTelefono('');
+    setRisposte({}); setChecklist([]); setNote('');
+  };
 
   const cancella = (sch: SchedaOnboarding) => {
     const nome = sch.ospiteNome || 'questa persona';
@@ -274,6 +315,21 @@ export function OnboardingScreen() {
         ))}
       </View>
 
+      {schedaApertaId && tipo === 'interessato' && (
+        <View style={[s.card, { borderColor: colors.accent }]}>
+          <Text style={[s.cardTitle, { color: colors.accent }]}>
+            Stai modificando: {ospiteNome || 'consulenza senza nome'}
+          </Text>
+          <Text style={s.muted}>
+            Salvando aggiorni questa scheda, non ne crei un'altra.
+          </Text>
+          <TouchableOpacity onPress={chiudiScheda} style={s.chiudiBtn}>
+            <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+            <Text style={s.chiudiTxt}>Chiudi e comincia una consulenza nuova</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {tipo === 'allievo' ? (
         <StudentSearchPicker
           students={students}
@@ -321,28 +377,41 @@ export function OnboardingScreen() {
           <Text style={s.muted}>
             Persone che hanno fatto la consulenza e non sono (ancora) allievi.
           </Text>
-          {interessati.map((sch) => (
-            <View key={sch.id} style={s.interessatoRiga}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.interessatoNome}>
-                  {sch.ospiteNome || 'Senza nome'}
-                  {sch.ospiteTelefono ? ` · ${sch.ospiteTelefono}` : ''}
-                </Text>
-                <Text style={[
-                  s.interessatoScad,
-                  scaduta(sch.date) && { color: colors.error },
-                ]}>
-                  {sch.date.toLocaleDateString('it-IT')} — {descriviScadenza(sch.date)}
-                </Text>
+          {interessati.map((sch) => {
+            const apertaQui = schedaApertaId === sch.id;
+            return (
+              <View key={sch.id} style={[s.interessatoRiga, apertaQui && s.interessatoRigaAperta]}>
+                {/* Tutta la riga si tocca: è il modo per RILEGGERE quello
+                    che si è raccolto. Senza, la scheda si salvava e non
+                    si riapriva più — e con la valutazione in due sessioni
+                    è precisamente quello che serve. */}
+                <TouchableOpacity style={{ flex: 1 }} onPress={() => apri(sch)} activeOpacity={0.6}>
+                  <Text style={s.interessatoNome}>
+                    {apertaQui ? '● ' : ''}{sch.ospiteNome || 'Senza nome'}
+                    {sch.ospiteTelefono ? ` · ${sch.ospiteTelefono}` : ''}
+                  </Text>
+                  <Text style={[
+                    s.interessatoScad,
+                    scaduta(sch.date) && { color: colors.error },
+                  ]}>
+                    {apertaQui
+                      ? 'Aperta qui sotto — salvando aggiorni questa'
+                      : `${sch.date.toLocaleDateString('it-IT')} — ${descriviScadenza(sch.date)}`}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => collega(sch)} style={s.interessatoBtn}>
+                  <Ionicons name="link-outline" size={17} color={colors.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => cancella(sch)} style={s.interessatoBtn}>
+                  <Ionicons name="trash-outline" size={17} color={colors.error} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => collega(sch)} style={s.interessatoBtn}>
-                <Ionicons name="link-outline" size={17} color={colors.accent} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => cancella(sch)} style={s.interessatoBtn}>
-                <Ionicons name="trash-outline" size={17} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
+          <Text style={s.interessatoAiuto}>
+            Tocca una riga per riaprirla e continuare. 🔗 la collega a un allievo,
+            🗑 la cancella.
+          </Text>
         </View>
       )}
 
@@ -476,6 +545,15 @@ const s = StyleSheet.create({
   },
   interessatoNome: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text },
   interessatoScad: { fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
+  interessatoRigaAperta: { backgroundColor: colors.surface, borderRadius: borderRadius.md },
+  interessatoAiuto: {
+    fontSize: fontSize.xs, color: colors.textLight,
+    marginTop: spacing.sm, lineHeight: 16,
+  },
+  chiudiBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm,
+  },
+  chiudiTxt: { fontSize: fontSize.sm, color: colors.accent, fontWeight: '600' },
   interessatoBtn: { padding: spacing.xs },
   soggettoRiga: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
   soggettoChip: {
