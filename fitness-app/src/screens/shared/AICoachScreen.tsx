@@ -22,6 +22,7 @@ import { getStudentMeasurements } from '../../services/nutritionistService';
 import { getStudentSessions } from '../../services/sessionService';
 import { getStudentGamification } from '../../services/gamificationService';
 import { generateAICoachInsights, AICoachInsights } from '../../services/aiService';
+import { StudentSearchPicker } from '../../components/common/StudentSearchPicker';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { crossAlert } from '../../utils/alert';
 
@@ -90,7 +91,6 @@ export const AICoachScreen: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [insights, setInsights] = useState<AICoachInsights | null>(null);
-  const [showStudentPicker, setShowStudentPicker] = useState(false);
 
   // --- Carica lista studenti per staff ---
   const loadStudents = useCallback(async () => {
@@ -292,82 +292,37 @@ export const AICoachScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* Student Selector (staff only) */}
+        {/* ------------------------------------------------------------
+            SCEGLIERE L'ALLIEVO
+            Qui c'era un elenco fatto in casa, senza riga di ricerca:
+            con settanta allievi voleva dire scorrere tutto per
+            arrivare a una persona. È lo stesso componente che usano
+            le altre schermate — una cosa sola, scritta una volta.
+            ------------------------------------------------------------ */}
         {isStaff && (
-          <View style={styles.selectorContainer}>
-            <Text style={styles.sectionLabel}>Seleziona Allievo</Text>
-            <TouchableOpacity
-              style={styles.selectorButton}
-              onPress={() => setShowStudentPicker(!showStudentPicker)}
-            >
-              <Ionicons name="person" size={18} color={colors.accent} />
-              <Text style={styles.selectorText} numberOfLines={1}>
-                {selectedStudent
-                  ? `${selectedStudent.name} ${selectedStudent.surname}`
-                  : 'Scegli un allievo...'}
-              </Text>
-              <Ionicons
-                name={showStudentPicker ? 'chevron-up' : 'chevron-down'}
-                size={18}
-                color={colors.textSecondary}
+          // In questa schermata il margine laterale lo mette ogni
+          // blocco, non lo scorrevole: senza questo involucro il
+          // selettore resterebbe attaccato ai bordi.
+          <View style={styles.selettoreAllievo}>
+            {loading ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.accent}
+                style={{ padding: spacing.md }}
               />
-            </TouchableOpacity>
-
-            {showStudentPicker && (
-              <View style={styles.pickerList}>
-                {loading ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={colors.accent}
-                    style={{ padding: spacing.md }}
-                  />
-                ) : students.length === 0 ? (
-                  <Text style={styles.emptyText}>Nessun allievo trovato</Text>
-                ) : (
-                  <ScrollView nestedScrollEnabled>
-                    {students
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((s) => (
-                        <TouchableOpacity
-                          key={s.id}
-                          style={[
-                            styles.pickerItem,
-                            selectedStudentId === s.id && styles.pickerItemSelected,
-                          ]}
-                          onPress={() => {
-                            setSelectedStudentId(s.id);
-                            setShowStudentPicker(false);
-                            setInsights(null);
-                          }}
-                        >
-                          <View style={styles.pickerAvatar}>
-                            <Text style={styles.pickerAvatarText}>
-                              {s.name[0]}
-                              {s.surname[0]}
-                            </Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.pickerName}>
-                              {s.name} {s.surname}
-                            </Text>
-                            {s.goals ? (
-                              <Text style={styles.pickerGoals} numberOfLines={1}>
-                                {s.goals}
-                              </Text>
-                            ) : null}
-                          </View>
-                          {selectedStudentId === s.id && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={20}
-                              color={colors.accent}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                )}
-              </View>
+            ) : (
+              <StudentSearchPicker
+                students={students}
+                selectedId={selectedStudentId || undefined}
+                onSelect={(id) => {
+                  setSelectedStudentId(id);
+                  // L'analisi di prima riguardava un'altra persona: si
+                  // toglie subito, invece di restare sotto un nome nuovo.
+                  setInsights(null);
+                }}
+                label="Seleziona Allievo"
+                placeholder="Cerca allievo per nome…"
+              />
             )}
           </View>
         )}
@@ -639,84 +594,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
-  // --- Student Selector ---
-  selectorContainer: {
+  // Gli stili del vecchio elenco fatto in casa vivevano qui: sono
+  // andati via con lui. Adesso la scelta dell'allievo la disegna
+  // StudentSearchPicker, che porta i propri. Resta solo il margine.
+  selettoreAllievo: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-  },
-  sectionLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
-  },
-  selectorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
-  },
-  selectorText: {
-    flex: 1,
-    fontSize: fontSize.lg,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  pickerList: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginTop: spacing.sm,
-    maxHeight: 400,
-  },
-  pickerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.divider,
-    gap: spacing.sm,
-  },
-  pickerItemSelected: {
-    backgroundColor: colors.accent + '10',
-  },
-  pickerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accent + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerAvatarText: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: colors.accent,
-  },
-  pickerName: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  pickerGoals: {
-    fontSize: fontSize.xs,
-    color: colors.textLight,
-    marginTop: 1,
-  },
-  emptyText: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    padding: spacing.lg,
   },
 
   // --- Student info bar (student role) ---
