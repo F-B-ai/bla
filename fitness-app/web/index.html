@@ -152,7 +152,17 @@
       }
 
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js').then(function (reg) {
+        // `updateViaCache: 'none'` non e' un dettaglio: senza, il browser
+        // controlla se c'e' un service worker nuovo LEGGENDOLO DALLA
+        // PROPRIA CACHE HTTP. Il 13 settembre 2026 sw.js veniva servito
+        // con «immutable, un anno»: in firebase.json la regola generica
+        // per i file .js stava DOPO quella specifica e la sovrascriveva.
+        // Risultato: ogni `reg.update()` rileggeva gli stessi byte
+        // vecchi, non trovava mai niente di nuovo, e la fascia «c'e' una
+        // versione nuova» non poteva comparire nemmeno una volta.
+        // Il meccanismo era giusto e non veniva mai interpellato.
+        // Con questo, il controllo va SEMPRE in rete.
+        navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function (reg) {
           // Una versione nuova già pronta e in attesa: lo si dice subito.
           if (reg.waiting && navigator.serviceWorker.controller) mostraAvviso();
 
