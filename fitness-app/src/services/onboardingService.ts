@@ -15,7 +15,10 @@ import { db } from '../config/firebase';
 import { emitTwinEvent } from './twinEventService';
 import { valutaOnboarding, sintesiPerTwin, Risposte } from '../domain/onboarding';
 import { ONBOARDING_VERSION } from '../data/onboardingForm';
-import { TipoSoggetto, vaSulGemello } from '../domain/interessato';
+import {
+  TipoSoggetto, vaSulGemello, eInteressato, ordinaPerData,
+  spiegaElencoFallito, EsitoElenco,
+} from '../domain/interessato';
 
 const COLLECTION = 'onboardings';
 
@@ -92,18 +95,27 @@ export const saveOnboarding = async (input: {
 /**
  * Le schede di chi è venuto in consulenza e non è (ancora) un allievo.
  * Dalla più recente: è l'ordine con cui si decide che farne.
+ *
+ * A Firestore si chiede SOLO un ordinamento per data — una domanda che
+ * sa rispondere con l'indice che crea da solo. Chiedere anche un
+ * filtro su `tipoSoggetto` voleva un indice composito che non
+ * esisteva: la lettura falliva sempre, il `catch` restituiva una lista
+ * vuota, e la schermata mostrava il nulla come se non ci fosse
+ * nessuno. Lo smistamento si fa qui, dove non può fallire.
+ *
+ * E se la lettura non riesce, si dice: `errore` non è mai decorativo.
  */
-export const elencaInteressati = async (): Promise<SchedaOnboarding[]> => {
+export const elencaInteressati = async (): Promise<EsitoElenco<SchedaOnboarding>> => {
   try {
     const snap = await getDocs(query(
       collection(db, COLLECTION),
-      where('tipoSoggetto', '==', 'interessato'),
       orderBy('date', 'desc'),
-      limit(100)
+      limit(200)
     ));
-    return snap.docs.map((d) => leggiScheda(d.id, d.data()));
-  } catch {
-    return [];
+    const tutte = snap.docs.map((d) => leggiScheda(d.id, d.data()));
+    return { schede: ordinaPerData(tutte.filter(eInteressato)), errore: null };
+  } catch (e) {
+    return { schede: [], errore: spiegaElencoFallito(e) };
   }
 };
 
@@ -214,6 +226,15 @@ const leggiScheda = (id: string, x: Record<string, any>): SchedaOnboarding => ({
   version: x.version || 1,
 });
 
+/**
+ * L'ultima scheda di un allievo.
+ *
+ * Anche qui niente `orderBy` accanto al filtro: il solo `where` su
+ * `studentId` usa l'indice automatico, e la più recente la si sceglie
+ * qui. Prima serviva un indice composito che non c'era, e la funzione
+ * restituiva `null` — «questo allievo non ha mai fatto l'onboarding»,
+ * che è una bugia diversa dalla verità «non sono riuscito a leggere».
+ */
 export const getOnboarding = async (
   studentId: string
 ): Promise<SchedaOnboarding | null> => {
@@ -221,12 +242,10 @@ export const getOnboarding = async (
     const snap = await getDocs(query(
       collection(db, COLLECTION),
       where('studentId', '==', studentId),
-      orderBy('date', 'desc'),
-      limit(1)
+      limit(50)
     ));
     if (snap.empty) return null;
-    const d = snap.docs[0];
-    return leggiScheda(d.id, d.data());
+    return ordinaPerData(snap.docs.map((d) => leggiScheda(d.id, d.data())))[0] || null;
   } catch {
     return null;
   }

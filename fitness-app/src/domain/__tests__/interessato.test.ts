@@ -1,7 +1,7 @@
 import {
   controllaSoggetto, vaSulGemello, giorniRimasti, scaduta,
   descriviScadenza, confermaCancellazione, confermaCollegamento,
-  GIORNI_CONSERVAZIONE,
+  GIORNI_CONSERVAZIONE, eInteressato, ordinaPerData, spiegaElencoFallito,
 } from '../interessato';
 
 // ============================================================
@@ -119,5 +119,94 @@ describe('le due conferme', () => {
     const c = confermaCollegamento('Anna Verdi', 'Anna Verdi');
     expect(c).toContain('non si cancella più');
     expect(c).toContain('primo atto');
+  });
+});
+
+// ============================================================
+// «NON VEDO NESSUN CAMBIAMENTO» — 13 settembre 2026
+// ------------------------------------------------------------
+// L'elenco delle consulenze in sospeso era vuoto perché la lettura
+// falliva (indice mancante) e un catch la trasformava in zero righe.
+// Sullo schermo, «non c'è nessuno» e «è rotto» erano identici.
+// ============================================================
+
+describe('chi finisce nell\'elenco delle consulenze in sospeso', () => {
+  it('chi è marcato interessato', () => {
+    expect(eInteressato({ tipoSoggetto: 'interessato', studentId: '' })).toBe(true);
+  });
+
+  it('non un allievo vero', () => {
+    expect(eInteressato({ tipoSoggetto: 'allievo', studentId: 'a1' })).toBe(false);
+  });
+
+  // Una scheda senza allievo non può essere di nessuno: o è nata prima
+  // che il tipo esistesse, o è stata salvata da un telefono con la
+  // versione vecchia. È lavoro fatto da qualcuno: non si perde.
+  it('e chi non ha nessun allievo, comunque sia finito lì', () => {
+    expect(eInteressato({ studentId: '' })).toBe(true);
+    expect(eInteressato({})).toBe(true);
+    expect(eInteressato({ tipoSoggetto: 'allievo', studentId: '   ' })).toBe(true);
+  });
+});
+
+describe('l\'ordine: la più recente in cima', () => {
+  it('mette davanti la più nuova', () => {
+    const r = ordinaPerData([
+      { id: 'vecchia', date: new Date(2026, 0, 1) },
+      { id: 'nuova', date: new Date(2026, 8, 12) },
+      { id: 'mezzo', date: new Date(2026, 4, 1) },
+    ]);
+    expect(r.map((x) => x.id)).toEqual(['nuova', 'mezzo', 'vecchia']);
+  });
+
+  it('una data mancante o storta non fa sparire la scheda', () => {
+    const r = ordinaPerData([
+      { id: 'senza' },
+      { id: 'buona', date: new Date(2026, 8, 12) },
+      { id: 'storta', date: new Date('boh') },
+    ]);
+    expect(r).toHaveLength(3);
+    expect(r[0].id).toBe('buona');
+  });
+
+  it('non modifica la lista di partenza', () => {
+    const partenza = [
+      { id: 'a', date: new Date(2026, 0, 1) },
+      { id: 'b', date: new Date(2026, 8, 1) },
+    ];
+    ordinaPerData(partenza);
+    expect(partenza.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('quando la lettura non riesce, si dice che cosa è successo', () => {
+  // La regola sopra ogni altra: mai far passare un guasto per un vuoto.
+  it('nessuna frase fa credere che le consulenze siano perse', () => {
+    ['permission-denied', 'failed-precondition: index', 'unavailable', 'boh']
+      .forEach((e) => {
+        const f = spiegaElencoFallito(e);
+        expect(f.length).toBeGreaterThan(30);
+        expect(f).toMatch(/non sono perse|NON sono perse|non riesco/i);
+      });
+  });
+
+  it('i permessi si riconoscono e si spiegano', () => {
+    expect(spiegaElencoFallito({ code: 'permission-denied' }))
+      .toContain('permessi');
+  });
+
+  it('l\'indice mancante dice che è la lettura a non riuscire', () => {
+    const f = spiegaElencoFallito({ code: 'failed-precondition' });
+    expect(f).toContain('indice');
+    expect(f).toContain('NON sono perse');
+  });
+
+  it('la rete assente non si confonde con un database vuoto', () => {
+    expect(spiegaElencoFallito(new Error('client is offline')))
+      .toContain('connessione');
+  });
+
+  it('un errore che non conosco non diventa silenzio', () => {
+    expect(spiegaElencoFallito(null)).toContain('Non riesco a leggere');
   });
 });

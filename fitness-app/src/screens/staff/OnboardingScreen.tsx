@@ -20,7 +20,7 @@ import {
 } from '../../services/onboardingService';
 import {
   TipoSoggetto, controllaSoggetto, descriviScadenza, scaduta,
-  confermaCancellazione, confermaCollegamento,
+  confermaCancellazione, confermaCollegamento, spiegaElencoFallito,
 } from '../../domain/interessato';
 
 // ============================================================
@@ -47,12 +47,21 @@ export function OnboardingScreen() {
   const [ospiteNome, setOspiteNome] = useState('');
   const [ospiteTelefono, setOspiteTelefono] = useState('');
   const [interessati, setInteressati] = useState<SchedaOnboarding[]>([]);
+  const [erroreElenco, setErroreElenco] = useState<string | null>(null);
+  const [caricandoInteressati, setCaricandoInteressati] = useState(true);
   // Quale consulenza si sta modificando. Se è aperta, salvare AGGIORNA
   // quella invece di crearne una seconda con lo stesso nome.
   const [schedaApertaId, setSchedaApertaId] = useState<string | null>(null);
 
+  // Un elenco vuoto e un elenco che non si è potuto leggere sono due
+  // cose diverse, e il 13 settembre 2026 sullo schermo erano la stessa:
+  // niente. Adesso l'errore arriva fin qui e si vede.
   const ricaricaInteressati = useCallback(() => {
-    elencaInteressati().then(setInteressati).catch(() => setInteressati([]));
+    setCaricandoInteressati(true);
+    elencaInteressati()
+      .then((r) => { setInteressati(r.schede); setErroreElenco(r.errore); })
+      .catch((e) => { setInteressati([]); setErroreElenco(spiegaElencoFallito(e)); })
+      .finally(() => setCaricandoInteressati(false));
   }, []);
 
   useEffect(() => { ricaricaInteressati(); }, [ricaricaInteressati]);
@@ -369,15 +378,42 @@ export function OnboardingScreen() {
           sempre non è prudenza: è il contrario. La cancellazione resta
           una scelta umana, ma la scadenza si vede.
           ------------------------------------------------------------ */}
-      {interessati.length > 0 && (
-        <View style={[s.card, { borderColor: colors.warning }]}>
-          <Text style={[s.cardTitle, { color: colors.warning }]}>
-            Consulenze in sospeso ({interessati.length})
+      {/* Il riquadro c'è SEMPRE. Prima compariva solo con almeno una
+          consulenza dentro: se la lettura falliva non compariva niente,
+          e non si poteva distinguere «non c'è nessuno» da «è rotto». */}
+      <View style={[
+        s.card,
+        { borderColor: erroreElenco ? colors.error : colors.warning },
+      ]}>
+        <Text style={[
+          s.cardTitle,
+          { color: erroreElenco ? colors.error : colors.warning },
+        ]}>
+          Consulenze in sospeso{interessati.length > 0 ? ` (${interessati.length})` : ''}
+        </Text>
+
+        {erroreElenco ? (
+          <>
+            <Text style={[s.muted, { color: colors.error }]}>{erroreElenco}</Text>
+            <TouchableOpacity onPress={ricaricaInteressati} style={s.chiudiBtn}>
+              <Ionicons name="refresh-outline" size={16} color={colors.accent} />
+              <Text style={s.chiudiTxt}>Riprova</Text>
+            </TouchableOpacity>
+          </>
+        ) : caricandoInteressati ? (
+          <Text style={s.muted}>Sto guardando…</Text>
+        ) : interessati.length === 0 ? (
+          <Text style={s.muted}>
+            Nessuna. Quando salvi una consulenza con «Consulenza» selezionato,
+            la ritrovi qui e la riapri quando vuoi — anche fra qualche giorno.
           </Text>
+        ) : (
           <Text style={s.muted}>
             Persone che hanno fatto la consulenza e non sono (ancora) allievi.
           </Text>
-          {interessati.map((sch) => {
+        )}
+
+        {interessati.map((sch) => {
             const apertaQui = schedaApertaId === sch.id;
             return (
               <View key={sch.id} style={[s.interessatoRiga, apertaQui && s.interessatoRigaAperta]}>
@@ -408,12 +444,13 @@ export function OnboardingScreen() {
               </View>
             );
           })}
+        {interessati.length > 0 && (
           <Text style={s.interessatoAiuto}>
             Tocca una riga per riaprirla e continuare. 🔗 la collega a un allievo,
             🗑 la cancella.
           </Text>
-        </View>
-      )}
+        )}
+      </View>
 
       {(tipo === 'interessato' || student) && (
         <>

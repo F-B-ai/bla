@@ -40,7 +40,27 @@
 // peggio. Ma la schermata lo dice, con i giorni in faccia.
 // ============================================================
 
-export const INTERESSATO_VERSION = 1;
+// ------------------------------------------------------------
+// 13 SETTEMBRE 2026 — «NON VEDO NESSUN CAMBIAMENTO»
+// ------------------------------------------------------------
+// Il titolare ha aperto la schermata e non ha visto l'elenco delle
+// consulenze in sospeso. Il pulsante c'era, il codice era in rete:
+// l'elenco era VUOTO, e vuoto e rotto si vedevano uguale.
+//
+// La lettura chiedeva a Firestore un filtro su `tipoSoggetto` più un
+// ordinamento su `date`. Una domanda così ha bisogno di un indice
+// composito che nessuno aveva creato, quindi falliva sempre — e il
+// `catch` che avevo scritto io restituiva una lista vuota. Il difetto
+// che ho passato la settimana a togliere dagli altri, scritto di mia
+// mano: un errore raccolto e buttato via, e la schermata che dice
+// «non c'è niente» quando la verità è «non sono riuscito a guardare».
+//
+// Adesso: si chiede a Firestore solo quello che sa dare senza indici
+// nuovi (le ultime schede in ordine di data), e si sceglie qui chi è
+// un interessato. Se la lettura fallisce, si vede che è fallita.
+// ------------------------------------------------------------
+
+export const INTERESSATO_VERSION = 2;
 
 export type TipoSoggetto = 'allievo' | 'interessato';
 
@@ -103,6 +123,81 @@ export const controllaSoggetto = (s: Partial<Soggetto>): EsitoSoggetto => {
  */
 export const vaSulGemello = (tipo: TipoSoggetto): boolean =>
   tipo === 'allievo';
+
+// ------------------------------------------------------------
+// Chi finisce nell'elenco delle consulenze in sospeso
+// ------------------------------------------------------------
+
+/** Quel poco che serve per decidere se una scheda è in sospeso. */
+export interface SchedaDaSmistare {
+  tipoSoggetto?: string;
+  studentId?: string;
+  date?: Date;
+}
+
+/**
+ * È una consulenza in sospeso?
+ *
+ * Due casi, non uno:
+ *  · la scheda dice di essere di un interessato;
+ *  · la scheda non ha un allievo. Non può essere di nessuno: o è nata
+ *    prima che esistesse il tipo, o è stata salvata mentre il
+ *    telefono aveva ancora la versione vecchia. In tutti e due i casi
+ *    è lavoro fatto da qualcuno, e non si perde per un campo mancante.
+ */
+export const eInteressato = (s: SchedaDaSmistare): boolean =>
+  s.tipoSoggetto === 'interessato' || !(s.studentId || '').trim();
+
+/** Dalla più recente: è l'ordine con cui si decide che farne. */
+export const ordinaPerData = <T extends { date?: Date }>(schede: T[]): T[] =>
+  [...(schede || [])].sort((a, b) => {
+    const ta = a.date instanceof Date && !isNaN(a.date.getTime()) ? a.date.getTime() : 0;
+    const tb = b.date instanceof Date && !isNaN(b.date.getTime()) ? b.date.getTime() : 0;
+    return tb - ta;
+  });
+
+// ------------------------------------------------------------
+// Quando la lettura non riesce
+// ------------------------------------------------------------
+
+export interface EsitoElenco<T> {
+  schede: T[];
+  /** null quando è andata bene. Altrimenti la frase da mostrare. */
+  errore: string | null;
+}
+
+/**
+ * Che cosa si legge al posto dell'elenco quando Firestore non risponde.
+ *
+ * Non «errore»: che cosa NON si sta vedendo, e che i dati ci sono
+ * ancora. Un elenco vuoto per un guasto e un elenco vuoto perché non
+ * c'è nessuno devono avere due frasi diverse — confonderli è
+ * esattamente il difetto che ha nascosto questa schermata.
+ */
+export const spiegaElencoFallito = (errore: unknown): string => {
+  const testo = String(
+    (errore as { code?: string })?.code
+    || (errore as { message?: string })?.message
+    || errore || ''
+  ).toLowerCase();
+
+  if (testo.includes('permission') || testo.includes('insufficient')) {
+    return 'Non ho i permessi per leggere le consulenze — che NON sono perse: '
+      + 'è la lettura a essere bloccata. Esci e rientra nell\'App; se continua, '
+      + 'sono le regole di sicurezza da sistemare.';
+  }
+  if (testo.includes('index') || testo.includes('failed-precondition')) {
+    return 'Il database non riesce a ordinare questo elenco (manca un indice). '
+      + 'Le consulenze NON sono perse: è la lettura che non riesce.';
+  }
+  if (testo.includes('offline') || testo.includes('unavailable')
+    || testo.includes('network')) {
+    return 'Non riesco a raggiungere il database. Controlla la connessione '
+      + 'e riprova: le consulenze sono al loro posto.';
+  }
+  return 'Non riesco a leggere le consulenze in sospeso adesso. '
+    + 'Non sono perse: riprova fra poco.';
+};
 
 // ------------------------------------------------------------
 // La scadenza
