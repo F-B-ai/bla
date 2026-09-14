@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { istruzioniPonte } from '../domain/ponteCal';
 
 // ============================================================
 // LE DUE PORTE DEL BOT
@@ -67,6 +68,39 @@ describe('chi legge non scrive', () => {
 
   it('la risposta porta con sé il limite, insieme ai dati', () => {
     expect(liberi).toContain('AVVISO_SOLA_LETTURA');
+  });
+});
+
+describe('le istruzioni che il titolare inoltra', () => {
+  // Il pulsante «Copia chiave e istruzioni» deve consegnare il ponte
+  // INTERO: se descrive solo metà, chi esegue usa solo metà.
+  const testo = istruzioniPonte('https://essere-3fe6f.web.app', 'CHIAVE-DI-PROVA');
+
+  it('parlano di tutte e due le porte', () => {
+    expect(testo).toContain('/v1/cal/liberi');
+    expect(testo).toMatch(/POST\s+\S+\/v1\/cal\b/);
+  });
+
+  it('portano la chiave, una volta sola da incollare', () => {
+    expect(testo).toContain('CHIAVE-DI-PROVA');
+  });
+
+  it('e la regola della giornata, con i tre orari', () => {
+    ['09:00', '17:30', '19:30'].forEach((o) => expect(testo).toContain(o));
+  });
+
+  // Il limite che il titolare ha messo per primo.
+  it('dicono a chiare lettere che nessuna porta crea appuntamenti', () => {
+    expect(testo).toContain('Nessuna delle due crea appuntamenti');
+    expect(testo).toContain('RICHIESTE IN ATTESA');
+  });
+
+  it('e vietano di dire alla persona che è fatta', () => {
+    expect(testo).toContain('NON dire mai che l\'appuntamento è preso');
+  });
+
+  it('spiegano che dalla lettura non escono nomi né telefoni', () => {
+    expect(testo).toContain('SOLO ore');
   });
 });
 
