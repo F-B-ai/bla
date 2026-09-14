@@ -59,6 +59,28 @@ service cloud.firestore {
         .hasOnly(['status', 'cancelledAt', 'isCountedAsCompleted']);
     }
 
+    // ------------------------------------------------------------
+    // L'ANNULLAMENTO È DEL TITOLARE
+    // ------------------------------------------------------------
+    // 14 settembre 2026: «I manager, collaboratori, nutrizionisti non
+    // possono decidere l'annullamento. Possono solo fissare
+    // l'appuntamento, spostarlo, quindi modificarlo, ma non hanno la
+    // possibilità di annullarlo o cancellarlo.»
+    //
+    // Nascondere i due pulsanti non basta: senza questa regola
+    // resterebbero raggiungibili da fuori l'App.
+    // ------------------------------------------------------------
+    function statoAnnullato(s) {
+      return s in ['cancelled', 'cancelled_by_student', 'cancelled_late'];
+    }
+
+    // Uno staff che non è il titolare può cambiare tutto TRANNE
+    // portare una seduta in uno stato annullato.
+    function nonStaAnnullando() {
+      return !(request.resource.data.status != resource.data.status
+        && statoAnnullato(request.resource.data.status));
+    }
+
     function annullamentoInRegola(statoFinale) {
       return isAuthenticated()
         && resource.data.studentId == request.auth.uid
@@ -345,23 +367,26 @@ service cloud.firestore {
 
     match /sessions/{sessionId} {
       allow read: if isStaff() || resource.data.studentId == request.auth.uid;
-      // Le sedute le mette in agenda lo staff: nell'App il pulsante
-      // «+ Nuovo Appuntamento» è già solo suo.
+      // Fissare una seduta lo fa tutto lo staff: è il loro lavoro.
       allow create: if isStaff();
-      // Lo staff modifica quello che serve. L'allievo può fare UNA
+      // Il titolare fa tutto. Gli altri spostano, correggono e
+      // segnano completata, ma non annullano. L'allievo può fare UNA
       // cosa sola sulla PROPRIA seduta: annullarla, in tempo.
-      allow update: if isStaff()
+      allow update: if isOwner()
+        || (isStaff() && nonStaAnnullando())
         || annullamentoInRegola('cancelled_by_student');
-      allow delete: if isStaff();
+      // Anche l'appuntamento preso per sbaglio lo cancella il titolare.
+      allow delete: if isOwner();
     }
 
     // Nutritionist appointments - dati sensibili
     match /nutritionistAppointments/{appointmentId} {
       allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
-      allow update: if isStaff()
+      allow update: if isOwner()
+        || (isStaff() && nonStaAnnullando())
         || annullamentoInRegola('cancelled');
-      allow delete: if isStaff();
+      allow delete: if isOwner();
     }
 
     // Body measurements - dati sanitari sensibili

@@ -101,6 +101,12 @@ export interface TrainingSession {
    *  comparire «Scala dal percorso» sulla seduta: senza, una seduta
    *  registrata in ritardo restava zoppa e nessuno lo sapeva. */
   scaloDaFare?: boolean;
+  /** true quando il titolare ha annullato questa seduta fuori dalle
+   *  dieci ore SENZA conteggiarla: è una delle due cortesie che
+   *  spettano a ogni allievo. Vedi domain/eccezioni.ts. */
+  eccezioneConcessa?: boolean;
+  /** che numero era, quando è stata concessa (1 o 2) */
+  eccezioneNumero?: number;
   /**
    * Che seduta è. Assente = individuale: le sedute registrate prima
    * che questo campo esistesse restano quello che erano.
@@ -448,6 +454,10 @@ export interface NutritionistAppointment {
   /** true quando si è provato a scalare e non si è potuto: vedi
    *  TrainingSession.scaloDaFare */
   scaloDaFare?: boolean;
+  /** eccezione alle dieci ore concessa dal titolare: vedi
+   *  TrainingSession.eccezioneConcessa */
+  eccezioneConcessa?: boolean;
+  eccezioneNumero?: number;
 }
 
 export interface BodyMeasurement {

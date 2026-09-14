@@ -60,6 +60,51 @@ describe('la porta accanto non resta aperta', () => {
   });
 });
 
+// ============================================================
+// «QUESTO È UN CONTROLLO CHE DOVEVA AVERE SOLAMENTE IO»
+// ------------------------------------------------------------
+// 14 settembre 2026: annullare ed eliminare passano al titolare.
+// Nascondere i due pulsanti non basta — senza queste regole
+// resterebbero raggiungibili da fuori l'App.
+// ============================================================
+
+describe('annullare ed eliminare sono del titolare', () => {
+  const blocchi = senzaCommenti.split('match /').filter((b) =>
+    b.startsWith('sessions/') || b.startsWith('nutritionistAppointments/'));
+
+  it('eliminare: solo il titolare, su sedute e visite', () => {
+    expect(blocchi).toHaveLength(2);
+    blocchi.forEach((b) => {
+      expect(b).toMatch(/allow delete:\s*if isOwner\(\)\s*;/);
+      expect(b).not.toMatch(/allow delete:\s*if isStaff\(\)\s*;/);
+    });
+  });
+
+  it('aggiornare: il titolare tutto, gli altri solo se non stanno annullando', () => {
+    blocchi.forEach((b) => {
+      expect(b).toContain('isOwner()');
+      expect(b).toContain('nonStaAnnullando()');
+      // la vecchia riga che dava tutto a tutto lo staff
+      expect(b).not.toMatch(/allow update:\s*if isStaff\(\)\s*$/m);
+    });
+  });
+
+  it('gli stati annullati sono elencati tutti e tre', () => {
+    ['cancelled', 'cancelled_by_student', 'cancelled_late'].forEach((s) =>
+      expect(senzaCommenti).toContain(`'${s}'`));
+  });
+
+  // Il buco classico: cambio l'ora E annullo nella stessa scrittura.
+  it('il divieto guarda lo stato finale, non solo i campi toccati', () => {
+    const f = senzaCommenti.slice(
+      senzaCommenti.indexOf('function nonStaAnnullando'),
+      senzaCommenti.indexOf('function nonStaAnnullando') + 300
+    );
+    expect(f).toContain('request.resource.data.status');
+    expect(f).toContain('statoAnnullato');
+  });
+});
+
 describe('che cosa può fare un allievo sulla propria seduta', () => {
   const regola = senzaCommenti.slice(
     senzaCommenti.indexOf('function annullamentoInRegola'),

@@ -67,6 +67,11 @@ import {
   giaScalata, registrazionePassata, giorno, Avviso,
 } from '../../domain/piani';
 import { valutaAnnullamento } from '../../domain/annullamento';
+import {
+  permessiAgenda, spiegaNienteAnnullo, spiegaNienteEliminazione,
+} from '../../domain/permessiAgenda';
+import { valutaEccezione, riassuntoEccezioni } from '../../domain/eccezioni';
+import { contaEccezioniAllievo } from '../../services/eccezioniService';
 import { createNotification } from '../../services/notificationService';
 import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequestService';
 import { addTransaction } from '../../services/financialService';
@@ -177,6 +182,9 @@ export const CalendarScreen: React.FC = () => {
   const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
   const canSeeAll = isOwner;
   const isStaff = isOwner || isManager || isCollaborator;
+  // Annullare ed eliminare sono del titolare soltanto: gli altri
+  // fissano, spostano e completano. Vedi domain/permessiAgenda.ts.
+  const permessi = permessiAgenda(user?.role);
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
@@ -920,17 +928,35 @@ export const CalendarScreen: React.FC = () => {
     ]);
   };
 
-  const handleCancel = (item: AppointmentItem) => {
-    // L'ALLIEVO passa dal giudizio delle dieci ore; lo STAFF no.
-    // Se una persona telefona due ore prima per un imprevisto vero,
-    // quella decisione la prende chi la segue, non un contatore.
-    //
-    // Qui c'era «Annulla comunque», che annullava davvero: il limite
-    // si scavalcava da soli, sempre. Vedi domain/annullamento.ts.
+  const handleCancel = async (item: AppointmentItem) => {
+    // L'ALLIEVO passa dal giudizio delle dieci ore. Dopo il limite
+    // non annulla più: qui c'era «Annulla comunque», che annullava
+    // davvero. Vedi domain/annullamento.ts.
     if (isStudent) {
       const v = valutaAnnullamento({ quando: item.date, stato: item.status });
       if (!v.puo) {
         crossAlert(v.titolo, v.messaggio, [{ text: 'Ho capito', style: 'cancel' }]);
+        return;
+      }
+    }
+
+    // MANAGER, COLLABORATORI, NUTRIZIONISTI non annullano: riferiscono
+    // al titolare, che decide. Vedi domain/permessiAgenda.ts.
+    if (isStaff && !permessi.annullare) {
+      crossAlert('Lo decide il titolare', spiegaNienteAnnullo(), [
+        { text: 'Ho capito', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    // IL TITOLARE, fuori dalle dieci ore: è un'eccezione, e le
+    // eccezioni sono due. Alla terza la lezione si conta comunque.
+    if (permessi.annullare && !isStudent) {
+      const fuoriTempo = !valutaAnnullamento({
+        quando: item.date, stato: item.status,
+      }).puo;
+      if (fuoriTempo && item.status === 'scheduled') {
+        await chiediEccezione(item);
         return;
       }
     }
@@ -975,7 +1001,92 @@ export const CalendarScreen: React.FC = () => {
     ]);
   };
 
+  /**
+   * L'annullamento fuori tempo massimo, deciso dal titolare.
+   *
+   * Non decide il software: gli mette davanti il numero — è la
+   * prima, la seconda, o una che va conteggiata — e lui sceglie.
+   * Dopo sei mesi nessuno si ricorda a chi l'ha già fatta.
+   */
+  const chiediEccezione = async (item: AppointmentItem) => {
+    const nome = getStudentName(item.studentId);
+    const { quante, errore } = await contaEccezioniAllievo(item.studentId);
+
+    // Zero per un errore di lettura vorrebbe dire «non ne ha mai
+    // avute»: regalerebbe la terza a chi le ha finite. Si dice.
+    if (errore) {
+      crossAlert('Non riesco a contare le eccezioni', errore, [
+        { text: 'Lascia stare', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    const e = valutaEccezione(quante, nome);
+    crossAlert(e.titolo, e.messaggio, [
+      { text: 'No, la lascio', style: 'cancel' },
+      {
+        text: e.azione,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const segno: Record<string, unknown> = {
+              status: eSessione(item.kind) ? 'cancelled_by_student' : 'cancelled',
+              cancelledAt: new Date(),
+              isCountedAsCompleted: e.conteggiata,
+              eccezioneConcessa: e.graziata,
+              eccezioneNumero: e.numero,
+            };
+            if (eSessione(item.kind)) await updateSession(item.id, segno);
+            else await updateAppointment(item.id, segno);
+
+            // Conteggiata = si scala dal percorso, come una svolta.
+            // Graziata = non si tocca niente: la lezione resta sua.
+            let coda = '';
+            if (e.conteggiata) {
+              const esito = await scalaSeduta(item.studentId, item.kind, item.date);
+              if (!esito.scalata) {
+                const daFare = { planDecremented: false, scaloDaFare: true };
+                if (eSessione(item.kind)) await updateSession(item.id, daFare);
+                else await updateAppointment(item.id, daFare);
+              }
+              coda = '\n\n' + (esito.scalata
+                ? 'Scalata dal percorso.'
+                : 'NON scalata dal percorso: riaprila e tocca «Scala dal percorso».');
+            }
+
+            createNotification(
+              item.studentId,
+              'session_cancelled',
+              'Lezione annullata',
+              e.conteggiata
+                ? `La lezione del ${item.date.toLocaleDateString('it-IT')} è stata `
+                  + 'annullata, e conteggiata come svolta.'
+                : `La lezione del ${item.date.toLocaleDateString('it-IT')} è stata `
+                  + 'annullata senza conteggiarla. Resta nel tuo percorso.'
+            ).catch(() => {});
+
+            crossAlert(
+              e.conteggiata ? 'Annullata e conteggiata' : 'Eccezione concessa',
+              riassuntoEccezioni(quante + (e.graziata ? 1 : 0), nome) + coda
+            );
+            loadData();
+          } catch {
+            crossAlert('Errore', 'Impossibile annullare la seduta.');
+          }
+        },
+      },
+    ]);
+  };
+
   const handleDelete = (item: AppointmentItem) => {
+    // Anche l'appuntamento sbagliato lo cancella il titolare: chi ha
+    // sbagliato lo sposta o lo corregge, e glielo riferisce.
+    if (!permessi.eliminare) {
+      crossAlert('Lo decide il titolare', spiegaNienteEliminazione(), [
+        { text: 'Ho capito', style: 'cancel' },
+      ]);
+      return;
+    }
     crossAlert('Conferma', 'Eliminare definitivamente?', [
       { text: 'No', style: 'cancel' },
       {
@@ -1194,6 +1305,7 @@ export const CalendarScreen: React.FC = () => {
       isStaff={isStaff}
       isOwner={isOwner}
       isStudent={isStudent}
+      ruolo={user?.role}
       getStudentName={getStudentName}
       getStaffName={getStaffName}
       getStudentPhone={getStudentPhone}

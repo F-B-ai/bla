@@ -9,6 +9,7 @@ import { aspetto, eSessione } from '../../../domain/appuntamento';
 import { etichettaGruppo } from '../../../domain/gruppo';
 import { restaDaScalare } from '../../../domain/piani';
 import { valutaAnnullamento } from '../../../domain/annullamento';
+import { permessiAgenda } from '../../../domain/permessiAgenda';
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -40,6 +41,8 @@ export interface AppointmentCardProps {
   isStaff: boolean;
   isOwner: boolean;
   isStudent: boolean;
+  /** ruolo di chi guarda: decide quali pulsanti esistono */
+  ruolo?: string;
   getStudentName: (id: string) => string;
   getStaffName: (id: string) => string;
   getStudentPhone?: (id: string) => string;
@@ -65,6 +68,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   isStaff,
   isOwner,
   isStudent,
+  ruolo,
   getStudentName,
   getStaffName,
   getStudentPhone,
@@ -90,6 +94,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const troppoTardi = isStudent && !valutaAnnullamento({
     quando: item.date, stato: item.status,
   }).puo;
+  const permessi = permessiAgenda(ruolo);
   const staffName = getStaffName(item.staffId);
 
   const handleWhatsAppReminder = () => {
@@ -179,7 +184,11 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       )}
 
-      {/* Staff actions */}
+      {/* Staff actions.
+          «Annulla» e il cestino compaiono SOLO al titolare: chi
+          collabora fissa, sposta e completa, e per il resto riferisce
+          a lui. Un pulsante che si vede e poi nega è peggio di un
+          pulsante che non c'è. Vedi domain/permessiAgenda.ts. */}
       {isStaff && (
         <View style={styles.actionRow}>
           {canStaffAct && (
@@ -192,10 +201,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
                 <Text style={{ ...styles.actionText, color: colors.success }}>Completato</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
-                <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
-                <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
-              </TouchableOpacity>
+              {permessi.annullare && (
+                <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+                  <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
+                  <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
+                </TouchableOpacity>
+              )}
               {isScheduled && (
                 <TouchableOpacity style={styles.actionBtn} onPress={handleWhatsAppReminder}>
                   <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
@@ -204,9 +215,11 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               )}
             </>
           )}
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(item)}>
-            <Ionicons name="trash-outline" size={18} color={colors.error} />
-          </TouchableOpacity>
+          {permessi.eliminare && (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(item)}>
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
       {canStudentCancel && isStudent && (

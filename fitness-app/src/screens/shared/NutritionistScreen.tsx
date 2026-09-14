@@ -44,6 +44,7 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
+import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -331,6 +332,15 @@ export const NutritionistScreen: React.FC = () => {
         crossAlert(v.titolo, v.messaggio, [{ text: 'Ho capito', style: 'cancel' }]);
         return;
       }
+    }
+
+    // Il nutrizionista è uno staff come gli altri: fissa e sposta,
+    // non annulla. Riferisce al titolare. Vedi domain/permessiAgenda.
+    if (!isStudent && !permessiAgenda(user?.role).annullare) {
+      crossAlert('Lo decide il titolare', spiegaNienteAnnullo(), [
+        { text: 'Ho capito', style: 'cancel' },
+      ]);
+      return;
     }
 
     const now = new Date();
