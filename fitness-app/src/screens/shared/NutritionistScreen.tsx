@@ -43,6 +43,7 @@ import {
 } from '../../services/nutritionistService';
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
+import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -318,12 +319,27 @@ export const NutritionistScreen: React.FC = () => {
 
   const handleCancelAppointment = (appointment: NutritionistAppointment) => {
     const appointmentDate = new Date(appointment.date as unknown as string);
+
+    // Vale anche per le visite: l'allievo entro le dieci ore non
+    // annulla pi\u00f9 da solo. Lo staff s\u00ec, sempre \u2014 \u00e8 lui che gestisce
+    // l'agenda. Vedi domain/annullamento.ts.
+    if (isStudent) {
+      const v = valutaAnnullamento({
+        quando: appointmentDate, stato: appointment.status,
+      });
+      if (!v.puo) {
+        crossAlert(v.titolo, v.messaggio, [{ text: 'Ho capito', style: 'cancel' }]);
+        return;
+      }
+    }
+
     const now = new Date();
     const hoursUntil = (appointmentDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     let message = 'Vuoi annullare questa visita?';
-    if (hoursUntil < 10) {
-      message = 'Attenzione: mancano meno di 10 ore alla visita. La cancellazione verr\u00e0 conteggiata come visita effettuata. Procedere?';
+    if (hoursUntil < ORE_LIMITE) {
+      message = `Attenzione: mancano meno di ${ORE_LIMITE} ore alla visita. `
+        + 'La cancellazione verr\u00e0 conteggiata come visita effettuata. Procedere?';
     }
 
     crossAlert('Annulla Visita', message, [

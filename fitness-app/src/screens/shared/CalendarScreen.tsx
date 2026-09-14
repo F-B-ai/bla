@@ -66,6 +66,7 @@ import { scalaDalPercorso } from '../../services/paymentService';
 import {
   giaScalata, registrazionePassata, giorno, Avviso,
 } from '../../domain/piani';
+import { valutaAnnullamento } from '../../domain/annullamento';
 import { createNotification } from '../../services/notificationService';
 import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequestService';
 import { addTransaction } from '../../services/financialService';
@@ -920,48 +921,16 @@ export const CalendarScreen: React.FC = () => {
   };
 
   const handleCancel = (item: AppointmentItem) => {
+    // L'ALLIEVO passa dal giudizio delle dieci ore; lo STAFF no.
+    // Se una persona telefona due ore prima per un imprevisto vero,
+    // quella decisione la prende chi la segue, non un contatore.
+    //
+    // Qui c'era «Annulla comunque», che annullava davvero: il limite
+    // si scavalcava da soli, sempre. Vedi domain/annullamento.ts.
     if (isStudent) {
-      const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
-      const isLate = hoursLeft < 10;
-
-      if (isLate) {
-        crossAlert(
-          'Attenzione',
-          'Meno di 10 ore prima: la sessione sarà considerata come eseguita e verrà addebitata.',
-          [
-            { text: 'Ho capito', style: 'cancel' },
-            {
-              text: 'Annulla comunque',
-              style: 'destructive',
-              onPress: async () => {
-                try {
-                  if (eSessione(item.kind)) await cancelSession(item.id, item.date);
-                  else await cancelAppointment(item.id, item.date);
-                  // Annullata tardi = eseguita, quindi si scala. Anche
-                  // qui passava per la copia muta: se non scalava,
-                  // l'allievo non pagava e nessuno se ne accorgeva.
-                  const { scalata } = await scalaSeduta(item.studentId, item.kind, item.date);
-                  const segno = { planDecremented: scalata, scaloDaFare: !scalata };
-                  if (eSessione(item.kind)) await updateSession(item.id, segno);
-                  else await updateAppointment(item.id, segno);
-                  const dateLabel = item.date.toLocaleDateString('it-IT');
-                  getOwner().then((owner) => {
-                    if (owner) createNotification(
-                      owner.id,
-                      'session_cancelled',
-                      'Appuntamento annullato (tardivo)',
-                      `${getStudentName(item.studentId)} ha annullato l'appuntamento del ${dateLabel} a meno di 10 ore. `
-                      + (scalata
-                        ? 'Sessione addebitata e scalata dal percorso.'
-                        : 'Sessione addebitata, ma NON scalata dal percorso: aprila in agenda e tocca «Scala dal percorso».')
-                    ).catch(() => {});
-                  }).catch(() => {});
-                  loadData();
-                } catch { crossAlert('Errore', 'Impossibile annullare'); }
-              },
-            },
-          ]
-        );
+      const v = valutaAnnullamento({ quando: item.date, stato: item.status });
+      if (!v.puo) {
+        crossAlert(v.titolo, v.messaggio, [{ text: 'Ho capito', style: 'cancel' }]);
         return;
       }
     }

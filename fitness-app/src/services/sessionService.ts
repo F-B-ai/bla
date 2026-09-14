@@ -15,9 +15,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { TrainingSession, SessionStatus } from '../types';
+import { ORE_LIMITE } from '../domain/annullamento';
 
 const SESSIONS_COLLECTION = 'sessions';
-const CANCELLATION_HOURS_LIMIT = 10;
+// Il numero era scritto qui, e di nuovo in nutritionistService, e di
+// nuovo in due schermate: quattro copie dello stesso 10. Adesso vive
+// in domain/annullamento.ts insieme alla regola che lo usa.
+const CANCELLATION_HOURS_LIMIT = ORE_LIMITE;
 
 export const createSession = async (
   session: Omit<TrainingSession, 'id'>

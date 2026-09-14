@@ -20,10 +20,14 @@ import {
 } from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
 import { aspetto, eSessione, tipoDaSeduta } from '../../domain/appuntamento';
+import {
+  ORE_LIMITE, valutaAnnullamento, avvisoSullaScheda,
+} from '../../domain/annullamento';
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
-const CANCELLATION_HOURS = 10;
+// Terza copia del numero 10, sparita: viene da domain/annullamento.
+const CANCELLATION_HOURS = ORE_LIMITE;
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -111,38 +115,36 @@ export const SessionsScreen: React.FC = () => {
     : allItems;
 
   const handleCancel = async (item: UnifiedItem) => {
-    const hoursLeft = (item.date.getTime() - Date.now()) / (1000 * 60 * 60);
+    // Prima qui c'era un avviso seguito da «Annulla comunque», che
+    // annullava davvero: il limite delle dieci ore si scavalcava da
+    // soli, sempre. Adesso la decisione la prende domain/annullamento
+    // e quando dice di no, è no — un solo pulsante, «Ho capito».
+    const v = valutaAnnullamento({ quando: item.date, stato: item.status });
 
-    if (hoursLeft < CANCELLATION_HOURS) {
-      crossAlert(
-        'Attenzione',
-        `Non puoi annullare meno di ${CANCELLATION_HOURS} ore prima. La sessione sarà considerata come eseguita e verrà addebitata.`,
-        [
-          { text: 'Ho capito', style: 'cancel' },
-          {
-            text: 'Annulla comunque',
-            style: 'destructive',
-            onPress: async () => {
-              if (eSessione(item.kind)) await cancelSession(item.id, item.date);
-              else await cancelAppointment(item.id, item.date);
-              await loadData();
-              crossAlert('Sessione annullata', 'Annullata con meno di 10 ore di preavviso: sarà conteggiata.');
-            },
-          },
-        ]
-      );
+    if (!v.puo) {
+      crossAlert(v.titolo, v.messaggio, [{ text: 'Ho capito', style: 'cancel' }]);
       return;
     }
 
-    crossAlert('Conferma annullamento', 'Sei sicuro di voler annullare?', [
-      { text: 'No', style: 'cancel' },
+    crossAlert(v.titolo, v.messaggio, [
+      { text: 'No, la tengo', style: 'cancel' },
       {
         text: 'Sì, annulla',
         onPress: async () => {
-          if (eSessione(item.kind)) await cancelSession(item.id, item.date);
-          else await cancelAppointment(item.id, item.date);
-          await loadData();
-          crossAlert('Fatto', 'Appuntamento annullato con successo');
+          try {
+            if (eSessione(item.kind)) await cancelSession(item.id, item.date);
+            else await cancelAppointment(item.id, item.date);
+            await loadData();
+            crossAlert('Fatto', 'Seduta annullata. Il posto è tornato libero.');
+          } catch {
+            // Le regole possono rifiutare un annullamento che qui
+            // sembrava ancora possibile (per esempio se il limite è
+            // scattato mentre la schermata era aperta).
+            crossAlert(
+              'Non sono riuscito ad annullare',
+              'Riprova; se continua, avvisa lo studio: la seduta resta in programma.'
+            );
+          }
         },
       },
     ]);
@@ -183,14 +185,28 @@ export const SessionsScreen: React.FC = () => {
 
         {cancellable && (
           <View style={styles.cancelContainer}>
-            <Button
-              title={isLateCancel ? 'Annulla (sarà addebitata)' : 'Annulla Sessione'}
-              onPress={() => handleCancel(item)}
-              variant="danger"
-            />
+            {isLateCancel ? (
+              // Un pulsante rosso che promette di annullare e poi non
+              // annulla è peggio di nessun pulsante. Qui si vede subito
+              // che è chiuso; toccandolo si legge il perché per intero.
+              <TouchableOpacity
+                style={styles.annullaChiuso}
+                onPress={() => handleCancel(item)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.annullaChiusoTxt}>Non più annullabile</Text>
+              </TouchableOpacity>
+            ) : (
+              <Button
+                title="Annulla Sessione"
+                onPress={() => handleCancel(item)}
+                variant="danger"
+              />
+            )}
             {isLateCancel && (
               <Text style={styles.lateWarning}>
-                Meno di {CANCELLATION_HOURS} ore - sarà conteggiata
+                {avvisoSullaScheda(item.date)}
               </Text>
             )}
           </View>
@@ -310,6 +326,22 @@ const styles = StyleSheet.create({
     color: colors.error,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  annullaChiuso: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  annullaChiusoTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
   emptyText: {
     color: colors.textSecondary,

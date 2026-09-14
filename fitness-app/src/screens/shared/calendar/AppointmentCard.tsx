@@ -8,6 +8,7 @@ import { Badge } from '../../../components/common/Badge';
 import { aspetto, eSessione } from '../../../domain/appuntamento';
 import { etichettaGruppo } from '../../../domain/gruppo';
 import { restaDaScalare } from '../../../domain/piani';
+import { valutaAnnullamento } from '../../../domain/annullamento';
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -85,6 +86,10 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   // Prima non c'era nessun pulsante e nessun segno: la seduta era
   // «completata» e il percorso intatto, e non si poteva più rimediare.
   const daScalare = !isStudent && restaDaScalare(item);
+  // Solo per l'allievo: lo staff annulla quando vuole.
+  const troppoTardi = isStudent && !valutaAnnullamento({
+    quando: item.date, stato: item.status,
+  }).puo;
   const staffName = getStaffName(item.staffId);
 
   const handleWhatsAppReminder = () => {
@@ -206,10 +211,22 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
       )}
       {canStudentCancel && isStudent && (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
-            <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-            <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
-          </TouchableOpacity>
+          {/* Entro le dieci ore il pulsante non annulla più. Si vede
+              che è chiuso PRIMA di toccarlo; toccandolo si legge il
+              perché. Vedi domain/annullamento.ts. */}
+          {troppoTardi ? (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+              <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />
+              <Text style={{ ...styles.actionText, color: colors.textSecondary }}>
+                Non più annullabile
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+              <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+              <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </Card>
