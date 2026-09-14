@@ -12,7 +12,7 @@ const path = require('path');
 
 const SRC = path.join(__dirname, '..', 'src', 'domain');
 const DST = path.join(__dirname, 'src', 'domain');
-const FILES = ['formulas.ts', 'brain.ts', 'twinEvents.ts'];
+const FILES = ['formulas.ts', 'brain.ts', 'twinEvents.ts', 'orariStudio.ts'];
 
 fs.mkdirSync(DST, { recursive: true });
 for (const f of FILES) {

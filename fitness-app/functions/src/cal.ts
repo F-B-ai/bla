@@ -232,3 +232,192 @@ export const calKeyRotate = onCall({region: "europe-west1"}, async (request) => 
 
   return {chiave};
 });
+
+// ============================================================
+// CAL LIBERI — GET /v1/cal/liberi
+// ------------------------------------------------------------
+// Il titolare, il 14 settembre 2026:
+//
+//   «Devi fare in modo che Grok Bot possa avere anche la lettura del
+//    calendario, ma non scrivere: sono io a confermare la scrittura.
+//    Devono aiutarmi a vedere gli spazi liberi secondo la nostra
+//    regola [...] e farmi una proposta di inserimento che io posso
+//    confermare oppure no.»
+//
+// Fin qui la chiave permetteva di SCRIVERE richieste e basta —
+// «chi scrive non legge». Adesso permette anche di leggere UNA cosa
+// sola: quali mezz'ore sono libere, in un giorno, secondo la regola
+// della giornata.
+//
+// REGOLE FERREE
+//  · Non escono nomi, telefoni, note, tipi di seduta: soltanto ore.
+//    Chi ha la chiave non deve poter ricostruire chi viene e quando.
+//  · Non si scrive niente. Nemmeno una richiesta: per quella c'è
+//    /v1/cal, ed è un'altra porta.
+//  · La regola della giornata NON vive qui: sta in
+//    src/domain/orariStudio.ts, copiata a ogni build da
+//    copy-domain.js. Una copia scritta a mano divergerebbe.
+// ============================================================
+
+import {
+  slotLiberi, descriviSlot, regolaDellaGiornata, AVVISO_SOLA_LETTURA,
+  APERTURA, ULTIMO_INIZIO, ULTIMO_INIZIO_ECCEZIONE,
+} from "./domain/orariStudio";
+
+const MAX_GIORNI = 14;
+
+// `giornoValido` esiste già più in alto, e controlla anche che la data
+// esista davvero (31 febbraio no). Scriverne un secondo, più debole,
+// sarebbe stata la solita seconda copia.
+
+/** Gli estremi del giorno, per pescare gli impegni da Firestore. */
+const estremi = (giorno: string): {da: Date; a: Date} => {
+  const [y, m, d] = giorno.split("-").map(Number);
+  return {
+    da: new Date(y, m - 1, d, 0, 0, 0, 0),
+    a: new Date(y, m - 1, d, 23, 59, 59, 999),
+  };
+};
+
+const oraDi = (v: unknown, fallback: string): string =>
+  typeof v === "string" && /^\d{1,2}:\d{2}$/.test(v) ? v : fallback;
+
+/** Tutto ciò che occupa lo studio quel giorno, ridotto a due ore. */
+async function impegniDelGiorno(giorno: string) {
+  const {da, a} = estremi(giorno);
+  const inizio = admin.firestore.Timestamp.fromDate(da);
+  const fine = admin.firestore.Timestamp.fromDate(a);
+
+  const occupato: Array<{inizio: string; fine: string}> = [];
+  const aggiungi = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) => {
+    for (const d of docs) {
+      const x = d.data();
+      // Una seduta annullata libera il posto: è il senso di annullarla.
+      const stato = String(x.status || "");
+      if (stato.startsWith("cancelled")) continue;
+      occupato.push({
+        inizio: oraDi(x.startTime, "00:00"),
+        fine: oraDi(x.endTime, "23:59"),
+      });
+    }
+  };
+
+  const [sedute, visite] = await Promise.all([
+    db().collection("sessions")
+      .where("date", ">=", inizio).where("date", "<=", fine).get(),
+    db().collection("nutritionistAppointments")
+      .where("date", ">=", inizio).where("date", "<=", fine).get(),
+  ]);
+  aggiungi(sedute.docs);
+  aggiungi(visite.docs);
+
+  // Gli ospiti confermati (persone non ancora in anagrafica) occupano
+  // il posto come tutti gli altri: dimenticarli vorrebbe dire
+  // proporre un'ora che in realtà è presa.
+  const ospiti = await db().collection("bookingRequests")
+    .where("giorno", "==", giorno).where("stato", "==", "confermata").get();
+  for (const d of ospiti.docs) {
+    const ora = oraDi(d.data().ora, "");
+    if (!ora) continue;
+    const [h, mm] = ora.split(":").map(Number);
+    const fineMin = h * 60 + mm + 60;
+    occupato.push({
+      inizio: ora,
+      fine: `${String(Math.floor(fineMin / 60) % 24).padStart(2, "0")}:` +
+        `${String(fineMin % 60).padStart(2, "0")}`,
+    });
+  }
+
+  return occupato;
+}
+
+export const calLiberi = onRequest(
+  {region: "europe-west1", cors: true, maxInstances: 5},
+  async (req, res) => {
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+    if (req.method !== "GET" && req.method !== "POST") {
+      res.status(405).json({errore: "Serve GET o POST."});
+      return;
+    }
+
+    const chiave = String(
+      req.get("x-cal-key") ||
+      (req.query && req.query.chiave) ||
+      (req.body && req.body.chiave) || ""
+    ).trim();
+    if (!chiave) {
+      res.status(401).json({errore: "Chiave mancante."});
+      return;
+    }
+    const cfg = await db().doc(CONFIG_DOC).get();
+    const attesa = cfg.exists ? (cfg.data()?.hash as string | undefined) : undefined;
+    if (!attesa) {
+      res.status(503).json({
+        errore: "Nessuna chiave impostata: il titolare deve generarla dall'app.",
+      });
+      return;
+    }
+    if (impronta(chiave) !== attesa) {
+      res.status(403).json({errore: "Chiave non valida."});
+      return;
+    }
+
+    const dati = req.method === "GET" ? req.query : (req.body || {});
+    const giorni = String(dati.giorno || dati.giorni || "")
+      .split(",").map((g) => g.trim()).filter(Boolean);
+
+    if (!giorni.length) {
+      res.status(400).json({
+        errore: "Serve almeno un giorno, nel formato AAAA-MM-GG.",
+        regola: regolaDellaGiornata(),
+      });
+      return;
+    }
+    if (giorni.length > MAX_GIORNI) {
+      res.status(400).json({errore: `Troppi giorni in una volta (max ${MAX_GIORNI}).`});
+      return;
+    }
+    const storti = giorni.filter((g) => !giornoValido(g));
+    if (storti.length) {
+      res.status(400).json({
+        errore: `Giorno non valido: ${storti.join(", ")}. Serve AAAA-MM-GG.`,
+      });
+      return;
+    }
+
+    const durata = Number(dati.durata) > 0 ? Number(dati.durata) : undefined;
+    const conEccezioni = String(dati.eccezioni || "") === "1" ||
+      dati.eccezioni === true;
+
+    const risposta = [];
+    for (const giorno of giorni) {
+      const impegni = await impegniDelGiorno(giorno);
+      const liberi = slotLiberi({impegni, durata, conEccezioni});
+      risposta.push({
+        giorno,
+        liberi: liberi.map((s) => ({
+          inizio: s.inizio, fine: s.fine, eccezione: s.eccezione,
+        })),
+        occupate: impegni.length,
+        testo: descriviSlot(liberi, giorno),
+      });
+    }
+
+    res.status(200).json({
+      ok: true,
+      regola: {
+        apertura: APERTURA,
+        ultimoInizio: ULTIMO_INIZIO,
+        ultimoInizioEccezione: ULTIMO_INIZIO_ECCEZIONE,
+        testo: regolaDellaGiornata(),
+      },
+      giorni: risposta,
+      // Il limite viaggia INSIEME ai dati: chi legge la risposta —
+      // persona o modello — lo trova lì dentro, non altrove.
+      avviso: AVVISO_SOLA_LETTURA,
+    });
+  }
+);

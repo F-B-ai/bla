@@ -162,6 +162,13 @@
         }
       },
       {
+        "source": "/v1/cal/liberi",
+        "function": {
+          "functionId": "calLiberi",
+          "region": "europe-west1"
+        }
+      },
+      {
         "source": "/v1/cal",
         "function": {
           "functionId": "calIngest",
