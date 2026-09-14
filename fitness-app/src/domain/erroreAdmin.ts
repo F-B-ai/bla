@@ -30,7 +30,42 @@
 // permette di chiedere aiuto con qualcosa in mano.
 // ============================================================
 
-export const ERRORE_ADMIN_VERSION = 1;
+export const ERRORE_ADMIN_VERSION = 2;
+
+// ------------------------------------------------------------
+// 14 SETTEMBRE 2026 — «internal (functions/internal)»
+// ------------------------------------------------------------
+// Il titolare ha provato a cambiare l'email di un'allieva e ha letto
+// «non so dirti perché. Dettaglio: internal (functions/internal)».
+//
+// Quella parola nuda è la firma di una Function CROLLATA: quando una
+// Function lancia il proprio errore, il testo arriva fino allo
+// schermo; quando invece le scappa un errore qualunque, il runtime
+// manda solo `INTERNAL` e il motivo resta nei log del server, dove
+// nessuno lo legge. Il difetto stava lì, e si chiude nella Function.
+//
+// Qui resta una cosa da sistemare: se il server MANDA una frase, va
+// mostrata quella frase — non preceduta da «non so dirti perché»,
+// che la contraddice. Si dice di non sapere solo quando è vero.
+// ------------------------------------------------------------
+
+/** Le parole che il runtime manda al posto di una spiegazione. */
+const PAROLE_VUOTE = [
+  'internal', 'unknown', 'error', 'unavailable', 'deadline-exceeded',
+  'failed-precondition', 'invalid-argument', 'already-exists',
+  'permission-denied', 'unauthenticated', 'not-found',
+];
+
+/**
+ * Il server ha detto qualcosa di sensato, o solo il nome di un codice?
+ * Una frase ha spazi e lunghezza; «internal» no.
+ */
+const eUnaSpiegazione = (testo: string): boolean => {
+  const t = testo.trim();
+  if (t.length < 12) return false;
+  if (PAROLE_VUOTE.includes(t.toLowerCase().replace(/^functions\//, ''))) return false;
+  return t.includes(' ');
+};
 
 export type MotivoAdmin =
   /** la Function non si raggiunge davvero: rete, oppure non pubblicata */
@@ -109,6 +144,11 @@ export const spiegaErroreAdmin = (err: unknown): string => {
   const e = err as { code?: string; message?: string } | null;
   const dettaglio = (e?.message || '').trim();
   const codice = (e?.code || '').trim();
+
+  // Il server ha spiegato: si mostra la SUA frase, senza premetterle
+  // «non so dirti perché», che la smentirebbe.
+  if (eUnaSpiegazione(dettaglio)) return dettaglio;
+
   const coda = [dettaglio, codice && `(${codice})`].filter(Boolean).join(' ');
   return coda
     ? `L'operazione non è riuscita e non so dirti perché. Dettaglio: ${coda}`

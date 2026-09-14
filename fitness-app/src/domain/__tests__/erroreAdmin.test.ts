@@ -1,4 +1,6 @@
-import { classificaErroreAdmin, spiegaErroreAdmin } from '../erroreAdmin';
+import {
+  classificaErroreAdmin, spiegaErroreAdmin, ERRORE_ADMIN_VERSION,
+} from '../erroreAdmin';
 
 // ============================================================
 // «IL CAMBIO PASSWORD PER GLI ALLIEVI NON FUNZIONA»
@@ -86,5 +88,67 @@ describe('quando il server DAVVERO non si raggiunge', () => {
     const m = spiegaErroreAdmin(err('functions/unavailable'));
     expect(m).toContain('connessione');
     expect(m).not.toMatch(/Blaze/);
+  });
+});
+
+// ============================================================
+// «internal (functions/internal)» — 14 settembre 2026
+// ------------------------------------------------------------
+// La parola nuda è la firma di una Function crollata: il motivo
+// resta nei log del server. Ma quando il server MANDA una frase,
+// va mostrata quella — non preceduta da «non so dirti perché».
+// ============================================================
+
+describe('quando il server spiega, si mostra la sua frase', () => {
+  it('un messaggio vero passa intero, senza premesse che lo smentiscono', () => {
+    const t = spiegaErroreAdmin({
+      code: 'functions/internal',
+      message: 'L\'email dell\'accesso era cambiata ma la scheda no, quindi ho '
+        + 'rimesso tutto com\'era: non è cambiato niente. Motivo: 5 NOT_FOUND',
+    });
+    expect(t).toContain('rimesso tutto com\'era');
+    expect(t).not.toContain('non so dirti perché');
+  });
+
+  it('e l\'avviso grave arriva per intero', () => {
+    const t = spiegaErroreAdmin({
+      code: 'functions/internal',
+      message: 'ATTENZIONE: l\'email di ACCESSO è stata cambiata ma la scheda no, '
+        + 'e non sono riuscito a tornare indietro.',
+    });
+    expect(t).toContain('ATTENZIONE');
+    expect(t).not.toContain('non so dirti');
+  });
+});
+
+describe('quando il server NON spiega, si continua a dirlo', () => {
+  // Esattamente ciò che il titolare ha letto sullo schermo.
+  it('la parola nuda «internal» non viene spacciata per una spiegazione', () => {
+    const t = spiegaErroreAdmin({ code: 'functions/internal', message: 'internal' });
+    expect(t).toContain('non so dirti perché');
+    expect(t).toContain('functions/internal');
+  });
+
+  it('nemmeno in maiuscolo', () => {
+    expect(spiegaErroreAdmin({ code: 'functions/internal', message: 'INTERNAL' }))
+      .toContain('non so dirti perché');
+  });
+
+  it('né il nome di un altro codice al posto di una frase', () => {
+    ['unknown', 'not-found', 'unavailable'].forEach((m) => {
+      expect(spiegaErroreAdmin({ code: 'functions/internal', message: m }))
+        .toContain('non so dirti perché');
+    });
+  });
+
+  it('e una frase troppo corta non conta come spiegazione', () => {
+    expect(spiegaErroreAdmin({ code: 'functions/internal', message: 'ops qui' }))
+      .toContain('non so dirti perché');
+  });
+});
+
+describe('versione', () => {
+  it('tracciata', () => {
+    expect(ERRORE_ADMIN_VERSION).toBe(2);
   });
 });
