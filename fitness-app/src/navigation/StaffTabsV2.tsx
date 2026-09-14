@@ -46,6 +46,7 @@ import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
+import { ComunicazioniScreen } from '../screens/owner/ComunicazioniScreen';
 import { EarningsScreen } from '../screens/collaborator/EarningsScreen';
 
 // ============================================================
@@ -133,6 +134,7 @@ const agendaGroup: HubGroup = {
   title: 'Agenda',
   rows: [
     { icon: 'logo-whatsapp', title: 'Richieste da WhatsApp', route: 'RichiesteWhatsApp' },
+    { icon: 'megaphone-outline', title: 'Comunicazioni — scrivi a tutti', route: 'Comunicazioni' },
   ],
 };
 const assessGroup: HubGroup = {
@@ -280,6 +282,7 @@ const buildNavigators = (role: StaffRole) => {
           <StudioStack.Screen name="Pagamenti" component={PaymentPlanScreen} options={inner('Piani di pagamento')} />
           <StudioStack.Screen name="Team" component={ManageUsersScreen} options={inner('Team')} />
           <StudioStack.Screen name="Spazio" component={StorageManagementScreen} options={inner('Spazio di archiviazione')} />
+          <StudioStack.Screen name="Comunicazioni" component={ComunicazioniScreen} options={inner('Comunicazioni')} />
           <StudioStack.Screen name="ImpostazioniAI" component={AISettingsScreen} options={inner('Impostazioni AI')} />
         </>
       )}

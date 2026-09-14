@@ -64,6 +64,20 @@ Regole positive:
   cardiovascolari, epilessia, glaucoma, disturbi psichiatrici acuti. Mai in
   acqua o alla guida.»* Non si abbrevia e non si toglie mai.
 
+### L'unica eccezione, scritta perché non resti sottintesa
+
+La parola **«diagnosi»** è nell'elenco proibito. Ma **A-03 la usa**, ed è
+giusto così: è l'unico Reel il cui argomento *è* quella distinzione, e
+vietarla lì renderebbe il pezzo impossibile.
+
+**La regola precisa:** «diagnosi» si può pronunciare **soltanto** dentro una
+frase che la nega, o che la attribuisce a un medico. Mai per descrivere ciò che
+facciamo noi. **In A-03 e in nessun altro Reel.**
+
+Era già così nel copione approvato, ma non era scritto da nessuna parte — e una
+regola con un'eccezione non dichiarata è una regola che il primo che ha fretta
+aggira sostenendo che «tanto lo fa anche A-03».
+
 Se una grafica sembra «più forte» violando una di queste: **non si scrive.**
 Si chiede prima.
 

@@ -21,6 +21,7 @@ import {
   BodyMeasurement,
   BiaDocument,
 } from '../types';
+import { ORE_LIMITE } from '../domain/annullamento';
 
 // ============================================================
 // APPUNTAMENTI NUTRIZIONISTA
@@ -29,7 +30,8 @@ import {
 const APPOINTMENTS_COLLECTION = 'nutritionistAppointments';
 const MEASUREMENTS_COLLECTION = 'bodyMeasurements';
 const BIA_COLLECTION = 'biaDocuments';
-const CANCELLATION_HOURS_LIMIT = 10;
+// Seconda copia dello stesso 10: adesso viene da domain/annullamento.ts.
+const CANCELLATION_HOURS_LIMIT = ORE_LIMITE;
 
 export const createAppointment = async (
   appointment: Omit<NutritionistAppointment, 'id'>

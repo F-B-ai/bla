@@ -30,6 +30,67 @@ service cloud.firestore {
       return isAttivo() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
+    // ------------------------------------------------------------
+    // LE DIECI ORE — la regola, non il cartello
+    // ------------------------------------------------------------
+    // Il limite viveva solo nelle schermate, e le regole dicevano
+    // «allow update: if isAuthenticated()»: chiunque avesse un
+    // account poteva riscrivere qualsiasi seduta, di chiunque.
+    // Togliere il pulsante lasciava la porta aperta accanto.
+    //
+    // Il numero è 10 anche in src/domain/annullamento.ts: qui non si
+    // può importare niente, quindi le due copie si tengono insieme
+    // con un test (src/__tests__/regoleAnnullamento.test.ts).
+    // ------------------------------------------------------------
+    function oreAllaSeduta(quando) {
+      return (quando.toMillis() - request.time.toMillis()) / 3600000;
+    }
+
+    // In tempo per annullare da soli: la data dev'essere una data
+    // vera, altrimenti si rifiuta (mai aprire per una data illeggibile).
+    function inTempo(quando) {
+      return quando is timestamp && oreAllaSeduta(quando) >= 10;
+    }
+
+    // Un annullamento tocca SOLO questi campi. Serve a impedire che
+    // «annullo» diventi «mi riscrivo il costo» o «mi sposto l'ora».
+    function soloCampiAnnullamento() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'cancelledAt', 'isCountedAsCompleted']);
+    }
+
+    // ------------------------------------------------------------
+    // L'ANNULLAMENTO È DEL TITOLARE
+    // ------------------------------------------------------------
+    // 14 settembre 2026: «I manager, collaboratori, nutrizionisti non
+    // possono decidere l'annullamento. Possono solo fissare
+    // l'appuntamento, spostarlo, quindi modificarlo, ma non hanno la
+    // possibilità di annullarlo o cancellarlo.»
+    //
+    // Nascondere i due pulsanti non basta: senza questa regola
+    // resterebbero raggiungibili da fuori l'App.
+    // ------------------------------------------------------------
+    function statoAnnullato(s) {
+      return s in ['cancelled', 'cancelled_by_student', 'cancelled_late'];
+    }
+
+    // Uno staff che non è il titolare può cambiare tutto TRANNE
+    // portare una seduta in uno stato annullato.
+    function nonStaAnnullando() {
+      return !(request.resource.data.status != resource.data.status
+        && statoAnnullato(request.resource.data.status));
+    }
+
+    function annullamentoInRegola(statoFinale) {
+      return isAuthenticated()
+        && resource.data.studentId == request.auth.uid
+        && resource.data.status == 'scheduled'
+        && soloCampiAnnullamento()
+        && request.resource.data.status == statoFinale
+        && request.resource.data.isCountedAsCompleted == false
+        && inTempo(resource.data.date);
+    }
+
     // Check-in accessi palestra (QR/codice alla reception)
     match /checkins/{checkinId} {
       allow read: if isAuthenticated();
@@ -121,12 +182,21 @@ service cloud.firestore {
     // Scheda di onboarding: primo atto del percorso. Contiene dati
     // di salute — la scrive lo staff nel colloquio, la legge lo staff
     // e l'interessato. Append-only: una scheda firmata non si riscrive.
+    // La scheda di onboarding si fa DURANTE la consulenza, quindi anche
+    // a chi non è ancora un allievo: in quel caso `studentId` è vuoto e
+    // `tipoSoggetto` vale 'interessato'.
+    //
+    // Le schede degli ALLIEVI restano incancellabili: sono il primo atto
+    // del loro percorso. Quelle degli interessati si cancellano, e devono
+    // potersi cancellare — chi non è entrato non deve lasciare i suoi
+    // dati di salute in casa nostra. La decisione è del titolare.
     match /onboardings/{docId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.studentId == request.auth.uid
       );
       allow create, update: if isStaff();
-      allow delete: if false;
+      allow delete: if isOwnerOrManager()
+        && resource.data.tipoSoggetto == 'interessato';
     }
 
     // Sessioni di respiro: atto di prima persona dell'allievo.
@@ -297,17 +367,26 @@ service cloud.firestore {
 
     match /sessions/{sessionId} {
       allow read: if isStaff() || resource.data.studentId == request.auth.uid;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
-      allow delete: if isStaff();
+      // Fissare una seduta lo fa tutto lo staff: è il loro lavoro.
+      allow create: if isStaff();
+      // Il titolare fa tutto. Gli altri spostano, correggono e
+      // segnano completata, ma non annullano. L'allievo può fare UNA
+      // cosa sola sulla PROPRIA seduta: annullarla, in tempo.
+      allow update: if isOwner()
+        || (isStaff() && nonStaAnnullando())
+        || annullamentoInRegola('cancelled_by_student');
+      // Anche l'appuntamento preso per sbaglio lo cancella il titolare.
+      allow delete: if isOwner();
     }
 
     // Nutritionist appointments - dati sensibili
     match /nutritionistAppointments/{appointmentId} {
       allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
-      allow update: if isAuthenticated();
-      allow delete: if isStaff();
+      allow update: if isOwner()
+        || (isStaff() && nonStaAnnullando())
+        || annullamentoInRegola('cancelled');
+      allow delete: if isOwner();
     }
 
     // Body measurements - dati sanitari sensibili
@@ -503,6 +582,18 @@ service cloud.firestore {
     }
 
     // Notifications
+    // ----------------------------------------------------------
+    // LA BACHECA — un messaggio a tutti gli allievi
+    // ----------------------------------------------------------
+    // La scrive lo staff, la legge chi è dentro. Si cancella solo dal
+    // titolare: una comunicazione tolta dalla bacheca sparisce per
+    // tutti, e non è una decisione da collaboratore.
+    match /comunicazioni/{comunicazioneId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+      allow delete: if isOwnerOrManager();
+    }
+
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.userId == request.auth.uid

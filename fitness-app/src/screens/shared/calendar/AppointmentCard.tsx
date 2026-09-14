@@ -7,6 +7,9 @@ import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { aspetto, eSessione } from '../../../domain/appuntamento';
 import { etichettaGruppo } from '../../../domain/gruppo';
+import { restaDaScalare } from '../../../domain/piani';
+import { valutaAnnullamento } from '../../../domain/annullamento';
+import { permessiAgenda } from '../../../domain/permessiAgenda';
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -27,6 +30,10 @@ export type AppointmentItem = {
   isCountedAsCompleted: boolean;
   persone?: number;
   quotaPersona?: number;
+  /** la seduta ha già scalato dal percorso */
+  planDecremented?: boolean;
+  /** si è provato a scalare e non si è potuto: vedi domain/piani.ts */
+  scaloDaFare?: boolean;
 };
 
 export interface AppointmentCardProps {
@@ -34,6 +41,8 @@ export interface AppointmentCardProps {
   isStaff: boolean;
   isOwner: boolean;
   isStudent: boolean;
+  /** ruolo di chi guarda: decide quali pulsanti esistono */
+  ruolo?: string;
   getStudentName: (id: string) => string;
   getStaffName: (id: string) => string;
   getStudentPhone?: (id: string) => string;
@@ -48,6 +57,8 @@ export interface AppointmentCardProps {
   onComplete: (item: AppointmentItem) => void;
   onCancel: (item: AppointmentItem) => void;
   onDelete: (item: AppointmentItem) => void;
+  /** riprova a scalare dal percorso una seduta rimasta in sospeso */
+  onScala: (item: AppointmentItem) => void;
   onStudentDetail: (studentId: string) => void;
   styles: Record<string, any>;
 }
@@ -57,6 +68,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   isStaff,
   isOwner,
   isStudent,
+  ruolo,
   getStudentName,
   getStaffName,
   getStudentPhone,
@@ -65,6 +77,7 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onComplete,
   onCancel,
   onDelete,
+  onScala,
   onStudentDetail,
   styles,
 }) => {
@@ -72,6 +85,16 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
   const isFuture = item.date >= new Date();
   const canStudentCancel = isScheduled && isFuture;
   const canStaffAct = isScheduled;
+  // Una seduta registrata in ritardo che non ha trovato un percorso da
+  // scalare resta qui, con il suo pulsante, finché non si sistema.
+  // Prima non c'era nessun pulsante e nessun segno: la seduta era
+  // «completata» e il percorso intatto, e non si poteva più rimediare.
+  const daScalare = !isStudent && restaDaScalare(item);
+  // Solo per l'allievo: lo staff annulla quando vuole.
+  const troppoTardi = isStudent && !valutaAnnullamento({
+    quando: item.date, stato: item.status,
+  }).puo;
+  const permessi = permessiAgenda(ruolo);
   const staffName = getStaffName(item.staffId);
 
   const handleWhatsAppReminder = () => {
@@ -141,7 +164,31 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </View>
       )}
 
-      {/* Staff actions */}
+      {/* Seduta registrata, percorso non toccato: si dice e si rimedia */}
+      {daScalare && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', gap: 8,
+          marginTop: 8, paddingVertical: 8, paddingHorizontal: 10,
+          borderRadius: 8, backgroundColor: colors.surfaceLight,
+          borderLeftWidth: 3, borderLeftColor: colors.warning,
+        }}>
+          <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+          <Text style={{ flex: 1, fontSize: 12, color: colors.textSecondary }}>
+            Non è stata scalata dal percorso.
+          </Text>
+          <TouchableOpacity onPress={() => onScala(item)}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>
+              Scala dal percorso
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Staff actions.
+          «Annulla» e il cestino compaiono SOLO al titolare: chi
+          collabora fissa, sposta e completa, e per il resto riferisce
+          a lui. Un pulsante che si vede e poi nega è peggio di un
+          pulsante che non c'è. Vedi domain/permessiAgenda.ts. */}
       {isStaff && (
         <View style={styles.actionRow}>
           {canStaffAct && (
@@ -154,10 +201,12 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
                 <Ionicons name="checkmark-circle-outline" size={18} color={colors.success} />
                 <Text style={{ ...styles.actionText, color: colors.success }}>Completato</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
-                <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
-                <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
-              </TouchableOpacity>
+              {permessi.annullare && (
+                <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+                  <Ionicons name="close-circle-outline" size={18} color={colors.warning} />
+                  <Text style={{ ...styles.actionText, color: colors.warning }}>Annulla</Text>
+                </TouchableOpacity>
+              )}
               {isScheduled && (
                 <TouchableOpacity style={styles.actionBtn} onPress={handleWhatsAppReminder}>
                   <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
@@ -166,17 +215,31 @@ export const AppointmentCard: React.FC<AppointmentCardProps> = ({
               )}
             </>
           )}
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(item)}>
-            <Ionicons name="trash-outline" size={18} color={colors.error} />
-          </TouchableOpacity>
+          {permessi.eliminare && (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete(item)}>
+              <Ionicons name="trash-outline" size={18} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
       )}
       {canStudentCancel && isStudent && (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
-            <Ionicons name="close-circle-outline" size={18} color={colors.error} />
-            <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
-          </TouchableOpacity>
+          {/* Entro le dieci ore il pulsante non annulla più. Si vede
+              che è chiuso PRIMA di toccarlo; toccandolo si legge il
+              perché. Vedi domain/annullamento.ts. */}
+          {troppoTardi ? (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+              <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />
+              <Text style={{ ...styles.actionText, color: colors.textSecondary }}>
+                Non più annullabile
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.actionBtn} onPress={() => onCancel(item)}>
+              <Ionicons name="close-circle-outline" size={18} color={colors.error} />
+              <Text style={{ ...styles.actionText, color: colors.error }}>Annulla Sessione</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </Card>

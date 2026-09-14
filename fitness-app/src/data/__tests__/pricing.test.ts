@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { TIERS, PRICING_NOTES } from '../pricingData';
 import { CONDUTTORI, PREZZO_VALUTAZIONE, conduttore } from '../../domain/protocollo';
 
@@ -48,10 +50,41 @@ describe('la valutazione completa', () => {
     expect(testo).toContain('composizione corporea');
   });
 
-  it('l\'analisi posturale isolata a 49 € non esiste più', () => {
+  // Questo test c'era già, e guardava nel posto sbagliato: cercava
+  // «€49» dentro TIERS, mentre il prezzo ritirato viveva nelle NOTE —
+  // e da lì l'assistente AI lo stava dicendo agli allievi. Adesso
+  // guarda dappertutto: listino, note, e la schermata del Listino.
+  it('l\'analisi posturale isolata a 49 € non esiste più — da nessuna parte', () => {
     expect(tier('postural_standalone')).toBeUndefined();
-    const tutto = JSON.stringify(TIERS);
-    expect(tutto).not.toContain('€49');
+
+    const listino = JSON.stringify(TIERS);
+    expect(listino).not.toContain('€49');
+    expect(listino).not.toContain('€100');
+
+    const note = PRICING_NOTES.join(' ');
+    expect(note).not.toContain('€49');
+    expect(note).not.toContain('49 €');
+  });
+
+  // La schermata non deve riscrivere i prezzi a mano: il 12 settembre
+  // vendeva «€49» mentre il pulsante creava già il piano da €150.
+  it('la schermata del Listino non scrive prezzi a mano', () => {
+    const schermata = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'screens', 'owner', 'PricingScreen.tsx'),
+      'utf8'
+    );
+    // si tolgono i commenti, dove il prezzo vecchio è citato apposta
+    const codice = schermata.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    const prezziScritti = codice.match(/€\s?\d+/g) || [];
+    expect(prezziScritti).toEqual([]);
+  });
+
+  it('la valutazione Mind Movement costa 150 € e dura due sessioni', () => {
+    const v = tier('valutazione_mind_movement')!;
+    expect(v.amount).toBe(150);
+    expect(v.priceLabel).toBe('€150');
+    expect(v.priceNote).toContain('due sessioni');
+    expect(v.category).toBe('postural');
   });
 
   it('il perimetro sanitario è dichiarato anche nel listino', () => {

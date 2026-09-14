@@ -34,7 +34,13 @@ import {
   createCredentialRequest,
   getUserRequests,
 } from '../../services/credentialService';
-import { adminSetUserEmail, adminSetUserPassword } from '../../services/adminAuthService';
+import {
+  adminSetUserEmail, adminSetUserPassword,
+  leggiStatoAccesso, creaAccessoPerAllievo, StatoAccesso,
+} from '../../services/adminAuthService';
+import {
+  controllaNuovoAccesso, passwordDettabile, daConsegnare, descriviAccesso,
+} from '../../domain/accesso';
 import { ConsentScreen } from './ConsentScreen';
 import { resetPassword } from '../../services/authService';
 import { createNotification } from '../../services/notificationService';
@@ -57,6 +63,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
   // Invio link reimpostazione password (staff)
   const [sendingResetLink, setSendingResetLink] = useState(false);
   const [showConsents, setShowConsents] = useState(false);
+
+  // Accesso all'App: esiste? va creato?
+  const [statoAccesso, setStatoAccesso] = useState<StatoAccesso | null>(null);
+  const [creandoAccesso, setCreandoAccesso] = useState(false);
+  const [salvandoAccesso, setSalvandoAccesso] = useState(false);
+  const [nuovoAccessoEmail, setNuovoAccessoEmail] = useState('');
+  const [nuovoAccessoPassword, setNuovoAccessoPassword] = useState('');
 
   // Edit email
   const [editingEmail, setEditingEmail] = useState(false);
@@ -87,6 +100,59 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
 
   const canEditInfo = isOwner;
   const needsApproval = !isOwner && !isEditingOther;
+  // Creare un accesso è la stessa responsabilità del cambio password:
+  // la Function lo consente a titolare e manager.
+  const isStaffChePuò = isOwner;
+
+  // Lo stato dell'accesso si chiede al server: la scheda in anagrafica
+  // non sa se la persona può entrare davvero.
+  useEffect(() => {
+    if (!isStaffChePuò || !isEditingOther || !targetUserId) {
+      setStatoAccesso(null);
+      return;
+    }
+    let vivo = true;
+    leggiStatoAccesso(targetUserId)
+      .then((s) => { if (vivo) setStatoAccesso(s); })
+      // Non si finge che l'accesso ci sia: si lascia la riga a «sto
+      // controllando», che è meno sbagliato di una risposta inventata.
+      .catch(() => { if (vivo) setStatoAccesso(null); });
+    return () => { vivo = false; };
+  }, [isStaffChePuò, isEditingOther, targetUserId]);
+
+  const handleCreaAccesso = async () => {
+    if (!profileUser) return;
+    const controllo = controllaNuovoAccesso(nuovoAccessoEmail, nuovoAccessoPassword);
+    if (!controllo.ok) {
+      crossAlert('Manca qualcosa', controllo.problemi.join('\n'));
+      return;
+    }
+    setSalvandoAccesso(true);
+    try {
+      const email = nuovoAccessoEmail.trim();
+      const avvisi = await creaAccessoPerAllievo(
+        profileUser.id, email, nuovoAccessoPassword
+      );
+      // È l'unico momento in cui la password si vede: dopo, nel
+      // database, c'è solo la versione cifrata di Firebase.
+      crossAlert(
+        'Accesso creato',
+        daConsegnare(
+          `${profileUser.name} ${profileUser.surname || ''}`,
+          email,
+          nuovoAccessoPassword
+        ) + (avvisi.length ? `\n\nDa sistemare: ${avvisi.join('; ')}.` : '')
+      );
+      setProfileUser({ ...profileUser, email });
+      setStatoAccesso({ haAccesso: true, email, maiEntrata: true });
+      setCreandoAccesso(false);
+      setNuovoAccessoPassword('');
+    } catch (err: any) {
+      crossAlert('Errore', err?.message || 'Impossibile creare l\'accesso.');
+    } finally {
+      setSalvandoAccesso(false);
+    }
+  };
 
   // Request flow (students + staff)
   const [requestType, setRequestType] = useState<'email' | 'password' | 'info' | null>(null);
@@ -585,6 +651,82 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
               style={styles.formBtn}
             />
           </View>
+        </Card>
+      )}
+
+      {/* ------------------------------------------------------------
+          ACCESSO ALL'APP
+          14 settembre 2026: «Non tutti, soprattutto le persone più
+          anziane, capiscono come fare.» L'invito da completare da
+          soli non è una strada per tutti: l'accesso lo crea il
+          titolare e lo detta a voce. Vedi domain/accesso.ts.
+          ------------------------------------------------------------ */}
+      {isStaffChePuò && isEditingOther && profileUser && (
+        <Card variant="elevated">
+          <Text style={styles.sectionTitle}>Accesso all{'\''}App</Text>
+
+          {statoAccesso === null ? (
+            <Text style={styles.infoValue}>Sto controllando…</Text>
+          ) : (
+            <Text style={{ ...styles.infoLabel, marginBottom: 12 }}>
+              {descriviAccesso(statoAccesso)}
+            </Text>
+          )}
+
+          {statoAccesso && !statoAccesso.haAccesso && !creandoAccesso && (
+            <Button
+              title="Crea l'accesso per questa persona"
+              variant="primary"
+              onPress={() => {
+                setNuovoAccessoEmail(profileUser.email || '');
+                setNuovoAccessoPassword(passwordDettabile());
+                setCreandoAccesso(true);
+              }}
+            />
+          )}
+
+          {creandoAccesso && (
+            <View>
+              <InputField
+                label="Email con cui entrerà"
+                value={nuovoAccessoEmail}
+                onChangeText={setNuovoAccessoEmail}
+                placeholder="nome@esempio.it"
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <InputField
+                label="Password (gliela detti tu)"
+                value={nuovoAccessoPassword}
+                onChangeText={setNuovoAccessoPassword}
+                placeholder="almeno 6 caratteri"
+                autoCapitalize="none"
+              />
+              {/* Si vede in chiaro APPOSTA: questa password va letta ad
+                  alta voce, e nasconderla dietro i pallini serve solo
+                  a farla sbagliare. */}
+              <Text style={styles.infoLabel}>
+                Si legge al telefono senza spiegare niente: niente maiuscole,
+                niente simboli, niente 0/1/5.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Annulla"
+                    variant="outline"
+                    onPress={() => setCreandoAccesso(false)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title={salvandoAccesso ? 'Creo…' : 'Crea accesso'}
+                    loading={salvandoAccesso}
+                    onPress={handleCreaAccesso}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
         </Card>
       )}
 

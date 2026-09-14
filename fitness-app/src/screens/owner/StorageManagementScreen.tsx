@@ -38,6 +38,7 @@ const ICONE: Record<string, string> = {
   'exercise-videos': 'videocam',
   content: 'folder',
   nutritionTeam: 'nutrition',
+  comunicazioni: 'megaphone',
   '(root)': 'document',
 };
 

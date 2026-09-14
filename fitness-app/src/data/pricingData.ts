@@ -143,6 +143,14 @@ export const TIERS: PricingTier[] = [
   },
 ];
 
+/**
+ * La quota di iscrizione, letta dai piani che ce l'hanno.
+ * Era scritta a mano anche nella schermata del Listino: due posti,
+ * e il secondo prima o poi resta indietro. Vedi il test.
+ */
+export const QUOTA_ISCRIZIONE: number =
+  TIERS.find((t) => t.registrationFee > 0)?.registrationFee ?? 0;
+
 // Note commerciali extra usate da Listino e Assistente
 export const PRICING_NOTES = [
   'I piani annuali PREMIUM comprendono la valutazione completa Mind Movement™ '
@@ -157,8 +165,13 @@ export const PRICING_NOTES = [
   + 'integrata e il protocollo di lavoro scritto: è il documento che si firma insieme '
   + "prima di iniziare un percorso. Le valutazioni sono di screening e non sostituiscono "
   + 'il parere di un professionista sanitario.',
+  // La vecchia riga «analisi posturale €49 da sola, gratuita con
+  // qualsiasi abbonamento» è stata tolta il 12 settembre 2026: quel
+  // prodotto non esiste più, ed era ancora in bocca all'assistente AI,
+  // che lo stava dicendo agli allievi.
+  'La valutazione Mind Movement™ è compresa nei piani annuali PREMIUM. '
+  + 'Con gli altri piani si acquista a parte, a €150.',
   'Quota di iscrizione palestra: €35 una tantum (solo piani Mensile/Trimestrale/Semestrale).',
   "Bonus pagamento annuale in un'unica soluzione: 1 mese in regalo + T-shirt Mind Movement Lab.",
   'Pagamento semestrale dei piani annuali tramite contratto: possibile ma senza bonus.',
-  "Analisi posturale: €49 da sola (invece di €100); GRATUITA come bonus con qualsiasi abbonamento.",
 ];

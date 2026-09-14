@@ -168,7 +168,6 @@ const toSafeDate = (d: unknown): Date => {
   return new Date(d as string);
 };
 
-// Get active plan for student (the one within date range and not fully used)
 /**
  * Scala una lezione (o una consulenza) dal percorso e DICE che cosa
  * è successo. Prima falliva in silenzio quando il percorso non
@@ -176,10 +175,15 @@ const toSafeDate = (d: unknown): Date => {
  * domani: la lezione non veniva scalata e nessuno lo sapeva.
  *
  * La scelta del percorso vive in src/domain/piani.ts e si testa lì.
+ *
+ * `quando` è il giorno in cui la seduta è AVVENUTA, non quello in cui
+ * la si registra: una lezione di agosto la paga il pacchetto di
+ * agosto. Per una seduta segnata completata adesso i due coincidono.
  */
 export const scalaDalPercorso = async (
   studentId: string,
   tipo: TipoImpegnoPiano,
+  quando: Date = new Date(),
   oggi: Date = new Date()
 ): Promise<Scelta> => {
   const piani = await getStudentPaymentPlans(studentId);
@@ -192,7 +196,7 @@ export const scalaDalPercorso = async (
     consulenzeIncluse: p.includedConsultations || 0,
     consulenzeUsate: p.usedConsultations || 0,
     creatoIl: p.createdAt ? toSafeDate(p.createdAt) : undefined,
-  })), tipo, oggi);
+  })), tipo, quando, oggi);
 
   if (scelta.esito !== 'scalata' || !scelta.piano) return scelta;
 
@@ -206,17 +210,13 @@ export const scalaDalPercorso = async (
   return scelta;
 };
 
-export const getActiveStudentPlan = async (studentId: string): Promise<PaymentPlan | null> => {
-  const plans = await getStudentPaymentPlans(studentId);
-  const now = new Date();
-  return plans.find((p) => {
-    const start = toSafeDate(p.startDate);
-    const end = toSafeDate(p.endDate);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-    const endOfDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
-    return start <= now && endOfDay >= now;
-  }) || null;
-};
+// C'era qui `getActiveStudentPlan`: «il percorso attivo oggi». È
+// stata cancellata il 12 settembre 2026 insieme all'ultima funzione
+// che la usava. Sembrava innocua e invece era la trappola: per una
+// seduta registrata dopo (una lezione di agosto segnata a settembre)
+// restituiva `null`, e chi la chiamava usciva in silenzio senza
+// scalare niente. Chi deve scalare usa `scalaDalPercorso`, che sa
+// guardare il giorno giusto e non tace mai.
 
 // ------------------------------------------------------------
 // TEMPO REALE

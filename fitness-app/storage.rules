@@ -165,6 +165,18 @@ service firebase.storage {
     }
 
     // ----------------------------------------------------------
+    // GLI ALLEGATI DELLE COMUNICAZIONI
+    // ----------------------------------------------------------
+    // Una foto, un video o un audio mandato a tutti gli allievi.
+    // Li carica lo staff, li vede chi è dentro. Li toglie il titolare.
+
+    match /comunicazioni/{fileName} {
+      allow read: if autenticato();
+      allow write: if staff();
+      allow delete: if titolare();
+    }
+
+    // ----------------------------------------------------------
     // LO STRUMENTO DI GESTIONE SPAZIO
     // ----------------------------------------------------------
     // Serviva un elenco su tutto il bucket, ed è per quello che
