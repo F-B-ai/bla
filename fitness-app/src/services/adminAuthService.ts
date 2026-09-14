@@ -90,3 +90,57 @@ export const cleanAllManagedPasswords = async (): Promise<number> => {
     throw translateError(err);
   }
 };
+
+// ============================================================
+// CREARE L'ACCESSO AL POSTO DELLA PERSONA
+// ------------------------------------------------------------
+// 14 settembre 2026: «Non tutti, soprattutto le persone più anziane,
+// capiscono come fare.» L'invito da completare da soli non è una
+// strada per tutti; l'accesso lo crea il titolare e lo detta a voce.
+// ============================================================
+
+export interface StatoAccesso {
+  haAccesso: boolean;
+  email: string;
+  /** ha un accesso ma non è mai entrata */
+  maiEntrata: boolean;
+}
+
+/** Questa persona può entrare nell'App? */
+export const leggiStatoAccesso = async (
+  targetUserId: string
+): Promise<StatoAccesso> => {
+  try {
+    const fn = httpsCallable(functions, 'adminStatoAccesso');
+    const res = await fn({ targetUserId });
+    const d = res.data as Partial<StatoAccesso>;
+    return {
+      haAccesso: !!d?.haAccesso,
+      email: d?.email || '',
+      maiEntrata: d?.maiEntrata !== false,
+    };
+  } catch (err) {
+    throw translateError(err);
+  }
+};
+
+/**
+ * Crea l'accesso per una persona già in anagrafica.
+ *
+ * Restituisce gli eventuali avvisi: l'accesso a quel punto ESISTE
+ * comunque, e nascondere che qualcosa di secondario non è riuscito
+ * sarebbe peggio che dirlo.
+ */
+export const creaAccessoPerAllievo = async (
+  targetUserId: string,
+  email: string,
+  password: string
+): Promise<string[]> => {
+  try {
+    const fn = httpsCallable(functions, 'adminCreaAccesso');
+    const res = await fn({ targetUserId, email, password });
+    return (res.data as { avvisi?: string[] })?.avvisi || [];
+  } catch (err) {
+    throw translateError(err);
+  }
+};

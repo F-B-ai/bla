@@ -192,6 +192,157 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
   return {success: true};
 });
 
+/**
+ * Questa persona può entrare nell'App?
+ *
+ * La schermata non poteva saperlo: mostrava gli stessi pulsanti a chi
+ * ha un accesso e a chi non l'ha mai avuto, e l'unico modo di
+ * scoprirlo era provare e leggere un errore.
+ */
+export const adminStatoAccesso = onCall({region: "europe-west1"}, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Devi essere autenticato.");
+  }
+  await verifyOwnerOrManager(request.auth.uid);
+
+  const {targetUserId} = request.data;
+  if (!targetUserId) {
+    throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
+  }
+
+  try {
+    const u = await authAdmin.getUser(targetUserId);
+    return {
+      haAccesso: true,
+      email: u.email || "",
+      // Firebase azzera questo campo solo se non è MAI entrata.
+      maiEntrata: !u.metadata.lastSignInTime,
+    };
+  } catch (err) {
+    if ((err as {code?: string})?.code === "auth/user-not-found") {
+      return {haAccesso: false, email: "", maiEntrata: true};
+    }
+    throw comeHttpsError(err, "Non riesco a leggere lo stato dell'accesso");
+  }
+});
+
+/**
+ * Creare l'accesso al posto della persona.
+ *
+ * 14 settembre 2026: «Non tutti, soprattutto le persone più anziane,
+ * capiscono come fare.» Fino a oggi c'era una strada sola — mandare
+ * l'invito e sperare che venisse completato. Per una signora di
+ * settant'anni quella strada non esiste, e la scheda in anagrafica
+ * non diventava mai un accesso.
+ *
+ * L'account si crea con `uid` uguale all'id della scheda: tutta
+ * l'App dà per scontato che le due cose coincidano, e crearne uno
+ * con un id diverso vorrebbe dire spaccare in due la persona.
+ */
+export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Devi essere autenticato.");
+  }
+  await verifyOwnerOrManager(request.auth.uid);
+
+  const {targetUserId, email, password} = request.data;
+  if (!targetUserId || !email || !password) {
+    throw new HttpsError(
+      "invalid-argument",
+      "targetUserId, email e password sono obbligatori."
+    );
+  }
+  if (String(password).length < 6) {
+    throw new HttpsError("invalid-argument", "La password deve avere almeno 6 caratteri.");
+  }
+
+  // La scheda dev'esserci: l'accesso si crea per una persona che è
+  // già in anagrafica, non si inventa una persona nuova da qui.
+  let scheda;
+  try {
+    scheda = await db.collection("users").doc(targetUserId).get();
+  } catch (err) {
+    throw comeHttpsError(err, "Non riesco a leggere la scheda di questa persona");
+  }
+  if (!scheda.exists) {
+    throw new HttpsError(
+      "not-found",
+      "Non trovo la scheda di questa persona: crea prima l'anagrafica."
+    );
+  }
+
+  // Se l'accesso c'è già, non si sovrascrive niente in silenzio.
+  try {
+    const gia = await authAdmin.getUser(targetUserId);
+    throw new HttpsError(
+      "already-exists",
+      `Questa persona ha già un accesso (${gia.email || "email non nota"}). ` +
+      "Se non riesce a entrare, cambiale la password o mandale il link " +
+      "per reimpostarla."
+    );
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    if ((err as {code?: string})?.code !== "auth/user-not-found") {
+      throw comeHttpsError(err, "Non riesco a controllare l'accesso esistente");
+    }
+    // user-not-found è il caso buono: si prosegue.
+  }
+
+  const dati = scheda.data() || {};
+  try {
+    await authAdmin.createUser({
+      uid: targetUserId,
+      email: String(email).trim(),
+      password: String(password),
+      displayName: [dati.name, dati.surname].filter(Boolean).join(" ") || undefined,
+      emailVerified: false,
+    });
+  } catch (err) {
+    const codice = (err as {code?: string})?.code || "";
+    if (codice === "auth/email-already-exists") {
+      throw new HttpsError(
+        "already-exists",
+        "Questa email è già usata da un altro account. Usane un'altra, " +
+        "oppure controlla se la persona è già in anagrafica due volte."
+      );
+    }
+    if (codice === "auth/invalid-email") {
+      throw new HttpsError("invalid-argument", "Questa email non è valida.");
+    }
+    if (codice === "auth/invalid-password") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Questa password non va bene: servono almeno 6 caratteri, senza spazi."
+      );
+    }
+    throw comeHttpsError(err, "Non sono riuscito a creare l'accesso");
+  }
+
+  // Da qui in poi l'accesso ESISTE: se qualcosa fallisce non si torna
+  // indietro cancellandolo — si dice che cosa manca, perché la
+  // persona intanto può già entrare.
+  const avvisi: string[] = [];
+  try {
+    await authAdmin.setCustomUserClaims(targetUserId, {
+      role: dati.role || "student",
+      attivo: dati.isActive !== false,
+    });
+  } catch {
+    avvisi.push(
+      "il ruolo non è stato scritto nel token: apri Gestione Utenti e " +
+      "tocca «Allinea i ruoli»"
+    );
+  }
+  try {
+    await db.collection("users").doc(targetUserId)
+      .set({email: String(email).trim()}, {merge: true});
+  } catch {
+    avvisi.push("la scheda mostra ancora l'email vecchia");
+  }
+
+  return {success: true, avvisi};
+});
+
 export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
