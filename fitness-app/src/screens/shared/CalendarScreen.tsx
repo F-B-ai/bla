@@ -53,7 +53,9 @@ import {
   deleteAppointment,
 } from '../../services/nutritionistService';
 import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
-import { soloSePersonali, spiegaFiltro } from '../../domain/filtroStaff';
+import {
+  soloSePersonali, spiegaFiltro, ETICHETTA_TOGLI_FILTRO,
+} from '../../domain/filtroStaff';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   createTask,
@@ -468,6 +470,33 @@ export const CalendarScreen: React.FC = () => {
     staffList.find((p) => p.id === selectedStaffId)?.name,
     user?.id
   ), [selectedStaffId, staffList, user?.id]);
+
+  /**
+   * Il banner del filtro, con dentro il modo di toglierlo.
+   *
+   * Compare in TUTTE E TRE le viste. Prima stava solo in Agenda: in
+   * Timeline e Calendario il filtro nascondeva gli appuntamenti del
+   * titolare e tutti i suoi ospiti senza dire niente, e da Timeline
+   * non si poteva nemmeno togliere. Vedi domain/filtroStaff.ts.
+   */
+  const bannerFiltro = useMemo(() => {
+    if (avvisoFiltro === '') return null;
+    return (
+      <View style={styles.filtroAvviso}>
+        <Ionicons name="eye-outline" size={16} color={colors.info} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.filtroAvvisoTxt}>{avvisoFiltro}</Text>
+          <TouchableOpacity
+            onPress={() => setSelectedStaffId(null)}
+            style={{ marginTop: 6 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filtroAvvisoAzione}>{ETICHETTA_TOGLI_FILTRO}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [avvisoFiltro]);
 
   const getStudentName = (id: string) => {
     const s = students.find((st) => st.id === id);
@@ -1628,6 +1657,10 @@ export const CalendarScreen: React.FC = () => {
               quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
           {avvisoMancanze}
 
+          {/* E se si sta guardando la giornata di un altro, si dice
+              QUI — in ogni vista — con dentro il modo di smettere. */}
+          {bannerFiltro}
+
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
             <TouchableOpacity
@@ -1767,12 +1800,7 @@ export const CalendarScreen: React.FC = () => {
               la guarda crede di vedere tutto — ed è l'equivoco che ha
               fatto sospettare al titolare che i collaboratori vedessero
               le sue cose. */}
-          {avvisoFiltro !== '' && (
-            <View style={styles.filtroAvviso}>
-              <Ionicons name="eye-outline" size={16} color={colors.info} />
-              <Text style={styles.filtroAvvisoTxt}>{avvisoFiltro}</Text>
-            </View>
-          )}
+          {bannerFiltro}
 
           {/* Today's appointments */}
           <View style={styles.agendaSection}>
@@ -1900,6 +1928,10 @@ export const CalendarScreen: React.FC = () => {
               perché è la prima cosa da sapere prima di fidarsi di
               quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
           {avvisoMancanze}
+
+          {/* E se si sta guardando la giornata di un altro, si dice
+              QUI — in ogni vista — con dentro il modo di smettere. */}
+          {bannerFiltro}
 
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
@@ -2815,6 +2847,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.info,
     backgroundColor: colors.surface,
+  },
+  filtroAvvisoAzione: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
   },
   filtroAvvisoTxt: {
     flex: 1,

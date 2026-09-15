@@ -30,7 +30,33 @@
 // giornata di QUALCUN ALTRO, quelle voci non ci sono.
 // ============================================================
 
-export const FILTRO_STAFF_VERSION = 1;
+// ------------------------------------------------------------
+// 15 SETTEMBRE 2026 — LA METÀ CHE ERA RIMASTA FUORI
+// ------------------------------------------------------------
+// Il titolare: «Oggi ho un appuntamento alle 14 di un ospite e non
+// lo vedo. Io stamattina avevo un appuntamento, non lo vedo. Non
+// vedo tutti gli appuntamenti ospiti gialli.»
+//
+// Il filtro funzionava. Ma l'avviso che lo spiega compariva in UNA
+// vista sola su tre:
+//
+//   Agenda      → filtra, ha le pillole, avvisa
+//   Timeline    → filtra, NIENTE pillole, NIENTE avviso
+//   Calendario  → filtra, ha le pillole, NIENTE avviso
+//
+// Cioè: in due viste su tre gli sparivano i propri appuntamenti e
+// tutti i propri ospiti, senza una parola — e da una delle due non
+// poteva nemmeno togliere il filtro.
+//
+// A settembre avevo chiuso metà del difetto: «un filtro che filtra
+// metà schermo è peggio di un filtro assente». Vale identico per un
+// filtro che si spiega in una vista sola.
+//
+// Adesso l'avviso sta in tutte e tre, e porta con sé il modo di
+// toglierlo: dirlo senza dare l'uscita è mezzo servizio.
+// ------------------------------------------------------------
+
+export const FILTRO_STAFF_VERSION = 2;
 
 /**
  * Le voci personali del titolare (task, ospiti) si vedono solo quando
@@ -68,6 +94,11 @@ export const spiegaFiltro = (
   if (!staffScelto) return '';
   if (mioId && staffScelto === mioId) return '';
   const chi = nomeScelto?.trim() || 'questa persona';
-  return `Stai guardando la giornata di ${chi}. `
-    + 'I tuoi task e i tuoi ospiti non compaiono qui.';
+  // Non basta dire di chi è la giornata: va detto che cosa MANCA,
+  // perché è quello che la persona sta cercando e non trova.
+  return `Stai guardando solo la giornata di ${chi}. `
+    + 'I tuoi appuntamenti, i tuoi task e i tuoi ospiti NON compaiono qui.';
 };
+
+/** Che cosa scrivere sul pulsante che toglie il filtro. */
+export const ETICHETTA_TOGLI_FILTRO = 'Mostra tutta l\'agenda';
