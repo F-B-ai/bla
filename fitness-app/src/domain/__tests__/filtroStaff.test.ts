@@ -123,8 +123,38 @@ describe('la schermata mostra l\'avviso in TUTTE le viste', () => {
 
   // Agenda, Timeline, Calendario: il filtro agisce in tutte e tre,
   // quindi in tutte e tre va detto.
-  it('il banner compare tre volte, una per vista', () => {
-    expect(schermata.split('{bannerFiltro}').length - 1).toBe(3);
+  // Non basta contarli: il 15 settembre 2026 erano tre, ma DUE
+  // nella stessa vista e ZERO nel Calendario. Il conteggio giusto
+  // nascondeva la distribuzione sbagliata.
+  // I confini sono i marcatori che le viste hanno già nel codice:
+  // più solidi di qualunque euristica sul «return».
+  const viste = (() => {
+    const segna = (n: string) => {
+      const i = schermata.indexOf(`// ========== ${n} VIEW ==========`);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    const a = segna('AGENDA');
+    const t2 = segna('TIMELINE');
+    const c = segna('CALENDAR');
+    return {
+      agenda: schermata.slice(a, t2),
+      timeline: schermata.slice(t2, c),
+      calendario: schermata.slice(c),
+    };
+  })();
+
+  it('ogni vista ha il banner del filtro, una volta sola', () => {
+    (['agenda', 'timeline', 'calendario'] as const).forEach((v) => {
+      const quante = viste[v].split('{bannerFiltro}').length - 1;
+      expect({ vista: v, quante }).toEqual({ vista: v, quante: 1 });
+    });
+  });
+
+  it('e ogni vista dice anche che cosa non ha potuto leggere', () => {
+    (['agenda', 'timeline', 'calendario'] as const).forEach((v) => {
+      expect(viste[v]).toContain('{avvisoMancanze}');
+    });
   });
 
   it('e porta con sé il modo di toglierlo', () => {

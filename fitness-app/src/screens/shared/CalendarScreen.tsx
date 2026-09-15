@@ -193,6 +193,10 @@ export const CalendarScreen: React.FC = () => {
   // Che cosa non si è riuscito a leggere, per dirlo invece di
   // mostrare una lista vuota. Vedi domain/caricamentoAgenda.ts.
   const [mancanze, setMancanze] = useState<Mancanza[]>([]);
+  // Che cosa è successo davvero all'ultima lettura degli ospiti.
+  const [letturaOspiti, setLetturaOspiti] = useState<{
+    letti: number; confermate: number; mostrati: number;
+  } | null>(null);
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
@@ -288,17 +292,31 @@ export const CalendarScreen: React.FC = () => {
         canSeeAll ? getManagers() : Promise.resolve([]),
         // Solo il titolare può leggerli: per gli altri resta vuoto e
         // l'agenda funziona esattamente come prima.
-        isOwner
-          ? getOspitiConfermati().catch((e) => {
-            mancanti.push(mancanza('ospiti', e));
-            return { ospiti: [], troncato: false };
-          })
-          : Promise.resolve({ ospiti: [], troncato: false }),
+        // NON si salta più la lettura in base al ruolo letto dal
+        // client. Era un `isOwner ? leggi : niente`: se per qualunque
+        // motivo il profilo non risultava «owner», gli ospiti non
+        // venivano nemmeno CHIESTI — nessun errore, nessun avviso,
+        // lista vuota identica a «non ce ne sono».
+        //
+        // Chi può leggerli lo decidono le regole di Firestore, che
+        // sono la serratura vera (`bookingRequests: if isOwner()`).
+        // Se dicono di no, arriva un errore e si vede. Un permesso si
+        // fa rispettare dove conta, non nascondendo la domanda.
+        getOspitiConfermati().catch((e) => {
+          mancanti.push(mancanza('ospiti', e));
+          return { ospiti: [], troncato: false, letti: 0, confermate: 0 };
+        }),
       ]);
       setOspiti(osp.ospiti);
       // Il tetto di lettura non si tocca in silenzio: se si tocca, si
       // dice, perché è esattamente così che erano spariti gli ospiti.
       if (osp.troncato) mancanti.push(mancanza('ospiti', 'elenco troncato: troppi ospiti in archivio'));
+      // Zero ospiti su documenti letti NON è la stessa cosa di zero
+      // documenti: la prima è una domanda sbagliata, la seconda un
+      // archivio vuoto. Finché non si distinguono, si tira a indovinare.
+      setLetturaOspiti({
+        letti: osp.letti, confermate: osp.confermate, mostrati: osp.ospiti.length,
+      });
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
@@ -1367,6 +1385,36 @@ export const CalendarScreen: React.FC = () => {
    * consulenze con chi non è ancora in anagrafica — una lettura
    * fallita faceva sparire tutto senza una parola.
    */
+  /**
+   * La riga che compare SOLO quando gli ospiti non si vedono e
+   * qualcosa era stato letto: distingue «l'archivio è vuoto» da
+   * «ho letto e ho scartato tutto».
+   *
+   * Senza questi due numeri, il 15 settembre 2026 ho tentato tre
+   * rimedi diversi senza sapere quale delle due fosse — e ogni
+   * tentativo a vuoto è costato tempo al titolare, che intanto
+   * riscriveva a mano gli appuntamenti.
+   */
+  const spiaOspiti = useMemo(() => {
+    const l = letturaOspiti;
+    if (!l || l.mostrati > 0 || l.letti === 0) return null;
+    return (
+      <View style={styles.avvisoMancanze}>
+        <Ionicons name="help-circle-outline" size={20} color={colors.warning} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.avvisoMancanzeTitolo}>Nessun ospite da mostrare</Text>
+          <Text style={styles.avvisoMancanzeTxt}>
+            {`Ho letto ${l.letti} richieste in archivio: ${l.confermate} risultano `
+            + 'confermate, e nessuna è rimasta come ospite (le altre sono già '
+            + 'diventate sedute, oppure sono in attesa o rifiutate).\n\n'
+            + 'Se ti aspettavi di vederne, mandami questa riga: dice esattamente '
+            + 'dove si perdono.'}
+          </Text>
+        </View>
+      </View>
+    );
+  }, [letturaOspiti]);
+
   const avvisoMancanze = useMemo(() => {
     const testo = descriviMancanze(mancanze);
     if (!testo) return null;
@@ -1661,6 +1709,7 @@ export const CalendarScreen: React.FC = () => {
               perché è la prima cosa da sapere prima di fidarsi di
               quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
           {avvisoMancanze}
+          {spiaOspiti}
 
           {/* E se si sta guardando la giornata di un altro, si dice
               QUI — in ogni vista — con dentro il modo di smettere. */}
@@ -1801,12 +1850,6 @@ export const CalendarScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Una schermata filtrata deve dire che è filtrata: senza, chi
-              la guarda crede di vedere tutto — ed è l'equivoco che ha
-              fatto sospettare al titolare che i collaboratori vedessero
-              le sue cose. */}
-          {bannerFiltro}
-
           {/* Today's appointments */}
           <View style={styles.agendaSection}>
             <View style={styles.agendaSectionHeader}>
@@ -1933,6 +1976,7 @@ export const CalendarScreen: React.FC = () => {
               perché è la prima cosa da sapere prima di fidarsi di
               quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
           {avvisoMancanze}
+          {spiaOspiti}
 
           {/* E se si sta guardando la giornata di un altro, si dice
               QUI — in ogni vista — con dentro il modo di smettere. */}
@@ -2144,6 +2188,13 @@ export const CalendarScreen: React.FC = () => {
                 </Text>
               )}
             </View>
+
+            {/* Anche qui: che cosa non si è letto, e se si sta
+                guardando la giornata di un altro. Il filtro agisce in
+                TUTTE le viste, quindi in tutte va detto. */}
+            {avvisoMancanze}
+            {spiaOspiti}
+            {bannerFiltro}
 
             {/* View mode tabs */}
             <View style={styles.viewTabsBar}>

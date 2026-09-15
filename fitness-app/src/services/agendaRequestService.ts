@@ -255,6 +255,10 @@ export interface EsitoOspiti {
   ospiti: RichiestaSalvata[];
   /** true se si è toccato il tetto: l'elenco potrebbe non essere tutto */
   troncato: boolean;
+  /** quanti documenti sono stati letti in tutto */
+  letti: number;
+  /** quanti erano «confermata» prima di togliere quelli già diventati seduta */
+  confermate: number;
 }
 
 /**
@@ -311,10 +315,23 @@ export const getOspitiConfermati = async (): Promise<EsitoOspiti> => {
     orderBy('giorno', 'desc'),
     limit(TETTO_OSPITI)
   ));
-  const ospiti = snap.docs.map(daDoc)
-    .filter((r) => r.stato === 'confermata' && !r.sessionId)
+  const tutte = snap.docs.map(daDoc);
+  const confermate = tutte.filter((r) => r.stato === 'confermata');
+  const ospiti = confermate
+    .filter((r) => !r.sessionId)
     .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora));
-  return { ospiti, troncato: snap.size >= TETTO_OSPITI };
+
+  // I due conteggi non sono decorazione: distinguono «l'archivio è
+  // vuoto» da «ho letto cento documenti e li ho scartati tutti». Per
+  // tre volte, il 15 settembre, non ho saputo dire quale delle due
+  // fosse — e ogni tentativo a vuoto è costato tempo al titolare
+  // mentre riscriveva a mano gli appuntamenti.
+  return {
+    ospiti,
+    troncato: snap.size >= TETTO_OSPITI,
+    letti: tutte.length,
+    confermate: confermate.length,
+  };
 };
 
 // ------------------------------------------------------------
