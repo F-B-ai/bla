@@ -1294,10 +1294,12 @@ export const CalendarScreen: React.FC = () => {
 
   // Gli ospiti confermati (persone non ancora in anagrafica) valgono
   // come impegni: si vedono anche qui, non solo nel calendario.
-  const ospitiOggi = useMemo(
-    () => ospitiVisibili.filter((o) => o.giorno === todayStr),
-    [ospitiVisibili, todayStr]
-  );
+  // `ospitiOggi` viveva qui e non lo usava NESSUNO: gli ospiti di oggi
+  // arrivano già dentro `giornataOggi`, che li mescola agli
+  // appuntamenti in ordine di orario. Una variabile calcolata e mai
+  // disegnata è una pista falsa per chi cerca un difetto — e mi ci ha
+  // fatto perdere tempo il 15 settembre 2026, mentre il titolare
+  // aspettava. Tolta.
   const ospitiProssimi = useMemo(
     () => ospitiVisibili.filter((o) => o.giorno > todayStr)
       .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora))

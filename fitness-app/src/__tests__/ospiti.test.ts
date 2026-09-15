@@ -28,18 +28,28 @@ const agenda = fs.readFileSync(
 
 const lettura = servizio.slice(
   servizio.indexOf('export const getOspitiConfermati'),
-  servizio.indexOf('export const getOspitiConfermati') + 900
+  servizio.indexOf('export const getOspitiConfermati') + 2600
 );
 
-describe('la lettura chiede solo quello che serve', () => {
-  // Il cuore della correzione: senza questo filtro, le sedute
-  // riempiono la finestra e gli ospiti cadono fuori.
-  it('filtra sugli ospiti, non su tutte le richieste confermate', () => {
-    expect(lettura).toContain("where('ospite', '==', true)");
-    expect(lettura).toContain("where('stato', '==', 'confermata')");
+describe('la lettura non può più cadere fuori dalla finestra', () => {
+  // Il cuore della correzione: ordinando per giorno DECRESCENTE,
+  // oggi e il futuro stanno sempre in cima. Anche con anni di
+  // archivio sotto, quello che serve all'agenda resta dentro.
+  it('ordina per giorno, dal più avanti al più indietro', () => {
+    expect(lettura).toContain("orderBy('giorno', 'desc')");
   });
 
-  it('tiene la cintura: un ospite con una seduta non è più un ospite', () => {
+  // Un solo orderBy = indice automatico. Con un filtro accanto
+  // servirebbe un indice composito, che quando manca fa fallire
+  // tutta la query — e allora sparirebbero di nuovo.
+  it('senza filtri accanto, così non serve nessun indice nuovo', () => {
+    expect(lettura).not.toContain('where(');
+  });
+
+  // Il rimedio precedente si fidava del campo `ospite`: un documento
+  // che non ce l'ha spariva e non tornava più.
+  it('non si fida di nessun campo facoltativo: smista qui', () => {
+    expect(lettura).toContain("r.stato === 'confermata'");
     expect(lettura).toContain('!r.sessionId');
   });
 });
@@ -59,8 +69,8 @@ describe('il tetto non si tocca mai in silenzio', () => {
 });
 
 describe('ogni strada che crea un ospite lo marca', () => {
-  // Il filtro nuovo si fida del campo `ospite`: se una strada
-  // dimenticasse di scriverlo, quegli ospiti sparirebbero.
+  // La lettura non dipende più da questo campo, ma la schermata
+  // Richieste lo usa ancora: resta difeso.
   it('creaOspite scrive ospite: true', () => {
     const crea = servizio.slice(
       servizio.indexOf('export const creaOspite'),

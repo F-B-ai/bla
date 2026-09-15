@@ -288,16 +288,31 @@ export interface EsitoOspiti {
  * che l'elenco si accorci da solo.
  */
 export const getOspitiConfermati = async (): Promise<EsitoOspiti> => {
+  // ------------------------------------------------------------
+  // SECONDO TENTATIVO, 15 settembre 2026 — e questa volta senza
+  // dipendere da niente che possa mancare.
+  // ------------------------------------------------------------
+  // Il primo rimedio filtrava su `ospite == true`. Più preciso, ma
+  // si fidava di un campo: un documento che non ce l'ha — scritto
+  // prima che il campo esistesse, o da una strada che non lo mette —
+  // sparisce e non torna. E il titolare continuava a non vederli.
+  //
+  // Adesso si chiede la cosa più semplice che Firestore sa fare
+  // SENZA indici nuovi: le richieste in ordine di GIORNO, dalla più
+  // avanti alla più indietro. Un solo `orderBy`, indice automatico.
+  //
+  // Ordinare per giorno decrescente vuol dire che oggi e il futuro
+  // stanno sempre in cima alla finestra: anche con anni di archivio
+  // sotto, quello che serve all'agenda non può più cadere fuori.
+  // Lo smistamento (confermata, non ancora seduta) si fa qui, dove
+  // non può fallire e non dipende da nessun campo facoltativo.
   const snap = await getDocs(query(
     collection(db, RICHIESTE),
-    where('stato', '==', 'confermata'),
-    where('ospite', '==', true),
+    orderBy('giorno', 'desc'),
     limit(TETTO_OSPITI)
   ));
   const ospiti = snap.docs.map(daDoc)
-    // Cintura e bretelle: un ospite collegato a una seduta non è più
-    // un ospite, e `ospite` viene rimesso a false quando succede.
-    .filter((r) => !r.sessionId)
+    .filter((r) => r.stato === 'confermata' && !r.sessionId)
     .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora));
   return { ospiti, troncato: snap.size >= TETTO_OSPITI };
 };
