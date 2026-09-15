@@ -248,15 +248,58 @@ export const leggiImpegni = async (studenti: Student[]): Promise<Impegno[]> => {
  * agganciarsi. Occupano un posto vero, e devono vedersi in agenda:
  * un impegno che non compare sul calendario è un impegno che salta.
  */
-export const getOspitiConfermati = async (): Promise<RichiestaSalvata[]> => {
+/** Quanti se ne leggono in una volta. Vedi il commento qui sotto. */
+export const TETTO_OSPITI = 500;
+
+export interface EsitoOspiti {
+  ospiti: RichiestaSalvata[];
+  /** true se si è toccato il tetto: l'elenco potrebbe non essere tutto */
+  troncato: boolean;
+}
+
+/**
+ * Gli ospiti confermati: persone che hanno un posto in agenda e non
+ * sono (ancora) in anagrafica.
+ *
+ * ------------------------------------------------------------
+ * IL DIFETTO DEL 15 SETTEMBRE 2026
+ * ------------------------------------------------------------
+ * Il titolare: «Non vedo tutti gli appuntamenti ospiti gialli.»
+ *
+ * Questa funzione chiedeva le prime 300 richieste `confermata`
+ * SENZA ALCUN ORDINE, e solo dopo buttava via quelle già diventate
+ * sedute (`sessionId`). Ma ogni richiesta WhatsApp confermata di un
+ * allievo in anagrafica resta lì, `confermata` e con `sessionId`:
+ * cioè la collezione si riempie di documenti che occupano il posto
+ * nelle 300 senza mai comparire nell'elenco.
+ *
+ * Superate le 300 confermate, gli ospiti veri cominciano a cadere
+ * fuori dalla finestra — a caso, uno alla volta, finché non ne resta
+ * nessuno. Nessun errore, nessun messaggio: sparivano e basta.
+ *
+ * Il titolare aveva sentito che c'entrava un numero («erano troppi
+ * appuntamenti in settimana»): c'entrava, ma era il numero totale
+ * delle richieste in archivio, non quello degli appuntamenti.
+ *
+ * Adesso si chiedono SOLO gli ospiti (`ospite == true`): due filtri
+ * di uguaglianza, che Firestore serve senza indici nuovi, e le
+ * sedute non occupano più posto. Se un giorno anche i soli ospiti
+ * dovessero superare il tetto, `troncato` lo dice invece di lasciare
+ * che l'elenco si accorci da solo.
+ */
+export const getOspitiConfermati = async (): Promise<EsitoOspiti> => {
   const snap = await getDocs(query(
     collection(db, RICHIESTE),
     where('stato', '==', 'confermata'),
-    limit(300)
+    where('ospite', '==', true),
+    limit(TETTO_OSPITI)
   ));
-  return snap.docs.map(daDoc)
+  const ospiti = snap.docs.map(daDoc)
+    // Cintura e bretelle: un ospite collegato a una seduta non è più
+    // un ospite, e `ospite` viene rimesso a false quando succede.
     .filter((r) => !r.sessionId)
     .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora));
+  return { ospiti, troncato: snap.size >= TETTO_OSPITI };
 };
 
 // ------------------------------------------------------------

@@ -291,11 +291,14 @@ export const CalendarScreen: React.FC = () => {
         isOwner
           ? getOspitiConfermati().catch((e) => {
             mancanti.push(mancanza('ospiti', e));
-            return [];
+            return { ospiti: [], troncato: false };
           })
-          : Promise.resolve([]),
+          : Promise.resolve({ ospiti: [], troncato: false }),
       ]);
-      setOspiti(osp);
+      setOspiti(osp.ospiti);
+      // Il tetto di lettura non si tocca in silenzio: se si tocca, si
+      // dice, perché è esattamente così che erano spariti gli ospiti.
+      if (osp.troncato) mancanti.push(mancanza('ospiti', 'elenco troncato: troppi ospiti in archivio'));
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));

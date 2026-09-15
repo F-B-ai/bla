@@ -102,7 +102,7 @@ export function RichiesteWhatsAppScreen() {
       ]);
       setImpegni(i);
       setAttesa(a);
-      setOspiti(o);
+      setOspiti(o.ospiti);
     } catch {
       crossAlert('Errore', 'Non riesco a leggere agenda e richieste');
     } finally {
