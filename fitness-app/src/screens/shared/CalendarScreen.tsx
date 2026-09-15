@@ -68,6 +68,9 @@ import {
 } from '../../domain/piani';
 import { valutaAnnullamento } from '../../domain/annullamento';
 import {
+  Mancanza, mancanza, descriviMancanze, titoloMancanze,
+} from '../../domain/caricamentoAgenda';
+import {
   permessiAgenda, spiegaNienteAnnullo, spiegaNienteEliminazione,
 } from '../../domain/permessiAgenda';
 import { valutaEccezione, riassuntoEccezioni } from '../../domain/eccezioni';
@@ -185,6 +188,9 @@ export const CalendarScreen: React.FC = () => {
   // Annullare ed eliminare sono del titolare soltanto: gli altri
   // fissano, spostano e completano. Vedi domain/permessiAgenda.ts.
   const permessi = permessiAgenda(user?.role);
+  // Che cosa non si è riuscito a leggere, per dirlo invece di
+  // mostrare una lista vuota. Vedi domain/caricamentoAgenda.ts.
+  const [mancanze, setMancanze] = useState<Mancanza[]>([]);
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
@@ -268,13 +274,24 @@ export const CalendarScreen: React.FC = () => {
         return;
       }
 
+      // Le letture che possono mancare NON si buttano più via in
+      // silenzio: una lista vuota per un guasto si vedeva identica a
+      // una lista vuota perché non c'è niente. Vedi
+      // domain/caricamentoAgenda.ts — 15 settembre 2026.
+      const mancanti: Mancanza[] = [];
+
       const [studs, collabs, mgrs, osp] = await Promise.all([
         getStudents(),
         canSeeAll ? getCollaborators() : Promise.resolve([]),
         canSeeAll ? getManagers() : Promise.resolve([]),
         // Solo il titolare può leggerli: per gli altri resta vuoto e
         // l'agenda funziona esattamente come prima.
-        isOwner ? getOspitiConfermati().catch(() => []) : Promise.resolve([]),
+        isOwner
+          ? getOspitiConfermati().catch((e) => {
+            mancanti.push(mancanza('ospiti', e));
+            return [];
+          })
+          : Promise.resolve([]),
       ]);
       setOspiti(osp);
 
@@ -293,17 +310,26 @@ export const CalendarScreen: React.FC = () => {
         (canSeeAll
           ? getAllAppointments()
           : getNutritionistAppointmentsByStaff(user.id)
-        ).catch(() => []),
+        ).catch((e) => {
+          mancanti.push(mancanza('visite', e));
+          return [];
+        }),
       ]);
       setSessions(trainingSessions);
       setNutritionAppts(nutrAppts);
 
       if (isOwner) {
-        const ownerTasks = await getTasksByOwner(user.id).catch(() => []);
+        const ownerTasks = await getTasksByOwner(user.id).catch((e) => {
+          mancanti.push(mancanza('impegni', e));
+          return [];
+        });
         setTasks(ownerTasks);
       }
+      setMancanze(mancanti);
     } catch (err) {
-      console.error('Errore caricamento calendario:', err);
+      // Le sedute non hanno una cattura propria: se salta questa, è
+      // saltato il pezzo grosso, e si dice quale.
+      setMancanze([mancanza('sedute', err)]);
       crossAlert('Errore', 'Impossibile caricare i dati.');
     }
   }, [user, canSeeAll, isCollaborator, isManager, isStudent, isOwner]);
@@ -1298,6 +1324,32 @@ export const CalendarScreen: React.FC = () => {
   );
 
   // Render appointment card
+  /**
+   * L'avviso di quello che non si è letto.
+   *
+   * Prima non c'era: due `catch` restituivano una lista vuota, e una
+   * lista vuota per un guasto si vede identica a una lista vuota
+   * perché non c'è niente. Con gli ospiti dentro — cioè le
+   * consulenze con chi non è ancora in anagrafica — una lettura
+   * fallita faceva sparire tutto senza una parola.
+   */
+  const avvisoMancanze = useMemo(() => {
+    const testo = descriviMancanze(mancanze);
+    if (!testo) return null;
+    return (
+      <View style={styles.avvisoMancanze}>
+        <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.avvisoMancanzeTitolo}>{titoloMancanze(mancanze)}</Text>
+          <Text style={styles.avvisoMancanzeTxt}>{testo}</Text>
+          <TouchableOpacity onPress={loadData} style={{ marginTop: 8 }}>
+            <Text style={styles.avvisoMancanzeRiprova}>Riprova</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [mancanze, loadData]);
+
   const renderAppointmentCard = (item: AppointmentItem) => (
     <AppointmentCard
       key={item.id}
@@ -1571,6 +1623,11 @@ export const CalendarScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* Quello che non si è riuscito a leggere. Sta in cima
+              perché è la prima cosa da sapere prima di fidarsi di
+              quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
+          {avvisoMancanze}
+
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
             <TouchableOpacity
@@ -1838,6 +1895,11 @@ export const CalendarScreen: React.FC = () => {
               </View>
             </View>
           </View>
+
+          {/* Quello che non si è riuscito a leggere. Sta in cima
+              perché è la prima cosa da sapere prima di fidarsi di
+              quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
+          {avvisoMancanze}
 
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
@@ -2379,6 +2441,33 @@ export const CalendarScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   listContent: { paddingBottom: spacing.xxl },
+  avvisoMancanze: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  avvisoMancanzeTitolo: {
+    color: colors.error,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+    marginBottom: 4,
+  },
+  avvisoMancanzeTxt: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    lineHeight: 19,
+  },
+  avvisoMancanzeRiprova: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
+  },
   searchSection: {
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
