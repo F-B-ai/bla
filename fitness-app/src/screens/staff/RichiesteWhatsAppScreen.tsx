@@ -18,6 +18,7 @@ import {
 import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
   leggiImpegni, getOspitiConfermati, eliminaRichiesta, RichiestaSalvata,
+  getRichiesteRifiutate, recuperaRichiesta,
 } from '../../services/agendaRequestService';
 import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
 
@@ -85,6 +86,8 @@ export function RichiesteWhatsAppScreen() {
   const [impegni, setImpegni] = useState<Impegno[]>([]);
   const [attesa, setAttesa] = useState<RichiestaSalvata[]>([]);
   const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
+  const [rifiutate, setRifiutate] = useState<RichiestaSalvata[]>([]);
+  const [rifiutateRotte, setRifiutateRotte] = useState(false);
   const [testo, setTesto] = useState('');
   const [loading, setLoading] = useState(true);
   const [lavoro, setLavoro] = useState(false);
@@ -97,12 +100,17 @@ export function RichiesteWhatsAppScreen() {
     try {
       const s = await getStudents();
       setStudents(s);
-      const [i, a, o] = await Promise.all([
+      const [i, a, o, rif] = await Promise.all([
         leggiImpegni(s), getRichiesteInAttesa(), getOspitiConfermati(),
+        // Se questa non riesce NON si finge che non ce ne siano:
+        // è esattamente così che erano sparite.
+        getRichiesteRifiutate().catch(() => null),
       ]);
       setImpegni(i);
       setAttesa(a);
       setOspiti(o.ospiti);
+      setRifiutate(rif || []);
+      setRifiutateRotte(rif === null);
     } catch {
       crossAlert('Errore', 'Non riesco a leggere agenda e richieste');
     } finally {
@@ -257,6 +265,28 @@ export function RichiesteWhatsAppScreen() {
         },
       ]
     );
+  };
+
+  /**
+   * Una rifiutata torna «in attesa», non confermata: recuperare non
+   * vuol dire scavalcare la regola in automatico — vuol dire riavere
+   * la scelta, che è di chi comanda.
+   */
+  const recupera = async (r: RichiestaSalvata) => {
+    setLavoro(true);
+    try {
+      await recuperaRichiesta(r.id);
+      await carica();
+      crossAlert(
+        'Recuperata',
+        `${r.persona} è tornata fra le richieste da decidere, per il `
+        + `${dataBreve(r.giorno)} alle ${r.ora}. Adesso confermala come le altre.`
+      );
+    } catch {
+      crossAlert('Errore', 'Non riesco a recuperare la richiesta');
+    } finally {
+      setLavoro(false);
+    }
   };
 
   const rifiuta = async (r: RichiestaSalvata, motivo: string) => {
@@ -603,6 +633,66 @@ export function RichiesteWhatsAppScreen() {
         </>
       )}
 
+      {/* ------------------------------------------------------------
+          LE RIFIUTATE — quello che il tetto ha scartato
+          15 settembre 2026: il titolare ha passato una mattina a
+          riscrivere a memoria appuntamenti che erano stati rifiutati
+          perché il giorno era pieno. Una regola può dire di no; non
+          può far sparire quello su cui ha detto no.
+          ------------------------------------------------------------ */}
+      {rifiutateRotte && (
+        <View style={s.card}>
+          <Text style={s.motivo}>
+            Non sono riuscito a leggere le richieste rifiutate. NON vuol dire
+            che non ce ne siano: vuol dire che la lettura non è riuscita.
+          </Text>
+        </View>
+      )}
+
+      {rifiutate.length > 0 && (
+        <>
+          <Text style={s.sezione}>Rifiutate ({rifiutate.length})</Text>
+          <Text style={s.aiuto}>
+            Richieste che il tetto della giornata ha scartato. Non sono perse:
+            se una era un appuntamento vero, recuperala — torna fra quelle da
+            decidere e la confermi come tutte le altre.
+          </Text>
+          {rifiutate.map((r) => (
+            <View key={r.id} style={s.card}>
+              <Text style={s.persona}>{r.persona}</Text>
+              <Text style={s.quando}>
+                {dataBreve(r.giorno)} alle {r.ora} · {r.tipo}
+                {r.telefono ? ` · ${r.telefono}` : ''}
+              </Text>
+              {!!r.note && <Text style={s.note}>{r.note}</Text>}
+              {!!r.motivoRifiuto && (
+                <Text style={s.motivo}>Scartata perché: {r.motivoRifiuto}</Text>
+              )}
+
+              <TouchableOpacity
+                style={s.btnPrimario}
+                onPress={() => recupera(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="arrow-undo" size={17} color={colors.textOnAccent} />
+                <Text style={s.btnPrimarioTxt}>Recupera: rimettila fra quelle da decidere</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.btnElimina}
+                onPress={() => elimina(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+                <Text style={s.btnEliminaTxt}>Era giusto scartarla: elimina</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+
       {/* --- il ponte: chi scrive le richieste al posto tuo --- */}
       <TouchableOpacity
         style={s.catalogoBtn}
@@ -789,6 +879,12 @@ const s = StyleSheet.create({
   },
   persona: { color: colors.text, fontSize: fontSize.lg, fontWeight: '700' },
   quando: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 2 },
+  motivo: {
+    color: colors.warning,
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
+    lineHeight: 19,
+  },
   note: { color: colors.textLight, fontSize: fontSize.xs, marginTop: 4, lineHeight: 17 },
   aiuto: { color: colors.textLight, fontSize: fontSize.xs, lineHeight: 16, marginTop: 4 },
   chiusura: {

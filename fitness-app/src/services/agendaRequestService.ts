@@ -13,7 +13,7 @@
 
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
-  query, where, orderBy, limit, Timestamp,
+  query, where, orderBy, limit, Timestamp, deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { TrainingSession, NutritionistAppointment, Student } from '../types';
@@ -392,4 +392,47 @@ export const confermaRichiesta = async (input: {
     chiusaIl: Timestamp.now(),
   });
   return { ospite: true };
+};
+
+// ============================================================
+// LE RIFIUTATE — quello che il tetto ha scartato
+// ------------------------------------------------------------
+// 15 settembre 2026. Il titolare ha passato una mattina a
+// riscrivere a memoria appuntamenti che non trovava più. Non erano
+// persi: erano stati RIFIUTATI, perché quel giorno aveva già i suoi
+// quattro. E una richiesta rifiutata non è un ospite, quindi non
+// compare in agenda né altrove: usciva dalla vista e non tornava.
+//
+// Una regola può dire di no. Non può far sparire quello su cui ha
+// detto no: per decidere bisogna vedere, e la decisione è di chi
+// comanda.
+// ============================================================
+
+/** Le richieste scartate, dalla più recente. */
+export const getRichiesteRifiutate = async (
+  maxResults = 200
+): Promise<RichiestaSalvata[]> => {
+  const snap = await getDocs(query(
+    collection(db, RICHIESTE),
+    where('stato', '==', 'rifiutata'),
+    limit(maxResults)
+  ));
+  return snap.docs.map(daDoc)
+    .sort((a, b) => (b.giorno + b.ora).localeCompare(a.giorno + a.ora));
+};
+
+/**
+ * Riporta una richiesta rifiutata fra quelle da decidere.
+ *
+ * Non la conferma: la rimette «in attesa», dove il titolare la
+ * valuta come tutte le altre. Recuperare non vuol dire scavalcare
+ * la regola in automatico — vuol dire riavere la scelta.
+ */
+export const recuperaRichiesta = async (id: string): Promise<void> => {
+  await updateDoc(doc(db, RICHIESTE, id), {
+    stato: 'in_attesa' as StatoRichiesta,
+    motivoRifiuto: deleteField(),
+    chiusaIl: deleteField(),
+    recuperataIl: Timestamp.now(),
+  });
 };
