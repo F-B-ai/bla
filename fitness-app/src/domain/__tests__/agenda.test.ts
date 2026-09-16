@@ -5,6 +5,7 @@ import {
   giornoChiuso, dentroLeFinestre, nelBloccoAcademy,
   TETTO_GIORNALIERO, TETTO_SETTIMANALE, EXTRA_GIORNALIERO,
   tettiDelGiorno, postiNormali, sarebbeExtra,
+  primiOrariLiberi, proponiOrari,
   ORARI_CONSIGLIATI, AGENDA_VERSION, Impegno, RichiestaCAL,
 } from '../agenda';
 
@@ -670,5 +671,98 @@ describe('il tetto settimanale che il titolare voleva', () => {
   it('sono quindici, come nella rotta', () => {
     expect(TETTO_SETTIMANALE).toBe(15);
     expect(tettiDelGiorno('2026-09-21').settimanale).toBe(15);
+  });
+});
+
+// ============================================================
+// QUANDO LA DATA NON C'È — 16 settembre 2026
+// ------------------------------------------------------------
+// Il titolare, scegliendo fra «proponi gli orari liberi» e «dì che
+// non c'è una data»: «La 1, parti.»
+// ============================================================
+
+describe('la proposta degli orari liberi', () => {
+  const LUN = '2026-09-21'; // lunedì, regime normale
+
+  it('propone i primi orari liberi, in ordine', () => {
+    const l = primiOrariLiberi([], LUN, 3);
+    expect(l).toHaveLength(3);
+    expect(l[0]).toEqual({ giorno: LUN, ora: '10:30' });
+    expect(l[1].ora).toBe('11:30');
+  });
+
+  it('salta le ore già prese', () => {
+    const presi = [imp(LUN, '10:30', 'Maria'), imp(LUN, '11:30', 'Luca')];
+    const l = primiOrariLiberi(presi, LUN, 2);
+    expect(l.map((x) => x.ora)).toEqual(['15:00', '16:00']);
+  });
+
+  it('e passa al giorno dopo quando quello è pieno', () => {
+    const pienoLun = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`))
+      .concat(imp(LUN, '17:00', 'extra'));
+    const l = primiOrariLiberi(pienoLun, LUN, 1);
+    expect(l[0].giorno).not.toBe(LUN);
+  });
+
+  // La domenica è chiusa: proporla sarebbe una promessa che non si
+  // può mantenere.
+  it('non propone mai un giorno chiuso', () => {
+    const DOM = '2026-09-20';
+    expect(primiOrariLiberi([], DOM, 4).some((x) => x.giorno === DOM)).toBe(false);
+  });
+
+  it('una data storta non fa esplodere niente', () => {
+    expect(primiOrariLiberi([], 'boh', 3)).toEqual([]);
+    expect(primiOrariLiberi([], '', 3)).toEqual([]);
+  });
+});
+
+describe('il messaggio da rimandare alla persona', () => {
+  const LUN = '2026-09-21';
+
+  it('saluta col nome e propone gli orari', () => {
+    const m = proponiOrari([], LUN, 'Rosa Cesarano');
+    expect(m).toContain('Ciao Rosa');
+    expect(m).toContain('10:30');
+    expect(m).toContain('Quale ti va meglio?');
+  });
+
+  it('senza nome resta una frase intera', () => {
+    expect(proponiOrari([], LUN)).toMatch(/^Ciao, /);
+  });
+
+  // Anche quando non c'è posto, si dà una strada: non un muro.
+  it('se è tutto pieno chiede due giorni, non dice solo no', () => {
+    const tutto: Impegno[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(2026, 8, 21 + i));
+      const g = d.toISOString().slice(0, 10);
+      ORARI_CONSIGLIATI.forEach((o) => tutto.push(imp(g, o, 'x')));
+      tutto.push(imp(g, '17:00', 'extra'));
+    }
+    const m = proponiOrari(tutto, LUN, 'Rosa');
+    expect(m).toContain('sono pieno');
+    expect(m).toContain('Dimmi due giorni');
+  });
+});
+
+describe('il riepilogo non spaccia l\'extra per un posto libero', () => {
+  const LUN = '2026-09-21';
+
+  it('con quattro scritti i liberi sono zero, ma l\'extra c\'è', () => {
+    const quattroLun = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`));
+    const r = riepilogoDi(quattroLun, LUN);
+    expect(r.liberi).toBe(0);
+    expect(r.extra).toBe(true);
+    expect(r.pieno).toBe(false);
+    expect(r.riga).toContain('resta solo l\'extra');
+  });
+
+  it('col quinto è pieno davvero', () => {
+    const cinque = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`))
+      .concat(imp(LUN, '17:00', 'Quinta'));
+    const r = riepilogoDi(cinque, LUN);
+    expect(r.pieno).toBe(true);
+    expect(r.extra).toBe(false);
   });
 });

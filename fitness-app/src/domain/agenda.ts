@@ -685,7 +685,10 @@ export const rispostaWhatsApp = (input: {
 export interface RiepilogoGiorno {
   giorno: string;
   quanti: number;
+  /** posti NORMALI ancora liberi: l'extra non si conta qui */
   liberi: number;
+  /** i normali sono finiti ma l'extra c'è ancora */
+  extra: boolean;
   pieno: boolean;
   impegni: Impegno[];
   /** una riga sola, da leggere al volo */
@@ -694,16 +697,101 @@ export interface RiepilogoGiorno {
 
 export const riepilogoDi = (impegni: Impegno[], giorno: string): RiepilogoGiorno => {
   const del = impegniDi(impegni, giorno);
-  const liberi = Math.max(0, TETTO_GIORNALIERO - del.length);
+  // I tetti si chiedono al GIORNO, non alla costante: dal 15 settembre
+  // 2026 c'è l'extra, e questa riga diceva ancora «su 4» quando il
+  // massimo era 5. Due conti diversi sulla stessa giornata.
+  const t = tettiDelGiorno(giorno);
+  // `liberi` sono i posti NORMALI: l'extra è una riserva, non un
+  // posto libero. Contarlo insieme agli altri direbbe «3 liberi»
+  // quando in realtà sono due più una cortesia da concedere.
+  const liberi = Math.max(0, t.normali - del.length);
+  const extra = del.length >= t.normali && del.length < t.massimo;
   return {
     giorno,
     quanti: del.length,
     liberi,
-    pieno: liberi === 0,
+    extra,
+    pieno: del.length >= t.massimo,
     impegni: del,
     riga: del.length === 0
       ? 'Giornata libera.'
-      : `${del.length} su ${TETTO_GIORNALIERO}: ${del.map((i) => `${i.ora} ${i.chi}`).join(' · ')}`
-        + (liberi === 0 ? ' — pieno.' : ''),
+      : `${del.length} su ${t.normali}: ${del.map((i) => `${i.ora} ${i.chi}`).join(' · ')}`
+        + (extra ? ' — resta solo l\'extra.' : '')
+        + (del.length >= t.massimo ? ' — pieno.' : ''),
   };
+};
+
+// ------------------------------------------------------------
+// QUANDO LA DATA NON C'È
+// ------------------------------------------------------------
+// 16 settembre 2026. Il titolare, scegliendo fra «l'App propone gli
+// orari liberi» e «l'App dice che non c'è una data»:
+//
+//   «La 1, parti.»
+//
+// Quindi: da un messaggio senza data non esce un rifiuto, esce una
+// proposta già pronta da rimandare alla persona. È il lavoro che gli
+// toglie di mano, non un altro schermo da leggere.
+
+export interface OrarioLibero {
+  giorno: string;
+  ora: string;
+}
+
+/**
+ * I primi orari liberi a partire da un giorno, saltando le giornate
+ * chiuse e le ore già prese.
+ *
+ * Si propongono solo gli ORARI_CONSIGLIATI: sono quelli che stanno
+ * nelle finestre della giornata. Proporre le 13:30 perché «è libero»
+ * vorrebbe dire rompere la struttura del giorno per riempire un buco.
+ */
+export const primiOrariLiberi = (
+  impegni: Impegno[],
+  daGiorno: string,
+  quanti = 3,
+  giorniAvanti = 10
+): OrarioLibero[] => {
+  const fuori: OrarioLibero[] = [];
+  const [a, m, d] = (daGiorno || '').split('-').map((x) => parseInt(x, 10));
+  if (!a || !m || !d) return fuori;
+
+  for (let i = 0; i < giorniAvanti && fuori.length < quanti; i++) {
+    const data = new Date(Date.UTC(a, m - 1, d + i));
+    const p = (n: number) => String(n).padStart(2, '0');
+    const g = `${data.getUTCFullYear()}-${p(data.getUTCMonth() + 1)}-${p(data.getUTCDate())}`;
+
+    // Una giornata chiusa non si propone: il primo orario basta a dirlo.
+    if (giornoChiuso(g, ORARI_CONSIGLIATI[0])) continue;
+    if (postiLiberi(impegni, g) <= 0) continue;
+
+    const prese = new Set(impegniDi(impegni, g).map((x) => x.ora));
+    for (const ora of ORARI_CONSIGLIATI) {
+      if (fuori.length >= quanti) break;
+      if (prese.has(ora)) continue;
+      if (giornoChiuso(g, ora)) continue;
+      fuori.push({ giorno: g, ora });
+    }
+  }
+  return fuori;
+};
+
+/**
+ * Il messaggio da rimandare a chi ha chiesto un appuntamento senza
+ * dire quando. Pronto da incollare su WhatsApp.
+ */
+export const proponiOrari = (
+  impegni: Impegno[],
+  daGiorno: string,
+  nome = ''
+): string => {
+  const liberi = primiOrariLiberi(impegni, daGiorno);
+  const ciao = nome.trim() ? `Ciao ${nome.trim().split(' ')[0]}, ` : 'Ciao, ';
+  if (!liberi.length) {
+    return `${ciao}in questi giorni sono pieno. Dimmi due giorni che ti `
+      + 'vanno bene e ti richiamo appena si libera un posto.';
+  }
+  const righe = liberi.map((l) => `${dataParlata(l.giorno)} alle ${l.ora}`);
+  return `${ciao}ho libero ${righe.join(', ')}. `
+    + 'Quale ti va meglio?';
 };
