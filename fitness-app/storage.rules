@@ -109,6 +109,15 @@ service firebase.storage {
     // Le carica lo staff dalla schermata di valutazione. L'allievo
     // può vedere le proprie e nient'altro. Cancella solo il titolare.
 
+    // Il patto firmato: un contratto. Lo legge chi lo ha firmato e
+    // lo staff; lo carica lo staff; lo cancella solo il titolare —
+    // togliere la prova di un contratto non è un'operazione qualunque.
+    match /patti/{studentId}/{fileName} {
+      allow read: if staff() || propria(studentId);
+      allow write: if staff();
+      allow delete: if titolare();
+    }
+
     match /postural/{studentId}/{fileName} {
       allow read: if staff() || propria(studentId);
       allow write: if staff();

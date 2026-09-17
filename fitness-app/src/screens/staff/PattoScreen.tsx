@@ -1,7 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  ActivityIndicator, StyleSheet, Platform,
+  ActivityIndicator, StyleSheet, Platform, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
@@ -13,7 +13,15 @@ import { StudentSearchPicker } from '../../components/common/StudentSearchPicker
 import { brand } from '../../config/brand';
 import {
   articoli, IMPEGNO_STUDIO, IMPEGNO_ALLIEVO, REGOLE, DatiPatto, PATTO_VERSION,
+  testoPatto,
 } from '../../domain/patto';
+import {
+  PattoFirmato, TIPI_AMMESSI, controllaAllegato, descriviPattoFirmato,
+  confermaAllegato, confermaCancellazione, scriviGiorno, leggiGiorno,
+} from '../../domain/pattoFirmato';
+import {
+  allegaPattoFirmato, leggiPattoFirmato, cancellaPattoFirmato,
+} from '../../services/pattoFirmatoService';
 
 // ============================================================
 // IL PATTO — si compila, si stampa, si firma dal vivo.
@@ -36,11 +44,40 @@ export function PattoScreen() {
   const [primaScadenza, setPrimaScadenza] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // --- la copia firmata ---
+  const [patto, setPatto] = useState<PattoFirmato | null>(null);
+  const [cercando, setCercando] = useState(false);
+  const [erroreLettura, setErroreLettura] = useState('');
+  const [allegando, setAllegando] = useState(false);
+  const [dataFirma, setDataFirma] = useState(() => scriviGiorno(new Date()));
+
   useEffect(() => {
     getStudents().then(setStudents)
       .catch(() => crossAlert('Errore', 'Non riesco a caricare gli allievi'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Se la lettura fallisce NON si dice «non c'è»: un errore e
+  // «non c'è nessuna copia» si vedrebbero identici, ed è il difetto
+  // che ha fatto sparire gli appuntamenti degli ospiti.
+  useEffect(() => {
+    if (!student) { setPatto(null); setErroreLettura(''); return undefined; }
+    let vivo = true;
+    setCercando(true);
+    setErroreLettura('');
+    leggiPattoFirmato(student.id)
+      .then((p) => { if (vivo) setPatto(p); })
+      .catch((e: any) => {
+        if (!vivo) return;
+        setPatto(null);
+        setErroreLettura(
+          'Non riesco a leggere se c\'è una copia firmata: '
+          + `${e?.message || e}. Non vuol dire che non ci sia.`
+        );
+      })
+      .finally(() => { if (vivo) setCercando(false); });
+    return () => { vivo = false; };
+  }, [student]);
 
   const dati: DatiPatto = useMemo(() => {
     const n = parseInt(rate, 10);
@@ -110,6 +147,135 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
     setTimeout(() => { try { f.print(); } catch { /* l'utente stampa a mano */ } }, 400);
   };
 
+  // ------------------------------------------------------------
+  // Allegare la copia firmata
+  // ------------------------------------------------------------
+
+  const nomeAllievo = student ? `${student.name} ${student.surname}` : '';
+
+  /** Apre la fotocamera o i file. Su web e su telefono. */
+  const scegliFile = useCallback(async (): Promise<
+    { blob: Blob; nome: string; tipo: string } | null
+  > => {
+    if (Platform.OS === 'web') {
+      return new Promise((resolve) => {
+        const doc = (globalThis as any).document;
+        const input = doc.createElement('input');
+        input.type = 'file';
+        input.accept = TIPI_AMMESSI.join(',');
+        // Sul telefono apre direttamente la fotocamera.
+        input.capture = 'environment';
+        input.onchange = (e: any) => {
+          const f = e?.target?.files?.[0];
+          resolve(f ? { blob: f, nome: f.name || 'patto-firmato.jpg', tipo: f.type } : null);
+        };
+        input.click();
+      });
+    }
+    const DocumentPicker = require('expo-document-picker');
+    const res = await DocumentPicker.getDocumentAsync({
+      type: TIPI_AMMESSI, copyToCacheDirectory: true,
+    });
+    if (res.canceled || !res.assets?.[0]) return null;
+    const a = res.assets[0];
+    const blob = await (await fetch(a.uri)).blob();
+    return { blob, nome: a.name || 'patto-firmato.jpg', tipo: a.mimeType || blob.type };
+  }, []);
+
+  const carica = async (
+    scelto: { blob: Blob; nome: string; tipo: string },
+    firmatoIl: Date
+  ) => {
+    if (!student) return;
+    setAllegando(true);
+    try {
+      const nuovo = await allegaPattoFirmato({
+        studentId: student.id,
+        studentName: nomeAllievo,
+        firmatoIl,
+        allegatoDa: user?.id || '',
+        file: scelto.blob,
+        nomeFile: scelto.nome,
+        tipo: scelto.tipo,
+        // Il testo di oggi, congelato: gli articoli si generano dalle
+        // REGOLE correnti e fra un anno direbbero un'altra cosa.
+        snapshot: {
+          versioneTesto: PATTO_VERSION,
+          testo: testoPatto(dati),
+          percorso: dati.percorso,
+          rate: dati.numeroRate || 0,
+          importoRata: dati.importoRata || 0,
+          disdettaOre: REGOLE.disdettaOre,
+        },
+      });
+      setPatto(nuovo);
+      crossAlert('Copia allegata', descriviPattoFirmato(nuovo));
+    } catch (e: any) {
+      // L'errore vero, non un «riprova» che non dice niente.
+      crossAlert('Non è stata allegata', e?.message || String(e));
+    } finally {
+      setAllegando(false);
+    }
+  };
+
+  const allega = async () => {
+    if (!student) { crossAlert('Manca l\'allievo', 'Scegli prima l\'allievo qui sopra.'); return; }
+    const firmatoIl = leggiGiorno(dataFirma);
+    if (!firmatoIl) {
+      crossAlert('La data non si legge',
+        `Scrivi il giorno della firma come ${scriviGiorno(new Date())}.`);
+      return;
+    }
+    let scelto: { blob: Blob; nome: string; tipo: string } | null = null;
+    try {
+      scelto = await scegliFile();
+    } catch (e: any) {
+      crossAlert('Non riesco ad aprire i file', e?.message || String(e));
+      return;
+    }
+    if (!scelto) return;
+
+    const verifica = controllaAllegato({
+      tipo: scelto.tipo, byte: scelto.blob.size, nome: scelto.nome,
+    });
+    if (!verifica.ok) {
+      crossAlert('Non posso allegarlo', verifica.problemi.join('\n'));
+      return;
+    }
+    const buono = scelto;
+    crossAlert('Allego la copia firmata', confermaAllegato(nomeAllievo, firmatoIl), [
+      { text: 'Annulla', style: 'cancel' },
+      { text: 'Allega', onPress: () => { carica(buono, firmatoIl); } },
+    ]);
+  };
+
+  const apri = () => {
+    if (!patto?.fileUrl) return;
+    Linking.openURL(patto.fileUrl).catch(() => crossAlert(
+      'Il collegamento non risponde',
+      'La copia è salvata ma il browser non è riuscito ad aprirla. Riprova fra poco.'
+    ));
+  };
+
+  const togli = () => {
+    if (!patto) return;
+    crossAlert('Togliere la copia digitale', confermaCancellazione(nomeAllievo), [
+      { text: 'Annulla', style: 'cancel' },
+      {
+        text: 'Togli',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancellaPattoFirmato(patto);
+            setPatto(null);
+          } catch (e: any) {
+            crossAlert('Non è stata tolta', e?.message || String(e));
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return <View style={s.center}><ActivityIndicator size="large" color={colors.accent} /></View>;
   }
@@ -171,12 +337,66 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
       </TouchableOpacity>
 
       <View style={[s.card, { borderColor: colors.info }]}>
-        <Text style={[s.cardTitle, { color: colors.info }]}>Sulla firma</Text>
-        <Text style={s.muted}>
-          Si firma dal vivo, in due copie: una all'allievo, una allo studio. Poi fotografa
-          la copia firmata e allegala al profilo.{'\n\n'}
+        <Text style={[s.cardTitle, { color: colors.info }]}>La copia firmata</Text>
+
+        {!student && (
+          <Text style={s.muted}>
+            Scegli l'allievo qui sopra e qui vedrai se la sua copia firmata è già allegata.
+          </Text>
+        )}
+
+        {!!student && cercando && (
+          <ActivityIndicator color={colors.info} style={{ marginVertical: spacing.sm }} />
+        )}
+
+        {!!student && !!erroreLettura && (
+          <Text style={s.errore}>{erroreLettura}</Text>
+        )}
+
+        {!!student && !cercando && !erroreLettura && (
+          <>
+            <Text style={s.muted}>{descriviPattoFirmato(patto)}</Text>
+
+            {!!patto && (
+              <TouchableOpacity style={s.btnChiaro} onPress={apri} activeOpacity={0.85}>
+                <Ionicons name="document-text-outline" size={17} color={colors.info} />
+                <Text style={[s.btnChiaroTxt, { color: colors.info }]}>Apri la copia</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={s.lab}>Firmata il giorno</Text>
+            <TextInput
+              style={s.input} value={dataFirma} onChangeText={setDataFirma}
+              placeholder={scriviGiorno(new Date())} placeholderTextColor={colors.textLight}
+            />
+
+            <TouchableOpacity
+              style={[s.btn, allegando && { opacity: 0.6 }]}
+              onPress={allega} disabled={allegando} activeOpacity={0.85}
+            >
+              {allegando
+                ? <ActivityIndicator color={colors.textOnAccent} />
+                : <Ionicons name="camera-outline" size={19} color={colors.textOnAccent} />}
+              <Text style={s.btnTxt}>
+                {allegando ? 'Carico…' : patto ? 'Allega una copia più recente' : 'Allega il patto firmato'}
+              </Text>
+            </TouchableOpacity>
+
+            {!!patto && user?.role === 'owner' && (
+              <TouchableOpacity style={s.btnChiaro} onPress={togli} activeOpacity={0.85}>
+                <Ionicons name="trash-outline" size={17} color={colors.error} />
+                <Text style={[s.btnChiaroTxt, { color: colors.error }]}>Togli la copia digitale</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        <Text style={[s.muted, { marginTop: spacing.md }]}>
+          Si firma dal vivo, in due copie: una all'allievo, una allo studio. Poi si fotografa
+          la copia dello studio e si allega qui.{'\n\n'}
           Nessuna firma viene memorizzata nell'app: una firma-immagine applicata in automatico
-          non è una firma valida, e in una contestazione conta meno di niente.
+          non è una firma valida, e in una contestazione conta meno di niente. La carta resta
+          la firma valida — questa è la prova che la conserva, insieme al testo esatto di oggi.
         </Text>
       </View>
 
@@ -219,6 +439,16 @@ const s = StyleSheet.create({
     paddingVertical: 14, marginTop: spacing.md,
   },
   btnTxt: { color: colors.textOnAccent, fontWeight: '700', fontSize: fontSize.md },
+  btnChiaro: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md,
+    paddingVertical: 11, marginTop: spacing.sm, backgroundColor: colors.surfaceLight,
+  },
+  btnChiaroTxt: { fontWeight: '700', fontSize: fontSize.sm },
+  errore: {
+    color: colors.error, fontSize: fontSize.sm, lineHeight: 20,
+    marginVertical: spacing.xs,
+  },
   disclaimer: {
     color: colors.textLight, fontSize: fontSize.xs, textAlign: 'center',
     lineHeight: 16, marginTop: spacing.md,

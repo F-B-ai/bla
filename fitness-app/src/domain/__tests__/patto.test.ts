@@ -1,5 +1,5 @@
 import {
-  valutaDisdetta, momentoDi, messaggioPromemoria, articoli,
+  valutaDisdetta, momentoDi, messaggioPromemoria, articoli, testoPatto,
   REGOLE, PATTO_VERSION,
 } from '../patto';
 
@@ -178,5 +178,71 @@ describe('il testo del patto', () => {
 
   it('versione tracciata', () => {
     expect(PATTO_VERSION).toBe(1);
+  });
+});
+
+// ============================================================
+// IL TESTO CONGELATO
+// ------------------------------------------------------------
+// Gli articoli si generano dalle REGOLE correnti. Se cambiano le
+// dieci ore di disdetta, la schermata mostrerebbe la regola nuova
+// sopra una firma vecchia. testoPatto() è quello che si salva
+// accanto alla foto, perché fra un anno si sappia CHE COSA è
+// stato firmato.
+// ============================================================
+
+describe('il testo che si congela con la firma', () => {
+  const dati = {
+    allievo: 'Rosa Cesarano',
+    percorso: 'Armonia Posturale',
+    coach: 'Francesco Busanca',
+    studio: 'A.S.D. Evolution Sport — Mind Movement Lab',
+    numeroRate: 3,
+    importoRata: 150,
+    importoTotale: 450,
+    primaScadenza: '15 ottobre 2026',
+  };
+
+  it('porta dentro chi, che percorso e con chi', () => {
+    const t = testoPatto(dati);
+    expect(t).toContain('Rosa Cesarano');
+    expect(t).toContain('Armonia Posturale');
+    expect(t).toContain('Francesco Busanca');
+  });
+
+  it('porta dentro i soldi concordati', () => {
+    const t = testoPatto(dati);
+    expect(t).toContain('3 da 150');
+    expect(t).toContain('450');
+    expect(t).toContain('15 ottobre 2026');
+  });
+
+  // Il motivo per cui la foto da sola non basterebbe.
+  it('contiene tutti gli articoli, per intero', () => {
+    const t = testoPatto(dati);
+    articoli(dati).forEach((a) => {
+      expect(t).toContain(a.testo);
+    });
+  });
+
+  it('contiene i due impegni e la versione', () => {
+    const t = testoPatto(dati);
+    expect(t).toContain('LO STUDIO SI IMPEGNA');
+    expect(t).toContain('L\'ALLIEVO SI IMPEGNA');
+    expect(t).toContain(`v${PATTO_VERSION}`);
+  });
+
+  // Il perimetro non può sparire dalla copia conservata.
+  it('conserva il perimetro: screening, mai diagnosi', () => {
+    const t = testoPatto(dati);
+    expect(t).toContain('screening');
+    expect(t.toLowerCase()).toContain('non costituiscono atto diagnostico');
+  });
+
+  it('regge anche un patto senza rate', () => {
+    const t = testoPatto({ allievo: 'A', percorso: 'B', coach: 'C' });
+    expect(t).toContain('A');
+    expect(t).not.toContain('undefined');
+    expect(t).not.toContain('NaN');
   });
 });
