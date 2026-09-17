@@ -16,11 +16,13 @@ import {
   testoPatto,
 } from '../../domain/patto';
 import {
-  PattoFirmato, TIPI_AMMESSI, controllaAllegato, descriviPattoFirmato,
+  PattoFirmato, TIPI_AMMESSI, controllaAllegati, descriviPattoFirmato,
   confermaAllegato, confermaCancellazione, scriviGiorno, leggiGiorno,
+  paginePatto, COME_FOTOGRAFARE,
 } from '../../domain/pattoFirmato';
 import {
   allegaPattoFirmato, leggiPattoFirmato, cancellaPattoFirmato,
+  FileDaAllegare,
 } from '../../services/pattoFirmatoService';
 
 // ============================================================
@@ -138,7 +140,8 @@ ${art.map((a) => `<h2>${a.n}. ${a.titolo}</h2><p>${a.testo}</p>`).join('')}
   <div><div class="linea"></div><div class="cap">Per lo studio — firma e data</div></div>
 </div>
 <div class="nota">Documento generato da ESSĒRE · patto v${PATTO_VERSION} · ${oggi()}.
-Da stampare in due copie: una all'allievo, una allo studio.</div>
+Da stampare in due copie: una all'allievo, una allo studio.
+Sigla ogni pagina in basso, firma per esteso qui sopra: così nessun foglio si può sostituire.</div>
 </body></html>`;
     const f = w.open('', '_blank');
     if (!f) { crossAlert('Bloccato', 'Il browser ha bloccato la finestra. Consenti i popup e riprova.'); return; }
@@ -153,39 +156,46 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
 
   const nomeAllievo = student ? `${student.name} ${student.surname}` : '';
 
-  /** Apre la fotocamera o i file. Su web e su telefono. */
-  const scegliFile = useCallback(async (): Promise<
-    { blob: Blob; nome: string; tipo: string } | null
-  > => {
+  /**
+   * Apre la fotocamera o i file, e ne accetta PIÙ DI UNO.
+   *
+   * Il patto è di più fogli. Con un file solo, tre foto scattate una
+   * dopo l'altra diventavano tre copie e se ne vedeva una: le altre
+   * due pagine c'erano e nessuno le trovava.
+   */
+  const scegliFile = useCallback(async (): Promise<FileDaAllegare[]> => {
     if (Platform.OS === 'web') {
       return new Promise((resolve) => {
         const doc = (globalThis as any).document;
         const input = doc.createElement('input');
         input.type = 'file';
         input.accept = TIPI_AMMESSI.join(',');
-        // Sul telefono apre direttamente la fotocamera.
-        input.capture = 'environment';
+        input.multiple = true;
         input.onchange = (e: any) => {
-          const f = e?.target?.files?.[0];
-          resolve(f ? { blob: f, nome: f.name || 'patto-firmato.jpg', tipo: f.type } : null);
+          const scelti: any[] = Array.from(e?.target?.files || []);
+          resolve(scelti.map((f, i) => ({
+            blob: f, nome: f.name || `patto-pagina-${i + 1}.jpg`, tipo: f.type,
+          })));
         };
         input.click();
       });
     }
     const DocumentPicker = require('expo-document-picker');
     const res = await DocumentPicker.getDocumentAsync({
-      type: TIPI_AMMESSI, copyToCacheDirectory: true,
+      type: TIPI_AMMESSI, copyToCacheDirectory: true, multiple: true,
     });
-    if (res.canceled || !res.assets?.[0]) return null;
-    const a = res.assets[0];
-    const blob = await (await fetch(a.uri)).blob();
-    return { blob, nome: a.name || 'patto-firmato.jpg', tipo: a.mimeType || blob.type };
+    if (res.canceled || !res.assets?.length) return [];
+    return Promise.all(res.assets.map(async (a: any, i: number) => {
+      const blob = await (await fetch(a.uri)).blob();
+      return {
+        blob,
+        nome: a.name || `patto-pagina-${i + 1}.jpg`,
+        tipo: a.mimeType || blob.type,
+      };
+    }));
   }, []);
 
-  const carica = async (
-    scelto: { blob: Blob; nome: string; tipo: string },
-    firmatoIl: Date
-  ) => {
+  const carica = async (scelti: FileDaAllegare[], firmatoIl: Date) => {
     if (!student) return;
     setAllegando(true);
     try {
@@ -194,9 +204,7 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
         studentName: nomeAllievo,
         firmatoIl,
         allegatoDa: user?.id || '',
-        file: scelto.blob,
-        nomeFile: scelto.nome,
-        tipo: scelto.tipo,
+        files: scelti,
         // Il testo di oggi, congelato: gli articoli si generano dalle
         // REGOLE correnti e fra un anno direbbero un'altra cosa.
         snapshot: {
@@ -226,32 +234,36 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
         `Scrivi il giorno della firma come ${scriviGiorno(new Date())}.`);
       return;
     }
-    let scelto: { blob: Blob; nome: string; tipo: string } | null = null;
+    let scelti: FileDaAllegare[] = [];
     try {
-      scelto = await scegliFile();
+      scelti = await scegliFile();
     } catch (e: any) {
       crossAlert('Non riesco ad aprire i file', e?.message || String(e));
       return;
     }
-    if (!scelto) return;
+    if (!scelti.length) return;
 
-    const verifica = controllaAllegato({
-      tipo: scelto.tipo, byte: scelto.blob.size, nome: scelto.nome,
-    });
+    const verifica = controllaAllegati(scelti.map((f) => ({
+      tipo: f.tipo, byte: f.blob.size, nome: f.nome,
+    })));
     if (!verifica.ok) {
       crossAlert('Non posso allegarlo', verifica.problemi.join('\n'));
       return;
     }
-    const buono = scelto;
-    crossAlert('Allego la copia firmata', confermaAllegato(nomeAllievo, firmatoIl), [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Allega', onPress: () => { carica(buono, firmatoIl); } },
-    ]);
+    const buoni = scelti;
+    crossAlert(
+      'Allego la copia firmata',
+      confermaAllegato(nomeAllievo, firmatoIl, buoni.length),
+      [
+        { text: 'Annulla', style: 'cancel' },
+        { text: 'Allega', onPress: () => { carica(buoni, firmatoIl); } },
+      ]
+    );
   };
 
-  const apri = () => {
-    if (!patto?.fileUrl) return;
-    Linking.openURL(patto.fileUrl).catch(() => crossAlert(
+  const apri = (url: string) => {
+    if (!url) return;
+    Linking.openURL(url).catch(() => crossAlert(
       'Il collegamento non risponde',
       'La copia è salvata ma il browser non è riuscito ad aprirla. Riprova fra poco.'
     ));
@@ -357,12 +369,17 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
           <>
             <Text style={s.muted}>{descriviPattoFirmato(patto)}</Text>
 
-            {!!patto && (
-              <TouchableOpacity style={s.btnChiaro} onPress={apri} activeOpacity={0.85}>
+            {paginePatto(patto).map((pg, i, tutte) => (
+              <TouchableOpacity
+                key={pg.url} style={s.btnChiaro}
+                onPress={() => apri(pg.url)} activeOpacity={0.85}
+              >
                 <Ionicons name="document-text-outline" size={17} color={colors.info} />
-                <Text style={[s.btnChiaroTxt, { color: colors.info }]}>Apri la copia</Text>
+                <Text style={[s.btnChiaroTxt, { color: colors.info }]}>
+                  {tutte.length === 1 ? 'Apri la copia' : `Apri la pagina ${i + 1}`}
+                </Text>
               </TouchableOpacity>
-            )}
+            ))}
 
             <Text style={s.lab}>Firmata il giorno</Text>
             <TextInput
@@ -381,6 +398,8 @@ Da stampare in due copie: una all'allievo, una allo studio.</div>
                 {allegando ? 'Carico…' : patto ? 'Allega una copia più recente' : 'Allega il patto firmato'}
               </Text>
             </TouchableOpacity>
+
+            <Text style={[s.muted, { marginTop: spacing.sm }]}>{COME_FOTOGRAFARE}</Text>
 
             {!!patto && user?.role === 'owner' && (
               <TouchableOpacity style={s.btnChiaro} onPress={togli} activeOpacity={0.85}>

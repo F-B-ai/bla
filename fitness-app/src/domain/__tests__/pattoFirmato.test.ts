@@ -4,6 +4,7 @@ import {
   controllaAllegato, descriviPattoFirmato, confermaAllegato,
   confermaCancellazione, MAX_MB, TIPI_AMMESSI, PattoFirmato,
   PATTO_FIRMATO_VERSION, scriviGiorno, leggiGiorno,
+  controllaAllegati, paginePatto, MAX_PAGINE, COME_FOTOGRAFARE,
 } from '../pattoFirmato';
 
 // ============================================================
@@ -236,9 +237,152 @@ describe('la schermata del Patto aggancia davvero l\'allegato', () => {
     expect(schermata).toMatch(/user\?\.role === 'owner'[\s\S]{0,400}togli/);
   });
 
+  // «Sono più pagine»: il selettore ne deve accettare più di una,
+  // e la schermata le deve mostrare tutte.
+  it('accetta più pagine in un colpo solo', () => {
+    expect(schermata).toContain('input.multiple = true');
+    expect(schermata).toContain('multiple: true');
+    expect(schermata).toContain('paginePatto(patto).map');
+  });
+
+  it('spiega come si fotografa un patto di più fogli', () => {
+    expect(schermata).toContain('COME_FOTOGRAFARE');
+  });
+
   // La decisione di fondo, che non deve tornare indietro.
   it('non memorizza nessuna firma disegnata', () => {
     expect(schermata).not.toMatch(/signature|firmaDigitale|canvas/i);
     expect(schermata).toContain('non è una firma valida');
+  });
+});
+
+// ============================================================
+// «SONO PIÙ PAGINE»
+// ------------------------------------------------------------
+// Il titolare, il 17 settembre 2026, dopo la prima consegna:
+//
+//   «Cosa devo allegare, solo la firma o tutto il patto? Ma come
+//    faccio a fotografarlo, sono più pagine?»
+//
+// Tutto il patto: una firma staccata dal testo non dice CHE COSA è
+// stato firmato, ed è esattamente la cosa che si contesta.
+//
+// E con un file solo, tre foto scattate una dopo l'altra sarebbero
+// diventate tre copie, di cui se ne vedeva una: le altre due pagine
+// c'erano, e nessuno le trovava. Lo stesso difetto delle consulenze
+// e degli ospiti, in un posto nuovo.
+// ============================================================
+
+const pag = (n: number) => Array.from({ length: n }, () => ({
+  tipo: 'image/jpeg', byte: MB,
+}));
+
+describe('più pagine insieme', () => {
+  it('tre foto di tre fogli si allegano in un colpo solo', () => {
+    expect(controllaAllegati(pag(3)).ok).toBe(true);
+  });
+
+  it('una pagina sola va bene lo stesso: è la scansione in PDF', () => {
+    expect(controllaAllegati([{ tipo: 'application/pdf', byte: MB }]).ok).toBe(true);
+  });
+
+  it('nessuna pagina non è un allegato', () => {
+    const e = controllaAllegati([]);
+    expect(e.ok).toBe(false);
+    expect(e.problemi.join(' ')).toContain('nessuna pagina');
+  });
+
+  // Chi sbaglia deve sapere QUALE foglio è sbagliato, non che
+  // «qualcosa» non va.
+  it('dice quale pagina è quella sbagliata', () => {
+    const e = controllaAllegati([
+      { tipo: 'image/jpeg', byte: MB, nome: 'pagina1.jpg' },
+      { tipo: 'application/zip', byte: MB, nome: 'strano.zip' },
+    ]);
+    expect(e.ok).toBe(false);
+    expect(e.problemi.join(' ')).toContain('strano.zip');
+    expect(e.problemi.join(' ')).not.toContain('pagina1.jpg');
+  });
+
+  it('troppe pagine: suggerisce il PDF unico', () => {
+    const e = controllaAllegati(pag(MAX_PAGINE + 1));
+    expect(e.ok).toBe(false);
+    expect(e.problemi.join(' ')).toContain('PDF unico');
+  });
+});
+
+describe('le pagine di una copia allegata', () => {
+  const base = {
+    id: 'p1', studentId: 'a1', studentName: 'Rosa Cesarano',
+    firmatoIl: new Date(2026, 8, 17), allegatoIl: new Date(2026, 8, 17),
+    allegatoDa: 'owner1', fileUrl: 'https://esempio/1.jpg', fileTipo: 'image/jpeg',
+    filePath: 'patti/a1/1.jpg',
+    snapshot: {
+      versioneTesto: 1, testo: 'x', percorso: 'Armonia Posturale',
+      rate: 3, importoRata: 150, disdettaOre: 10,
+    },
+  };
+
+  it('quando ci sono, si leggono tutte e in ordine', () => {
+    const p = paginePatto({
+      ...base,
+      pagine: [
+        { url: 'https://esempio/1.jpg', tipo: 'image/jpeg' },
+        { url: 'https://esempio/2.jpg', tipo: 'image/jpeg' },
+        { url: 'https://esempio/3.jpg', tipo: 'image/jpeg' },
+      ],
+    });
+    expect(p).toHaveLength(3);
+    expect(p[1].url).toContain('2.jpg');
+  });
+
+  // Le copie allegate prima di questo cambiamento non si toccano.
+  it('una copia vecchia, senza elenco, torna come pagina unica', () => {
+    const p = paginePatto(base);
+    expect(p).toHaveLength(1);
+    expect(p[0].url).toBe('https://esempio/1.jpg');
+    expect(p[0].path).toBe('patti/a1/1.jpg');
+  });
+
+  it('nessun patto: nessuna pagina, non un errore', () => {
+    expect(paginePatto(null)).toEqual([]);
+  });
+
+  it('la riga sul profilo dice quante pagine sono', () => {
+    const r = descriviPattoFirmato({
+      ...base,
+      pagine: [
+        { url: 'a', tipo: 'image/jpeg' },
+        { url: 'b', tipo: 'image/jpeg' },
+      ],
+    });
+    expect(r).toContain('2 pagine');
+  });
+
+  it('con una pagina sola non dice «1 pagine»', () => {
+    expect(descriviPattoFirmato(base)).not.toContain('1 pagine');
+  });
+
+  it('prima di allegare dice quante pagine sta caricando', () => {
+    expect(confermaAllegato('Rosa', new Date(2026, 8, 17), 3)).toContain('3 pagine');
+    expect(confermaAllegato('Rosa', new Date(2026, 8, 17), 1)).not.toContain('pagine');
+  });
+});
+
+describe('come si fotografa un patto di più fogli', () => {
+  it('dice di allegarli tutti, non solo la firma', () => {
+    expect(COME_FOTOGRAFARE).toContain('tutti');
+    expect(COME_FOTOGRAFARE).toContain('non solo quello della firma');
+  });
+
+  it('spiega lo scanner del telefono, per tutti e due i telefoni', () => {
+    expect(COME_FOTOGRAFARE).toContain('iPhone');
+    expect(COME_FOTOGRAFARE).toContain('Scansiona documenti');
+    expect(COME_FOTOGRAFARE).toContain('Android');
+    expect(COME_FOTOGRAFARE).toContain('Drive');
+  });
+
+  it('e ricorda la sigla su ogni foglio', () => {
+    expect(COME_FOTOGRAFARE).toContain('sigla ogni pagina');
   });
 });
