@@ -1,0 +1,12 @@
+{
+  "name": "TeleightBots + ESSERE fitness-app",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "essere-web",
+      "command": "cd fitness-app && npm run web"
+    }
+  ],
+  "ports": [8081]
+}
