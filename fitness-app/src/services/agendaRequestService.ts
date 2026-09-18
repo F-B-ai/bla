@@ -13,7 +13,7 @@
 
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
-  query, where, orderBy, limit, Timestamp,
+  query, where, orderBy, limit, Timestamp, deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { TrainingSession, NutritionistAppointment, Student } from '../types';
@@ -248,15 +248,90 @@ export const leggiImpegni = async (studenti: Student[]): Promise<Impegno[]> => {
  * agganciarsi. Occupano un posto vero, e devono vedersi in agenda:
  * un impegno che non compare sul calendario è un impegno che salta.
  */
-export const getOspitiConfermati = async (): Promise<RichiestaSalvata[]> => {
+/** Quanti se ne leggono in una volta. Vedi il commento qui sotto. */
+export const TETTO_OSPITI = 500;
+
+export interface EsitoOspiti {
+  ospiti: RichiestaSalvata[];
+  /** true se si è toccato il tetto: l'elenco potrebbe non essere tutto */
+  troncato: boolean;
+  /** quanti documenti sono stati letti in tutto */
+  letti: number;
+  /** quanti erano «confermata» prima di togliere quelli già diventati seduta */
+  confermate: number;
+}
+
+/**
+ * Gli ospiti confermati: persone che hanno un posto in agenda e non
+ * sono (ancora) in anagrafica.
+ *
+ * ------------------------------------------------------------
+ * IL DIFETTO DEL 15 SETTEMBRE 2026
+ * ------------------------------------------------------------
+ * Il titolare: «Non vedo tutti gli appuntamenti ospiti gialli.»
+ *
+ * Questa funzione chiedeva le prime 300 richieste `confermata`
+ * SENZA ALCUN ORDINE, e solo dopo buttava via quelle già diventate
+ * sedute (`sessionId`). Ma ogni richiesta WhatsApp confermata di un
+ * allievo in anagrafica resta lì, `confermata` e con `sessionId`:
+ * cioè la collezione si riempie di documenti che occupano il posto
+ * nelle 300 senza mai comparire nell'elenco.
+ *
+ * Superate le 300 confermate, gli ospiti veri cominciano a cadere
+ * fuori dalla finestra — a caso, uno alla volta, finché non ne resta
+ * nessuno. Nessun errore, nessun messaggio: sparivano e basta.
+ *
+ * Il titolare aveva sentito che c'entrava un numero («erano troppi
+ * appuntamenti in settimana»): c'entrava, ma era il numero totale
+ * delle richieste in archivio, non quello degli appuntamenti.
+ *
+ * Adesso si chiedono SOLO gli ospiti (`ospite == true`): due filtri
+ * di uguaglianza, che Firestore serve senza indici nuovi, e le
+ * sedute non occupano più posto. Se un giorno anche i soli ospiti
+ * dovessero superare il tetto, `troncato` lo dice invece di lasciare
+ * che l'elenco si accorci da solo.
+ */
+export const getOspitiConfermati = async (): Promise<EsitoOspiti> => {
+  // ------------------------------------------------------------
+  // SECONDO TENTATIVO, 15 settembre 2026 — e questa volta senza
+  // dipendere da niente che possa mancare.
+  // ------------------------------------------------------------
+  // Il primo rimedio filtrava su `ospite == true`. Più preciso, ma
+  // si fidava di un campo: un documento che non ce l'ha — scritto
+  // prima che il campo esistesse, o da una strada che non lo mette —
+  // sparisce e non torna. E il titolare continuava a non vederli.
+  //
+  // Adesso si chiede la cosa più semplice che Firestore sa fare
+  // SENZA indici nuovi: le richieste in ordine di GIORNO, dalla più
+  // avanti alla più indietro. Un solo `orderBy`, indice automatico.
+  //
+  // Ordinare per giorno decrescente vuol dire che oggi e il futuro
+  // stanno sempre in cima alla finestra: anche con anni di archivio
+  // sotto, quello che serve all'agenda non può più cadere fuori.
+  // Lo smistamento (confermata, non ancora seduta) si fa qui, dove
+  // non può fallire e non dipende da nessun campo facoltativo.
   const snap = await getDocs(query(
     collection(db, RICHIESTE),
-    where('stato', '==', 'confermata'),
-    limit(300)
+    orderBy('giorno', 'desc'),
+    limit(TETTO_OSPITI)
   ));
-  return snap.docs.map(daDoc)
+  const tutte = snap.docs.map(daDoc);
+  const confermate = tutte.filter((r) => r.stato === 'confermata');
+  const ospiti = confermate
     .filter((r) => !r.sessionId)
     .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora));
+
+  // I due conteggi non sono decorazione: distinguono «l'archivio è
+  // vuoto» da «ho letto cento documenti e li ho scartati tutti». Per
+  // tre volte, il 15 settembre, non ho saputo dire quale delle due
+  // fosse — e ogni tentativo a vuoto è costato tempo al titolare
+  // mentre riscriveva a mano gli appuntamenti.
+  return {
+    ospiti,
+    troncato: snap.size >= TETTO_OSPITI,
+    letti: tutte.length,
+    confermate: confermate.length,
+  };
 };
 
 // ------------------------------------------------------------
@@ -317,4 +392,47 @@ export const confermaRichiesta = async (input: {
     chiusaIl: Timestamp.now(),
   });
   return { ospite: true };
+};
+
+// ============================================================
+// LE RIFIUTATE — quello che il tetto ha scartato
+// ------------------------------------------------------------
+// 15 settembre 2026. Il titolare ha passato una mattina a
+// riscrivere a memoria appuntamenti che non trovava più. Non erano
+// persi: erano stati RIFIUTATI, perché quel giorno aveva già i suoi
+// quattro. E una richiesta rifiutata non è un ospite, quindi non
+// compare in agenda né altrove: usciva dalla vista e non tornava.
+//
+// Una regola può dire di no. Non può far sparire quello su cui ha
+// detto no: per decidere bisogna vedere, e la decisione è di chi
+// comanda.
+// ============================================================
+
+/** Le richieste scartate, dalla più recente. */
+export const getRichiesteRifiutate = async (
+  maxResults = 200
+): Promise<RichiestaSalvata[]> => {
+  const snap = await getDocs(query(
+    collection(db, RICHIESTE),
+    where('stato', '==', 'rifiutata'),
+    limit(maxResults)
+  ));
+  return snap.docs.map(daDoc)
+    .sort((a, b) => (b.giorno + b.ora).localeCompare(a.giorno + a.ora));
+};
+
+/**
+ * Riporta una richiesta rifiutata fra quelle da decidere.
+ *
+ * Non la conferma: la rimette «in attesa», dove il titolare la
+ * valuta come tutte le altre. Recuperare non vuol dire scavalcare
+ * la regola in automatico — vuol dire riavere la scelta.
+ */
+export const recuperaRichiesta = async (id: string): Promise<void> => {
+  await updateDoc(doc(db, RICHIESTE, id), {
+    stato: 'in_attesa' as StatoRichiesta,
+    motivoRifiuto: deleteField(),
+    chiusaIl: deleteField(),
+    recuperataIl: Timestamp.now(),
+  });
 };

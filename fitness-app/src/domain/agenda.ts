@@ -10,8 +10,10 @@
 // Qui il tetto diventa una regola del software.
 //
 // REGOLE FERREE
-//  · Massimo QUATTRO impegni al giorno. Mai un quinto: non un
-//    avviso, un rifiuto — con la proposta del primo giorno libero.
+//  · QUATTRO impegni normali al giorno, più UN extra che si vede
+//    che è un extra. Il sesto no: non un avviso, un rifiuto — con
+//    la proposta del primo giorno libero. (Regime dal 15 settembre
+//    2026; prima il quinto veniva rifiutato.)
 //  · Gli orari non si inventano: si prende quello chiesto, e se
 //    è occupato si dice, con l'elenco di quelli liberi.
 //  · Una richiesta non è un appuntamento finché il coach non
@@ -20,7 +22,7 @@
 //    occupa uno dei quattro esattamente come tutti gli altri.
 // ============================================================
 
-export const AGENDA_VERSION = 1;
+export const AGENDA_VERSION = 2;
 
 // ------------------------------------------------------------
 // LE REGOLE DELLA GIORNATA DEL FONDATORE
@@ -29,11 +31,92 @@ export const AGENDA_VERSION = 1;
 // oltre le quindici settimanali costa 776 € di Academy mancata.
 // ------------------------------------------------------------
 
-/** Massimo appuntamenti in un giorno. Il quinto non si scrive. */
+// ------------------------------------------------------------
+// 15 SETTEMBRE 2026 — IL TETTO CHE RIFIUTAVA IN SILENZIO
+// ------------------------------------------------------------
+// Il titolare, dopo aver passato una mattina a riscrivere a memoria
+// gli appuntamenti che non vedeva più:
+//
+//   «Per questa settimana teniamolo un po' più alto. Dalla prossima,
+//    quattro appuntamenti più al massimo un extra.»
+//
+// Il tetto funzionava benissimo: rifiutava. Il difetto era che una
+// richiesta rifiutata usciva dalla vista — non è un ospite, non
+// compare in agenda, non compare da nessuna parte — e lui non poteva
+// nemmeno sapere che era stata scartata. Una regola che decide al
+// posto tuo e non te lo dice non è una regola: è una perdita.
+//
+// Adesso il quinto ESISTE, si chiama extra, e si vede che è un
+// extra. Il sesto no.
+// ------------------------------------------------------------
+
+/** Appuntamenti «normali» in un giorno. */
 export const TETTO_GIORNALIERO = 4;
+
+/**
+ * Oltre i quattro se ne concede UNO, e si chiama extra.
+ * Non è una svista da tollerare: è una scelta che si vede.
+ */
+export const EXTRA_GIORNALIERO = 1;
 
 /** Massimo appuntamenti in una settimana. Il sedicesimo costa, non rende. */
 export const TETTO_SETTIMANALE = 15;
+
+// ------------------------------------------------------------
+// LA SETTIMANA DI RIENTRO
+// ------------------------------------------------------------
+// Questa settimana il titolare sta rimettendo in agenda gli
+// appuntamenti che il tetto aveva scartato. Lasciare il tetto
+// stretto vorrebbe dire rifiutargli i suoi stessi appuntamenti
+// mentre li recupera: il rimedio che combatte la cura.
+//
+// Vale fino a domenica 20 settembre 2026 compresa. Da lunedì 21
+// entra il regime che ha deciso lui, e questa parentesi si chiude
+// da sola — senza che nessuno debba ricordarsi di chiuderla.
+
+// La parentesi è una SETTIMANA, non «tutto fino a domenica»: senza
+// l'estremo inferiore varrebbe anche per marzo, e le regole del
+// passato cambierebbero sotto i piedi a chi guarda l'archivio.
+export const INIZIO_RIENTRO = '2026-09-14';
+export const FINE_RIENTRO = '2026-09-20';
+export const TETTO_GIORNALIERO_RIENTRO = 8;
+export const TETTO_SETTIMANALE_RIENTRO = 30;
+
+export interface TettiDelGiorno {
+  /** quanti se ne scrivono senza discutere */
+  normali: number;
+  /** il massimo assoluto: oltre questo non si scrive */
+  massimo: number;
+  settimanale: number;
+  /** true finché dura la parentesi di rientro */
+  rientro: boolean;
+}
+
+/**
+ * I tetti che valgono per un certo giorno.
+ *
+ * Si passa il giorno e non «oggi» perché una richiesta per lunedì
+ * prossimo deve essere giudicata con le regole di lunedì prossimo,
+ * anche se la si scrive stasera.
+ */
+export const tettiDelGiorno = (giorno: string): TettiDelGiorno => {
+  const rientro = typeof giorno === 'string'
+    && giorno >= INIZIO_RIENTRO && giorno <= FINE_RIENTRO;
+  if (rientro) {
+    return {
+      normali: TETTO_GIORNALIERO_RIENTRO,
+      massimo: TETTO_GIORNALIERO_RIENTRO,
+      settimanale: TETTO_SETTIMANALE_RIENTRO,
+      rientro: true,
+    };
+  }
+  return {
+    normali: TETTO_GIORNALIERO,
+    massimo: TETTO_GIORNALIERO + EXTRA_GIORNALIERO,
+    settimanale: TETTO_SETTIMANALE,
+    rientro: false,
+  };
+};
 
 /** Le due finestre in cui la giornata prevede gli appuntamenti. */
 export const FINESTRE: Array<[string, string]> = [
@@ -252,7 +335,21 @@ export const quantiIl = (impegni: Impegno[], giorno: string): number =>
   impegniDi(impegni, giorno).length;
 
 export const postiLiberi = (impegni: Impegno[], giorno: string): number =>
-  Math.max(0, TETTO_GIORNALIERO - quantiIl(impegni, giorno));
+  Math.max(0, tettiDelGiorno(giorno).massimo - quantiIl(impegni, giorno));
+
+/**
+ * I posti «normali», cioè prima dell'extra. Serve a distinguere
+ * «c'è posto» da «c'è solo l'extra», che non sono la stessa cosa.
+ */
+export const postiNormali = (impegni: Impegno[], giorno: string): number =>
+  Math.max(0, tettiDelGiorno(giorno).normali - quantiIl(impegni, giorno));
+
+/** Questo appuntamento sarebbe l'extra della giornata? */
+export const sarebbeExtra = (impegni: Impegno[], giorno: string): boolean => {
+  const t = tettiDelGiorno(giorno);
+  const quanti = quantiIl(impegni, giorno);
+  return quanti >= t.normali && quanti < t.massimo;
+};
 
 // ------------------------------------------------------------
 // LA DECISIONE: si può confermare questa richiesta?
@@ -398,26 +495,39 @@ export const valutaRichiesta = (input: {
     };
   }
 
-  if (quanti >= TETTO_GIORNALIERO) {
+  const tetti = tettiDelGiorno(richiesta.giorno);
+
+  // Si rifiuta solo oltre il MASSIMO. Fra i quattro normali e il
+  // massimo c'è l'extra: si scrive, e si dice che è un extra.
+  if (quanti >= tetti.massimo) {
     return {
       esito: 'giorno_pieno', confermabile: false,
-      motivo: `Il ${richiesta.giorno} ha già ${quanti} appuntamenti: è pieno. `
-        + 'Il quinto non si scrive.',
+      motivo: `Il ${richiesta.giorno} ha già ${quanti} appuntamenti `
+        + `(${tetti.normali} più l'extra): è pieno davvero.`,
       quantiQuelGiorno: quanti, postiLiberi: 0,
       quantiQuellaSettimana: nellaSettimana,
       conflittoCon: null, alternative, avvisi,
     };
   }
 
-  if (nellaSettimana >= TETTO_SETTIMANALE) {
+  if (nellaSettimana >= tetti.settimanale) {
     return {
       esito: 'settimana_piena', confermabile: false,
-      motivo: `Questa settimana ha già ${nellaSettimana} appuntamenti su ${TETTO_SETTIMANALE}. `
-        + 'Il sedicesimo non rende: costa 776 € di Academy mancata.',
+      motivo: `Questa settimana ha già ${nellaSettimana} appuntamenti su ${tetti.settimanale}. `
+        + 'Il prossimo non rende: costa 776 € di Academy mancata.',
       quantiQuelGiorno: quanti, postiLiberi: liberi,
       quantiQuellaSettimana: nellaSettimana,
       conflittoCon: null, alternative, avvisi,
     };
+  }
+
+  // L'extra si concede, ma non di nascosto: chi conferma deve
+  // sapere che sta usando la riserva della giornata.
+  if (quanti >= tetti.normali) {
+    avvisi.push(
+      `È l'EXTRA del ${richiesta.giorno}: il ${quanti + 1}° appuntamento, `
+      + `oltre i ${tetti.normali} che ti sei dato. Uno solo, e oggi è questo.`
+    );
   }
 
   const occupato = delGiorno.find((i) => i.ora === richiesta.ora);
@@ -541,8 +651,10 @@ export const rispostaWhatsApp = (input: {
   }
 
   if (v.esito === 'giorno_pieno') {
-    return `${ciao}${dataParlata(r.giorno)} è già pieno — teniamo quattro `
-      + 'appuntamenti al giorno per non correre. '
+    const t = tettiDelGiorno(r.giorno);
+    return `${ciao}${dataParlata(r.giorno)} è già pieno — teniamo `
+      + `${t.normali} appuntamenti al giorno`
+      + (t.rientro ? '' : ', più uno di riserva') + ', per non correre. '
       + (v.alternative.length
         ? `Il primo giorno con posto è ${dataParlata(v.alternative[0])}: te lo tengo?`
         : 'Dimmi due giorni che ti vanno bene e ti richiamo con l\'orario.');
@@ -573,7 +685,10 @@ export const rispostaWhatsApp = (input: {
 export interface RiepilogoGiorno {
   giorno: string;
   quanti: number;
+  /** posti NORMALI ancora liberi: l'extra non si conta qui */
   liberi: number;
+  /** i normali sono finiti ma l'extra c'è ancora */
+  extra: boolean;
   pieno: boolean;
   impegni: Impegno[];
   /** una riga sola, da leggere al volo */
@@ -582,16 +697,101 @@ export interface RiepilogoGiorno {
 
 export const riepilogoDi = (impegni: Impegno[], giorno: string): RiepilogoGiorno => {
   const del = impegniDi(impegni, giorno);
-  const liberi = Math.max(0, TETTO_GIORNALIERO - del.length);
+  // I tetti si chiedono al GIORNO, non alla costante: dal 15 settembre
+  // 2026 c'è l'extra, e questa riga diceva ancora «su 4» quando il
+  // massimo era 5. Due conti diversi sulla stessa giornata.
+  const t = tettiDelGiorno(giorno);
+  // `liberi` sono i posti NORMALI: l'extra è una riserva, non un
+  // posto libero. Contarlo insieme agli altri direbbe «3 liberi»
+  // quando in realtà sono due più una cortesia da concedere.
+  const liberi = Math.max(0, t.normali - del.length);
+  const extra = del.length >= t.normali && del.length < t.massimo;
   return {
     giorno,
     quanti: del.length,
     liberi,
-    pieno: liberi === 0,
+    extra,
+    pieno: del.length >= t.massimo,
     impegni: del,
     riga: del.length === 0
       ? 'Giornata libera.'
-      : `${del.length} su ${TETTO_GIORNALIERO}: ${del.map((i) => `${i.ora} ${i.chi}`).join(' · ')}`
-        + (liberi === 0 ? ' — pieno.' : ''),
+      : `${del.length} su ${t.normali}: ${del.map((i) => `${i.ora} ${i.chi}`).join(' · ')}`
+        + (extra ? ' — resta solo l\'extra.' : '')
+        + (del.length >= t.massimo ? ' — pieno.' : ''),
   };
+};
+
+// ------------------------------------------------------------
+// QUANDO LA DATA NON C'È
+// ------------------------------------------------------------
+// 16 settembre 2026. Il titolare, scegliendo fra «l'App propone gli
+// orari liberi» e «l'App dice che non c'è una data»:
+//
+//   «La 1, parti.»
+//
+// Quindi: da un messaggio senza data non esce un rifiuto, esce una
+// proposta già pronta da rimandare alla persona. È il lavoro che gli
+// toglie di mano, non un altro schermo da leggere.
+
+export interface OrarioLibero {
+  giorno: string;
+  ora: string;
+}
+
+/**
+ * I primi orari liberi a partire da un giorno, saltando le giornate
+ * chiuse e le ore già prese.
+ *
+ * Si propongono solo gli ORARI_CONSIGLIATI: sono quelli che stanno
+ * nelle finestre della giornata. Proporre le 13:30 perché «è libero»
+ * vorrebbe dire rompere la struttura del giorno per riempire un buco.
+ */
+export const primiOrariLiberi = (
+  impegni: Impegno[],
+  daGiorno: string,
+  quanti = 3,
+  giorniAvanti = 10
+): OrarioLibero[] => {
+  const fuori: OrarioLibero[] = [];
+  const [a, m, d] = (daGiorno || '').split('-').map((x) => parseInt(x, 10));
+  if (!a || !m || !d) return fuori;
+
+  for (let i = 0; i < giorniAvanti && fuori.length < quanti; i++) {
+    const data = new Date(Date.UTC(a, m - 1, d + i));
+    const p = (n: number) => String(n).padStart(2, '0');
+    const g = `${data.getUTCFullYear()}-${p(data.getUTCMonth() + 1)}-${p(data.getUTCDate())}`;
+
+    // Una giornata chiusa non si propone: il primo orario basta a dirlo.
+    if (giornoChiuso(g, ORARI_CONSIGLIATI[0])) continue;
+    if (postiLiberi(impegni, g) <= 0) continue;
+
+    const prese = new Set(impegniDi(impegni, g).map((x) => x.ora));
+    for (const ora of ORARI_CONSIGLIATI) {
+      if (fuori.length >= quanti) break;
+      if (prese.has(ora)) continue;
+      if (giornoChiuso(g, ora)) continue;
+      fuori.push({ giorno: g, ora });
+    }
+  }
+  return fuori;
+};
+
+/**
+ * Il messaggio da rimandare a chi ha chiesto un appuntamento senza
+ * dire quando. Pronto da incollare su WhatsApp.
+ */
+export const proponiOrari = (
+  impegni: Impegno[],
+  daGiorno: string,
+  nome = ''
+): string => {
+  const liberi = primiOrariLiberi(impegni, daGiorno);
+  const ciao = nome.trim() ? `Ciao ${nome.trim().split(' ')[0]}, ` : 'Ciao, ';
+  if (!liberi.length) {
+    return `${ciao}in questi giorni sono pieno. Dimmi due giorni che ti `
+      + 'vanno bene e ti richiamo appena si libera un posto.';
+  }
+  const righe = liberi.map((l) => `${dataParlata(l.giorno)} alle ${l.ora}`);
+  return `${ciao}ho libero ${righe.join(', ')}. `
+    + 'Quale ti va meglio?';
 };

@@ -53,7 +53,9 @@ import {
   deleteAppointment,
 } from '../../services/nutritionistService';
 import { getStudents, getCollaborators, getManagers, getOwner } from '../../services/authService';
-import { soloSePersonali, spiegaFiltro } from '../../domain/filtroStaff';
+import {
+  soloSePersonali, spiegaFiltro, ETICHETTA_TOGLI_FILTRO,
+} from '../../domain/filtroStaff';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import {
   createTask,
@@ -67,6 +69,9 @@ import {
   giaScalata, registrazionePassata, giorno, Avviso,
 } from '../../domain/piani';
 import { valutaAnnullamento } from '../../domain/annullamento';
+import {
+  Mancanza, mancanza, descriviMancanze, titoloMancanze,
+} from '../../domain/caricamentoAgenda';
 import {
   permessiAgenda, spiegaNienteAnnullo, spiegaNienteEliminazione,
 } from '../../domain/permessiAgenda';
@@ -185,6 +190,13 @@ export const CalendarScreen: React.FC = () => {
   // Annullare ed eliminare sono del titolare soltanto: gli altri
   // fissano, spostano e completano. Vedi domain/permessiAgenda.ts.
   const permessi = permessiAgenda(user?.role);
+  // Che cosa non si è riuscito a leggere, per dirlo invece di
+  // mostrare una lista vuota. Vedi domain/caricamentoAgenda.ts.
+  const [mancanze, setMancanze] = useState<Mancanza[]>([]);
+  // Che cosa è successo davvero all'ultima lettura degli ospiti.
+  const [letturaOspiti, setLetturaOspiti] = useState<{
+    letti: number; confermate: number; mostrati: number;
+  } | null>(null);
 
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
@@ -268,15 +280,43 @@ export const CalendarScreen: React.FC = () => {
         return;
       }
 
+      // Le letture che possono mancare NON si buttano più via in
+      // silenzio: una lista vuota per un guasto si vedeva identica a
+      // una lista vuota perché non c'è niente. Vedi
+      // domain/caricamentoAgenda.ts — 15 settembre 2026.
+      const mancanti: Mancanza[] = [];
+
       const [studs, collabs, mgrs, osp] = await Promise.all([
         getStudents(),
         canSeeAll ? getCollaborators() : Promise.resolve([]),
         canSeeAll ? getManagers() : Promise.resolve([]),
         // Solo il titolare può leggerli: per gli altri resta vuoto e
         // l'agenda funziona esattamente come prima.
-        isOwner ? getOspitiConfermati().catch(() => []) : Promise.resolve([]),
+        // NON si salta più la lettura in base al ruolo letto dal
+        // client. Era un `isOwner ? leggi : niente`: se per qualunque
+        // motivo il profilo non risultava «owner», gli ospiti non
+        // venivano nemmeno CHIESTI — nessun errore, nessun avviso,
+        // lista vuota identica a «non ce ne sono».
+        //
+        // Chi può leggerli lo decidono le regole di Firestore, che
+        // sono la serratura vera (`bookingRequests: if isOwner()`).
+        // Se dicono di no, arriva un errore e si vede. Un permesso si
+        // fa rispettare dove conta, non nascondendo la domanda.
+        getOspitiConfermati().catch((e) => {
+          mancanti.push(mancanza('ospiti', e));
+          return { ospiti: [], troncato: false, letti: 0, confermate: 0 };
+        }),
       ]);
-      setOspiti(osp);
+      setOspiti(osp.ospiti);
+      // Il tetto di lettura non si tocca in silenzio: se si tocca, si
+      // dice, perché è esattamente così che erano spariti gli ospiti.
+      if (osp.troncato) mancanti.push(mancanza('ospiti', 'elenco troncato: troppi ospiti in archivio'));
+      // Zero ospiti su documenti letti NON è la stessa cosa di zero
+      // documenti: la prima è una domanda sbagliata, la seconda un
+      // archivio vuoto. Finché non si distinguono, si tira a indovinare.
+      setLetturaOspiti({
+        letti: osp.letti, confermate: osp.confermate, mostrati: osp.ospiti.length,
+      });
 
       if (isCollaborator) {
         setStudents(studs.filter((s) => isStudentAssignedTo(s, user.id)));
@@ -293,17 +333,26 @@ export const CalendarScreen: React.FC = () => {
         (canSeeAll
           ? getAllAppointments()
           : getNutritionistAppointmentsByStaff(user.id)
-        ).catch(() => []),
+        ).catch((e) => {
+          mancanti.push(mancanza('visite', e));
+          return [];
+        }),
       ]);
       setSessions(trainingSessions);
       setNutritionAppts(nutrAppts);
 
       if (isOwner) {
-        const ownerTasks = await getTasksByOwner(user.id).catch(() => []);
+        const ownerTasks = await getTasksByOwner(user.id).catch((e) => {
+          mancanti.push(mancanza('impegni', e));
+          return [];
+        });
         setTasks(ownerTasks);
       }
+      setMancanze(mancanti);
     } catch (err) {
-      console.error('Errore caricamento calendario:', err);
+      // Le sedute non hanno una cattura propria: se salta questa, è
+      // saltato il pezzo grosso, e si dice quale.
+      setMancanze([mancanza('sedute', err)]);
       crossAlert('Errore', 'Impossibile caricare i dati.');
     }
   }, [user, canSeeAll, isCollaborator, isManager, isStudent, isOwner]);
@@ -442,6 +491,33 @@ export const CalendarScreen: React.FC = () => {
     staffList.find((p) => p.id === selectedStaffId)?.name,
     user?.id
   ), [selectedStaffId, staffList, user?.id]);
+
+  /**
+   * Il banner del filtro, con dentro il modo di toglierlo.
+   *
+   * Compare in TUTTE E TRE le viste. Prima stava solo in Agenda: in
+   * Timeline e Calendario il filtro nascondeva gli appuntamenti del
+   * titolare e tutti i suoi ospiti senza dire niente, e da Timeline
+   * non si poteva nemmeno togliere. Vedi domain/filtroStaff.ts.
+   */
+  const bannerFiltro = useMemo(() => {
+    if (avvisoFiltro === '') return null;
+    return (
+      <View style={styles.filtroAvviso}>
+        <Ionicons name="eye-outline" size={16} color={colors.info} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.filtroAvvisoTxt}>{avvisoFiltro}</Text>
+          <TouchableOpacity
+            onPress={() => setSelectedStaffId(null)}
+            style={{ marginTop: 6 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.filtroAvvisoAzione}>{ETICHETTA_TOGLI_FILTRO}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [avvisoFiltro]);
 
   const getStudentName = (id: string) => {
     const s = students.find((st) => st.id === id);
@@ -1236,10 +1312,12 @@ export const CalendarScreen: React.FC = () => {
 
   // Gli ospiti confermati (persone non ancora in anagrafica) valgono
   // come impegni: si vedono anche qui, non solo nel calendario.
-  const ospitiOggi = useMemo(
-    () => ospitiVisibili.filter((o) => o.giorno === todayStr),
-    [ospitiVisibili, todayStr]
-  );
+  // `ospitiOggi` viveva qui e non lo usava NESSUNO: gli ospiti di oggi
+  // arrivano già dentro `giornataOggi`, che li mescola agli
+  // appuntamenti in ordine di orario. Una variabile calcolata e mai
+  // disegnata è una pista falsa per chi cerca un difetto — e mi ci ha
+  // fatto perdere tempo il 15 settembre 2026, mentre il titolare
+  // aspettava. Tolta.
   const ospitiProssimi = useMemo(
     () => ospitiVisibili.filter((o) => o.giorno > todayStr)
       .sort((a, b) => (a.giorno + a.ora).localeCompare(b.giorno + b.ora))
@@ -1298,6 +1376,62 @@ export const CalendarScreen: React.FC = () => {
   );
 
   // Render appointment card
+  /**
+   * L'avviso di quello che non si è letto.
+   *
+   * Prima non c'era: due `catch` restituivano una lista vuota, e una
+   * lista vuota per un guasto si vede identica a una lista vuota
+   * perché non c'è niente. Con gli ospiti dentro — cioè le
+   * consulenze con chi non è ancora in anagrafica — una lettura
+   * fallita faceva sparire tutto senza una parola.
+   */
+  /**
+   * La riga che compare SOLO quando gli ospiti non si vedono e
+   * qualcosa era stato letto: distingue «l'archivio è vuoto» da
+   * «ho letto e ho scartato tutto».
+   *
+   * Senza questi due numeri, il 15 settembre 2026 ho tentato tre
+   * rimedi diversi senza sapere quale delle due fosse — e ogni
+   * tentativo a vuoto è costato tempo al titolare, che intanto
+   * riscriveva a mano gli appuntamenti.
+   */
+  const spiaOspiti = useMemo(() => {
+    const l = letturaOspiti;
+    if (!l || l.mostrati > 0 || l.letti === 0) return null;
+    return (
+      <View style={styles.avvisoMancanze}>
+        <Ionicons name="help-circle-outline" size={20} color={colors.warning} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.avvisoMancanzeTitolo}>Nessun ospite da mostrare</Text>
+          <Text style={styles.avvisoMancanzeTxt}>
+            {`Ho letto ${l.letti} richieste in archivio: ${l.confermate} risultano `
+            + 'confermate, e nessuna è rimasta come ospite (le altre sono già '
+            + 'diventate sedute, oppure sono in attesa o rifiutate).\n\n'
+            + 'Se ti aspettavi di vederne, mandami questa riga: dice esattamente '
+            + 'dove si perdono.'}
+          </Text>
+        </View>
+      </View>
+    );
+  }, [letturaOspiti]);
+
+  const avvisoMancanze = useMemo(() => {
+    const testo = descriviMancanze(mancanze);
+    if (!testo) return null;
+    return (
+      <View style={styles.avvisoMancanze}>
+        <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.avvisoMancanzeTitolo}>{titoloMancanze(mancanze)}</Text>
+          <Text style={styles.avvisoMancanzeTxt}>{testo}</Text>
+          <TouchableOpacity onPress={loadData} style={{ marginTop: 8 }}>
+            <Text style={styles.avvisoMancanzeRiprova}>Riprova</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }, [mancanze, loadData]);
+
   const renderAppointmentCard = (item: AppointmentItem) => (
     <AppointmentCard
       key={item.id}
@@ -1571,6 +1705,16 @@ export const CalendarScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* Quello che non si è riuscito a leggere. Sta in cima
+              perché è la prima cosa da sapere prima di fidarsi di
+              quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
+          {avvisoMancanze}
+          {spiaOspiti}
+
+          {/* E se si sta guardando la giornata di un altro, si dice
+              QUI — in ogni vista — con dentro il modo di smettere. */}
+          {bannerFiltro}
+
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
             <TouchableOpacity
@@ -1706,17 +1850,6 @@ export const CalendarScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Una schermata filtrata deve dire che è filtrata: senza, chi
-              la guarda crede di vedere tutto — ed è l'equivoco che ha
-              fatto sospettare al titolare che i collaboratori vedessero
-              le sue cose. */}
-          {avvisoFiltro !== '' && (
-            <View style={styles.filtroAvviso}>
-              <Ionicons name="eye-outline" size={16} color={colors.info} />
-              <Text style={styles.filtroAvvisoTxt}>{avvisoFiltro}</Text>
-            </View>
-          )}
-
           {/* Today's appointments */}
           <View style={styles.agendaSection}>
             <View style={styles.agendaSectionHeader}>
@@ -1838,6 +1971,16 @@ export const CalendarScreen: React.FC = () => {
               </View>
             </View>
           </View>
+
+          {/* Quello che non si è riuscito a leggere. Sta in cima
+              perché è la prima cosa da sapere prima di fidarsi di
+              quello che c'è sotto. Vedi domain/caricamentoAgenda.ts. */}
+          {avvisoMancanze}
+          {spiaOspiti}
+
+          {/* E se si sta guardando la giornata di un altro, si dice
+              QUI — in ogni vista — con dentro il modo di smettere. */}
+          {bannerFiltro}
 
           {/* View mode tabs */}
           <View style={styles.viewTabsBar}>
@@ -2045,6 +2188,13 @@ export const CalendarScreen: React.FC = () => {
                 </Text>
               )}
             </View>
+
+            {/* Anche qui: che cosa non si è letto, e se si sta
+                guardando la giornata di un altro. Il filtro agisce in
+                TUTTE le viste, quindi in tutte va detto. */}
+            {avvisoMancanze}
+            {spiaOspiti}
+            {bannerFiltro}
 
             {/* View mode tabs */}
             <View style={styles.viewTabsBar}>
@@ -2379,6 +2529,33 @@ export const CalendarScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   listContent: { paddingBottom: spacing.xxl },
+  avvisoMancanze: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  avvisoMancanzeTitolo: {
+    color: colors.error,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+    marginBottom: 4,
+  },
+  avvisoMancanzeTxt: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    lineHeight: 19,
+  },
+  avvisoMancanzeRiprova: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
+  },
   searchSection: {
     paddingHorizontal: spacing.md,
     marginTop: spacing.sm,
@@ -2726,6 +2903,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.info,
     backgroundColor: colors.surface,
+  },
+  filtroAvvisoAzione: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: fontSize.sm,
   },
   filtroAvvisoTxt: {
     flex: 1,

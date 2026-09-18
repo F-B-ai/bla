@@ -13,13 +13,16 @@ import { StudentSearchPicker } from '../../components/common/StudentSearchPicker
 import {
   leggiTuttiCAL, valutaSequenza, valutaRichiesta, rispostaWhatsApp, riepilogoDi,
   RichiestaCAL, Impegno, Valutazione,
-  TETTO_GIORNALIERO, TETTO_SETTIMANALE,
+  TETTO_GIORNALIERO, TETTO_SETTIMANALE, proponiOrari,
 } from '../../domain/agenda';
 import {
   salvaRichiesta, getRichiesteInAttesa, confermaRichiesta, rifiutaRichiesta,
   leggiImpegni, getOspitiConfermati, eliminaRichiesta, RichiestaSalvata,
+  getRichiesteRifiutate, recuperaRichiesta,
 } from '../../services/agendaRequestService';
 import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
+import { leggiMessaggioWhatsApp } from '../../services/segreteriaService';
+import { LetturaSegreteria, spiegaLettura } from '../../domain/segreteria';
 
 // ============================================================
 // RICHIESTE DA WHATSAPP
@@ -85,24 +88,47 @@ export function RichiesteWhatsAppScreen() {
   const [impegni, setImpegni] = useState<Impegno[]>([]);
   const [attesa, setAttesa] = useState<RichiestaSalvata[]>([]);
   const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
+  const [rifiutate, setRifiutate] = useState<RichiestaSalvata[]>([]);
+  const [rifiutateRotte, setRifiutateRotte] = useState(false);
   const [testo, setTesto] = useState('');
   const [loading, setLoading] = useState(true);
   const [lavoro, setLavoro] = useState(false);
   const [scelte, setScelte] = useState<Record<string, string | undefined>>({});
   const [chiave, setChiave] = useState<string | null>(null);
   const [apriPonte, setApriPonte] = useState(false);
+  // La segreteria: il messaggio WhatsApp com'è, e la sua traduzione.
+  const [messaggio, setMessaggio] = useState('');
+  const [lettura, setLettura] = useState<LetturaSegreteria | null>(null);
+  const [traducendo, setTraducendo] = useState(false);
+
+  /**
+   * Gli orari da rimandare a chi non ha detto quando.
+   * Si calcola dai veri impegni: quello che si propone esiste.
+   */
+  const orariDaProporre = useMemo(() => {
+    if (!lettura || lettura.esito !== 'senza_data') return '';
+    const oggi = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    const g = `${oggi.getFullYear()}-${p(oggi.getMonth() + 1)}-${p(oggi.getDate())}`;
+    return proponiOrari(impegni, g, lettura.persona);
+  }, [lettura, impegni]);
 
   const carica = useCallback(async () => {
     setLoading(true);
     try {
       const s = await getStudents();
       setStudents(s);
-      const [i, a, o] = await Promise.all([
+      const [i, a, o, rif] = await Promise.all([
         leggiImpegni(s), getRichiesteInAttesa(), getOspitiConfermati(),
+        // Se questa non riesce NON si finge che non ce ne siano:
+        // è esattamente così che erano sparite.
+        getRichiesteRifiutate().catch(() => null),
       ]);
       setImpegni(i);
       setAttesa(a);
-      setOspiti(o);
+      setOspiti(o.ospiti);
+      setRifiutate(rif || []);
+      setRifiutateRotte(rif === null);
     } catch {
       crossAlert('Errore', 'Non riesco a leggere agenda e richieste');
     } finally {
@@ -145,6 +171,43 @@ export function RichiesteWhatsAppScreen() {
       valutazione: v || valutaRichiesta({ richiesta: r, impegni }),
       impegni,
     });
+
+  /**
+   * Il messaggio WhatsApp diventa una lettura, non una richiesta:
+   * la richiesta la scrive il titolare quando ha controllato.
+   */
+  const traduci = async () => {
+    const m = messaggio.trim();
+    if (!m) return;
+    setTraducendo(true);
+    setLettura(null);
+    try {
+      setLettura(await leggiMessaggioWhatsApp(m));
+    } finally {
+      setTraducendo(false);
+    }
+  };
+
+  /**
+   * Porta la lettura nella casella qui sotto, come pacchetto CAL.
+   * NON la registra: passa dalla stessa strada di sempre, dove viene
+   * valutata sulle regole della giornata e si vede prima di salvare.
+   */
+  const portaInCasella = () => {
+    const l = lettura;
+    if (!l || l.esito !== 'richiesta') return;
+    setTesto([
+      'CAL prenota',
+      `persona: ${l.persona}`,
+      l.telefono ? `telefono: ${l.telefono}` : '',
+      `giorno: ${l.giorno}`,
+      `ora: ${l.ora}`,
+      `tipo: ${l.tipo}`,
+      l.note ? `note: ${l.note}` : '',
+    ].filter(Boolean).join('\n'));
+    setLettura(null);
+    setMessaggio('');
+  };
 
   const registra = async () => {
     const daSalvare = valide.filter((r) => r.comando !== 'chiedi-liberi');
@@ -259,6 +322,28 @@ export function RichiesteWhatsAppScreen() {
     );
   };
 
+  /**
+   * Una rifiutata torna «in attesa», non confermata: recuperare non
+   * vuol dire scavalcare la regola in automatico — vuol dire riavere
+   * la scelta, che è di chi comanda.
+   */
+  const recupera = async (r: RichiestaSalvata) => {
+    setLavoro(true);
+    try {
+      await recuperaRichiesta(r.id);
+      await carica();
+      crossAlert(
+        'Recuperata',
+        `${r.persona} è tornata fra le richieste da decidere, per il `
+        + `${dataBreve(r.giorno)} alle ${r.ora}. Adesso confermala come le altre.`
+      );
+    } catch {
+      crossAlert('Errore', 'Non riesco a recuperare la richiesta');
+    } finally {
+      setLavoro(false);
+    }
+  };
+
   const rifiuta = async (r: RichiestaSalvata, motivo: string) => {
     setLavoro(true);
     try {
@@ -284,9 +369,87 @@ export function RichiesteWhatsAppScreen() {
         scrivono.</Text> Domenica chiusa, sabato solo mattina.
       </Text>
 
+      {/* ------------------------------------------------------------
+          LA SEGRETERIA — il messaggio così com'è
+          16 settembre 2026. Il bot che traduceva i messaggi in
+          pacchetti CAL si è fermato: aveva una riserva settimanale.
+          Ricevere gli appuntamenti non può dipendere da un
+          abbonamento di terzi. La traduzione la fa ESSĒRE, con il
+          gateway AI che ha già dentro. Vedi domain/segreteria.ts.
+          ------------------------------------------------------------ */}
+      <View style={s.card}>
+        <Text style={s.cardTitle}>Incolla il messaggio di WhatsApp</Text>
+        <Text style={s.muted}>
+          Il messaggio com'è, senza sistemarlo. Lo traduco io in una richiesta:
+          tu controlli e confermi. <Text style={s.forte}>La data non me la
+          invento mai</Text> — se non c'è, te lo dico e ti do gli orari liberi
+          da rimandare alla persona.
+        </Text>
+        <TextInput
+          style={s.area}
+          multiline
+          numberOfLines={4}
+          placeholder={'«Ciao Francesco, giovedì pomeriggio verso le 3 ci sono»'}
+          placeholderTextColor={colors.textLight}
+          value={messaggio}
+          onChangeText={setMessaggio}
+        />
+        <TouchableOpacity
+          style={s.btnPrimario}
+          onPress={traduci}
+          disabled={lavoro || traducendo || !messaggio.trim()}
+          activeOpacity={0.85}
+        >
+          {traducendo
+            ? <ActivityIndicator size="small" color={colors.textOnAccent} />
+            : <Ionicons name="sparkles" size={17} color={colors.textOnAccent} />}
+          <Text style={s.btnPrimarioTxt}>
+            {traducendo ? 'Sto leggendo…' : 'Leggi e prepara la richiesta'}
+          </Text>
+        </TouchableOpacity>
+
+        {lettura && (
+          <View style={s.letturaBox}>
+            <Text style={s.letturaTitolo}>{spiegaLettura(lettura)}</Text>
+            {lettura.problemi.map((x, i) => (
+              <Text key={i} style={s.motivo}>{x}</Text>
+            ))}
+
+            {lettura.esito === 'richiesta' && (
+              <TouchableOpacity
+                style={s.btnSecondario}
+                onPress={portaInCasella}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="arrow-down" size={16} color={colors.accent} />
+                <Text style={s.btnSecondarioTxt}>
+                  Portala qui sotto, così la controllo prima di registrarla
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* La scelta del titolare, 16 settembre: quando la data
+                non c'è, l'App propone gli orari liberi. */}
+            {lettura.esito === 'senza_data' && !!orariDaProporre && (
+              <>
+                <Text style={s.muted}>{orariDaProporre}</Text>
+                <TouchableOpacity
+                  style={s.btnSecondario}
+                  onPress={() => copia(orariDaProporre)}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="copy-outline" size={16} color={colors.accent} />
+                  <Text style={s.btnSecondarioTxt}>Copia da rimandare su WhatsApp</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+      </View>
+
       {/* --- incolla --- */}
       <View style={s.card}>
-        <Text style={s.cardTitle}>Incolla la richiesta</Text>
+        <Text style={s.cardTitle}>Oppure scrivi la richiesta a mano</Text>
         <TextInput
           style={s.area}
           multiline
@@ -603,6 +766,66 @@ export function RichiesteWhatsAppScreen() {
         </>
       )}
 
+      {/* ------------------------------------------------------------
+          LE RIFIUTATE — quello che il tetto ha scartato
+          15 settembre 2026: il titolare ha passato una mattina a
+          riscrivere a memoria appuntamenti che erano stati rifiutati
+          perché il giorno era pieno. Una regola può dire di no; non
+          può far sparire quello su cui ha detto no.
+          ------------------------------------------------------------ */}
+      {rifiutateRotte && (
+        <View style={s.card}>
+          <Text style={s.motivo}>
+            Non sono riuscito a leggere le richieste rifiutate. NON vuol dire
+            che non ce ne siano: vuol dire che la lettura non è riuscita.
+          </Text>
+        </View>
+      )}
+
+      {rifiutate.length > 0 && (
+        <>
+          <Text style={s.sezione}>Rifiutate ({rifiutate.length})</Text>
+          <Text style={s.aiuto}>
+            Richieste che il tetto della giornata ha scartato. Non sono perse:
+            se una era un appuntamento vero, recuperala — torna fra quelle da
+            decidere e la confermi come tutte le altre.
+          </Text>
+          {rifiutate.map((r) => (
+            <View key={r.id} style={s.card}>
+              <Text style={s.persona}>{r.persona}</Text>
+              <Text style={s.quando}>
+                {dataBreve(r.giorno)} alle {r.ora} · {r.tipo}
+                {r.telefono ? ` · ${r.telefono}` : ''}
+              </Text>
+              {!!r.note && <Text style={s.note}>{r.note}</Text>}
+              {!!r.motivoRifiuto && (
+                <Text style={s.motivo}>Scartata perché: {r.motivoRifiuto}</Text>
+              )}
+
+              <TouchableOpacity
+                style={s.btnPrimario}
+                onPress={() => recupera(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="arrow-undo" size={17} color={colors.textOnAccent} />
+                <Text style={s.btnPrimarioTxt}>Recupera: rimettila fra quelle da decidere</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.btnElimina}
+                onPress={() => elimina(r)}
+                disabled={lavoro}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="trash-outline" size={16} color={colors.error} />
+                <Text style={s.btnEliminaTxt}>Era giusto scartarla: elimina</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+
       {/* --- il ponte: chi scrive le richieste al posto tuo --- */}
       <TouchableOpacity
         style={s.catalogoBtn}
@@ -789,6 +1012,27 @@ const s = StyleSheet.create({
   },
   persona: { color: colors.text, fontSize: fontSize.lg, fontWeight: '700' },
   quando: { color: colors.textSecondary, fontSize: fontSize.sm, marginTop: 2 },
+  letturaBox: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  letturaTitolo: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: fontSize.md,
+    lineHeight: 21,
+    marginBottom: spacing.xs,
+  },
+  motivo: {
+    color: colors.warning,
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
+    lineHeight: 19,
+  },
   note: { color: colors.textLight, fontSize: fontSize.xs, marginTop: 4, lineHeight: 17 },
   aiuto: { color: colors.textLight, fontSize: fontSize.xs, lineHeight: 16, marginTop: 4 },
   chiusura: {

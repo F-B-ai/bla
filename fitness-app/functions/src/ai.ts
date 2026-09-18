@@ -61,6 +61,11 @@ const MODEL_BY_FEATURE: Record<string, string> = {
   mindmovement: FABLE,
   portrait: FABLE,
   weekly_summary: "claude-opus-4-8",
+  // La segreteria: da un messaggio WhatsApp a una richiesta di
+  // appuntamento. Testo corto, risposta corta, nessun ragionamento
+  // lungo — e soprattutto nessuna data inventata: le regole stanno
+  // in src/domain/segreteria.ts, qui si sceglie solo il modello.
+  segreteria: "claude-sonnet-4-5",
   triage: "claude-haiku-4-5",
   generic: "claude-sonnet-4-5",
 };

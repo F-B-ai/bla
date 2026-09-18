@@ -65,6 +65,10 @@ export const CARTELLE: CartellaStorage[] = [
     contenuto: 'I materiali pubblicati dallo studio.' },
   { id: 'nutritionTeam', nome: 'Team nutrizione', sensibile: true,
     contenuto: 'Gli allegati del team nutrizionale: non li legge l\'allievo.' },
+  // Il patto firmato è un contratto con dentro nome, percorso e
+  // importi: si tratta con lo stesso riguardo dei dati del corpo.
+  { id: 'patti', nome: 'Patti firmati', sensibile: true,
+    contenuto: 'La copia fotografata del patto firmato, una per allievo.' },
   { id: 'comunicazioni', nome: 'Allegati delle comunicazioni', sensibile: false,
     contenuto: 'Foto, video e audio mandati a tutti gli allievi dalla bacheca.' },
 ];

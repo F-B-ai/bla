@@ -82,6 +82,14 @@ export const SOGLIE_PROTOCOLLO = {
 export type AreaLavoro =
   | 'postura' | 'movimento' | 'carico' | 'composizione' | 'respiro' | 'capacita';
 
+/**
+ * Da dove viene una priorità: da uno strumento, o dall'occhio di
+ * chi guardava. Il tipo vive qui perché lo usano tutti e due i
+ * livelli, e il livello delle scelte dipende da questo, mai il
+ * contrario.
+ */
+export type Origine = 'misurata' | 'riferita';
+
 export interface Priorita {
   area: AreaLavoro;
   titolo: string;
@@ -447,7 +455,19 @@ export interface DatiProtocollo {
   allievo: string;
   data: Date;
   quadro: Quadro;
-  priorita: Priorita[];
+  /**
+   * Le priorità finali. Possono portare `origine`: quelle aggiunte
+   * a mano si devono riconoscere anche sul foglio stampato.
+   */
+  priorita: Array<Priorita & { origine?: Origine }>;
+  /**
+   * Le righe delle scelte del direttore tecnico, GIÀ COMPOSTE.
+   * Arrivano fatte da domain/protocolloScelte.ts: questo file
+   * impagina, non decide, e così non dipende da quel livello.
+   */
+  scelteRighe?: string[];
+  /** la riga che il coach scrive a questa persona */
+  nota?: string;
   perimetro: Perimetro;
   piano: PianoLavoro;
   obiettivo?: string;
@@ -514,8 +534,33 @@ export const documentoCliente = (d: DatiProtocollo): SezioneDocumento[] => {
         + 'esce l\'ordine del lavoro — prima ciò che cambia lo schema, poi ciò che cambia i numeri.'
       : 'Dalle misure raccolte non emergono priorità che cambino l\'ordine del lavoro: '
         + 'si procede con il programma generale e si rivaluta alle scadenze previste.',
-    elenco: d.priorita.map((p, i) => `${i + 1}. ${p.titolo} — ${p.perche} ${p.comeSiLavora}`),
+    elenco: d.priorita.map((p, i) =>
+      `${i + 1}. ${p.titolo}`
+      + (p.origine === 'riferita' ? ' (riferita, non misurata)' : '')
+      + ` — ${p.perche} ${p.comeSiLavora}`),
   });
+
+  // Le scelte del direttore tecnico: esistono solo se ce ne sono.
+  // Un titolo vuoto su un foglio che si consegna a una persona è
+  // peggio che non averlo.
+  if (d.scelteRighe?.length) {
+    sezioni.push({
+      n: 0,
+      titolo: 'Le scelte del direttore tecnico',
+      testo: 'La lettura qui sopra esce dalle misure. Questa parte no: è quello che ho '
+        + 'deciso io guardando te, il tuo lavoro e il tempo che hai. È scritta perché '
+        + 'tu sappia che cosa ho cambiato e perché.',
+      elenco: d.scelteRighe,
+    });
+  }
+
+  if (d.nota?.trim()) {
+    sezioni.push({
+      n: 0,
+      titolo: 'Una nota per te',
+      testo: d.nota.trim(),
+    });
+  }
 
   sezioni.push({
     n: 4,
@@ -565,7 +610,10 @@ export const documentoCliente = (d: DatiProtocollo): SezioneDocumento[] => {
     elenco: d.perimetro.motivi,
   });
 
-  return sezioni;
+  // I numeri si assegnano alla fine: con due sezioni che ci sono
+  // solo a volte, scriverli a mano vorrebbe dire prima o poi
+  // consegnare un foglio che salta dal 3 al 5.
+  return sezioni.map((sez, i) => ({ ...sez, n: i + 1 }));
 };
 
 // ------------------------------------------------------------

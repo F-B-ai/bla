@@ -1,4 +1,9 @@
-import { personaliVisibili, soloSePersonali, spiegaFiltro } from '../filtroStaff';
+import fs from 'fs';
+import path from 'path';
+import {
+  personaliVisibili, soloSePersonali, spiegaFiltro,
+  ETICHETTA_TOGLI_FILTRO, FILTRO_STAFF_VERSION,
+} from '../filtroStaff';
 
 // ============================================================
 // «SIGNIFICA CHE LORO STANNO VEDENDO QUESTO?»
@@ -58,7 +63,9 @@ describe('la riga che dice che cosa stai guardando', () => {
   it('guardando un altro, lo dice col suo nome', () => {
     const r = spiegaFiltro(ALTRO, 'Giuseppe Calabrese', IO);
     expect(r).toContain('Giuseppe Calabrese');
-    expect(r).toContain('non compaiono qui');
+    // Il «NON» è maiuscolo apposta: è la parola che la persona
+    // sta cercando quando non trova le proprie cose.
+    expect(r).toMatch(/non compaiono qui/i);
   });
 
   it('senza filtro non dice niente: non c\'è niente da spiegare', () => {
@@ -71,5 +78,97 @@ describe('la riga che dice che cosa stai guardando', () => {
 
   it('senza il nome non lascia un buco nella frase', () => {
     expect(spiegaFiltro(ALTRO, null, IO)).toContain('questa persona');
+  });
+});
+
+// ============================================================
+// «NON VEDO TUTTI GLI APPUNTAMENTI OSPITI GIALLI» — 15 set 2026
+// ------------------------------------------------------------
+// Il filtro funzionava. L'avviso che lo spiega compariva in una
+// vista sola su tre: in due viste sparivano i suoi appuntamenti e
+// tutti i suoi ospiti senza una parola, e da una non si poteva
+// nemmeno togliere il filtro.
+// ============================================================
+
+describe('l\'avviso dice che cosa MANCA, non solo di chi è la giornata', () => {
+  const t = spiegaFiltro('altro', 'Giuseppe', 'io');
+
+  it('nomina gli appuntamenti, i task e gli ospiti', () => {
+    expect(t).toContain('appuntamenti');
+    expect(t).toContain('task');
+    expect(t).toContain('ospiti');
+  });
+
+  it('e dice a chiare lettere che NON ci sono qui', () => {
+    expect(t).toContain('NON compaiono qui');
+  });
+
+  it('dice «solo», perché è una vista parziale', () => {
+    expect(t).toContain('solo la giornata');
+  });
+});
+
+describe('dirlo senza dare l\'uscita è mezzo servizio', () => {
+  it('c\'è un\'etichetta per togliere il filtro', () => {
+    expect(ETICHETTA_TOGLI_FILTRO.length).toBeGreaterThan(5);
+    expect(ETICHETTA_TOGLI_FILTRO.toLowerCase()).toContain('agenda');
+  });
+});
+
+describe('la schermata mostra l\'avviso in TUTTE le viste', () => {
+  const schermata = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'shared', 'CalendarScreen.tsx'),
+    'utf8'
+  );
+
+  // Agenda, Timeline, Calendario: il filtro agisce in tutte e tre,
+  // quindi in tutte e tre va detto.
+  // Non basta contarli: il 15 settembre 2026 erano tre, ma DUE
+  // nella stessa vista e ZERO nel Calendario. Il conteggio giusto
+  // nascondeva la distribuzione sbagliata.
+  // I confini sono i marcatori che le viste hanno già nel codice:
+  // più solidi di qualunque euristica sul «return».
+  const viste = (() => {
+    const segna = (n: string) => {
+      const i = schermata.indexOf(`// ========== ${n} VIEW ==========`);
+      expect(i).toBeGreaterThan(-1);
+      return i;
+    };
+    const a = segna('AGENDA');
+    const t2 = segna('TIMELINE');
+    const c = segna('CALENDAR');
+    return {
+      agenda: schermata.slice(a, t2),
+      timeline: schermata.slice(t2, c),
+      calendario: schermata.slice(c),
+    };
+  })();
+
+  it('ogni vista ha il banner del filtro, una volta sola', () => {
+    (['agenda', 'timeline', 'calendario'] as const).forEach((v) => {
+      const quante = viste[v].split('{bannerFiltro}').length - 1;
+      expect({ vista: v, quante }).toEqual({ vista: v, quante: 1 });
+    });
+  });
+
+  it('e ogni vista dice anche che cosa non ha potuto leggere', () => {
+    (['agenda', 'timeline', 'calendario'] as const).forEach((v) => {
+      expect(viste[v]).toContain('{avvisoMancanze}');
+    });
+  });
+
+  it('e porta con sé il modo di toglierlo', () => {
+    expect(schermata).toContain('ETICHETTA_TOGLI_FILTRO');
+    expect(schermata).toContain('setSelectedStaffId(null)');
+  });
+
+  it('il vecchio avviso da una vista sola non c\'è più', () => {
+    expect(schermata).not.toContain("avvisoFiltro !== ''");
+  });
+});
+
+describe('versione', () => {
+  it('tracciata', () => {
+    expect(FILTRO_STAFF_VERSION).toBe(2);
   });
 });

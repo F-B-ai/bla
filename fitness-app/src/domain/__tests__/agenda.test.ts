@@ -3,15 +3,22 @@ import {
   valutaRichiesta, rispostaWhatsApp, riepilogoDi,
   impegniDi, quantiIl, postiLiberi, quantiNellaSettimana, settimanaDi,
   giornoChiuso, dentroLeFinestre, nelBloccoAcademy,
-  TETTO_GIORNALIERO, TETTO_SETTIMANALE, ORARI_CONSIGLIATI,
-  AGENDA_VERSION, Impegno, RichiestaCAL,
+  TETTO_GIORNALIERO, TETTO_SETTIMANALE, EXTRA_GIORNALIERO,
+  tettiDelGiorno, postiNormali, sarebbeExtra,
+  primiOrariLiberi, proponiOrari,
+  ORARI_CONSIGLIATI, AGENDA_VERSION, Impegno, RichiestaCAL,
 } from '../agenda';
 
 // ============================================================
 // AGENDA — le richieste da WhatsApp.
-// La regola che tutti i test difendono: MAI un quinto
-// appuntamento. Non un avviso da ignorare: un rifiuto, con
-// l'alternativa già pronta da rimandare alla persona.
+// La regola che tutti i test difendono: quattro appuntamenti al
+// giorno più UN extra, e il sesto non si scrive. Non un avviso da
+// ignorare: un rifiuto, con l'alternativa già pronta da rimandare
+// alla persona.
+//
+// Il 15 settembre 2026 il fondatore ha aggiunto l'extra: «quattro
+// appuntamenti più al massimo un extra». Prima il quinto veniva
+// rifiutato — e le richieste rifiutate sparivano dalla vista.
 // ============================================================
 
 const imp = (giorno: string, ora: string, chi: string, attivo = true): Impegno =>
@@ -19,13 +26,17 @@ const imp = (giorno: string, ora: string, chi: string, attivo = true): Impegno =
 
 const GIORNO = '2026-09-02';
 
-// I quattro orari veri della giornata del fondatore.
-const pieno: Impegno[] = [
+// I quattro orari veri della giornata del fondatore: dal 15 settembre
+// 2026 questi sono i NORMALI, e sopra c'è ancora l'extra.
+const quattro: Impegno[] = [
   imp(GIORNO, '10:30', 'Maria'),
   imp(GIORNO, '11:30', 'Luca'),
   imp(GIORNO, '15:00', 'Anna'),
   imp(GIORNO, '16:00', 'Paolo'),
 ];
+
+/** Quattro più l'extra: QUESTO è un giorno pieno davvero. */
+const pieno: Impegno[] = [...quattro, imp(GIORNO, '17:00', 'Extra')];
 
 const cal = (testo: string) => leggiCAL(testo);
 
@@ -127,9 +138,11 @@ nuova ora: 18:00`);
 
 describe('quanti impegni ha quel giorno', () => {
   it('conta solo quelli attivi: un annullato libera il posto', () => {
-    const con = [...pieno, imp(GIORNO, '19:00', 'Disdetto', false)];
+    const con = [...quattro, imp(GIORNO, '19:00', 'Disdetto', false)];
     expect(quantiIl(con, GIORNO)).toBe(4);
-    expect(postiLiberi(con, GIORNO)).toBe(0);
+    // Quattro scritti: resta solo l'extra.
+    expect(postiLiberi(con, GIORNO)).toBe(1);
+    expect(postiLiberi([...pieno, imp(GIORNO, '19:00', 'X', false)], GIORNO)).toBe(0);
   });
 
   it('mette in fila per ora', () => {
@@ -137,9 +150,10 @@ describe('quanti impegni ha quel giorno', () => {
     expect(impegniDi(mescolati, GIORNO).map((i) => i.chi)).toEqual(['A', 'B']);
   });
 
-  it('il tetto è quattro', () => {
+  it('i normali sono quattro, e sopra c\'è un extra solo', () => {
     expect(TETTO_GIORNALIERO).toBe(4);
-    expect(AGENDA_VERSION).toBe(1);
+    expect(EXTRA_GIORNALIERO).toBe(1);
+    expect(AGENDA_VERSION).toBe(2);
   });
 });
 
@@ -154,7 +168,7 @@ describe('IL QUINTO NON SI SCRIVE', () => {
     expect(v.esito).toBe('giorno_pieno');
     expect(v.confermabile).toBe(false);
     expect(v.postiLiberi).toBe(0);
-    expect(v.motivo).toContain('Il quinto non si scrive');
+    expect(v.motivo).toContain('è pieno davvero');
   });
 
   it('e propone il primo giorno che ha ancora posto', () => {
@@ -270,11 +284,16 @@ tipo:     visita`;
   it('e la quinta dello stesso giorno viene rifiutata dentro lo stesso incollo', () => {
     const richieste = [
       ...leggiTuttiCAL(QUATTRO).map((l) => l.richiesta!),
+      // La quinta è l'EXTRA: si scrive, e si dice che è l'extra.
       { giorno: '2026-09-02', ora: '16:00', persona: 'Cinque' },
+      // La sesta no.
+      { giorno: '2026-09-02', ora: '17:00', persona: 'Sei' },
     ];
     const v = valutaSequenza(richieste as any, []);
-    expect(v[4].esito).toBe('giorno_pieno');
-    expect(v[4].confermabile).toBe(false);
+    expect(v[4].confermabile).toBe(true);
+    expect(v[4].avvisi.join(' ')).toContain('EXTRA');
+    expect(v[5].esito).toBe('giorno_pieno');
+    expect(v[5].confermabile).toBe(false);
   });
 
   it('due richieste alla stessa ora: la seconda trova occupato', () => {
@@ -487,7 +506,8 @@ describe('la risposta che torna su WhatsApp', () => {
 
   it('spiega il perché del tetto, senza scusarsi', () => {
     const t = rispondi(richiesta(), pieno);
-    expect(t).toContain('quattro appuntamenti al giorno');
+    expect(t).toContain('4 appuntamenti al giorno');
+    expect(t).toContain('uno di riserva');
     expect(t.toLowerCase()).not.toContain('mi dispiace');
   });
 
@@ -560,5 +580,189 @@ describe('il riepilogo del giorno per il coach', () => {
 
   it('giornata vuota', () => {
     expect(riepilogoDi([], GIORNO).riga).toBe('Giornata libera.');
+  });
+});
+
+// ============================================================
+// «QUATTRO APPUNTAMENTI PIÙ AL MASSIMO UN EXTRA» — 15 set 2026
+// ------------------------------------------------------------
+// E per questa settimana un po' più alto, perché il titolare sta
+// rimettendo in agenda gli appuntamenti che il tetto stesso aveva
+// scartato: un tetto stretto gli rifiuterebbe i suoi.
+// ============================================================
+
+describe('il regime nuovo, da lunedì 21 settembre', () => {
+  const LUN = '2026-09-21';
+  const quattroLun = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`));
+
+  it('quattro normali, cinque col massimo', () => {
+    const t = tettiDelGiorno(LUN);
+    expect(t.normali).toBe(4);
+    expect(t.massimo).toBe(5);
+    expect(t.rientro).toBe(false);
+  });
+
+  it('con quattro scritti resta l\'extra, non zero', () => {
+    expect(postiLiberi(quattroLun, LUN)).toBe(1);
+    expect(postiNormali(quattroLun, LUN)).toBe(0);
+    expect(sarebbeExtra(quattroLun, LUN)).toBe(true);
+  });
+
+  // Il quinto SI SCRIVE: è quello che ha chiesto il titolare.
+  it('il quinto si conferma', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: LUN, ora: '17:00', persona: 'Quinta' },
+      impegni: quattroLun,
+    });
+    expect(v.confermabile).toBe(true);
+  });
+
+  // Ma non di nascosto: chi conferma deve sapere che è la riserva.
+  it('e si vede che è l\'extra', () => {
+    const v = valutaRichiesta({
+      richiesta: { giorno: LUN, ora: '17:00', persona: 'Quinta' },
+      impegni: quattroLun,
+    });
+    expect(v.avvisi.join(' ')).toContain('EXTRA');
+    expect(v.avvisi.join(' ')).toContain('5°');
+  });
+
+  it('il sesto no', () => {
+    const cinque = [...quattroLun, imp(LUN, '17:00', 'Quinta')];
+    const v = valutaRichiesta({
+      richiesta: { giorno: LUN, ora: '18:00', persona: 'Sesta' },
+      impegni: cinque,
+    });
+    expect(v.esito).toBe('giorno_pieno');
+    expect(v.confermabile).toBe(false);
+    expect(v.motivo).toContain('pieno davvero');
+  });
+});
+
+describe('la settimana di rientro', () => {
+  it('da lunedì 14 a domenica 20 il tetto è più alto', () => {
+    ['2026-09-14', '2026-09-15', '2026-09-20'].forEach((g) => {
+      expect(tettiDelGiorno(g).rientro).toBe(true);
+      expect(tettiDelGiorno(g).massimo).toBeGreaterThan(5);
+    });
+  });
+
+  // Senza l'estremo inferiore la parentesi varrebbe anche per
+  // marzo, e le regole del passato cambierebbero sotto i piedi a
+  // chi guarda l'archivio.
+  it('non vale per il passato', () => {
+    ['2026-09-13', '2026-09-02', '2026-03-01']
+      .forEach((g) => expect(tettiDelGiorno(g).rientro).toBe(false));
+  });
+
+  // Si chiude da sola: nessuno deve ricordarsi di chiuderla.
+  it('e si chiude da sola lunedì 21', () => {
+    expect(tettiDelGiorno('2026-09-21').rientro).toBe(false);
+    expect(tettiDelGiorno('2026-09-21').massimo).toBe(5);
+  });
+
+  it('un giorno illeggibile non apre la parentesi per sbaglio', () => {
+    ['', 'boh', undefined as unknown as string]
+      .forEach((g) => expect(tettiDelGiorno(g).rientro).toBe(false));
+  });
+});
+
+describe('il tetto settimanale che il titolare voleva', () => {
+  it('sono quindici, come nella rotta', () => {
+    expect(TETTO_SETTIMANALE).toBe(15);
+    expect(tettiDelGiorno('2026-09-21').settimanale).toBe(15);
+  });
+});
+
+// ============================================================
+// QUANDO LA DATA NON C'È — 16 settembre 2026
+// ------------------------------------------------------------
+// Il titolare, scegliendo fra «proponi gli orari liberi» e «dì che
+// non c'è una data»: «La 1, parti.»
+// ============================================================
+
+describe('la proposta degli orari liberi', () => {
+  const LUN = '2026-09-21'; // lunedì, regime normale
+
+  it('propone i primi orari liberi, in ordine', () => {
+    const l = primiOrariLiberi([], LUN, 3);
+    expect(l).toHaveLength(3);
+    expect(l[0]).toEqual({ giorno: LUN, ora: '10:30' });
+    expect(l[1].ora).toBe('11:30');
+  });
+
+  it('salta le ore già prese', () => {
+    const presi = [imp(LUN, '10:30', 'Maria'), imp(LUN, '11:30', 'Luca')];
+    const l = primiOrariLiberi(presi, LUN, 2);
+    expect(l.map((x) => x.ora)).toEqual(['15:00', '16:00']);
+  });
+
+  it('e passa al giorno dopo quando quello è pieno', () => {
+    const pienoLun = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`))
+      .concat(imp(LUN, '17:00', 'extra'));
+    const l = primiOrariLiberi(pienoLun, LUN, 1);
+    expect(l[0].giorno).not.toBe(LUN);
+  });
+
+  // La domenica è chiusa: proporla sarebbe una promessa che non si
+  // può mantenere.
+  it('non propone mai un giorno chiuso', () => {
+    const DOM = '2026-09-20';
+    expect(primiOrariLiberi([], DOM, 4).some((x) => x.giorno === DOM)).toBe(false);
+  });
+
+  it('una data storta non fa esplodere niente', () => {
+    expect(primiOrariLiberi([], 'boh', 3)).toEqual([]);
+    expect(primiOrariLiberi([], '', 3)).toEqual([]);
+  });
+});
+
+describe('il messaggio da rimandare alla persona', () => {
+  const LUN = '2026-09-21';
+
+  it('saluta col nome e propone gli orari', () => {
+    const m = proponiOrari([], LUN, 'Rosa Cesarano');
+    expect(m).toContain('Ciao Rosa');
+    expect(m).toContain('10:30');
+    expect(m).toContain('Quale ti va meglio?');
+  });
+
+  it('senza nome resta una frase intera', () => {
+    expect(proponiOrari([], LUN)).toMatch(/^Ciao, /);
+  });
+
+  // Anche quando non c'è posto, si dà una strada: non un muro.
+  it('se è tutto pieno chiede due giorni, non dice solo no', () => {
+    const tutto: Impegno[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(2026, 8, 21 + i));
+      const g = d.toISOString().slice(0, 10);
+      ORARI_CONSIGLIATI.forEach((o) => tutto.push(imp(g, o, 'x')));
+      tutto.push(imp(g, '17:00', 'extra'));
+    }
+    const m = proponiOrari(tutto, LUN, 'Rosa');
+    expect(m).toContain('sono pieno');
+    expect(m).toContain('Dimmi due giorni');
+  });
+});
+
+describe('il riepilogo non spaccia l\'extra per un posto libero', () => {
+  const LUN = '2026-09-21';
+
+  it('con quattro scritti i liberi sono zero, ma l\'extra c\'è', () => {
+    const quattroLun = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`));
+    const r = riepilogoDi(quattroLun, LUN);
+    expect(r.liberi).toBe(0);
+    expect(r.extra).toBe(true);
+    expect(r.pieno).toBe(false);
+    expect(r.riga).toContain('resta solo l\'extra');
+  });
+
+  it('col quinto è pieno davvero', () => {
+    const cinque = ORARI_CONSIGLIATI.map((o) => imp(LUN, o, `p${o}`))
+      .concat(imp(LUN, '17:00', 'Quinta'));
+    const r = riepilogoDi(cinque, LUN);
+    expect(r.pieno).toBe(true);
+    expect(r.extra).toBe(false);
   });
 });

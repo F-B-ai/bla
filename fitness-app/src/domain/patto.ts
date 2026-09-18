@@ -219,3 +219,35 @@ export const IMPEGNO_STUDIO =
 export const IMPEGNO_ALLIEVO =
   'L\'allievo si impegna a comunicare per tempo assenze e difficoltà, a rispettare le scadenze '
   + 'concordate e a segnalare ogni cambiamento nel proprio stato di salute.';
+
+/**
+ * Il patto per intero, in testo semplice.
+ *
+ * Serve a congelare CHE COSA è stato firmato. Gli articoli si
+ * generano dalle REGOLE correnti: se un domani cambiano le ore di
+ * disdetta o i giorni di sospensione, la schermata mostrerebbe le
+ * regole nuove sopra una firma vecchia. Questo testo, salvato
+ * accanto alla foto della pagina firmata, impedisce che accada.
+ */
+export const testoPatto = (d: DatiPatto): string => {
+  const capo = [
+    `PATTO DI PERCORSO — ${d.studio || 'A.S.D. Evolution Sport — Mind Movement Lab'}`,
+    `Allievo: ${d.allievo}`,
+    `Percorso: ${d.percorso}`,
+    `Coach: ${d.coach}`,
+  ];
+  if (d.numeroRate && d.importoRata) {
+    capo.push(
+      `Rate: ${d.numeroRate} da ${euro(d.importoRata)} €`
+      + (d.importoTotale ? ` — totale ${euro(d.importoTotale)} €` : '')
+      + (d.primaScadenza ? `, prima scadenza ${d.primaScadenza}` : '')
+    );
+  }
+  return [
+    capo.join('\n'),
+    ...articoli(d).map((a) => `${a.n}. ${a.titolo.toUpperCase()}\n${a.testo}`),
+    `LO STUDIO SI IMPEGNA. ${IMPEGNO_STUDIO}`,
+    `L'ALLIEVO SI IMPEGNA. ${IMPEGNO_ALLIEVO}`,
+    `Patto v${PATTO_VERSION}.`,
+  ].join('\n\n');
+};

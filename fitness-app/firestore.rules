@@ -190,6 +190,32 @@ service cloud.firestore {
     // del loro percorso. Quelle degli interessati si cancellano, e devono
     // potersi cancellare — chi non è entrato non deve lasciare i suoi
     // dati di salute in casa nostra. La decisione è del titolare.
+    // Il patto firmato: la copia digitale di un contratto.
+    // Lo legge l'allievo che l'ha firmato e lo staff. Lo scrive lo
+    // staff. Lo cancella SOLO il titolare, e non si modifica mai:
+    // un contratto firmato che si può riscrivere non prova niente.
+    match /pattiFirmati/{docId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+
+    // I protocolli di lavoro sono un archivio, non una lavagna.
+    // Non si correggono: se ne scrive uno nuovo, e la differenza fra
+    // quello di settembre e quello di gennaio è il percorso della
+    // persona. Per questo l'aggiornamento è negato a chiunque.
+    match /protocolli/{docId} {
+      allow read: if isAuthenticated() && (
+        isStaff() || resource.data.studentId == request.auth.uid
+      );
+      allow create: if isStaff();
+      allow update: if false;
+      allow delete: if isOwner();
+    }
+
     match /onboardings/{docId} {
       allow read: if isAuthenticated() && (
         isStaff() || resource.data.studentId == request.auth.uid
