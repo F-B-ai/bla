@@ -32,6 +32,9 @@ import {
 import { getStudentCoachIds } from '../../utils/helpers';
 import { VideoEsercizio } from '../../components/common/VideoEsercizio';
 import { trovaFilm } from '../../domain/filmEsercizio';
+import {
+  obiettivoDi, puoAggiungereSerie, esercizioCompleto,
+} from '../../domain/schedaSemplice';
 
 const DAYS = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'];
 
@@ -316,7 +319,7 @@ export const LiveWorkoutScreen: React.FC = () => {
     startRestTimer(restSeconds);
 
     // Se ho completato tutte le serie di questo esercizio, passa al prossimo
-    if (currentLog.sets.length >= currentLog.targetSets) {
+    if (esercizioCompleto(currentLog.sets.length, currentLog.targetSets)) {
       if (currentExerciseIndex < exerciseLogs.length - 1) {
         setTimeout(() => {
           setCurrentExerciseIndex(currentExerciseIndex + 1);
@@ -452,7 +455,7 @@ export const LiveWorkoutScreen: React.FC = () => {
     const restSeconds = dayExs[currentExerciseIndex]?.restSeconds || 120;
     startRestTimer(restSeconds);
 
-    if (currentLog.sets.length >= currentLog.targetSets) {
+    if (esercizioCompleto(currentLog.sets.length, currentLog.targetSets)) {
       if (currentExerciseIndex < exerciseLogs.length - 1) {
         setTimeout(() => {
           setCurrentExerciseIndex(currentExerciseIndex + 1);
@@ -518,7 +521,7 @@ export const LiveWorkoutScreen: React.FC = () => {
     const restSeconds = dayExs[currentExerciseIndex]?.restSeconds || 120;
     startRestTimer(restSeconds);
 
-    if (currentLog.sets.length >= currentLog.targetSets) {
+    if (esercizioCompleto(currentLog.sets.length, currentLog.targetSets)) {
       if (currentExerciseIndex < exerciseLogs.length - 1) {
         setTimeout(() => {
           setCurrentExerciseIndex(currentExerciseIndex + 1);
@@ -854,7 +857,7 @@ export const LiveWorkoutScreen: React.FC = () => {
         contentContainerStyle={styles.exerciseNavContent}
       >
         {exerciseLogs.map((ex, i) => {
-          const done = ex.sets.length >= ex.targetSets;
+          const done = esercizioCompleto(ex.sets.length, ex.targetSets);
           return (
             <TouchableOpacity
               key={i}
@@ -896,7 +899,7 @@ export const LiveWorkoutScreen: React.FC = () => {
           <Card variant="elevated">
             <Text style={styles.exerciseName}>{currentExercise.exerciseName}</Text>
             <Text style={styles.exerciseTarget}>
-              Obiettivo: {currentExercise.targetSets} x {currentExercise.targetReps}
+              {obiettivoDi(currentExercise.targetSets, currentExercise.targetReps)}
             </Text>
             {/* Il filmato dell'esecuzione, dove serve davvero: davanti a
                 chi sta per eseguire, non sepolto nella scheda. */}
@@ -1106,7 +1109,7 @@ export const LiveWorkoutScreen: React.FC = () => {
             )}
 
             {/* Input serie (se non ho completato tutte le serie di questo esercizio) */}
-            {currentExercise.sets.length < currentExercise.targetSets && (
+            {puoAggiungereSerie(currentExercise.sets.length, currentExercise.targetSets) && (
               currentExercise.technique === 'stripping' ? (
                 <View style={styles.inputSection}>
                   <Text style={styles.inputTitle}>

@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 import { brand } from '../config/brand';
+import {
+  componiSchedaSemplice, dicitureDi, GiornoSemplice,
+} from '../domain/schedaSemplice';
 
 const LOGO_CHAR = brand.appName;
 
@@ -582,6 +585,89 @@ export function printWorkoutPlan({ studentName, plan }: PrintWorkoutPlanParams) 
   }
 
   openPrintWindow(`Programma ${studentName}`, html, `Programma di allenamento – ${studentName}`, `${fmtDate(plan.startDate)} – ${fmtDate(plan.endDate)}`);
+}
+
+// ─── 5-bis. Scheda semplice — quella che si stampa e si porta in sala ──
+//
+// Per chi vuole il foglio in mano e non l'app. Niente serie, niente
+// carichi, niente recuperi: gli esercizi e come si fanno.
+//
+// Il carattere è grande perché chi la legge ha spesso settant'anni e
+// la tiene piegata nella borsa: qui il corpo piccolo è un difetto,
+// non una scelta grafica. Le regole stanno in domain/schedaSemplice.ts.
+
+const SCHEDA_SEMPLICE_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { color: #111; padding: 26px; line-height: 1.6; }
+  /* L'anteprima incolla uno stile in linea sul contenitore
+     (font piccolo, sans-serif) che vince su qualunque regola per
+     «body»: il corpo del foglio va legato a una classe nostra,
+     altrimenti la scheda per chi ha settant'anni esce a 13px. */
+  .scheda { font-family: Georgia, 'Times New Roman', serif; font-size: 18px; line-height: 1.6; color: #111; }
+  .header { text-align: center; border-bottom: 3px solid #111; padding-bottom: 14px; margin-bottom: 22px; }
+  .header h1 { font-size: 26px; letter-spacing: 3px; }
+  .header .subtitle { font-size: 20px; margin-top: 6px; }
+  .header .period { font-size: 16px; color: #555; margin-top: 4px; }
+  .giorno { margin-bottom: 26px; page-break-inside: avoid; }
+  .giorno-nome { font-size: 22px; font-weight: 700; border-bottom: 2px solid #111; padding-bottom: 5px; margin-bottom: 12px; }
+  .giorno-nota { font-size: 17px; font-style: italic; color: #444; margin-bottom: 10px; }
+  .es { margin-bottom: 16px; padding-left: 40px; position: relative; page-break-inside: avoid; }
+  .es-n { position: absolute; left: 0; top: 0; font-size: 22px; font-weight: 700; }
+  .es-nome { font-size: 20px; font-weight: 700; }
+  .es-spiega { font-size: 18px; margin-top: 3px; }
+  .es-nota { font-size: 17px; font-style: italic; color: #444; margin-top: 3px; }
+  .dicitura { margin-top: 26px; border-top: 2px solid #111; padding-top: 12px; }
+  .dicitura p { font-size: 16px; margin-bottom: 7px; }
+  .footer { margin-top: 18px; font-size: 14px; color: #666; text-align: center; }
+  @page { size: A4; margin: 15mm; }
+`;
+
+interface PrintSchedaSempliceParams {
+  studentName: string;
+  plan: any;
+}
+
+export function printSchedaSemplice({ studentName, plan }: PrintSchedaSempliceParams) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  const giorni: GiornoSemplice[] = componiSchedaSemplice(plan?.weeklySchedule || []);
+
+  const corpo = giorni.map((g) => `
+    <div class="giorno">
+      <div class="giorno-nome">${g.nome}</div>
+      ${g.note ? `<div class="giorno-nota">${g.note}</div>` : ''}
+      ${g.esercizi.map((e, i) => `
+        <div class="es">
+          <span class="es-n">${i + 1}.</span>
+          <div class="es-nome">${e.nome}</div>
+          ${e.spiegazione ? `<div class="es-spiega">${e.spiegazione}</div>` : ''}
+          ${e.note ? `<div class="es-nota">${e.note}</div>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+
+  const vuota = '<p style="font-size:18px">Non c\'è ancora nessun esercizio in questa scheda.</p>';
+
+  // La dicitura la decide il dominio: il perimetro sempre, e
+  // l'avviso sul respiro da sé se la scheda lo contiene.
+  const diciture = dicitureDi(giorni)
+    .map((r) => `<p>${r}</p>`).join('');
+
+  const oggi = new Date().toLocaleDateString('it-IT', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+
+  const content = `<div class="scheda">
+    <div class="header">
+      <h1>${LOGO_CHAR}</h1>
+      <div class="subtitle">${studentName || ''}</div>
+      <div class="period">${plan?.title || 'Scheda di allenamento'} · ${oggi}</div>
+    </div>
+    ${corpo || vuota}
+    <div class="dicitura">${diciture}</div>
+    <div class="footer">A.S.D. Evolution Sport · Mind Movement Lab</div>
+  </div>`;
+
+  showPrintOverlay(content, SCHEDA_SEMPLICE_CSS);
 }
 
 // ─── 6. Payment receipt ────────────────────────────────────────────────

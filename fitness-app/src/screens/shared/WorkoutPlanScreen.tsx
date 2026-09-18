@@ -47,7 +47,10 @@ import { sintesiPerAI, asse } from '../../domain/progressione';
 import { allTemplates, WorkoutTemplate } from '../../data/workoutTemplates';
 import { getCustomTemplates, CustomWorkoutTemplate, createCustomTemplate } from '../../services/programService';
 import { Ionicons } from '@expo/vector-icons';
-import { printWorkoutPlan } from '../../utils/printUtils';
+import { printWorkoutPlan, printSchedaSemplice } from '../../utils/printUtils';
+import {
+  componiSchedaSemplice, controllaSchedaSemplice, riepilogaScheda,
+} from '../../domain/schedaSemplice';
 
 const DAYS = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
@@ -585,9 +588,45 @@ export const WorkoutPlanScreen: React.FC = () => {
     [filteredLibrary]
   );
 
+  /**
+   * La scheda semplice: gli esercizi e come si fanno, niente carichi.
+   *
+   * Prima di stamparla dice che cosa ci finisce sopra, e avvisa se
+   * un esercizio è senza spiegazione — su quel foglio la spiegazione
+   * non è un di più, è la scheda. Non blocca: decide lui.
+   */
+  const stampaSemplice = (plan: any) => {
+    const giorni = componiSchedaSemplice(plan?.weeklySchedule || []);
+    const esito = controllaSchedaSemplice(giorni);
+    const stampa = () => printSchedaSemplice({
+      studentName: getStudentName(plan.studentId), plan,
+    });
+
+    if (!esito.pronta) {
+      crossAlert('Niente da stampare', esito.avvisi.join('\n'));
+      return;
+    }
+    if (esito.avvisi.length) {
+      crossAlert(
+        'Prima di stampare',
+        `${esito.avvisi.join('\n')}\n\n${riepilogaScheda(giorni)}`,
+        [
+          { text: 'Torno a scriverla', style: 'cancel' },
+          { text: 'Stampa così', onPress: stampa },
+        ]
+      );
+      return;
+    }
+    stampa();
+  };
+
   const addExercise = async () => {
-    if (!exName || !exSets || !exReps) {
-      crossAlert('Errore', 'Compila nome, serie e ripetizioni');
+    // Il nome è l'unica cosa indispensabile. Serie e ripetizioni no:
+    // ci sono allieve che vogliono il foglio stampato con gli
+    // esercizi e la spiegazione, e costringere a inventare un «3×12»
+    // che non useranno mai è un modo di sporcare la scheda.
+    if (!exName.trim()) {
+      crossAlert('Manca il nome', 'Scrivi almeno come si chiama l\'esercizio.');
       return;
     }
 
@@ -597,7 +636,7 @@ export const WorkoutPlanScreen: React.FC = () => {
         : Date.now().toString(),
       name: exName,
       description: exDescription,
-      sets: parseInt(exSets, 10),
+      sets: parseInt(exSets, 10) || 0,
       reps: exReps,
       restSeconds: parseInt(exRest, 10) || 60,
       notes: exNotes,
@@ -1958,6 +1997,15 @@ export const WorkoutPlanScreen: React.FC = () => {
                     >
                       <Ionicons name="print-outline" size={16} color={colors.white} />
                       <Text style={styles.saveAsTemplateText}>Stampa</Text>
+                    </TouchableOpacity>
+                  )}
+                  {Platform.OS === 'web' && isOwner && (
+                    <TouchableOpacity
+                      style={[styles.saveAsTemplateBtn, { backgroundColor: colors.success }]}
+                      onPress={() => stampaSemplice(viewingPlan)}
+                    >
+                      <Ionicons name="document-text-outline" size={16} color={colors.white} />
+                      <Text style={styles.saveAsTemplateText}>Scheda semplice</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
