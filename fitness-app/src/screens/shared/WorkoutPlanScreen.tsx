@@ -589,6 +589,28 @@ export const WorkoutPlanScreen: React.FC = () => {
   );
 
   /**
+   * Il programma come sarebbe se lo salvassi adesso.
+   *
+   * Le due stampe dell'editor partono da qui, da una funzione sola:
+   * due copie di questa composizione prima o poi divergono, e si
+   * finisce a stampare due fogli diversi dalla stessa scheda.
+   * Le date sono quelle vere se sto modificando, altrimenti le
+   * stesse che metterebbe il salvataggio: oggi e fra 28 giorni.
+   */
+  const pianoDaEditor = () => ({
+    studentId: selectedStudentId,
+    title: planTitle || 'Scheda di allenamento',
+    startDate: editingPlan?.startDate || new Date(),
+    endDate: editingPlan?.endDate
+      || new Date(Date.now() + 28 * 24 * 60 * 60 * 1000),
+    weeklySchedule: DAYS.map((_, i) => ({
+      dayOfWeek: i,
+      exercises: exercises[i] || [],
+      notes: '',
+    })),
+  });
+
+  /**
    * La scheda semplice: gli esercizi e come si fanno, niente carichi.
    *
    * Prima di stamparla dice che cosa ci finisce sopra, e avvisa se
@@ -1278,26 +1300,41 @@ export const WorkoutPlanScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* La scheda da stampare, QUI.
-            Stava solo nella vista del programma già salvato, dietro
+        {/* Le due stampe, QUI.
+            Stavano solo nella vista del programma già salvato, dietro
             «Vedi Programmazioni Precedenti»: chi ha appena scritto la
-            scheda la cerca dove l'ha scritta, non in un archivio. */}
+            scheda la cerca dove l'ha scritta, non in un archivio.
+
+            Sono due fogli diversi e restano due pulsanti diversi:
+            quella completa porta serie, ripetizioni e recuperi; la
+            semplice porta gli esercizi e come si fanno. Un pulsante
+            solo con un'opzione nascosta dentro sarebbe il modo
+            migliore di stampare il foglio sbagliato. */}
         {Platform.OS === 'web' && Object.values(exercises).some((exs) => exs.length > 0) && (
-          <TouchableOpacity
-            style={styles.saveAsTemplateBtnMain}
-            onPress={() => stampaSemplice({
-              studentId: selectedStudentId,
-              title: planTitle || 'Scheda di allenamento',
-              weeklySchedule: DAYS.map((_, i) => ({
-                dayOfWeek: i,
-                exercises: exercises[i] || [],
-                notes: '',
-              })),
-            })}
-          >
-            <Ionicons name="document-text-outline" size={18} color={colors.accent} />
-            <Text style={styles.saveAsTemplateMainText}>Stampa la scheda semplice</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.saveAsTemplateBtnMain}
+              onPress={() => printWorkoutPlan({
+                studentName: getStudentName(selectedStudentId),
+                plan: pianoDaEditor(),
+              })}
+            >
+              <Ionicons name="print-outline" size={18} color={colors.accent} />
+              <Text style={styles.saveAsTemplateMainText}>
+                Stampa completa (serie e ripetizioni)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.saveAsTemplateBtnMain}
+              onPress={() => stampaSemplice(pianoDaEditor())}
+            >
+              <Ionicons name="document-text-outline" size={18} color={colors.accent} />
+              <Text style={styles.saveAsTemplateMainText}>
+                Stampa la scheda semplice (senza carichi)
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 

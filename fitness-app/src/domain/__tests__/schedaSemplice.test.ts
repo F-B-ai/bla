@@ -318,11 +318,32 @@ describe('il tasto per stampare sta dove si scrive la scheda', () => {
     expect(editor).toContain('stampaSemplice(');
   });
 
+  // Sono due fogli diversi: quella completa porta serie e recuperi,
+  // la semplice no. Un pulsante solo con un'opzione nascosta dentro
+  // sarebbe il modo migliore di stampare il foglio sbagliato.
+  it('e accanto c\'è anche la stampa completa, come pulsante a sé', () => {
+    expect(editor).toContain('Stampa completa (serie e ripetizioni)');
+    expect(editor).toContain('printWorkoutPlan(');
+    expect(editor).toContain('senza carichi');
+  });
+
+  // Due composizioni del piano, prima o poi, divergono: e si
+  // stampano due fogli diversi dalla stessa scheda.
+  it('tutte e due partono dalla stessa composizione del piano', () => {
+    expect(editor).toContain('const pianoDaEditor');
+    expect(editor).toContain('plan: pianoDaEditor()');
+    expect(editor).toContain('stampaSemplice(pianoDaEditor())');
+  });
+
   it('e stampa quello che si sta scrivendo, non un programma salvato', () => {
     expect(editor).toContain('exercises[i] || []');
   });
 
-  it('senza nemmeno un esercizio il pulsante non compare', () => {
-    expect(editor).toMatch(/Object\.values\(exercises\)\.some\([\s\S]{0,300}stampaSemplice/);
+  it('senza nemmeno un esercizio i pulsanti non compaiono', () => {
+    // La guardia apre il blocco che contiene tutte e due le stampe:
+    // subito dopo viene il primo dei due pulsanti.
+    expect(editor).toMatch(
+      /Object\.values\(exercises\)\.some\(\(exs\) => exs\.length > 0\)[\s\S]{0,300}printWorkoutPlan\(/
+    );
   });
 });
