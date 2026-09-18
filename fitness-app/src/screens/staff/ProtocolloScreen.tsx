@@ -17,8 +17,16 @@ import {
   leggiPriorita, valutaPerimetro, componiPiano, prossimeRipetizioni,
   documentoCliente, CONDUTTORI, Conduttore, VoceSedute,
   PROCEDURA, DOMANDE_GUIDA, RITMO_TEST, PREZZO_VALUTAZIONE, PROTOCOLLO_VERSION,
-  SezioneDocumento,
+  SezioneDocumento, AreaLavoro,
 } from '../../domain/protocollo';
+import {
+  Scelte, SCELTE_VUOTE, PrioritaScelta, prioritaFinali, righeScelte,
+  riepilogaScelte, aggiungiPriorita, controllaMotivo, quanteScelte,
+  ETICHETTA_RIFERITA, PROTOCOLLO_SCELTE_VERSION,
+} from '../../domain/protocolloScelte';
+import {
+  salvaProtocollo, leggiProtocolli, ProtocolloSalvato,
+} from '../../services/protocolloService';
 
 // ============================================================
 // PROTOCOLLO DI LAVORO
@@ -35,6 +43,12 @@ import {
 // ============================================================
 
 type Vista = 'quadro' | 'piano' | 'procedura';
+
+/** Le aree su cui si può aprire una priorità propria. */
+const AREE: Array<[AreaLavoro, string]> = [
+  ['postura', 'Postura'], ['movimento', 'Movimento'], ['carico', 'Carico'],
+  ['composizione', 'Composizione'], ['respiro', 'Respiro'], ['capacita', 'Capacità'],
+];
 
 const dataIt = (d: Date) =>
   d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -94,6 +108,117 @@ export function ProtocolloScreen() {
   }), [voci, aSettimana, valutazionePagata, rate]);
 
   const priorita = useMemo(() => (quadro ? leggiPriorita(quadro) : []), [quadro]);
+
+  // ------------------------------------------------------------
+  // Le scelte del direttore tecnico, sopra il referto
+  // ------------------------------------------------------------
+  const [scelte, setScelte] = useState<Scelte>(SCELTE_VUOTE);
+  const [nuovoTitolo, setNuovoTitolo] = useState('');
+  const [nuovaArea, setNuovaArea] = useState<AreaLavoro>('movimento');
+  const [nuovoCome, setNuovoCome] = useState('');
+  const [nuovoMotivo, setNuovoMotivo] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [archivio, setArchivio] = useState<ProtocolloSalvato[]>([]);
+  const [erroreArchivio, setErroreArchivio] = useState('');
+
+  /** Le priorità su cui si lavora davvero: referto più scelte. */
+  const finali = useMemo(() => prioritaFinali(priorita, scelte), [priorita, scelte]);
+
+  // Cambiando allievo, le scelte dell'altro NON restano appiccicate
+  // addosso a questo: sarebbe il modo più veloce di consegnare a una
+  // persona il protocollo di un'altra.
+  useEffect(() => {
+    setScelte(SCELTE_VUOTE);
+    setNuovoTitolo(''); setNuovoCome(''); setNuovoMotivo('');
+  }, [studentId]);
+
+  // L'archivio dei protocolli di questa persona. Se la lettura
+  // fallisce lo si dice: un errore e «non ce n'è mai stato uno» non
+  // si devono vedere uguali.
+  useEffect(() => {
+    if (!studentId) { setArchivio([]); setErroreArchivio(''); return undefined; }
+    let vivo = true;
+    setErroreArchivio('');
+    leggiProtocolli(studentId)
+      .then((p) => { if (vivo) setArchivio(p); })
+      .catch((e: any) => {
+        if (!vivo) return;
+        setArchivio([]);
+        setErroreArchivio(
+          `Non riesco a leggere i protocolli già scritti: ${e?.message || e}. `
+          + 'Non vuol dire che non ce ne siano.'
+        );
+      });
+    return () => { vivo = false; };
+  }, [studentId]);
+
+  const mettiDaParte = (titolo: string) => {
+    const chiedi = (motivo: string) => {
+      const m = controllaMotivo(motivo);
+      if (!m.ok) { crossAlert('Manca il motivo', m.problema); return; }
+      setScelte((v) => ({
+        ...v,
+        messeDaParte: [...v.messeDaParte, { titolo, motivo: motivo.trim() }],
+      }));
+    };
+    if (Platform.OS === 'web') {
+      const w = (globalThis as any).window;
+      const motivo = w.prompt(
+        `Metti da parte «${titolo}».\n\n`
+        + 'Una misura l\'aveva accesa: scrivi perché per ora non è il punto. '
+        + 'Finisce sul foglio dell\'allievo, e serve a te fra sei mesi.'
+      );
+      if (motivo === null) return;
+      chiedi(motivo);
+      return;
+    }
+    // Su telefono il motivo si scrive nel campo qui sotto e poi si
+    // tocca di nuovo: niente finestre che il sistema non ha.
+    if (!nuovoMotivo.trim()) {
+      crossAlert(
+        'Scrivi prima il motivo',
+        `Per mettere da parte «${titolo}» scrivi il motivo nel campo «Perché» `
+        + 'qui sotto, poi tocca di nuovo.'
+      );
+      return;
+    }
+    chiedi(nuovoMotivo);
+    setNuovoMotivo('');
+  };
+
+  const rimetti = (titolo: string) => setScelte((v) => ({
+    ...v,
+    messeDaParte: v.messeDaParte.filter((x) => x.titolo !== titolo),
+  }));
+
+  const togliAggiunta = (titolo: string) => setScelte((v) => ({
+    ...v,
+    aggiunte: v.aggiunte.filter((x) => x.titolo !== titolo),
+    ordine: v.ordine.filter((t) => t !== titolo),
+  }));
+
+  const sposta = (titolo: string, verso: -1 | 1) => {
+    const ordine = finali.map((p) => p.titolo);
+    const i = ordine.indexOf(titolo);
+    const j = i + verso;
+    if (i === -1 || j < 0 || j >= ordine.length) return;
+    [ordine[i], ordine[j]] = [ordine[j], ordine[i]];
+    setScelte((v) => ({ ...v, ordine }));
+  };
+
+  const aggiungi = () => {
+    const e = aggiungiPriorita({
+      titolo: nuovoTitolo, area: nuovaArea,
+      comeSiLavora: nuovoCome, motivo: nuovoMotivo,
+    });
+    if (!e.ok) { crossAlert('Non posso aggiungerla', e.problemi.join('\n')); return; }
+    if (finali.some((p) => p.titolo === e.priorita!.titolo)) {
+      crossAlert('C\'è già', `«${e.priorita!.titolo}» è già nel protocollo.`);
+      return;
+    }
+    setScelte((v) => ({ ...v, aggiunte: [...v.aggiunte, e.priorita!] }));
+    setNuovoTitolo(''); setNuovoCome(''); setNuovoMotivo('');
+  };
   const perimetro = useMemo(() => (quadro ? valutaPerimetro({
     quadro,
     haControindicazioni: controindicazioni,
@@ -144,12 +269,51 @@ export function ProtocolloScreen() {
     setTimeout(() => { try { f.print(); } catch { /* si stampa a mano */ } }, 400);
   };
 
+  const salva = async () => {
+    if (!studentId || !allievo) {
+      crossAlert('Manca l\'allievo', 'Scegli prima l\'allievo qui sopra.');
+      return;
+    }
+    setSalvando(true);
+    try {
+      const salvato = await salvaProtocollo({
+        studentId,
+        studentName: nomeAllievo,
+        autoreId: user?.id || '',
+        autoreNome: user?.name || 'Direttore tecnico',
+        obiettivo: obiettivo.trim(),
+        // Una fotografia: le priorità e il piano come sono OGGI. Le
+        // misure cambieranno, e un protocollo che cambia da solo non
+        // è più quello che è stato consegnato.
+        priorita: finali,
+        scelte,
+        piano,
+        versione: PROTOCOLLO_SCELTE_VERSION,
+      });
+      setArchivio((v) => [salvato, ...v]);
+      crossAlert(
+        'Protocollo archiviato',
+        `Resta scritto com'è oggi, ${dataIt(new Date())}. `
+        + 'Non si modifica: quando cambierà qualcosa se ne scrive uno nuovo, '
+        + 'e la differenza fra i due è il percorso di questa persona.'
+      );
+    } catch (e: any) {
+      // L'errore vero, non un «riprova» che non dice niente.
+      crossAlert('Non è stato archiviato', e?.message || String(e));
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const stampaCliente = () => {
     if (!quadro || !perimetro) return;
     const sezioni: SezioneDocumento[] = documentoCliente({
       allievo: nomeAllievo || '________________________',
       data: new Date(),
-      quadro, priorita, perimetro, piano,
+      quadro, perimetro, piano,
+      priorita: finali,
+      scelteRighe: righeScelte(scelte),
+      nota: scelte.nota,
       obiettivo: obiettivo.trim() || undefined,
       coach: user?.name || 'Direttore tecnico',
       studio: `${brand.appName} — ${brand.tagline}`,
@@ -290,8 +454,8 @@ ${PROCEDURA.map((p) => `
                 Non è un vuoto: è un risultato.
               </Text>
             )}
-            {priorita.map((p, i) => (
-              <View key={i} style={s.priorita}>
+            {finali.map((p, i) => (
+              <View key={p.titolo} style={s.priorita}>
                 <View style={s.prioritaTesta}>
                   <Text style={s.prioritaN}>{i + 1}</Text>
                   <Text style={s.prioritaTitolo}>{p.titolo}</Text>
@@ -301,10 +465,119 @@ ${PROCEDURA.map((p) => `
                     </Text>
                   </View>
                 </View>
+                {p.origine === 'riferita' && (
+                  <View style={s.bollo}>
+                    <Ionicons name="eye-outline" size={13} color={colors.info} />
+                    <Text style={s.bolloTxt}>{ETICHETTA_RIFERITA}</Text>
+                  </View>
+                )}
                 <Text style={s.corpo}>{p.perche}</Text>
                 <Text style={s.corpoTenue}>{p.comeSiLavora}</Text>
+                <View style={s.azioni}>
+                  <TouchableOpacity
+                    style={s.azione} onPress={() => sposta(p.titolo, -1)}
+                    disabled={i === 0} activeOpacity={0.7}
+                  >
+                    <Ionicons name="arrow-up" size={15}
+                      color={i === 0 ? colors.textLight : colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={s.azione} onPress={() => sposta(p.titolo, 1)}
+                    disabled={i === finali.length - 1} activeOpacity={0.7}
+                  >
+                    <Ionicons name="arrow-down" size={15}
+                      color={i === finali.length - 1 ? colors.textLight : colors.textSecondary} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }} />
+                  <TouchableOpacity
+                    style={s.azione}
+                    onPress={() => (p.origine === 'riferita'
+                      ? togliAggiunta(p.titolo)
+                      : mettiDaParte(p.titolo))}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.azioneTxt}>
+                      {p.origine === 'riferita' ? 'Togli' : 'Metti da parte'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
+
+            {scelte.messeDaParte.map((m) => (
+              <View key={m.titolo} style={s.daParte}>
+                <Text style={s.daParteTitolo}>Messa da parte: {m.titolo}</Text>
+                <Text style={s.corpoTenue}>{m.motivo}</Text>
+                <TouchableOpacity onPress={() => rimetti(m.titolo)} activeOpacity={0.7}>
+                  <Text style={[s.azioneTxt, { marginTop: 6 }]}>Rimettila nel protocollo</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          {/* ---------------------------------------------------- */}
+          {/* Le scelte del direttore tecnico                       */}
+          {/* ---------------------------------------------------- */}
+          <View style={[s.card, { borderColor: colors.info }]}>
+            <Text style={[s.cardTitle, { color: colors.info }]}>Aggiungi una priorità tua</Text>
+            <Text style={s.muted}>
+              Quello che i test non misurano e tu sì: il lavoro che fa, il dolore che
+              racconta, il tempo che ha. Entra nel protocollo marcata «{ETICHETTA_RIFERITA}» —
+              non perché valga meno, ma perché chi legge quel foglio deve poter distinguere
+              lo strumento dall'occhio di chi guardava.
+            </Text>
+
+            <Text style={s.lab}>Come la chiami</Text>
+            <TextInput
+              style={s.input} value={nuovoTitolo} onChangeText={setNuovoTitolo}
+              placeholder="es. Spalla destra al lavoro"
+              placeholderTextColor={colors.textLight}
+            />
+
+            <Text style={s.lab}>Su quale area</Text>
+            <View style={s.aree}>
+              {AREE.map(([id, nome]) => (
+                <TouchableOpacity
+                  key={id} activeOpacity={0.8}
+                  style={[s.area, nuovaArea === id && s.areaAttiva]}
+                  onPress={() => setNuovaArea(id)}
+                >
+                  <Text style={[s.areaTxt, nuovaArea === id && s.areaTxtAttivo]}>{nome}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={s.lab}>Che cosa si fa, in pratica</Text>
+            <TextInput
+              style={[s.input, s.multiriga]} value={nuovoCome} onChangeText={setNuovoCome}
+              multiline placeholder="È la parte che l'allievo legge e mette in atto"
+              placeholderTextColor={colors.textLight}
+            />
+
+            <Text style={s.lab}>Perché — su che cosa la basi</Text>
+            <TextInput
+              style={[s.input, s.multiriga]} value={nuovoMotivo} onChangeText={setNuovoMotivo}
+              multiline placeholder="es. fa la cassiera, otto ore in piedi, dolore a fine turno"
+              placeholderTextColor={colors.textLight}
+            />
+
+            <TouchableOpacity style={s.btnSecondario} onPress={aggiungi} activeOpacity={0.85}>
+              <Ionicons name="add" size={18} color={colors.accent} />
+              <Text style={s.btnSecondarioTxt}>Aggiungi al protocollo</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={s.card}>
+            <Text style={s.cardTitle}>La tua nota per questa persona</Text>
+            <Text style={s.muted}>
+              Una riga tua, in fondo al foglio che si porta a casa. Non è obbligatoria.
+            </Text>
+            <TextInput
+              style={[s.input, s.multiriga]} value={scelte.nota} multiline
+              onChangeText={(t) => setScelte((v) => ({ ...v, nota: t }))}
+              placeholder="es. Andiamo per gradi: prima togliamo il dolore, poi costruiamo."
+              placeholderTextColor={colors.textLight}
+            />
           </View>
 
           <View style={[s.card, perimetro?.serveParere ? { borderColor: colors.warning } : null]}>
@@ -453,10 +726,66 @@ ${PROCEDURA.map((p) => `
             )}
           </View>
 
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Perché questo numero di sedute</Text>
+            <Text style={s.muted}>
+              Le esigenze di questa persona: quanto può spendere, quanto tempo ha,
+              come lavora. Finisce sul suo foglio, e fra sei mesi ti ricorda perché
+              avevi deciso così.
+            </Text>
+            <TextInput
+              style={[s.input, s.multiriga]} value={scelte.motivoPiano} multiline
+              onChangeText={(t) => setScelte((v) => ({ ...v, motivoPiano: t }))}
+              placeholder="es. due a settimana perché lavora su turni, e otto sedute per arrivare a Natale"
+              placeholderTextColor={colors.textLight}
+            />
+          </View>
+
+          <View style={[s.card, quanteScelte(scelte) > 0 ? { borderColor: colors.info } : null]}>
+            <Text style={s.cardTitle}>Che cosa leggerà</Text>
+            <Text style={s.muted}>{riepilogaScelte(scelte)}</Text>
+          </View>
+
           <TouchableOpacity style={s.btnPrimario} onPress={stampaCliente} activeOpacity={0.85}>
             <Ionicons name="print-outline" size={19} color={colors.textOnAccent} />
             <Text style={s.btnPrimarioTxt}>Stampa il protocollo per l'allievo</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[s.btnSecondario, salvando && { opacity: 0.6 }]}
+            onPress={salva} disabled={salvando} activeOpacity={0.85}
+          >
+            {salvando
+              ? <ActivityIndicator color={colors.accent} />
+              : <Ionicons name="archive-outline" size={18} color={colors.accent} />}
+            <Text style={s.btnSecondarioTxt}>
+              {salvando ? 'Archivio…' : 'Archivia questo protocollo'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={s.card}>
+            <Text style={s.cardTitle}>I protocolli già scritti</Text>
+            {!!erroreArchivio && <Text style={s.errore}>{erroreArchivio}</Text>}
+            {!erroreArchivio && archivio.length === 0 && (
+              <Text style={s.muted}>
+                Nessun protocollo archiviato per questa persona. Il primo che archivi
+                diventa il punto di partenza con cui confronterai i prossimi.
+              </Text>
+            )}
+            {!erroreArchivio && archivio.map((x) => (
+              <View key={x.id} style={s.riga}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rigaNome}>{dataIt(x.data)}</Text>
+                  <Text style={s.rigaNota}>
+                    {x.priorita.length} {x.priorita.length === 1 ? 'priorità' : 'priorità'}
+                    {x.piano?.totaleSedute ? ` · ${x.piano.totaleSedute} sedute` : ''}
+                    {x.autoreNome ? ` · ${x.autoreNome}` : ''}
+                    {x.obiettivo ? `\n${x.obiettivo}` : ''}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
 
           <Text style={s.disclaimer}>
             Due copie: una all'allievo, una allo studio. Si firma dal vivo.
@@ -587,6 +916,30 @@ const s = StyleSheet.create({
     paddingVertical: 14, marginTop: spacing.md,
   },
   btnPrimarioTxt: { color: colors.textOnAccent, fontWeight: '700', fontSize: fontSize.md },
+  multiriga: { minHeight: 64, textAlignVertical: 'top', paddingTop: 9 },
+  bollo: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    borderWidth: 1, borderColor: colors.info, borderRadius: borderRadius.sm,
+    paddingHorizontal: 7, paddingVertical: 2, marginBottom: 5,
+  },
+  bolloTxt: { color: colors.info, fontSize: fontSize.xs },
+  azioni: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  azione: { paddingVertical: 5, paddingHorizontal: 7 },
+  azioneTxt: { color: colors.accent, fontSize: fontSize.sm, fontWeight: '700' },
+  daParte: {
+    borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: spacing.sm,
+    marginTop: spacing.sm, opacity: 0.75,
+  },
+  daParteTitolo: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: '700' },
+  aree: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  area: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  areaAttiva: { borderColor: colors.accent, backgroundColor: colors.surfaceLight },
+  areaTxt: { color: colors.textSecondary, fontSize: fontSize.xs },
+  areaTxtAttivo: { color: colors.accent, fontWeight: '700' },
+  errore: { color: colors.error, fontSize: fontSize.sm, lineHeight: 20 },
   btnSecondario: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderWidth: 1, borderColor: colors.accent, borderRadius: borderRadius.md,
