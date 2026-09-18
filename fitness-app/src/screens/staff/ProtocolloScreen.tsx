@@ -27,6 +27,9 @@ import {
 import {
   salvaProtocollo, leggiProtocolli, ProtocolloSalvato,
 } from '../../services/protocolloService';
+import {
+  confronta, raccontaDifferenza, riassumiDifferenza,
+} from '../../domain/confrontoProtocolli';
 
 // ============================================================
 // PROTOCOLLO DI LAVORO
@@ -120,6 +123,7 @@ export function ProtocolloScreen() {
   const [salvando, setSalvando] = useState(false);
   const [archivio, setArchivio] = useState<ProtocolloSalvato[]>([]);
   const [erroreArchivio, setErroreArchivio] = useState('');
+  const [aperto, setAperto] = useState<string | null>(null);
 
   /** Le priorità su cui si lavora davvero: referto più scelte. */
   const finali = useMemo(() => prioritaFinali(priorita, scelte), [priorita, scelte]);
@@ -130,6 +134,7 @@ export function ProtocolloScreen() {
   useEffect(() => {
     setScelte(SCELTE_VUOTE);
     setNuovoTitolo(''); setNuovoCome(''); setNuovoMotivo('');
+    setAperto(null);
   }, [studentId]);
 
   // L'archivio dei protocolli di questa persona. Se la lettura
@@ -772,19 +777,77 @@ ${PROCEDURA.map((p) => `
                 diventa il punto di partenza con cui confronterai i prossimi.
               </Text>
             )}
-            {!erroreArchivio && archivio.map((x) => (
-              <View key={x.id} style={s.riga}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.rigaNome}>{dataIt(x.data)}</Text>
-                  <Text style={s.rigaNota}>
-                    {x.priorita.length} {x.priorita.length === 1 ? 'priorità' : 'priorità'}
-                    {x.piano?.totaleSedute ? ` · ${x.piano.totaleSedute} sedute` : ''}
-                    {x.autoreNome ? ` · ${x.autoreNome}` : ''}
-                    {x.obiettivo ? `\n${x.obiettivo}` : ''}
-                  </Text>
+            {!erroreArchivio && archivio.map((x, i) => {
+              // Il precedente è quello DOPO nella lista: l'archivio
+              // arriva dal più recente.
+              const precedente = archivio[i + 1];
+              const diff = precedente ? confronta(precedente, x) : null;
+              const espanso = aperto === x.id;
+              return (
+                <View key={x.id} style={s.riga}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }} activeOpacity={0.7}
+                    onPress={() => setAperto(espanso ? null : x.id)}
+                  >
+                    <View style={s.archivioTesta}>
+                      <Text style={s.rigaNome}>{dataIt(x.data)}</Text>
+                      <Ionicons
+                        name={espanso ? 'chevron-up' : 'chevron-down'}
+                        size={16} color={colors.textSecondary}
+                      />
+                    </View>
+                    <Text style={s.rigaNota}>
+                      {x.priorita.length} priorità
+                      {x.piano?.totaleSedute ? ` · ${x.piano.totaleSedute} sedute` : ''}
+                      {x.autoreNome ? ` · ${x.autoreNome}` : ''}
+                    </Text>
+                    {!!diff && <Text style={s.confronto}>{riassumiDifferenza(diff)}</Text>}
+
+                    {espanso && (
+                      <View style={s.espanso}>
+                        {!!x.obiettivo && (
+                          <Text style={s.corpo}>Obiettivo: {x.obiettivo}</Text>
+                        )}
+                        {x.priorita.map((pr, n) => (
+                          <View key={pr.titolo} style={{ marginTop: spacing.sm }}>
+                            <Text style={s.rigaNome}>
+                              {n + 1}. {pr.titolo}
+                              {pr.origine === 'riferita' ? ` (${ETICHETTA_RIFERITA})` : ''}
+                            </Text>
+                            <Text style={s.corpoTenue}>{pr.perche}</Text>
+                            <Text style={s.corpoTenue}>{pr.comeSiLavora}</Text>
+                          </View>
+                        ))}
+                        {righeScelte(x.scelte).map((r) => (
+                          <Text key={r} style={[s.corpoTenue, { marginTop: 6 }]}>· {r}</Text>
+                        ))}
+                        {!!x.scelte?.nota?.trim() && (
+                          <Text style={[s.corpo, { marginTop: spacing.sm }]}>
+                            Nota: {x.scelte.nota.trim()}
+                          </Text>
+                        )}
+                        {!!diff && (
+                          <View style={s.confrontoBox}>
+                            <Text style={s.confrontoTitolo}>
+                              Rispetto a quello del {dataIt(precedente.data)}
+                            </Text>
+                            {raccontaDifferenza(diff).map((r) => (
+                              <Text key={r} style={s.corpoTenue}>· {r}</Text>
+                            ))}
+                          </View>
+                        )}
+                        {!diff && (
+                          <Text style={[s.corpoTenue, { marginTop: spacing.sm }]}>
+                            È il primo protocollo di questa persona: non c'è ancora
+                            niente con cui confrontarlo.
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           <Text style={s.disclaimer}>
@@ -940,6 +1003,19 @@ const s = StyleSheet.create({
   areaTxt: { color: colors.textSecondary, fontSize: fontSize.xs },
   areaTxtAttivo: { color: colors.accent, fontWeight: '700' },
   errore: { color: colors.error, fontSize: fontSize.sm, lineHeight: 20 },
+  archivioTesta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  confronto: { color: colors.info, fontSize: fontSize.xs, marginTop: 3 },
+  espanso: {
+    borderTopWidth: 1, borderTopColor: colors.divider,
+    marginTop: spacing.sm, paddingTop: spacing.sm,
+  },
+  confrontoBox: {
+    backgroundColor: colors.surfaceLight, borderRadius: borderRadius.sm,
+    padding: spacing.sm, marginTop: spacing.md,
+  },
+  confrontoTitolo: {
+    color: colors.info, fontSize: fontSize.sm, fontWeight: '700', marginBottom: 4,
+  },
   btnSecondario: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderWidth: 1, borderColor: colors.accent, borderRadius: borderRadius.md,
