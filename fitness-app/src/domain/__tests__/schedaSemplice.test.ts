@@ -290,3 +290,39 @@ describe('un esercizio senza serie prescritte', () => {
     expect(esercizioCompleto(3, 3)).toBe(true);
   });
 });
+
+// ============================================================
+// «DOV'È IL TASTO PER STAMPARE?»
+// ------------------------------------------------------------
+// Il titolare, il 18 settembre 2026, con la scheda di Rosita
+// aperta davanti. Il pulsante c'era — ma solo nella VISTA di un
+// programma già salvato, dietro «Vedi Programmazioni Precedenti».
+//
+// Chi ha appena finito di scrivere una scheda la vuole stampare
+// lì, non andarsela a cercare in un archivio. Una funzione che
+// esiste in un posto dove nessuno la cerca è una funzione che non
+// esiste.
+// ============================================================
+
+describe('il tasto per stampare sta dove si scrive la scheda', () => {
+  const schermata = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'shared', 'WorkoutPlanScreen.tsx'),
+    'utf8'
+  );
+
+  // Il corpo dell'editor finisce dove comincia la Modal dello storico.
+  const editor = schermata.slice(0, schermata.indexOf('<Modal visible={showHistoryModal}'));
+
+  it('c\'è anche nell\'editor, non solo nell\'archivio', () => {
+    expect(editor).toContain('Stampa la scheda semplice');
+    expect(editor).toContain('stampaSemplice(');
+  });
+
+  it('e stampa quello che si sta scrivendo, non un programma salvato', () => {
+    expect(editor).toContain('exercises[i] || []');
+  });
+
+  it('senza nemmeno un esercizio il pulsante non compare', () => {
+    expect(editor).toMatch(/Object\.values\(exercises\)\.some\([\s\S]{0,300}stampaSemplice/);
+  });
+});

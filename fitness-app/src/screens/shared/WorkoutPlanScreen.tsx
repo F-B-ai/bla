@@ -1277,6 +1277,28 @@ export const WorkoutPlanScreen: React.FC = () => {
             <Text style={styles.saveAsTemplateMainText}>Salva come Template</Text>
           </TouchableOpacity>
         )}
+
+        {/* La scheda da stampare, QUI.
+            Stava solo nella vista del programma già salvato, dietro
+            «Vedi Programmazioni Precedenti»: chi ha appena scritto la
+            scheda la cerca dove l'ha scritta, non in un archivio. */}
+        {Platform.OS === 'web' && Object.values(exercises).some((exs) => exs.length > 0) && (
+          <TouchableOpacity
+            style={styles.saveAsTemplateBtnMain}
+            onPress={() => stampaSemplice({
+              studentId: selectedStudentId,
+              title: planTitle || 'Scheda di allenamento',
+              weeklySchedule: DAYS.map((_, i) => ({
+                dayOfWeek: i,
+                exercises: exercises[i] || [],
+                notes: '',
+              })),
+            })}
+          >
+            <Ionicons name="document-text-outline" size={18} color={colors.accent} />
+            <Text style={styles.saveAsTemplateMainText}>Stampa la scheda semplice</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Modale Aggiungi Esercizio */}
