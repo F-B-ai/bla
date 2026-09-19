@@ -3,6 +3,7 @@ import { brand } from '../config/brand';
 import {
   componiSchedaSemplice, dicitureDi, GiornoSemplice,
 } from '../domain/schedaSemplice';
+import { componiCarta, Carta, VocePreventivo } from '../domain/cartaIntestata';
 
 const LOGO_CHAR = brand.appName;
 
@@ -668,6 +669,124 @@ export function printSchedaSemplice({ studentName, plan }: PrintSchedaSemplicePa
   </div>`;
 
   showPrintOverlay(content, SCHEDA_SEMPLICE_CSS);
+}
+
+// ─── 5-ter. Carta intestata col preventivo ─────────────────────────────
+//
+// Il foglio che si consegna dopo il colloquio: l'obiettivo con le
+// parole sue, i rilievi che si possono condividere, e il preventivo.
+//
+// Questa funzione IMPAGINA e basta. Che cosa esce e che cosa resta
+// nello studio lo decide domain/cartaIntestata.ts, dove ci sono i
+// test: qui non si pesca mai dalle risposte grezze, altrimenti la
+// prima modifica distratta manderebbe fuori un dato di salute.
+
+const CARTA_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { color: #111; padding: 24px; line-height: 1.55; }
+  .carta { font-family: Georgia, 'Times New Roman', serif; font-size: 12pt; line-height: 1.55; color: #111; }
+  .testata { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #111; padding-bottom: 9px; }
+  .testata .nome { font-size: 19pt; letter-spacing: 3px; font-weight: 700; }
+  .testata .sotto { font-size: 8.5pt; letter-spacing: 1.6px; text-transform: uppercase; color: #555; margin-top: 3px; }
+  .testata .ente { font-size: 8.5pt; color: #555; text-align: right; line-height: 1.45; }
+  .intestazione { margin: 18px 0 14px; font-size: 11pt; }
+  .intestazione b { display: inline-block; min-width: 74px; }
+  h2 { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 1.2px; margin: 18px 0 7px; border-bottom: 1px solid #bbb; padding-bottom: 3px; }
+  .obiettivo { font-size: 13pt; font-style: italic; padding: 10px 14px; border-left: 3px solid #111; background: #f6f6f6; }
+  .tag { display: inline-block; border: 1px solid #999; border-radius: 11px; padding: 1px 9px; font-size: 9.5pt; margin: 5px 5px 0 0; }
+  ul { margin: 0 0 0 17px; }
+  li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 11pt; }
+  th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1px; color: #555; border-bottom: 1.5px solid #111; padding: 4px 3px; }
+  td { padding: 7px 3px; border-bottom: 1px solid #ddd; }
+  td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  tr.tot td { border-top: 2px solid #111; border-bottom: none; font-weight: 700; font-size: 12.5pt; padding-top: 8px; }
+  tr.rate td { border: none; font-size: 10.5pt; color: #444; padding-top: 2px; }
+  .vuota td { height: 26px; }
+  .firme { margin-top: 26px; display: flex; gap: 26px; }
+  .firme div { flex: 1; }
+  .linea { border-bottom: 1px solid #111; height: 26px; }
+  .cap { font-size: 8.5pt; color: #555; margin-top: 3px; }
+  .diciture { margin-top: 20px; border-top: 1px solid #bbb; padding-top: 9px; }
+  .diciture p { font-size: 8.5pt; color: #444; margin-bottom: 4px; }
+  @page { size: A4; margin: 16mm; }
+`;
+
+interface PrintCartaParams {
+  allievo: string;
+  risposte: any;
+  esito: any;
+  voci?: VocePreventivo[];
+  rate?: number;
+}
+
+export function printCartaIntestata(input: PrintCartaParams) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+  const c: Carta = componiCarta({
+    allievo: input.allievo,
+    risposte: input.risposte,
+    esito: input.esito,
+    voci: input.voci,
+    rate: input.rate,
+  });
+
+  const data = c.data.toLocaleDateString('it-IT', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  });
+  const euro = (n: number) =>
+    new Intl.NumberFormat('it-IT', { minimumFractionDigits: 2 }).format(n);
+
+  const righeVoci = c.voci.map((v) =>
+    `<tr><td>${v.descrizione}</td><td class="n">${euro(v.importo)} €</td></tr>`).join('');
+
+  const righeVuote = Array.from({ length: c.righeDaRiempire })
+    .map(() => '<tr class="vuota"><td></td><td class="n"></td></tr>').join('');
+
+  const chiusura = c.voci.length
+    ? `<tr class="tot"><td>Totale</td><td class="n">${euro(c.totale)} €</td></tr>`
+      + (c.rate > 1
+        ? `<tr class="rate"><td colspan="2">${c.rate} rate da ${euro(c.importoRata)} € ciascuna</td></tr>`
+        : '')
+    : '<tr class="tot"><td>Totale</td><td class="n">______________</td></tr>';
+
+  const content = `<div class="carta">
+    <div class="testata">
+      <div>
+        <div class="nome">${LOGO_CHAR}</div>
+        <div class="sotto">${brand.tagline || 'Mind Movement Lab'}</div>
+      </div>
+      <div class="ente">A.S.D. Evolution Sport<br>Mind Movement Lab<br>Gragnano (NA)</div>
+    </div>
+
+    <div class="intestazione">
+      <div><b>Per</b> ${c.allievo}</div>
+      <div><b>Data</b> ${data}</div>
+    </div>
+
+    <h2>Il tuo obiettivo</h2>
+    ${c.obiettivoFrase ? `<div class="obiettivo">«${c.obiettivoFrase}»</div>` : ''}
+    <div>${c.obiettivi.map((o) => `<span class="tag">${o}</span>`).join('')}</div>
+    ${c.orizzonte ? `<div style="margin-top:7px">Orizzonte indicato: <b>${c.orizzonte}</b></div>` : ''}
+
+    ${c.rilievi.length ? `<h2>Da dove partiamo</h2>
+    <ul>${c.rilievi.map((r) => `<li>${r}</li>`).join('')}</ul>` : ''}
+
+    <h2>Proposta</h2>
+    <table>
+      <tr><th>Voce</th><th style="text-align:right">Importo</th></tr>
+      ${righeVoci}${righeVuote}${chiusura}
+    </table>
+
+    <div class="firme">
+      <div><div class="linea"></div><div class="cap">Per accettazione — firma e data</div></div>
+      <div><div class="linea"></div><div class="cap">Per lo studio — firma e data</div></div>
+    </div>
+
+    <div class="diciture">${c.diciture.map((d) => `<p>${d}</p>`).join('')}</div>
+  </div>`;
+
+  showPrintOverlay(content, CARTA_CSS);
 }
 
 // ─── 6. Payment receipt ────────────────────────────────────────────────
