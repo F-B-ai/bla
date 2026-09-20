@@ -20,10 +20,19 @@ lasciamolo così».
 | | |
 |---|---|
 | **Dove** | Ultimo fotogramma utile, dopo l'ultima parola |
-| **Durata** | 1,5 s — 2 s massimo. Più lungo e la gente scrolla prima della fine, e il Reel perde la percentuale di completamento |
-| **Audio** | Il logo entra con l'audio della clip che sfuma, **non** con un suono suo. Uno stacco sonoro in chiusura fa sembrare il pezzo una pubblicità |
-| **Transizione** | Dissolvenza di 6-8 fotogrammi. Mai stacco netto, mai effetto |
-| **Prima del logo** | L'ultima frase si chiude, poi mezzo secondo di nero o di immagine ferma. Il logo non deve calpestare la parola |
+| **Durata** | **La decide il fondatore.** Il filmato del logo ha una sua musica e va rispettata: si monta sulla durata che serve a quella musica per chiudersi, non su un numero deciso a tavolino |
+| **Audio** | **Lo stacco musicale del logo è voluto.** L'audio della clip sfuma sotto e il tema del logo entra: è la firma sonora, e una firma si sente |
+| **Transizione** | Dissolvenza di 6-8 fotogrammi. Mai stacco netto sull'immagine, anche quando l'audio stacca |
+| **Prima del logo** | L'ultima frase si chiude, poi mezzo secondo di silenzio. Il logo non deve calpestare la parola |
+
+> **Il solo vincolo tecnico.** Se la chiusura supera i 3 secondi, il Reel perde
+> percentuale di completamento — la gente esce prima della fine e il pezzo viene
+> mostrato a meno persone. Se il tema del logo è più lungo, si monta una versione
+> accorciata **del tema**, non si taglia il logo a metà.
+>
+> E una cosa da fare una volta sola: **il tema del logo va normalizzato allo
+> stesso volume su tutti i pezzi.** Se in un Reel entra piano e nel successivo
+> spacca le orecchie, non sembra una firma: sembra un errore.
 
 **Perché sempre.** Un pezzo su tre viene ricondiviso tagliato, senza didascalia e
 senza profilo visibile. Il logo in coda è l'unica cosa che sopravvive a chi lo
@@ -62,6 +71,59 @@ intero, leggibile, per almeno 4 secondi:
 
 Non si abbrevia. Non si sposta in didascalia. Non si mette sopra il logo finale:
 va **durante** la pratica, quando la persona la sta guardando.
+
+### La musica — la parte dove si sbaglia e si paga
+
+⚠️ **Una traccia con diritti sbagliati non è un rischio estetico: è un Reel
+mutato, tolto, o un profilo con una segnalazione.** E succede settimane dopo la
+pubblicazione, quando il pezzo ha già girato.
+
+#### Da dove si prende
+
+| Fonte | Quando | Attenzione |
+|---|---|---|
+| **Libreria audio di Instagram** | Per i pezzi che restano SOLO su Instagram | ⚠️ Un account professionale ha una libreria **ridotta**: molti brani commerciali non ci sono, ed è normale |
+| **Meta Sound Collection** | Sempre sicura, gratuita | Meno «bella», ma non ti sveglia con una segnalazione |
+| **Abbonamento (Epidemic Sound, Artlist, Uppbeat)** | **Quando il pezzo deve vivere anche fuori** | Costa, ma copre sito, Academy, presentazioni, inserzioni |
+
+> **Il punto che vale più di tutti gli altri.** La musica della libreria di
+> Instagram **copre solo Instagram**. Lo stesso Reel messo sul sito, dentro
+> l'Academy, in una presentazione o in un'inserzione a pagamento **non è
+> coperto**. Visto che i Reel diventeranno materiale dell'Academy e delle
+> licenze, la scelta giusta è un abbonamento fin da subito per tutto ciò che
+> potrebbe essere riusato.
+
+#### Che musica
+
+Questo canale vende **serietà**, non energia. La musica sta sotto e non si
+accorge nessuno che c'è — se la noti, è troppa.
+
+- ✓ Tappeto continuo, senza battuta marcata, senza melodia che canta
+- ✓ Pianoforte tenuto, archi bassi, ambientale
+- ✗ Drop, build-up, batteria elettronica, musica «motivazionale» da palestra
+- ✗ Brani con voce cantata: rubano l'attenzione alla tua
+
+#### I livelli, che è dove si sbaglia davvero
+
+| | Valore di lavoro |
+|---|---|
+| **Voce** | Picchi intorno a **−6 dB**, mai in rosso |
+| **Musica sotto la voce** | **18-22 dB più bassa** della voce |
+| **Musica da sola** (senza parlato) | Può salire di 6-8 dB, e riscende **prima** che la voce rientri |
+| **Suoni reali** (il filo a piombo, il respiro) | Restano com'erano: sono la prova, non effetti |
+
+La prova finale si fa **col telefono, altoparlante, volume a metà, in una stanza
+normale**. Non in cuffia: in cuffia va bene tutto.
+
+#### I tre silenzi che non si riempiono mai
+
+1. **La SCENA 2 di B-03** — tu che osservi una persona. Muta. È l'unico modo per
+   far vedere che l'osservazione è un lavoro.
+2. **Il filo a piombo di A-02** — solo il filo che oscilla, col suo suono.
+3. **Mezzo secondo prima del logo.**
+
+Se chi monta «riempie» uno di questi tre perché «sembra vuoto», ha tolto al pezzo
+la cosa per cui è stato scritto.
 
 ### Ritmo del montaggio
 
