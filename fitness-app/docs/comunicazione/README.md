@@ -23,6 +23,7 @@ legge da qui. Se un contenuto non è qui, non si gira.
 | [`pacchetto-prime-due-settimane.md`](./pacchetto-prime-due-settimane.md) | **I PRIMI TRE REEL in un file solo** — A-03, B-03, A-02: regole, testi, scene, montaggio, didascalie. Pronto da inoltrare | chi gira, chi monta |
 | [`A-03-pacchetto-di-ripresa.md`](./A-03-pacchetto-di-ripresa.md) | Solo A-03, se serve isolato. **Superato dal pacchetto qui sopra** | archivio |
 | [`piano-di-ripresa.md`](./piano-di-ripresa.md) | **L'ordine con cui si GIRA**: nove blocchi di set, cosa preparare prima, cosa è bloccato. Si tiene in mano sul set | chi gira |
+| [`montaggio-e-storie.md`](./montaggio-e-storie.md) | **Come si monta** (chiusura logo sempre, sottotitoli, consegna) **e le storie**: cinque a settimana, i cinque tipi, quelle che non si fanno | chi monta, chi pubblica |
 | [`copioni-serie-A-essere.md`](./copioni-serie-A-essere.md) | Dieci copioni ESSĒRE, **parola per parola e scena per scena** | chi gira, chi monta |
 | [`copioni-serie-B-mestiere.md`](./copioni-serie-B-mestiere.md) | Dieci copioni Mestiere, parola per parola e scena per scena | chi gira, chi monta |
 | [`brief-reel-analisi-posturale.md`](./brief-reel-analisi-posturale.md) | Il brief originale dei primi sei. **Superato dai copioni**, tenuto per la provenienza tecnica | archivio |
@@ -44,6 +45,10 @@ misura?* Se no, e la sto dicendo come un fatto → si taglia. Vedi
 
 **3. Il respiro porta sempre le controindicazioni**, per intero, in
 sovrimpressione. Non si abbreviano e non si spostano in didascalia.
+
+**4. Ogni pezzo chiude col filmato del logo.** Reel, storie montate, clip
+per l'Academy: sempre, 1,5-2 secondi, in dissolvenza. Vedi
+[`montaggio-e-storie.md`](./montaggio-e-storie.md).
 
 ---
 
