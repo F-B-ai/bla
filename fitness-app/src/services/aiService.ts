@@ -17,7 +17,7 @@ const API_URL = 'https://api.anthropic.com/v1/messages';
 // M1 — AI Gateway server-side: la chiave Anthropic vive in Secret Manager,
 // il modello viene scelto dal server in base alla feature (03 §0.3).
 import {
-  leggiGuastoGateway, guastoDiRete, messaggioGuasto,
+  leggiGuastoGateway, guastoDiRete, messaggioGuasto, messaggioDopoGateway, MotivoGateway,
 } from '../domain/guastoAI';
 
 const AI_GATEWAY_URL = 'https://europe-west1-essere-3fe6f.cloudfunctions.net/aiMessages';
@@ -93,6 +93,11 @@ export const callClaude = async (
   // Se il gateway risponde, la chiave non serve sul client. Il fallback
   // diretto resta SOLO per la settimana di transizione (poi si revoca
   // la chiave client e si rimuove il ramo legacy).
+  // Perché il gateway non ha risposto bene. Resta null se il gateway
+  // non è stato nemmeno provato: è l'unico caso in cui «chiave
+  // scaduta» è la verità. Vedi domain/guastoAI.ts.
+  let motivoGateway: MotivoGateway | null = null;
+
   try {
     const idToken = await auth.currentUser?.getIdToken();
     if (idToken) {
@@ -152,14 +157,23 @@ export const callClaude = async (
           throw new Error('AI_FATAL: ' + messaggioGuasto(g));
         }
       }
-      // 404 (gateway non ancora deployato) → si tenta il ramo legacy
+      // Si arriva qui col gateway che ha rifiutato in un modo non
+      // previsto (404, 502 non di credito, 500 sul carico delle
+      // quattro foto). Si tenta ancora il ramo vecchio — ma da qui
+      // in poi la verità è QUESTA, non quello che dirà lui.
+      motivoGateway = {
+        stato: gwRes.status,
+        dettaglio: await gwRes.text().catch(() => ''),
+      };
     }
   } catch (e) {
     const msg = (e as Error)?.message || '';
     if (msg.startsWith('AI_FATAL: ')) {
       throw new Error(msg.slice('AI_FATAL: '.length));
     }
-    // errore di rete verso il gateway → fallback legacy
+    // Errore di rete verso il gateway: stato 0, perché non si è
+    // nemmeno arrivati a sentire una risposta.
+    if (!motivoGateway) motivoGateway = { stato: 0, dettaglio: msg };
   }
 
   // --- Ramo legacy (transizione M1): chiamata diretta con chiave client ---
@@ -229,7 +243,11 @@ export const callClaude = async (
           + 'poi riprova: non c\'è nessuna chiave da cambiare.'
         );
       }
-      throw new Error('Chiave AI non valida o scaduta. Aggiornala in Impostazioni AI.');
+      // IL DIFETTO DEL 23 SETTEMBRE. Qui finiva chi aveva il gateway
+      // caduto sulle quattro foto della composizione corporea: gli
+      // si diceva di aggiornare una chiave che non serve e che non
+      // avrebbe sistemato niente.
+      throw new Error(messaggioDopoGateway(motivoGateway, true));
     }
     if (response.status === 429) {
       throw new Error('Troppe richieste. Attendi qualche secondo e riprova.');
