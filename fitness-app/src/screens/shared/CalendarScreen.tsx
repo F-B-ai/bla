@@ -85,8 +85,9 @@ import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
 import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
-  eSessione, tipoPercorso, aspetto, tipoDaSeduta,
+  eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
 } from '../../domain/appuntamento';
+import { motivoSalvataggio } from '../../domain/salvataggio';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
@@ -729,15 +730,23 @@ export const CalendarScreen: React.FC = () => {
         resetForm();
         setShowModal(false);
         loadData();
-      } catch {
-        crossAlert('Errore', 'Impossibile salvare');
+      } catch (err) {
+        crossAlert('Non è stato salvato', motivoSalvataggio(err));
       } finally {
         setSaving(false);
       }
       return;
     }
     const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
-    const cost = formCost ? parseFloat(formCost) : undefined;
+    // Vuoto vuol dire zero: la seduta sta dentro un pacchetto già
+    // pagato. Prima «vuoto» diventava `undefined` e il salvataggio
+    // cadeva intero. Vedi domain/appuntamento.ts.
+    const letturaCosto = leggiCosto(formCost);
+    if (!letturaCosto.ok) {
+      crossAlert('Controlla il costo', letturaCosto.motivo);
+      return;
+    }
+    const cost = letturaCosto.valore;
 
     setSaving(true);
     try {
@@ -883,8 +892,11 @@ export const CalendarScreen: React.FC = () => {
       resetForm();
       setShowModal(false);
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare');
+    } catch (err) {
+      // «Impossibile salvare» e basta: due parole che non dicevano né
+      // che cosa era successo né che cosa fare. Il motivo arrivava fin
+      // qui e veniva buttato via sulla soglia.
+      crossAlert('Non è stato salvato', motivoSalvataggio(err));
     } finally {
       setSaving(false);
     }

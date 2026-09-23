@@ -22,6 +22,7 @@ import {
   BiaDocument,
 } from '../types';
 import { ORE_LIMITE } from '../domain/annullamento';
+import { senzaIndefiniti } from '../domain/salvataggio';
 
 // ============================================================
 // APPUNTAMENTI NUTRIZIONISTA
@@ -36,11 +37,13 @@ const CANCELLATION_HOURS_LIMIT = ORE_LIMITE;
 export const createAppointment = async (
   appointment: Omit<NutritionistAppointment, 'id'>
 ): Promise<string> => {
-  const docRef = await addDoc(collection(db, APPOINTMENTS_COLLECTION), {
+  // Stessa guardia delle sedute: un campo in bianco non si scrive,
+  // invece di far cadere tutto il salvataggio. Vedi domain/salvataggio.ts.
+  const docRef = await addDoc(collection(db, APPOINTMENTS_COLLECTION), senzaIndefiniti({
     ...appointment,
     date: Timestamp.fromDate(appointment.date),
     createdAt: Timestamp.now(),
-  });
+  }));
   return docRef.id;
 };
 
@@ -109,7 +112,7 @@ export const updateAppointment = async (
   appointmentId: string,
   updates: Partial<Omit<NutritionistAppointment, 'id'>>
 ): Promise<void> => {
-  const data: Record<string, unknown> = { ...updates };
+  const data: Record<string, unknown> = senzaIndefiniti({ ...updates });
   if (updates.date) {
     data.date = Timestamp.fromDate(updates.date);
   }
@@ -140,11 +143,15 @@ export const deleteAppointment = async (appointmentId: string): Promise<void> =>
 export const addMeasurement = async (
   measurement: Omit<BodyMeasurement, 'id'>
 ): Promise<string> => {
-  const docRef = await addDoc(collection(db, MEASUREMENTS_COLLECTION), {
+  // Una misura non presa NON è zero: è una misura che non c'è, e come
+  // tale non si scrive. Prima bastava un campo lasciato in bianco —
+  // e in una scheda misure ce ne sono nove — per far cadere tutto il
+  // salvataggio con un «Impossibile salvare le misure».
+  const docRef = await addDoc(collection(db, MEASUREMENTS_COLLECTION), senzaIndefiniti({
     ...measurement,
     date: Timestamp.fromDate(measurement.date),
     createdAt: Timestamp.now(),
-  });
+  }));
   return docRef.id;
 };
 

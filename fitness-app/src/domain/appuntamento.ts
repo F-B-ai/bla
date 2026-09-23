@@ -106,6 +106,66 @@ export const nomeOspiteValido = (input?: string | null): string | null => {
 };
 
 // ------------------------------------------------------------
+// IL COSTO DELLA SEDUTA
+// ------------------------------------------------------------
+//
+// Il campo si chiama «Costo sessione (€)» e il suo segnaposto è uno
+// zero — cioè il caso normale: la seduta sta dentro un pacchetto già
+// pagato, e a parte non costa niente. Lasciarlo vuoto è la cosa
+// giusta da fare, non una dimenticanza.
+//
+// Fino al 23 settembre 2026 lasciarlo vuoto faceva fallire l'intero
+// salvataggio: «vuoto» diventava `undefined`, e Firestore rifiuta i
+// campi senza valore. Adesso vuoto vuol dire zero, ed è scritto una
+// volta sola, qui, invece che in ognuna delle schermate che salvano
+// un appuntamento.
+
+/** Quanto può costare al massimo una seduta. Oltre è un dito scappato. */
+export const COSTO_MASSIMO = 10000;
+
+export type LetturaCosto =
+  | { ok: true; valore: number }
+  | { ok: false; motivo: string };
+
+/**
+ * Il costo scritto a mano, letto come numero.
+ *
+ * Accetta la virgola: su una tastiera italiana «12,50» è quello che
+ * esce, e rifiutarlo sarebbe una porta chiusa per niente.
+ *
+ * Un testo che non è un numero NON diventa zero di nascosto: diventa
+ * un errore detto. `parseFloat('abc')` vale NaN, e un NaN Firestore
+ * lo accetta — finirebbe nel documento e da lì in ogni somma.
+ */
+export const leggiCosto = (raw?: string | null): LetturaCosto => {
+  const testo = pulito(raw).replace(',', '.');
+  if (!testo) return { ok: true, valore: 0 };
+
+  if (!/^\d*\.?\d+$/.test(testo)) {
+    return {
+      ok: false,
+      motivo: 'Il costo della sessione dev\'essere un numero: «'
+        + pulito(raw) + '» non lo è. Lascia il campo vuoto se la seduta '
+        + 'è dentro un pacchetto già pagato.',
+    };
+  }
+
+  const n = parseFloat(testo);
+  if (!Number.isFinite(n)) {
+    return { ok: false, motivo: 'Il costo della sessione non è un numero valido.' };
+  }
+  if (n > COSTO_MASSIMO) {
+    return {
+      ok: false,
+      motivo: `Il costo della sessione è ${n} €: controlla, sembra un dito `
+        + `scappato sulla tastiera. Il massimo ammesso è ${COSTO_MASSIMO} €.`,
+    };
+  }
+  // I centesimi si tengono, il resto no: 12,509 non è un prezzo.
+  return { ok: true, valore: Math.round(n * 100) / 100 };
+};
+
+// ------------------------------------------------------------
 // COME SI LEGGE UN APPUNTAMENTO, IN UN POSTO SOLO
 // ------------------------------------------------------------
 //

@@ -45,6 +45,7 @@ import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
+import { motivoSalvataggio } from '../../domain/salvataggio';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -166,8 +167,8 @@ export const NutritionistScreen: React.FC = () => {
       setShowMeasureModal(false);
       setMeasureForm({ weight: '', height: '', bodyFat: '', muscleMass: '', waist: '', hips: '', chest: '', arms: '', thighs: '', notes: '' });
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare le misure');
+    } catch (err) {
+      crossAlert('Le misure non sono state salvate', motivoSalvataggio(err));
     } finally {
       setSavingMeasure(false);
     }
