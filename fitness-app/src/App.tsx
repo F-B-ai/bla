@@ -98,16 +98,17 @@ function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
+    // Qui si chiamava `window.__markAppLoaded()`, per dire a una rete di
+    // sicurezza «sono partita». Quella funzione in produzione non è mai
+    // esistita: viveva in web/index.html, che Expo non usa come sorgente
+    // della pagina. La chiamata era protetta da un `if`, quindi non ha
+    // mai dato errore — ha solo non fatto niente, per mesi.
+    // Adesso la rete guarda se la schermata è piena davvero, invece di
+    // aspettare che qualcuno le mandi un segnale. Vedi web/index.html.
     const load = Platform.OS === 'web' ? loadIcoFontsWeb : () => Font.loadAsync({ ...Ionicons.font });
     load()
-      .then(() => {
-        setFontsLoaded(true);
-        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
-      })
-      .catch(() => {
-        setFontsLoaded(true);
-        if (Platform.OS === 'web' && (window as any).__markAppLoaded) (window as any).__markAppLoaded();
-      });
+      .then(() => setFontsLoaded(true))
+      .catch(() => setFontsLoaded(true));
   }, []);
 
   if (!fontsLoaded) {
