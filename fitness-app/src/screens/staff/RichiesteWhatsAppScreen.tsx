@@ -22,6 +22,10 @@ import {
 } from '../../services/agendaRequestService';
 import { generaChiaveCAL, istruzioniPonte, CAL_ENDPOINT } from '../../services/calKeyService';
 import { leggiMessaggioWhatsApp } from '../../services/segreteriaService';
+import {
+  datiPerAssistente, contestoPer, scriviBozza,
+} from '../../services/assistenteService';
+import { Bozza, EsitoBozza, spiegaBozza, FIRMA } from '../../domain/assistente';
 import { LetturaSegreteria, spiegaLettura } from '../../domain/segreteria';
 
 // ============================================================
@@ -85,6 +89,13 @@ const Avvisi: React.FC<{ v: Valutazione }> = ({ v }) => {
 export function RichiesteWhatsAppScreen() {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+
+  // --- l'assistente che scrive la risposta ---
+  const [bozza, setBozza] = useState<Bozza | null>(null);
+  const [esitoBozza, setEsitoBozza] = useState<EsitoBozza | null>(null);
+  const [scrivendo, setScrivendo] = useState(false);
+  const [erroreBozza, setErroreBozza] = useState('');
+  const [allievoBozza, setAllievoBozza] = useState<string | undefined>();
   const [impegni, setImpegni] = useState<Impegno[]>([]);
   const [attesa, setAttesa] = useState<RichiestaSalvata[]>([]);
   const [ospiti, setOspiti] = useState<RichiestaSalvata[]>([]);
@@ -186,6 +197,54 @@ export function RichiesteWhatsAppScreen() {
     } finally {
       setTraducendo(false);
     }
+  };
+
+  /**
+   * La bozza di risposta.
+   *
+   * Non parte da sola e non partirà mai da sola dalla categoria
+   * «soldi»: la scrive lei, la manda lui. Scrivere un messaggio
+   * costa tre minuti, approvarne uno già scritto cinque secondi.
+   */
+  const preparaRisposta = async () => {
+    const m = messaggio.trim();
+    if (!m) return;
+    setScrivendo(true);
+    setBozza(null);
+    setEsitoBozza(null);
+    setErroreBozza('');
+    try {
+      const allievo = students.find((x) => x.id === allievoBozza) || null;
+      const dati = await datiPerAssistente(allievo);
+      // Le letture fallite si dicono: «non risulta nessuna rata
+      // aperta» a chi ne ha una scaduta è il danno peggiore.
+      if (dati.nonLette.length) {
+        setErroreBozza(
+          `Non sono riuscito a leggere: ${dati.nonLette.join(', ')}. `
+          + 'La bozza esce lo stesso, ma su quei dati non fidarti.'
+        );
+      }
+      const contesto = contestoPer({ messaggio: m, allievo, dati });
+      const r = await scriviBozza(contesto);
+      setBozza(r.bozza);
+      setEsitoBozza(r.esito);
+    } catch (e: any) {
+      setErroreBozza(e?.message || String(e));
+    } finally {
+      setScrivendo(false);
+    }
+  };
+
+  const copiaBozza = () => {
+    if (!bozza?.testo) return;
+    if (Platform.OS === 'web') {
+      const nav = (globalThis as any).navigator;
+      nav?.clipboard?.writeText?.(bozza.testo)
+        .then(() => crossAlert('Copiata', 'Incollala su WhatsApp e rileggila prima di mandarla.'))
+        .catch(() => crossAlert('Non copiata', 'Selezionala a mano e copiala.'));
+      return;
+    }
+    crossAlert('Copiala a mano', 'Tieni premuto sul testo e copia.');
   };
 
   /**
@@ -407,6 +466,74 @@ export function RichiesteWhatsAppScreen() {
             {traducendo ? 'Sto leggendo…' : 'Leggi e prepara la richiesta'}
           </Text>
         </TouchableOpacity>
+
+        {/* ------------------------------------------------------
+            L'ASSISTENTE CHE SCRIVE LA RISPOSTA
+            Non manda niente: prepara. La mandi tu, sempre — e
+            sulla categoria «soldi» sarà sempre così, anche fra
+            un anno. Vedi domain/assistente.ts.
+            ------------------------------------------------------ */}
+        <View style={s.divisorio} />
+
+        <Text style={s.cardTitle}>…oppure fatti scrivere la risposta</Text>
+        <Text style={s.muted}>
+          Dimmi chi ti ha scritto e guardo agenda, rate e percorso di quella
+          persona. Poi ti preparo la risposta, <Text style={s.forte}>senza
+          inventare nessun numero</Text>: ogni cifra viene dai dati veri, e se
+          non torna te lo dico invece di mandarla.
+        </Text>
+
+        <StudentSearchPicker
+          students={students}
+          selectedId={allievoBozza}
+          onSelect={setAllievoBozza}
+          label="Chi ha scritto" placeholder="Cerca allievo…"
+        />
+
+        <TouchableOpacity
+          style={s.btnSecondario}
+          onPress={preparaRisposta}
+          disabled={lavoro || scrivendo || !messaggio.trim()}
+          activeOpacity={0.85}
+        >
+          {scrivendo
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : <Ionicons name="create-outline" size={17} color={colors.accent} />}
+          <Text style={s.btnSecondarioTxt}>
+            {scrivendo ? 'Sto scrivendo…' : 'Scrivi la risposta'}
+          </Text>
+        </TouchableOpacity>
+
+        {!!erroreBozza && <Text style={s.erroreBozza}>{erroreBozza}</Text>}
+
+        {!!bozza && (
+          <View style={s.bozzaBox}>
+            <Text style={s.bozzaEtichetta}>{spiegaBozza(bozza)}</Text>
+
+            {esitoBozza?.gravi.map((g) => (
+              <Text key={g} style={s.erroreBozza}>⛔ {g}</Text>
+            ))}
+            {esitoBozza?.avvisi.map((a) => (
+              <Text key={a} style={s.avvisoBozza}>· {a}</Text>
+            ))}
+
+            {!!bozza.testo && (
+              <Text style={s.bozzaTesto} selectable>{bozza.testo}</Text>
+            )}
+
+            {esitoBozza?.ok && !!bozza.testo && (
+              <TouchableOpacity style={s.btnSecondario} onPress={copiaBozza} activeOpacity={0.85}>
+                <Ionicons name="copy-outline" size={17} color={colors.accent} />
+                <Text style={s.btnSecondarioTxt}>Copia e mandala tu</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={s.muted}>
+              Rileggila prima di mandarla. Si firma «{FIRMA}»: un ufficio, non
+              una persona che non esiste.
+            </Text>
+          </View>
+        )}
 
         {lettura && (
           <View style={s.letturaBox}>
@@ -898,6 +1025,30 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   intro: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 20 },
   forte: { color: colors.text, fontWeight: '700' },
+  divisorio: {
+    height: 1, backgroundColor: colors.divider,
+    marginVertical: spacing.md,
+  },
+  bozzaBox: {
+    borderWidth: 1, borderColor: colors.info, borderRadius: borderRadius.md,
+    padding: spacing.md, marginTop: spacing.md, backgroundColor: colors.surfaceLight,
+  },
+  bozzaEtichetta: {
+    color: colors.info, fontSize: fontSize.xs, fontWeight: '700',
+    marginBottom: spacing.sm,
+  },
+  bozzaTesto: {
+    color: colors.text, fontSize: fontSize.sm, lineHeight: 21,
+    marginVertical: spacing.sm,
+  },
+  erroreBozza: {
+    color: colors.error, fontSize: fontSize.sm, lineHeight: 20,
+    marginBottom: 4,
+  },
+  avvisoBozza: {
+    color: colors.textSecondary, fontSize: fontSize.xs, lineHeight: 18,
+    marginBottom: 3,
+  },
   card: {
     backgroundColor: colors.surface, borderRadius: borderRadius.md, borderWidth: 1,
     borderColor: colors.border, padding: spacing.md, marginTop: spacing.md,

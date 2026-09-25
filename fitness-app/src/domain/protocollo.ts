@@ -27,6 +27,7 @@ import { Quadro, Traccia } from './humanInterface';
 // ============================================================
 
 import { controllaGruppo, incassoSeduta } from './gruppo';
+import { PREZZO_TITOLARE, PREZZO_SINGOLO } from './listino';
 
 export const PROTOCOLLO_VERSION = 1;
 
@@ -43,9 +44,13 @@ export interface Listino {
   prezzo: number;
 }
 
+// I due numeri stavano scritti qui, e dal 23 settembre 2026 anche in
+// domain/listino.ts insieme alle regole che li governano. Due copie
+// dello stesso prezzo divergono sempre, e quella sbagliata la scopre
+// un allievo. Il listino ha un posto solo: è quello.
 export const CONDUTTORI: Listino[] = [
-  { id: 'francesco', nome: 'Francesco', ruolo: 'Direttore tecnico', prezzo: 40 },
-  { id: 'giuseppe', nome: 'Giuseppe', ruolo: 'Istruttore', prezzo: 35 },
+  { id: 'francesco', nome: 'Francesco', ruolo: 'Direttore tecnico', prezzo: PREZZO_TITOLARE },
+  { id: 'giuseppe', nome: 'Giuseppe', ruolo: 'Istruttore', prezzo: PREZZO_SINGOLO },
 ];
 
 /** La valutazione completa: test, lettura integrata, protocollo scritto. */

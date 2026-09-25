@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { segnaSchermata } from '../services/guastiService';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Platform, TouchableOpacity } from 'react-native';
@@ -1289,6 +1290,17 @@ export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer
       linking={linking}
+      // Dove si era arrivati, per il registro dei guasti. Una
+      // schermata che si rompe non sa come si chiama: glielo dice la
+      // navigazione. Senza, il registro direbbe solo «si è rotto
+      // qualcosa», che è quasi quanto non dire niente.
+      onStateChange={(stato) => {
+        try {
+          let r: any = stato;
+          while (r && r.routes) r = r.routes[r.index ?? 0]?.state ?? r.routes[r.index ?? 0];
+          segnaSchermata(r?.name);
+        } catch { /* il nome della schermata non vale un guasto */ }
+      }}
       documentTitle={{
         formatter: () => effectiveLoginMode === 'academy' ? brand.academyName : brand.appName,
       }}

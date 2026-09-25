@@ -16,6 +16,7 @@ import {
 import { db } from '../config/firebase';
 import { TrainingSession, SessionStatus } from '../types';
 import { ORE_LIMITE } from '../domain/annullamento';
+import { senzaIndefiniti } from '../domain/salvataggio';
 
 const SESSIONS_COLLECTION = 'sessions';
 // Il numero era scritto qui, e di nuovo in nutritionistService, e di
@@ -26,11 +27,14 @@ const CANCELLATION_HOURS_LIMIT = ORE_LIMITE;
 export const createSession = async (
   session: Omit<TrainingSession, 'id'>
 ): Promise<string> => {
-  const docRef = await addDoc(collection(db, SESSIONS_COLLECTION), {
+  // `senzaIndefiniti`: un campo lasciato in bianco non si scrive. Senza
+  // questo, una seduta creata senza costo — cioè quasi tutte quelle
+  // dentro un pacchetto — faceva fallire l'intero salvataggio.
+  const docRef = await addDoc(collection(db, SESSIONS_COLLECTION), senzaIndefiniti({
     ...session,
     date: Timestamp.fromDate(session.date),
     createdAt: Timestamp.now(),
-  });
+  }));
   return docRef.id;
 };
 
@@ -125,7 +129,7 @@ export const updateSession = async (
   sessionId: string,
   updates: Partial<Omit<TrainingSession, 'id'>>
 ): Promise<void> => {
-  const data: Record<string, unknown> = { ...updates };
+  const data: Record<string, unknown> = senzaIndefiniti({ ...updates });
   if (updates.date) {
     data.date = Timestamp.fromDate(updates.date);
   }

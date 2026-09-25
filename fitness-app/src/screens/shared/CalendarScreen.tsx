@@ -64,7 +64,7 @@ import {
   updateTask,
   deleteTask,
 } from '../../services/taskService';
-import { scalaDalPercorso } from '../../services/paymentService';
+import { scalaDalPercorso, getStudentPaymentPlans } from '../../services/paymentService';
 import {
   giaScalata, registrazionePassata, giorno, Avviso,
 } from '../../domain/piani';
@@ -85,8 +85,13 @@ import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
 import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
-  eSessione, tipoPercorso, aspetto, tipoDaSeduta,
+  eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
 } from '../../domain/appuntamento';
+import { motivoSalvataggio } from '../../domain/salvataggio';
+import {
+  tariffaDi, avvisoAnnualeColTitolare, eAnnuale, statoTetto,
+  stessaSettimana, TETTO_INIZIALE, Conduttore,
+} from '../../domain/listino';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
@@ -230,6 +235,10 @@ export const CalendarScreen: React.FC = () => {
   // personal di gruppo: quante persone e quanto paga ciascuna
   const [formPersone, setFormPersone] = useState(2);
   const [formQuota, setFormQuota] = useState('');
+  // L'allievo è su un percorso annuale? Cambia la tariffa proposta.
+  // Non c'è un contrassegno sui percorsi: si legge dalla durata, che è
+  // un dato già presente su tutti quelli esistenti. Vedi listino.ts.
+  const [allievoAnnuale, setAllievoAnnuale] = useState(false);
   // consulenza con chi non è ancora in anagrafica
   const [formNomeOspite, setFormNomeOspite] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -424,6 +433,80 @@ export const CalendarScreen: React.FC = () => {
     items.sort((a, b) => a.startTime.localeCompare(b.startTime));
     return items;
   }, [sessions, nutritionAppts]);
+
+  // ------------------------------------------------------------
+  // IL LISTINO, MENTRE SI COMPILA
+  // ------------------------------------------------------------
+  // Il costo era un campo libero: chiunque poteva scriverci qualsiasi
+  // cifra, e la tariffa giusta viveva solo nella testa del titolare.
+  // Adesso si propone da sola e dice da dove viene. Resta
+  // modificabile: il caso particolare esiste sempre, ma non deve
+  // diventare la norma per distrazione. Vedi domain/listino.ts.
+
+  /** Conduce il titolare in persona? Solo lui può esserlo. */
+  const conduceIlTitolare = useMemo(() => {
+    if (!isOwner || !user) return false;
+    const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
+    return staffId === user.id;
+  }, [isOwner, user, canSeeAll, formCollabId]);
+
+  const sedutaPerListino = useMemo(() => ({
+    conduce: (conduceIlTitolare ? 'titolare' : 'collaboratore') as Conduttore,
+    annuale: allievoAnnuale,
+  }), [conduceIlTitolare, allievoAnnuale]);
+
+  const tariffa = useMemo(() => tariffaDi(sedutaPerListino), [sedutaPerListino]);
+  const avvisoTariffa = useMemo(
+    () => avvisoAnnualeColTitolare(sedutaPerListino),
+    [sedutaPerListino]
+  );
+
+  // I posti del titolare nella settimana del giorno scelto. Si conta da
+  // quello che è già in agenda, senza altre letture.
+  const tetto = useMemo(() => {
+    if (!conduceIlTitolare || !user || !formDate) return null;
+    const quando = new Date(formDate);
+    if (isNaN(quando.getTime())) return null;
+    const fatte = allAppointments.filter(
+      (a) => a.staffId === user.id
+        && a.status !== 'cancelled'
+        && a.status !== 'cancelled_by_student'
+        && stessaSettimana(a.date, quando)
+        && a.id !== editingItem?.id
+    ).length;
+    // Quella che si sta scrivendo conta: il numero deve dire come
+    // sarà la settimana se salvi, non com'era prima di aprire.
+    return statoTetto(fatte + 1, TETTO_INIZIALE);
+  }, [conduceIlTitolare, user, formDate, allAppointments, editingItem]);
+
+  // Il percorso dell'allievo scelto, per sapere se è annuale.
+  // Se la lettura non riesce NON si finge che sia ordinario in
+  // silenzio: si lascia la proposta a zero e il campo parla da sé.
+  useEffect(() => {
+    let vivo = true;
+    if (!formStudentId) { setAllievoAnnuale(false); return; }
+    getStudentPaymentPlans(formStudentId)
+      .then((piani) => {
+        if (!vivo) return;
+        setAllievoAnnuale(piani.some((p) => eAnnuale({
+          inizio: toSafeDate(p.startDate),
+          fine: toSafeDate(p.endDate),
+        })));
+      })
+      .catch(() => { if (vivo) setAllievoAnnuale(false); });
+    return () => { vivo = false; };
+  }, [formStudentId]);
+
+  // La proposta riempie il campo SOLO quando è vuoto e si sta creando.
+  // In modifica non si tocca mai: quel numero è già stato deciso una
+  // volta, e sovrascriverlo cambierebbe i conti alle spalle di chi apre.
+  useEffect(() => {
+    if (!showModal || editingItem) return;
+    if (formCost) return;
+    if (formKind === 'gruppo') return; // il gruppo ha la sua quota
+    if (!isOwner && !isManager) return;
+    setFormCost(String(tariffa.prezzo));
+  }, [showModal, editingItem, formKind, tariffa.prezzo, isOwner, isManager]);
 
   const filteredAppointments = useMemo(() => {
     if (!canSeeAll || !selectedStaffId) return allAppointments;
@@ -729,15 +812,23 @@ export const CalendarScreen: React.FC = () => {
         resetForm();
         setShowModal(false);
         loadData();
-      } catch {
-        crossAlert('Errore', 'Impossibile salvare');
+      } catch (err) {
+        crossAlert('Non è stato salvato', motivoSalvataggio(err));
       } finally {
         setSaving(false);
       }
       return;
     }
     const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
-    const cost = formCost ? parseFloat(formCost) : undefined;
+    // Vuoto vuol dire zero: la seduta sta dentro un pacchetto già
+    // pagato. Prima «vuoto» diventava `undefined` e il salvataggio
+    // cadeva intero. Vedi domain/appuntamento.ts.
+    const letturaCosto = leggiCosto(formCost);
+    if (!letturaCosto.ok) {
+      crossAlert('Controlla il costo', letturaCosto.motivo);
+      return;
+    }
+    const cost = letturaCosto.valore;
 
     setSaving(true);
     try {
@@ -883,8 +974,11 @@ export const CalendarScreen: React.FC = () => {
       resetForm();
       setShowModal(false);
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare');
+    } catch (err) {
+      // «Impossibile salvare» e basta: due parole che non dicevano né
+      // che cosa era successo né che cosa fare. Il motivo arrivava fin
+      // qui e veniva buttato via sulla soglia.
+      crossAlert('Non è stato salvato', motivoSalvataggio(err));
     } finally {
       setSaving(false);
     }
@@ -2483,6 +2577,10 @@ export const CalendarScreen: React.FC = () => {
         formQuota={formQuota}
         setFormQuota={setFormQuota}
         prezzoIndividuale={PREZZO_SEDUTA_INDIVIDUALE}
+        tariffaPerche={tariffa.perche}
+        avvisoTariffa={avvisoTariffa}
+        tettoFrase={tetto ? tetto.frase : null}
+        tettoLivello={tetto ? tetto.livello : undefined}
         formNomeOspite={formNomeOspite}
         setFormNomeOspite={setFormNomeOspite}
         students={students}

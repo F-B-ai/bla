@@ -69,6 +69,14 @@ export interface AppointmentModalProps {
   setFormQuota: (v: string) => void;
   /** tariffa individuale del conduttore, per il confronto */
   prezzoIndividuale: number;
+  /** perché il costo proposto è quello: si legge, non si indovina */
+  tariffaPerche?: string;
+  /** quando il listino e la situazione non combaciano (annuale col titolare) */
+  avvisoTariffa?: string | null;
+  /** i posti del titolare in questa settimana, se è lui a condurre */
+  tettoFrase?: string | null;
+  /** 'pieno' e 'oltre' si vedono da lontano */
+  tettoLivello?: 'sotto' | 'vicino' | 'pieno' | 'oltre';
   /** solo per la consulenza: il nome di chi viene, se non è in anagrafica */
   formNomeOspite: string;
   setFormNomeOspite: (v: string) => void;
@@ -101,6 +109,10 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   setFormEndTime,
   formCost,
   setFormCost,
+  tariffaPerche,
+  avvisoTariffa,
+  tettoFrase,
+  tettoLivello,
   formNotes,
   setFormNotes,
   formPersone,
@@ -425,13 +437,38 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
           {/* Cost */}
           {(isOwner || isManager) && (
-            <InputField
-              label="Costo sessione (€)"
-              value={formCost}
-              onChangeText={setFormCost}
-              placeholder="0"
-              keyboardType="numeric"
-            />
+            <>
+              <InputField
+                label="Costo sessione (€)"
+                value={formCost}
+                onChangeText={setFormCost}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+              {/* Il prezzo proposto dice da dove viene. Un campo libero
+                  senza spiegazione è come non averlo: chi compila tira
+                  a indovinare, e il listino resta nella testa di uno. */}
+              {!!tariffaPerche && (
+                <Text style={styles.tariffaPerche}>{tariffaPerche}</Text>
+              )}
+              {!!avvisoTariffa && (
+                <Text style={styles.tariffaAvviso}>{avvisoTariffa}</Text>
+              )}
+            </>
+          )}
+
+          {/* I posti del titolare in questa settimana. Un contatore, non
+              un blocco: il carico lo decide chi si allena. */}
+          {!!tettoFrase && (
+            <Text
+              style={[
+                styles.tetto,
+                tettoLivello === 'pieno' && styles.tettoPieno,
+                tettoLivello === 'oltre' && styles.tettoOltre,
+              ]}
+            >
+              {tettoFrase}
+            </Text>
           )}
 
           <InputField
@@ -506,6 +543,31 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     lineHeight: 16,
     marginTop: spacing.xs,
+  },
+  tariffaPerche: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
+  tariffaAvviso: {
+    color: colors.warning,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
+  tetto: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    marginTop: spacing.md,
+  },
+  tettoPieno: {
+    color: colors.warning,
+    fontWeight: '600',
+  },
+  tettoOltre: {
+    color: colors.error,
+    fontWeight: '700',
   },
   gruppoBox: {
     backgroundColor: colors.surfaceLight,
