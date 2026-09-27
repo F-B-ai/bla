@@ -140,3 +140,37 @@ describe('ogni immagine che parta passa di qui', () => {
     expect(ai).toContain('fatta.size < blob.size ? fatta : blob');
   });
 });
+
+describe('nessuna funzione AI spedisce immagini per una strada diversa', () => {
+  const ai = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'services', 'aiService.ts'), 'utf8'
+  );
+
+  // Il ridimensionamento vive dentro `imageUriToBase64`. Se un domani
+  // qualcuno aggiunge una funzione che manda foto convertendole per
+  // conto suo, quella funzione spedirebbe l'originale — e il 502 del
+  // 27 settembre tornerebbe da una porta nuova.
+  it('tutte e tre le funzioni note convertono da lì', () => {
+    ['analyzePostureWithAI', 'comparePostureWithAI', 'estimateBodyComposition']
+      .forEach((f) => {
+        const i = ai.indexOf(`export const ${f}`);
+        expect(i).toBeGreaterThan(0);
+        // fino alla prossima funzione esportata
+        const dopo = ai.indexOf('\nexport const ', i + 10);
+        const corpo = ai.slice(i, dopo > 0 ? dopo : undefined);
+        expect(corpo).toContain('imageUriToBase64(');
+      });
+  });
+
+  it('e non esiste una seconda strada per fare base64 da una foto', () => {
+    // `readAsDataURL` può comparire UNA volta sola: dentro
+    // imageUriToBase64, dopo che la riduzione è già avvenuta.
+    const quante = (ai.match(/readAsDataURL/g) || []).length;
+    expect(quante).toBe(1);
+  });
+
+  it('la conversione non è esportata: si passa di lì e basta', () => {
+    expect(ai).toContain('const imageUriToBase64');
+    expect(ai).not.toContain('export const imageUriToBase64');
+  });
+});
