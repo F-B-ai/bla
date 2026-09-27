@@ -18,201 +18,20 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 
-<style>
-  :root {
-    --fondo: #0A0A0A;
-    --fondo-alto: #141414;
-    --bordo: #262626;
-    --testo: #F2F2F7;
-    --tenue: #9A9A9E;
-    --accento: #D40000;
-    --misura: 34rem;
-    --display: 'Fraunces', Georgia, 'Times New Roman', serif;
-    --corpo: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-
-  body {
-    background: var(--fondo);
-    color: var(--testo);
-    font-family: var(--corpo);
-    font-size: 17px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .guscio { max-width: var(--misura); margin: 0 auto; padding: 0 16px; }
-
-  /* ---------- testata ---------- */
-  header {
-    border-bottom: 1px solid var(--bordo);
-    padding: 22px 0 18px;
-  }
-  .marchio { font-family: var(--display); font-size: 1.35rem; font-weight: 700; letter-spacing: .22em; }
-  .sottomarchio {
-    font-size: .68rem; letter-spacing: .18em; text-transform: uppercase;
-    color: var(--tenue); margin-top: 4px;
-  }
-
-  /* ---------- apertura ---------- */
-  .apertura { padding: 52px 0 40px; }
-  .occhiello {
-    font-size: .7rem; letter-spacing: .2em; text-transform: uppercase;
-    color: var(--accento); font-weight: 600; margin-bottom: 14px;
-  }
-  h1 {
-    font-family: var(--display);
-    font-size: clamp(2.4rem, 11vw, 3.6rem);
-    line-height: 1.02;
-    font-weight: 600;
-    letter-spacing: -.015em;
-    text-wrap: balance;
-  }
-  .tesi {
-    font-family: var(--display);
-    font-size: clamp(1.15rem, 4.6vw, 1.45rem);
-    line-height: 1.35;
-    margin-top: 22px;
-    text-wrap: balance;
-  }
-  .attacco { color: var(--tenue); margin-top: 18px; }
-  .attacco b { color: var(--testo); font-weight: 600; }
-
-  /* ---------- sezioni ---------- */
-  section { padding: 34px 0; border-top: 1px solid var(--bordo); }
-  h2 {
-    font-family: var(--display);
-    font-size: 1.55rem; font-weight: 600; line-height: 1.15;
-    letter-spacing: -.01em; margin-bottom: 16px;
-    text-wrap: balance;
-  }
-  .intro { color: var(--tenue); margin-bottom: 20px; }
-
-  /* ---------- elenco delle funzioni ---------- */
-  .voci { display: flex; flex-direction: column; gap: 15px; }
-  .voce { display: grid; grid-template-columns: 8px 1fr; gap: 14px; align-items: start; }
-  .voce::before {
-    content: ''; width: 5px; height: 5px; border-radius: 50%;
-    background: var(--accento); margin-top: .62em;
-  }
-  .voce h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1px; }
-  .voce p { color: var(--tenue); font-size: .94rem; line-height: 1.52; }
-
-  /* ---------- appuntamenti ---------- */
-  .incontri { display: flex; flex-direction: column; gap: 14px; }
-  .incontro {
-    background: var(--fondo-alto);
-    border: 1px solid var(--bordo);
-    border-radius: 14px;
-    padding: 18px;
-  }
-  .incontro .capo {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 12px; margin-bottom: 8px;
-  }
-  .incontro h3 { font-family: var(--display); font-size: 1.1rem; font-weight: 600; }
-  .modo {
-    font-size: .66rem; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--tenue); border: 1px solid var(--bordo);
-    padding: 3px 8px; border-radius: 999px; white-space: nowrap;
-  }
-  .incontro p { color: var(--tenue); font-size: .94rem; line-height: 1.55; }
-  .incontro em { color: var(--testo); font-style: italic; }
-
-  /* ---------- i tre mesi ---------- */
-  .mesi { display: flex; flex-direction: column; gap: 0; margin-top: 4px; }
-  .mese {
-    display: grid; grid-template-columns: 62px 1fr; gap: 16px;
-    padding: 14px 0; border-bottom: 1px solid var(--bordo);
-  }
-  .mese:last-child { border-bottom: none; }
-  .mese .n {
-    font-family: var(--display); font-size: .78rem; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--accento); padding-top: 3px;
-  }
-  .mese .che { font-family: var(--display); font-size: 1.12rem; font-weight: 600; }
-  .mese p { color: var(--tenue); font-size: .92rem; margin-top: 2px; }
-
-  /* ---------- prezzo ---------- */
-  .prezzo {
-    background: var(--fondo-alto);
-    border: 1px solid var(--bordo);
-    border-radius: 16px; padding: 22px;
-  }
-  .cifra {
-    font-family: var(--display); font-size: 3rem; font-weight: 600;
-    line-height: 1; letter-spacing: -.02em;
-  }
-  .cifra span { font-size: 1rem; color: var(--tenue); font-weight: 400; letter-spacing: 0; }
-  .rate { margin-top: 16px; border-top: 1px solid var(--bordo); padding-top: 14px; }
-  .rata {
-    display: flex; justify-content: space-between; gap: 12px;
-    padding: 7px 0; font-size: .94rem;
-  }
-  .rata span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .rata.somma {
-    border-top: 1px solid var(--bordo); margin-top: 6px; padding-top: 12px;
-    font-weight: 600;
-  }
-  .rata .quando { color: var(--tenue); font-size: .84rem; display: block; font-weight: 400; }
-
-  /* ---------- note ---------- */
-  .nota {
-    border-left: 2px solid var(--accento);
-    padding: 2px 0 2px 16px; margin-top: 20px;
-  }
-  .nota h3 { font-size: .94rem; font-weight: 600; margin-bottom: 4px; }
-  .nota p { color: var(--tenue); font-size: .92rem; line-height: 1.55; }
-
-  /* ---------- perimetro ---------- */
-  .perimetro p { color: var(--tenue); margin-bottom: 12px; font-size: .96rem; }
-  .perimetro b { color: var(--testo); font-weight: 600; }
-
-  /* ---------- chiamata ---------- */
-  .chiamata { text-align: center; padding: 42px 0 36px; }
-  .chiamata h2 { margin-bottom: 10px; }
-  .chiamata p { color: var(--tenue); margin-bottom: 22px; }
-  .bottone {
-    display: inline-block;
-    background: var(--accento); color: #fff;
-    font-family: var(--corpo); font-size: 1rem; font-weight: 600;
-    text-decoration: none; padding: 15px 32px; border-radius: 999px;
-    transition: transform .15s ease, background .15s ease;
-  }
-  .bottone:hover { background: #E63333; transform: translateY(-1px); }
-  .bottone:focus-visible { outline: 2px solid var(--testo); outline-offset: 3px; }
-  .posti { color: var(--tenue); font-size: .84rem; margin-top: 16px; }
-
-  /* ---------- piede ---------- */
-  footer {
-    border-top: 1px solid var(--bordo);
-    padding: 24px 0 40px;
-    color: var(--tenue); font-size: .8rem; line-height: 1.6;
-  }
-  footer a { color: var(--tenue); }
-
-  @media (prefers-reduced-motion: reduce) {
-    * { animation: none !important; transition: none !important; }
-    html { scroll-behavior: auto; }
-  }
-
-  @media (min-width: 640px) {
-    body { font-size: 18px; }
-    .apertura { padding: 76px 0 52px; }
-    section { padding: 44px 0; }
-    .incontro { padding: 22px; }
-  }
-</style>
+<link rel="stylesheet" href="/sito.css">
 </head>
 <body>
 
 <header>
   <div class="guscio">
-    <div class="marchio">ESSĒRE</div>
+    <a class="marchio" href="/metodo.html">ESSĒRE</a>
     <div class="sottomarchio">Mind Movement Lab · Gragnano</div>
+    <nav>
+      <a href="/metodo.html">Il metodo</a>
+      <a href="/studio.html">In studio</a>
+      <a href="/premium.html" aria-current="page">A distanza</a>
+      <a href="/contatti.html">Contatti</a>
+    </nav>
   </div>
 </header>
 
@@ -292,21 +111,21 @@
   <section>
     <h2>Tre appuntamenti al mese, con me</h2>
 
-    <div class="incontri">
-      <div class="incontro">
+    <div class="pila">
+      <div class="riquadro">
         <div class="capo">
           <h3>Due incontri di spiegazione</h3>
-          <span class="modo">in diretta</span>
+          <span class="etichetta">in diretta</span>
         </div>
         <p>Guardiamo insieme il tuo quadro e la tua scheda. Non ti dico <em>cosa</em>
           fare: ti mostro <em>perché</em>. Che cosa ho visto nelle tue misure, quale
           priorità viene prima delle altre, e come deve sentirsi il movimento
           quando è quello giusto.</p>
       </div>
-      <div class="incontro">
+      <div class="riquadro">
         <div class="capo">
           <h3>Un check</h3>
-          <span class="modo">registrato</span>
+          <span class="etichetta">registrato</span>
         </div>
         <p>Rifacciamo il punto sui dati nuovi: che cosa è cambiato, che cosa non si
           è mosso, dove si corregge la rotta per il mese dopo. Lo registro e te lo
@@ -323,8 +142,8 @@
 
   <section>
     <h2>Perché tre mesi</h2>
-    <div class="mesi">
-      <div class="mese">
+    <div class="passi">
+      <div class="passo">
         <div class="n">Mese 1</div>
         <div>
           <div class="che">Si capisce</div>
@@ -332,7 +151,7 @@
             che cosa stanno dicendo i tuoi numeri.</p>
         </div>
       </div>
-      <div class="mese">
+      <div class="passo">
         <div class="n">Mese 2</div>
         <div>
           <div class="che">Si applica</div>
@@ -340,7 +159,7 @@
             proposito.</p>
         </div>
       </div>
-      <div class="mese">
+      <div class="passo">
         <div class="n">Mese 3</div>
         <div>
           <div class="che">Si vede</div>
@@ -397,8 +216,7 @@
   <div class="chiamata">
     <h2>Parliamone prima</h2>
     <p>Scrivimi che cosa cerchi. Se questo percorso non fa per te, te lo dico io.</p>
-    <!-- DA SOSTITUIRE con il numero WhatsApp vero, formato internazionale senza + -->
-    <a class="bottone" href="https://wa.me/39XXXXXXXXXX?text=Ciao%20Francesco%2C%20vorrei%20informazioni%20su%20ESS%C4%92RE%20Premium">
+    <a class="bottone" href="https://wa.me/393343097680?text=Ciao%20Francesco%2C%20vorrei%20informazioni%20su%20ESS%C4%92RE%20Premium">
       Scrivimi su WhatsApp
     </a>
     <p class="posti">I posti sono contati: conduco un numero chiuso di sedute a settimana.</p>
@@ -409,15 +227,13 @@
 <footer>
   <div class="guscio">
     <div><strong>A.S.D. Evolution Sport — Mind Movement Lab</strong></div>
-    <div>Gragnano (NA)</div>
-    <div style="margin-top:10px">
+    <div>Gragnano (NA) · <a href="https://wa.me/393343097680">334 309 7680</a></div>
+    <div class="disclaimer">
       Le valutazioni del Metodo Mind Movement™ hanno finalità di screening e di
       orientamento del lavoro educativo-motorio. Non costituiscono atto diagnostico
       e non sostituiscono alcuna valutazione o terapia sanitaria.
     </div>
-    <div style="margin-top:10px">
-      <a href="/">Accedi all'applicazione</a>
-    </div>
+    <div style="margin-top:10px"><a href="/">Accedi all'applicazione</a></div>
   </div>
 </footer>
 
