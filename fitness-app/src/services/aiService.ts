@@ -20,6 +20,9 @@ import {
   leggiGuastoGateway, guastoDiRete, messaggioGuasto, messaggioDopoGateway, MotivoGateway,
 } from '../domain/guastoAI';
 import { TENTATIVI, passeggero } from '../domain/guasti';
+import {
+  daRidurre, misureRidotte, QUALITA, PESO_MASSIMO_MB, troppoPesante,
+} from '../domain/foto';
 import { registraGuasto } from './guastiService';
 
 const AI_GATEWAY_URL = 'https://europe-west1-essere-3fe6f.cloudfunctions.net/aiMessages';
@@ -332,6 +335,54 @@ export const callClaude = async (
 };
 
 // --- Converte immagine URI in base64 ---
+/**
+ * Ridimensiona una foto prima che parta, se è più grande del dovuto.
+ *
+ * Si fa qui e non nelle schermate perché ogni funzione dell'AI che
+ * manda immagini passa da questa porta: posturale, composizione
+ * corporea, cammino. Metterlo in una schermata sola avrebbe voluto
+ * dire rifarlo in tutte le altre, e dimenticarsene in una.
+ *
+ * Se il ridimensionamento non è possibile — niente canvas, immagine
+ * illeggibile, formato strano — si restituisce l'originale invece di
+ * fermare tutto: una foto pesante che parte è meglio di una
+ * valutazione che non si fa. È il server che adesso la regge.
+ */
+const riduciSeServe = async (blob: Blob): Promise<Blob> => {
+  try {
+    const g: any = globalThis as any;
+    if (!g.document || !g.createImageBitmap) return blob;
+
+    const bitmap = await g.createImageBitmap(blob);
+    const misure = { larghezza: bitmap.width, altezza: bitmap.height };
+    if (!daRidurre(misure)) {
+      if (bitmap.close) bitmap.close();
+      return blob;
+    }
+
+    const r = misureRidotte(misure);
+    const tela = g.document.createElement('canvas');
+    tela.width = r.larghezza;
+    tela.height = r.altezza;
+    const ctx = tela.getContext('2d');
+    if (!ctx) { if (bitmap.close) bitmap.close(); return blob; }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, r.larghezza, r.altezza);
+    if (bitmap.close) bitmap.close();
+
+    const fatta: Blob | null = await new Promise((res) => {
+      try { tela.toBlob((b: Blob | null) => res(b), 'image/jpeg', QUALITA); }
+      catch { res(null); }
+    });
+
+    // Se per qualche motivo la ridotta pesa di più, si tiene l'originale.
+    return fatta && fatta.size > 0 && fatta.size < blob.size ? fatta : blob;
+  } catch {
+    return blob;
+  }
+};
+
 const imageUriToBase64 = async (uri: string): Promise<string> => {
   // Se l'URI è già base64, estrarre i dati
   if (uri.startsWith('data:')) {
@@ -347,9 +398,13 @@ const imageUriToBase64 = async (uri: string): Promise<string> => {
     }
     const blob = await response.blob();
 
-    // Controlla dimensione (max 20MB per l'API)
-    if (blob.size > 20 * 1024 * 1024) {
-      throw new Error('Immagine troppo grande. Usa foto con dimensioni inferiori a 20MB.');
+    // Si riduce PRIMA di pesare: una foto da 8 MB a piena risoluzione
+    // scende sotto il mega, e il controllo qui sotto non scatta più su
+    // foto che erano perfettamente utilizzabili. Vedi domain/foto.ts.
+    const ridotta = await riduciSeServe(blob);
+
+    if (ridotta.size > PESO_MASSIMO_MB * 1024 * 1024) {
+      throw new Error(troppoPesante(ridotta.size / (1024 * 1024)));
     }
 
     return new Promise((resolve, reject) => {
@@ -364,7 +419,7 @@ const imageUriToBase64 = async (uri: string): Promise<string> => {
         resolve(base64);
       };
       reader.onerror = () => reject(new Error('Errore nella lettura dell\'immagine'));
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(ridotta);
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes('Immagine')) {
