@@ -4,6 +4,7 @@ import {
   componiSchedaSemplice, dicitureDi, GiornoSemplice,
 } from '../domain/schedaSemplice';
 import { componiCarta, Carta, VocePreventivo } from '../domain/cartaIntestata';
+import { spiegaSconto } from '../domain/sconti';
 
 const LOGO_CHAR = brand.appName;
 
@@ -702,6 +703,9 @@ const CARTA_CSS = `
   td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   tr.tot td { border-top: 2px solid #111; border-bottom: none; font-weight: 700; font-size: 12.5pt; padding-top: 8px; }
   tr.rate td { border: none; font-size: 10.5pt; color: #444; padding-top: 2px; }
+  tr.sconto td { color: #444; font-style: italic; border-bottom: none; }
+  s { color: #888; font-weight: 400; }
+  .nota-sconto { font-size: 8.5pt; color: #444; margin-top: 5px; line-height: 1.35; }
   .vuota td { height: 26px; }
   .firme { margin-top: 26px; display: flex; gap: 26px; }
   .firme div { flex: 1; }
@@ -743,8 +747,18 @@ export function printCartaIntestata(input: PrintCartaParams) {
   const righeVuote = Array.from({ length: c.righeDaRiempire })
     .map(() => '<tr class="vuota"><td></td><td class="n"></td></tr>').join('');
 
+  // Lo sconto si vede: il pieno barrato, quanto si toglie, e quanto
+  // resta da pagare. Un totale già scontato senza la riga che lo dice
+  // fa sembrare il prezzo pieno una cosa che non è mai esistita — e
+  // toglie a chi lo riceve la percezione di aver avuto qualcosa.
+  const haSconto = c.sconto && c.sconto.sconto > 0;
   const chiusura = c.voci.length
-    ? `<tr class="tot"><td>Totale</td><td class="n">${euro(c.totale)} €</td></tr>`
+    ? (haSconto
+      ? `<tr><td>Totale</td><td class="n"><s>${euro(c.sconto.pieno)} €</s></td></tr>`
+        + `<tr class="sconto"><td>${c.sconto.riga.split(' · ')[0]}</td>`
+        + `<td class="n">− ${euro(c.sconto.sconto)} €</td></tr>`
+        + `<tr class="tot"><td>Da pagare</td><td class="n">${euro(c.sconto.dovuto)} €</td></tr>`
+      : `<tr class="tot"><td>Totale</td><td class="n">${euro(c.totale)} €</td></tr>`)
       + (c.rate > 1
         ? `<tr class="rate"><td colspan="2">${c.rate} rate da ${euro(c.importoRata)} € ciascuna</td></tr>`
         : '')
@@ -777,6 +791,7 @@ export function printCartaIntestata(input: PrintCartaParams) {
       <tr><th>Voce</th><th style="text-align:right">Importo</th></tr>
       ${righeVoci}${righeVuote}${chiusura}
     </table>
+    ${haSconto ? `<p class="nota-sconto">${spiegaSconto(c.sconto)}</p>` : ''}
 
     <div class="firme">
       <div><div class="linea"></div><div class="cap">Per accettazione — firma e data</div></div>

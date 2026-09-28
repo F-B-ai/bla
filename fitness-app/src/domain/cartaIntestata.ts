@@ -1,4 +1,5 @@
 import { CAMPI_TUTTI } from '../data/onboardingForm';
+import { applicaSconto, rateScontate, TipoSconto, Conto } from './sconti';
 import { EsitoOnboarding, Risposte } from './onboarding';
 import { PERIMETRO } from './perimetro';
 
@@ -86,8 +87,12 @@ export interface Carta {
   /** i fatti neutri che spiegano il percorso */
   rilievi: string[];
   voci: VocePreventivo[];
+  /** il totale PRIMA dello sconto */
   totale: number;
+  /** lo sconto applicato, se c'è: vedi domain/sconti.ts */
+  sconto: Conto;
   rate: number;
+  /** la rata calcolata sul DOVUTO, non sul pieno */
   importoRata: number;
   /** righe vuote da riempire a penna, se il preventivo non è stato scritto */
   righeDaRiempire: number;
@@ -195,6 +200,12 @@ export const componiCarta = (input: {
   voci?: VocePreventivo[];
   rate?: number;
   data?: Date;
+  /**
+   * Lo sconto deciso dal titolare. Non si deduce dai dati e non si
+   * applica da solo: il criterio dice chi PUÒ averlo, la mano resta
+   * sua. Vedi domain/sconti.ts.
+   */
+  sconto?: TipoSconto;
 }): Carta => {
   const r = input.risposte || {};
   const voci = (input.voci || []).filter(
@@ -202,6 +213,7 @@ export const componiCarta = (input: {
   );
   const totale = arrotonda2(voci.reduce((s, v) => s + v.importo, 0));
   const rate = input.rate && input.rate > 1 ? Math.floor(input.rate) : 1;
+  const sconto = applicaSconto(totale, input.sconto || 'nessuno');
 
   return {
     allievo: (input.allievo || '').trim() || '________________________',
@@ -212,8 +224,11 @@ export const componiCarta = (input: {
     rilievi: rilieviCondivisibili(r, input.esito),
     voci,
     totale,
+    sconto,
     rate,
-    importoRata: rate > 1 && totale > 0 ? arrotonda2(totale / rate) : 0,
+    // Sul DOVUTO. Dividere il pieno farebbe pagare a rate il prezzo
+    // intero, con lo sconto scritto sul foglio e mai tolto davvero.
+    importoRata: rate > 1 && sconto.dovuto > 0 ? rateScontate(sconto, rate) : 0,
     righeDaRiempire: voci.length ? 0 : RIGHE_VUOTE,
     validoGiorni: VALIDO_GIORNI,
     diciture: dicitureCarta(input.esito),
