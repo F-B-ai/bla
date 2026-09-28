@@ -334,3 +334,34 @@ describe('lo sconto si può scegliere davvero, dall\'app', () => {
     expect(schermata).toMatch(/useState<TipoSconto>\('nessuno'\)/);
   });
 });
+
+describe('quale documento serve quando', () => {
+  // Due documenti si somigliano e nessuno diceva quale serve quando:
+  // chi cerca le misure le cerca nel preventivo, non le trova, e
+  // conclude che l'app non le mostra — mentre stanno nel documento
+  // accanto.
+  const onboarding = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'staff', 'OnboardingScreen.tsx'), 'utf8'
+  );
+  const protocollo = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'staff', 'ProtocolloScreen.tsx'), 'utf8'
+  );
+
+  it('il preventivo dice che le misure NON stanno lì, e dove stanno', () => {
+    expect(onboarding).toContain('Qui non ci sono le misure');
+    expect(onboarding).toContain('Protocollo di lavoro');
+  });
+
+  it('il protocollo dice che le misure ci sono', () => {
+    expect(protocollo).toContain('LE MISURE');
+  });
+
+  // «Già pagata» copriva un caso solo: quando la valutazione è
+  // COMPRESA nel percorso non è stata pagata a parte, è dentro. Una
+  // parola sbagliata rende invisibile una funzione che c'è.
+  it('l\'interruttore della valutazione copre anche «compresa»', () => {
+    expect(protocollo).toContain('La valutazione non si paga a parte');
+    expect(protocollo).toContain('compresa nel percorso');
+    expect(protocollo).not.toContain('La valutazione è già stata pagata');
+  });
+});

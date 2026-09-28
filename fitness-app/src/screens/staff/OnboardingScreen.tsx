@@ -647,6 +647,16 @@ export function OnboardingScreen() {
               Se lasci le righe vuote, escono da riempire a penna.
             </Text>
 
+            {/* Due documenti si somigliano e nessuno dice quale serve
+                quando. Chi cerca le misure le cerca qui, non le trova,
+                e conclude che l'app non le mostra — mentre stanno nel
+                documento accanto. Una riga lo risolve. */}
+            <Text style={[s.muted, { marginTop: spacing.sm, fontStyle: 'italic' }]}>
+              Qui non ci sono le misure: è il foglio del primo incontro, quando
+              ancora non si è misurato niente. Per il documento CON le misure —
+              e con il numero di sedute — usa il Protocollo di lavoro.
+            </Text>
+
             {voci.map((v, i) => (
               <View key={i} style={s.vocePreventivo}>
                 <TextInput
