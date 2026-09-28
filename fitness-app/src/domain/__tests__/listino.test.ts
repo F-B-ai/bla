@@ -309,17 +309,27 @@ describe('prima valutazione e rivalutazioni', () => {
     expect(PREZZO_VALUTAZIONE).toBe(PREZZO_PRIMA_VALUTAZIONE);
   });
 
-  // Il sito non deve far credere che ogni valutazione costi 150: chi
-  // torna dopo tre mesi arriverebbe con l'aspettativa sbagliata, e
-  // qualunque cifra diversa sembrerebbe un'improvvisazione.
-  it('il sito dice «prima valutazione», e che le altre si concordano', () => {
+  // Il sito parla a chi NON è ancora cliente. La rivalutazione è un
+  // problema del secondo ciclo: metterla in vetrina aggiunge un punto
+  // interrogativo dove serve chiarezza, e una voce senza prezzo
+  // («si concordano») qualcuno la legge come «costa tanto e non lo
+  // dicono». Il prezzo della rivalutazione lo dice il titolare di
+  // persona, al momento giusto, a chi lo conosce già.
+  it('il sito non parla di rivalutazioni', () => {
     const studio = fs.readFileSync(
       path.join(__dirname, '..', '..', '..', 'public', 'studio.html'), 'utf8'
     );
-    expect(studio).toContain('Prima valutazione');
-    expect(studio).toContain('Valutazioni successive');
-    expect(studio).toContain('si concordano');
-    expect(studio).not.toContain('Valutazione completa');
+    expect(studio).not.toContain('Valutazioni successive');
+    expect(studio).not.toContain('si concordano');
+  });
+
+  // «Prima valutazione» apriva la domanda «e le altre quanto?».
+  // «Iniziale» è il nome del servizio e non promette un seguito.
+  it('la voce si chiama «Valutazione iniziale»', () => {
+    const studio = fs.readFileSync(
+      path.join(__dirname, '..', '..', '..', 'public', 'studio.html'), 'utf8'
+    );
+    expect(studio).toContain('Valutazione iniziale');
   });
 });
 
