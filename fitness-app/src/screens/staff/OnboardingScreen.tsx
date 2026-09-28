@@ -18,6 +18,16 @@ import {
   componiCarta, controllaCarta, riepilogaCarta, VocePreventivo,
 } from '../../domain/cartaIntestata';
 import { printCartaIntestata } from '../../utils/printUtils';
+import { TipoSconto, REGOLE_SCONTO, regolaDi } from '../../domain/sconti';
+
+/** Le scelte del selettore: «nessuno» più le regole del dominio. */
+const SCELTE_SCONTO: { tipo: TipoSconto; etichetta: string }[] = [
+  { tipo: 'nessuno', etichetta: 'Nessuno' },
+  ...REGOLE_SCONTO.map((r) => ({
+    tipo: r.tipo,
+    etichetta: `${r.etichetta.replace('Sconto ', '')} −${Math.round(r.percentuale * 100)}%`,
+  })),
+];
 import {
   saveOnboarding, getOnboarding, elencaInteressati,
   cancellaInteressato, collegaAllievo, aggiornaInteressato, SchedaOnboarding,
@@ -64,6 +74,10 @@ export function OnboardingScreen() {
     { descrizione: '', importo: '' },
   ]);
   const [rateCarta, setRateCarta] = useState('');
+  // Lo sconto fedeltà. Non si applica da solo e non si deduce dai
+  // dati: il criterio dice chi PUÒ averlo, la mano resta del titolare.
+  // Vedi domain/sconti.ts.
+  const [scontoCarta, setScontoCarta] = useState<TipoSconto>('nessuno');
 
   // Un elenco vuoto e un elenco che non si è potuto leggere sono due
   // cose diverse, e il 13 settembre 2026 sullo schermo erano la stessa:
@@ -131,6 +145,7 @@ export function OnboardingScreen() {
       esito,
       voci: vociPulite,
       rate: parseInt(rateCarta, 10) || 1,
+      sconto: scontoCarta,
     });
 
     const verifica = controllaCarta(carta, risposte);
@@ -146,6 +161,7 @@ export function OnboardingScreen() {
         onPress: () => printCartaIntestata({
           allievo: nomeCarta, risposte, esito,
           voci: vociPulite, rate: parseInt(rateCarta, 10) || 1,
+          sconto: scontoCarta,
         }),
       },
     ]);
@@ -663,6 +679,32 @@ export function OnboardingScreen() {
               value={rateCarta} onChangeText={setRateCarta}
             />
 
+            <Text style={[s.label, { marginTop: spacing.md }]}>
+              Sconto fedeltà
+            </Text>
+            <View style={s.scontoRiga}>
+              {SCELTE_SCONTO.map((sc) => {
+                const attivo = scontoCarta === sc.tipo;
+                return (
+                  <TouchableOpacity
+                    key={sc.tipo}
+                    style={[s.scontoChip, attivo && s.scontoChipAttivo]}
+                    onPress={() => setScontoCarta(sc.tipo)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[s.scontoTxt, attivo && s.scontoTxtAttivo]}>
+                      {sc.etichetta}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {scontoCarta !== 'nessuno' && (
+              <Text style={s.scontoNota}>
+                {regolaDi(scontoCarta)?.criterio}
+              </Text>
+            )}
+
             <TouchableOpacity style={s.btnChiaro} onPress={stampaCarta} activeOpacity={0.85}>
               <Ionicons name="newspaper-outline" size={18} color={colors.info} />
               <Text style={[s.btnChiaroTxt, { color: colors.info }]}>
@@ -748,6 +790,18 @@ const s = StyleSheet.create({
   campo: { marginTop: spacing.md },
   label: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600', marginBottom: 4 },
   aiuto: { color: colors.textLight, fontSize: fontSize.xs, marginBottom: 6 },
+  scontoRiga: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  scontoChip: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg,
+    paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.surfaceLight,
+  },
+  scontoChipAttivo: { borderColor: colors.accent, backgroundColor: colors.accent },
+  scontoTxt: { color: colors.textLight, fontSize: fontSize.xs, fontWeight: '600' },
+  scontoTxtAttivo: { color: colors.textOnAccent },
+  // Il criterio sotto la scelta: è la risposta pronta a «perché lui sì».
+  scontoNota: {
+    color: colors.textLight, fontSize: fontSize.xs, marginTop: 6, lineHeight: 16,
+  },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm,
     color: colors.text, paddingHorizontal: 11, paddingVertical: 9,

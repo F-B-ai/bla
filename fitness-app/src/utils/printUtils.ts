@@ -4,7 +4,7 @@ import {
   componiSchedaSemplice, dicitureDi, GiornoSemplice,
 } from '../domain/schedaSemplice';
 import { componiCarta, Carta, VocePreventivo } from '../domain/cartaIntestata';
-import { spiegaSconto } from '../domain/sconti';
+import { spiegaSconto, TipoSconto } from '../domain/sconti';
 
 const LOGO_CHAR = brand.appName;
 
@@ -722,12 +722,15 @@ interface PrintCartaParams {
   esito: any;
   voci?: VocePreventivo[];
   rate?: number;
+  /** lo sconto fedeltà scelto dal titolare; vedi domain/sconti.ts */
+  sconto?: TipoSconto;
 }
 
 export function printCartaIntestata(input: PrintCartaParams) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
   const c: Carta = componiCarta({
+    sconto: input.sconto,
     allievo: input.allievo,
     risposte: input.risposte,
     esito: input.esito,

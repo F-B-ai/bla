@@ -302,3 +302,35 @@ describe('la ripartizione si fa sul totale scontato', () => {
     expect(stampa).not.toContain('collaboratore');
   });
 });
+
+describe('lo sconto si può scegliere davvero, dall\'app', () => {
+  // Il difetto: gli sconti erano nel dominio e nella stampa, ma
+  // nessuna schermata li passava. Una porta senza maniglia — la
+  // funzione esisteva e non si poteva usare.
+  const schermata = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'staff', 'OnboardingScreen.tsx'), 'utf8'
+  );
+  const stampa = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'utils', 'printUtils.ts'), 'utf8'
+  );
+
+  it('c\'è un selettore, costruito dalle regole del dominio', () => {
+    expect(schermata).toContain('SCELTE_SCONTO');
+    expect(schermata).toContain('REGOLE_SCONTO.map');
+  });
+
+  it('la scelta arriva al preventivo e alla stampa', () => {
+    expect(schermata).toContain('sconto: scontoCarta');
+    expect(stampa).toContain('sconto: input.sconto');
+  });
+
+  // Il criterio sotto la scelta è la risposta pronta a «perché lui sì
+  // e io no»: serve a chi compila, prima ancora che all'allievo.
+  it('sotto la scelta compare il criterio', () => {
+    expect(schermata).toContain('regolaDi(scontoCarta)?.criterio');
+  });
+
+  it('il selettore parte da «nessuno»', () => {
+    expect(schermata).toMatch(/useState<TipoSconto>\('nessuno'\)/);
+  });
+});
