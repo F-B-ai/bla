@@ -1,7 +1,8 @@
 import {
   applicaSconto, rateScontate, scontoSpettante, spiegaSconto, regolaDi,
   REGOLE_SCONTO, SCONTO_RINNOVO, SCONTO_STORICO,
-  GIORNI_PER_RINNOVO, ANNI_PER_STORICO,
+  GIORNI_PER_RINNOVO, ANNI_PER_STORICO, ANNI_PER_FEDELE,
+  SCONTO_FEDELE, PASSO_ARROTONDAMENTO, perEccesso,
 } from '../sconti';
 
 // ============================================================
@@ -14,18 +15,48 @@ import {
 // ============================================================
 
 describe('quanto si toglie', () => {
-  it('rinnovo: 15%', () => {
+  // I prezzi si arrotondano PER ECCESSO a multipli di cinque: 328,95
+  // diventa 330. «Trenta è un prezzo, ventotto è il risultato di un
+  // conto» — deciso il 28 settembre 2026.
+  it('rinnovo 15%: 387 € diventano 330, non 328,95', () => {
     const c = applicaSconto(387, 'rinnovo');
     expect(c.percentuale).toBe(SCONTO_RINNOVO);
-    expect(c.sconto).toBe(58.05);
-    expect(c.dovuto).toBe(328.95);
+    expect(c.dovuto).toBe(330);
+    expect(c.sconto).toBe(57);
   });
 
-  it('storico: 20%', () => {
+  it('storico 20%: 387 € diventano 310', () => {
     const c = applicaSconto(387, 'storico');
     expect(c.percentuale).toBe(SCONTO_STORICO);
-    expect(c.sconto).toBe(77.4);
-    expect(c.dovuto).toBe(309.6);
+    expect(c.dovuto).toBe(310);
+    expect(c.sconto).toBe(77);
+  });
+
+  it('fedele 10%: 387 € diventano 350', () => {
+    const c = applicaSconto(387, 'fedele');
+    expect(c.percentuale).toBe(SCONTO_FEDELE);
+    expect(c.dovuto).toBe(350);
+  });
+
+  it('ogni prezzo scontato è un multiplo di cinque', () => {
+    [30, 35, 40, 150, 387, 500, 1234].forEach((p) => {
+      (['fedele', 'rinnovo', 'storico'] as const).forEach((t) => {
+        expect(applicaSconto(p, t).dovuto % PASSO_ARROTONDAMENTO).toBe(0);
+      });
+    });
+  });
+
+  // L'arrotondamento per eccesso su importi piccoli può riportare al
+  // prezzo pieno: 35 meno il 10% fa 31,50, che sale a 35. Uno sconto
+  // che non sconta è peggio di nessuno sconto.
+  it('uno sconto resta sempre uno sconto', () => {
+    [30, 35, 40, 45, 33, 21].forEach((p) => {
+      (['fedele', 'rinnovo', 'storico'] as const).forEach((t) => {
+        const c = applicaSconto(p, t);
+        expect(c.dovuto).toBeLessThan(p);
+        expect(c.sconto).toBeGreaterThan(0);
+      });
+    });
   });
 
   it('nessuno: il prezzo resta quello', () => {
@@ -68,9 +99,20 @@ describe('chi ne ha diritto — il criterio, non l\'umore', () => {
     expect(scontoSpettante({ giorniDallaFinePrecedente: 31 })).toBe('nessuno');
   });
 
-  it('chi non ha nessuna delle due condizioni non ha sconto', () => {
+  it('dopo il primo anno: fedele', () => {
+    expect(scontoSpettante({ anniDiFrequenza: ANNI_PER_FEDELE })).toBe('fedele');
+  });
+
+  it('chi non ha nessuna delle condizioni non ha sconto', () => {
     expect(scontoSpettante({})).toBe('nessuno');
     expect(scontoSpettante({ anniDiFrequenza: 0, giorniDallaFinePrecedente: 200 })).toBe('nessuno');
+  });
+
+  it('si arrotonda per eccesso, mai per difetto', () => {
+    expect(perEccesso(28)).toBe(30);
+    expect(perEccesso(30)).toBe(30);
+    expect(perEccesso(30.01)).toBe(35);
+    expect(perEccesso(309.6)).toBe(310);
   });
 
   // Uno sconto che si somma da solo diventa un regalo che nessuno
@@ -92,9 +134,9 @@ describe('le rate si dividono sul dovuto, non sul pieno', () => {
   // L'errore che fa arrivare un allievo a fine percorso avendo pagato
   // il prezzo intero a rate, con lo sconto scritto sul foglio e mai
   // tolto da nessuna parte.
-  it('387 € scontati del 20%, in due rate', () => {
+  it('387 € scontati del 20% fanno 310: due rate da 155', () => {
     const c = applicaSconto(387, 'storico');
-    expect(rateScontate(c, 2)).toBe(154.8);
+    expect(rateScontate(c, 2)).toBe(155);
     expect(rateScontate(c, 2) * 2).toBeCloseTo(c.dovuto, 1);
   });
 
@@ -113,7 +155,7 @@ describe('che cosa si legge sul foglio', () => {
   it('la riga dice percentuale e importo tolto', () => {
     const c = applicaSconto(387, 'storico');
     expect(c.riga).toContain('20%');
-    expect(c.riga).toContain('77.40');
+    expect(c.riga).toContain('77.00');
   });
 
   // Chi riceve uno sconto una volta, l'anno dopo lo dà per scontato.
@@ -129,7 +171,7 @@ describe('che cosa si legge sul foglio', () => {
   });
 
   it('ogni regola ha un criterio dicibile a voce', () => {
-    expect(REGOLE_SCONTO.length).toBe(2);
+    expect(REGOLE_SCONTO.length).toBe(3);
     REGOLE_SCONTO.forEach((r) => {
       expect(r.criterio.length).toBeGreaterThan(25);
       expect(r.etichetta.length).toBeGreaterThan(5);

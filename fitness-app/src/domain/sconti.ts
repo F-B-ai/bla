@@ -26,10 +26,21 @@
 
 export const SCONTI_VERSION = 1;
 
-export type TipoSconto = 'nessuno' | 'rinnovo' | 'storico';
+export type TipoSconto = 'nessuno' | 'fedele' | 'rinnovo' | 'storico';
 
+export const SCONTO_FEDELE = 0.10;
 export const SCONTO_RINNOVO = 0.15;
 export const SCONTO_STORICO = 0.20;
+
+/**
+ * Il prezzo scontato si arrotonda PER ECCESSO a multipli di cinque.
+ *
+ * Deciso il 28 settembre 2026: «arrotondiamo a 30 piuttosto che 28».
+ * Trenta è un prezzo, ventotto è il risultato di un conto — e si
+ * vede. Un listino fatto di numeri tondi si dice a voce senza
+ * guardare il foglio, e non fa sembrare lo sconto una trattativa.
+ */
+export const PASSO_ARROTONDAMENTO = 5;
 
 /**
  * Entro quanti giorni dalla fine del percorso precedente un rinnovo
@@ -41,6 +52,21 @@ export const GIORNI_PER_RINNOVO = 30;
 /** Da quanti anni di frequenza si è «storici». */
 export const ANNI_PER_STORICO = 2;
 
+/** Dopo quanti anni comincia lo sconto fedeltà di base. */
+export const ANNI_PER_FEDELE = 1;
+
+/**
+ * Arrotonda per eccesso al passo dato.
+ *
+ * `Math.ceil` sui centesimi prima della divisione: senza, un 29,999
+ * nato da una moltiplicazione in virgola mobile resterebbe 30 invece
+ * di salire, e il conto tornerebbe giusto per caso.
+ */
+export const perEccesso = (n: number, passo: number = PASSO_ARROTONDAMENTO): number => {
+  const p = passo > 0 ? passo : 1;
+  return Math.ceil((Math.round(n * 100) / 100) / p) * p;
+};
+
 export interface RegolaSconto {
   tipo: TipoSconto;
   percentuale: number;
@@ -49,6 +75,8 @@ export interface RegolaSconto {
   criterio: string;
 }
 
+// In ordine dal più alto al più basso: chi rientra in più condizioni
+// prende la prima che trova, non la somma.
 export const REGOLE_SCONTO: RegolaSconto[] = [
   {
     tipo: 'storico',
@@ -62,6 +90,12 @@ export const REGOLE_SCONTO: RegolaSconto[] = [
     etichetta: 'Sconto rinnovo',
     criterio: `Riservato a chi rinnova entro ${GIORNI_PER_RINNOVO} giorni dalla fine `
       + 'del percorso precedente.',
+  },
+  {
+    tipo: 'fedele',
+    percentuale: SCONTO_FEDELE,
+    etichetta: 'Sconto fedeltà',
+    criterio: `Riservato a chi frequenta lo studio da più di ${ANNI_PER_FEDELE} anno.`,
   },
 ];
 
@@ -84,6 +118,7 @@ export const scontoSpettante = (f: {
   if (anni >= ANNI_PER_STORICO) return 'storico';
   const g = f.giorniDallaFinePrecedente;
   if (typeof g === 'number' && g >= 0 && g <= GIORNI_PER_RINNOVO) return 'rinnovo';
+  if (anni >= ANNI_PER_FEDELE) return 'fedele';
   return 'nessuno';
 };
 
@@ -117,15 +152,32 @@ export const applicaSconto = (pieno: number, tipo: TipoSconto = 'nessuno'): Cont
     return { pieno: base, tipo: 'nessuno', percentuale: 0, sconto: 0, dovuto: base, riga: '' };
   }
 
-  const sconto = arrotonda2(base * r.percentuale);
-  const dovuto = arrotonda2(base - sconto);
+  // Il conto esatto, poi l'arrotondamento per eccesso a multipli di
+  // cinque: 35 meno il 20% fa 28, e si paga 30.
+  const esatto = arrotonda2(base - base * r.percentuale);
+  let dovuto = perEccesso(esatto);
+
+  // LA GUARDIA CHE SERVE DAVVERO. Su importi piccoli l'arrotondamento
+  // per eccesso può riportare al prezzo pieno — 35 meno il 10% fa
+  // 31,50, che arrotondato per eccesso torna 35: uno sconto che non
+  // sconta niente, e un allievo che si sente preso in giro.
+  //
+  // Quando succede si scende al multiplo sotto (30). Non è una
+  // deroga alla regola: è la regola che dice che uno sconto deve
+  // restare uno sconto, altrimenti non andava promesso.
+  if (dovuto >= base) {
+    dovuto = Math.max(0, perEccesso(esatto) - PASSO_ARROTONDAMENTO);
+  }
+
+  const sconto = arrotonda2(base - dovuto);
+  const effettiva = base > 0 ? sconto / base : 0;
   return {
     pieno: base,
     tipo,
     percentuale: r.percentuale,
     sconto,
     dovuto,
-    riga: `${r.etichetta} −${Math.round(r.percentuale * 100)}% · −${sconto.toFixed(2)} €`,
+    riga: `${r.etichetta} −${Math.round(effettiva * 100)}% · −${sconto.toFixed(2)} €`,
   };
 };
 
