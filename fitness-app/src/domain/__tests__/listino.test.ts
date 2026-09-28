@@ -5,6 +5,8 @@ import {
   avvisoAnnualeColTitolare, statoTetto, lunediDi, stessaSettimana,
   PREZZO_ANNUALE, PREZZO_SINGOLO, PREZZO_TITOLARE,
   QUOTA_PIENA, QUOTA_ACCORDO, TETTO_INIZIALE, quotaSuPrezzoPagato,
+  VALUTAZIONE_ONLINE_MIN, VALUTAZIONE_ONLINE_MAX, controllaValutazioneOnline,
+  valutazioneOnlineDovuta,
 } from '../listino';
 import {
   PREZZO_PRIMA_VALUTAZIONE, PREZZO_VALUTAZIONE,
@@ -318,5 +320,61 @@ describe('prima valutazione e rivalutazioni', () => {
     expect(studio).toContain('Valutazioni successive');
     expect(studio).toContain('si concordano');
     expect(studio).not.toContain('Valutazione completa');
+  });
+});
+
+describe('la valutazione a distanza', () => {
+  it('sta fra 50 e 100 €', () => {
+    expect(VALUTAZIONE_ONLINE_MIN).toBe(50);
+    expect(VALUTAZIONE_ONLINE_MAX).toBe(100);
+    [50, 60, 80, 100].forEach((n) =>
+      expect(controllaValutazioneOnline(n).ok).toBe(true));
+  });
+
+  it('sotto i 50 non copre il tempo che costa', () => {
+    const r = controllaValutazioneOnline(40);
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toContain('50');
+  });
+
+  // Costa meno perché VALE meno: a distanza manca l'osservazione dal
+  // vivo. Il messaggio lo dice, invece di far sembrare il limite una
+  // regola arbitraria.
+  it('sopra i 100 spiega perché, invece di dire solo «no»', () => {
+    const r = controllaValutazioneOnline(150);
+    expect(r.ok).toBe(false);
+    expect(r.motivo).toContain('osservazione dal vivo');
+  });
+
+  it('costa meno della prima valutazione in studio', () => {
+    expect(VALUTAZIONE_ONLINE_MAX).toBeLessThan(PREZZO_PRIMA_VALUTAZIONE);
+  });
+});
+
+describe('chi entra nel percorso non paga la valutazione', () => {
+  it('compresa nei tre mesi', () => {
+    expect(valutazioneOnlineDovuta(true)).toBe(0);
+    expect(valutazioneOnlineDovuta(true, 100)).toBe(0);
+  });
+
+  it('chi vuole solo la valutazione la paga, nella forchetta', () => {
+    expect(valutazioneOnlineDovuta(false, 80)).toBe(80);
+    expect(valutazioneOnlineDovuta(false, 50)).toBe(50);
+  });
+
+  it('un importo fuori forchetta viene riportato dentro, non passa', () => {
+    expect(valutazioneOnlineDovuta(false, 200)).toBe(VALUTAZIONE_ONLINE_MAX);
+    expect(valutazioneOnlineDovuta(false, 10)).toBe(VALUTAZIONE_ONLINE_MIN);
+  });
+
+  // Un numero solo si decide; due numeri si confrontano, e mentre si
+  // confrontano non si compra.
+  it('la pagina dice che è compresa, e che il colloquio non si paga', () => {
+    const pagina = fs.readFileSync(
+      path.join(__dirname, '..', '..', '..', 'public', 'premium.html'), 'utf8'
+    );
+    expect(pagina).toContain('La valutazione iniziale è compresa');
+    expect(pagina).toContain('da 50 a 100');
+    expect(pagina).toContain('Il colloquio non si paga');
   });
 });

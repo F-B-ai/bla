@@ -38,6 +38,95 @@ export const PREZZO_ANNUALE = 30;
 export const PREZZO_SINGOLO = 35;
 export const PREZZO_TITOLARE = 40;
 
+// ------------------------------------------------------------
+// LA VALUTAZIONE A DISTANZA
+// ------------------------------------------------------------
+//
+// Da 50 a 100 €, decisa caso per caso dal titolare (28 settembre
+// 2026). In studio la prima valutazione è 150.
+//
+// Costa meno perché VALE MENO, e conviene dirselo invece di girarci
+// intorno: a distanza manca la mezz'ora di osservazione dal vivo,
+// mancano i test che si fanno con le mani, e resta quello che si vede
+// in una foto e in un video. È la stessa cosa scritta nella procedura
+// a distanza — «fingere che le foto sostituiscano l'osservazione
+// sarebbe la bugia più grave di tutto il percorso» — e qui diventa un
+// numero.
+//
+// Un prezzo che riflette onestamente quanto si è potuto vedere è la
+// cosa che rende credibile tutto il resto del listino.
+
+export const VALUTAZIONE_ONLINE_MIN = 50;
+export const VALUTAZIONE_ONLINE_MAX = 100;
+
+export interface EsitoValutazioneOnline {
+  ok: boolean;
+  importo: number;
+  motivo: string;
+}
+
+/**
+ * Controlla l'importo scelto per una valutazione a distanza.
+ *
+ * Non decide la cifra — quella la stabilisce il titolare guardando il
+ * caso. Impedisce soltanto che esca dalla forchetta per distrazione:
+ * sopra i cento si farebbe pagare a distanza quanto uno studio, sotto
+ * i cinquanta non si copre il tempo che costa.
+ */
+export const controllaValutazioneOnline = (
+  importo: number
+): EsitoValutazioneOnline => {
+  const n = Math.round((importo || 0) * 100) / 100;
+  if (n < VALUTAZIONE_ONLINE_MIN) {
+    return {
+      ok: false,
+      importo: n,
+      motivo: `Una valutazione a distanza non scende sotto ${VALUTAZIONE_ONLINE_MIN} €: `
+        + 'sotto quella cifra non copre il tempo che costa.',
+    };
+  }
+  if (n > VALUTAZIONE_ONLINE_MAX) {
+    return {
+      ok: false,
+      importo: n,
+      motivo: `Una valutazione a distanza non supera ${VALUTAZIONE_ONLINE_MAX} €. `
+        + 'In studio la prima valutazione costa di più perché comprende '
+        + 'l\'osservazione dal vivo: a distanza quella parte non c\'è, e il '
+        + 'prezzo lo dice.',
+    };
+  }
+  return { ok: true, importo: n, motivo: '' };
+};
+
+/**
+ * Quanto si paga per la valutazione a distanza.
+ *
+ * DECISO IL 28 SETTEMBRE 2026: chi entra nel percorso non la paga a
+ * parte — è compresa. La paga solo chi vuole la valutazione e basta,
+ * senza percorso, e la cifra si decide al primo colloquio in base a
+ * quello che la persona racconta.
+ *
+ * È la struttura giusta per due ragioni. La prima: il percorso resta
+ * un numero solo, e un numero solo si decide; due numeri si
+ * confrontano, e mentre si confrontano non si compra. La seconda: chi
+ * vuole solo sapere a che punto sta ha una porta che non lo obbliga a
+ * impegnarsi per tre mesi — ed è spesso la stessa persona che dopo la
+ * valutazione entra nel percorso.
+ */
+export const valutazioneOnlineDovuta = (
+  entraNelPercorso: boolean,
+  importoDeciso?: number
+): number => {
+  if (entraNelPercorso) return 0;
+  const n = typeof importoDeciso === 'number' ? importoDeciso : VALUTAZIONE_ONLINE_MIN;
+  const e = controllaValutazioneOnline(n);
+  // Fuori forchetta si riporta dentro invece di far passare un numero
+  // che non doveva esistere: il controllo l'ha già detto a chi scrive.
+  return e.ok
+    ? e.importo
+    : Math.min(VALUTAZIONE_ONLINE_MAX, Math.max(VALUTAZIONE_ONLINE_MIN, n));
+};
+
 /**
  * La percentuale del collaboratore.
  *
