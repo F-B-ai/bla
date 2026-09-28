@@ -170,6 +170,34 @@ export const quotaCollaboratore = (s: Seduta, quando: Date): number => {
   return Math.round(t.prezzo * quotaDelGiorno(quando) * 100) / 100;
 };
 
+/**
+ * La quota quando all'allievo è stato fatto uno sconto fedeltà.
+ *
+ * DECISIONE DEL 28 SETTEMBRE 2026: lo sconto lo pagano in due. La
+ * percentuale si calcola su quello che l'allievo paga davvero, non
+ * sul prezzo di listino.
+ *
+ * Il motivo, e vale la pena scriverlo perché fra un anno non sarà
+ * più ovvio: un allievo che resta due anni è un allievo che il
+ * collaboratore ha tenuto. Lo sconto fedeltà è il costo di quella
+ * fedeltà, e la fedeltà l'hanno costruita in due — quindi la pagano
+ * in due. L'alternativa (quota sul listino pieno, sconto a carico
+ * del solo studio) era difendibile, ed è stata scartata.
+ *
+ * Su una seduta da 35 € scontata del 20%: l'allievo paga 28, il
+ * collaboratore prende 14 invece di 17,50, e allo studio restano 14
+ * invece di 17,50.
+ */
+export const quotaSuPrezzoPagato = (
+  s: Seduta,
+  quando: Date,
+  prezzoPagato: number
+): number => {
+  if (s.conduce !== 'collaboratore') return 0;
+  const p = Math.max(0, prezzoPagato || 0);
+  return Math.round(p * quotaDelGiorno(quando) * 100) / 100;
+};
+
 // ------------------------------------------------------------
 // I POSTI DEL TITOLARE
 // ------------------------------------------------------------

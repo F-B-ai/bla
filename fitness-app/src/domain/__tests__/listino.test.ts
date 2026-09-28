@@ -4,7 +4,7 @@ import {
   tariffaDi, quotaCollaboratore, quotaDelGiorno, eAnnuale,
   avvisoAnnualeColTitolare, statoTetto, lunediDi, stessaSettimana,
   PREZZO_ANNUALE, PREZZO_SINGOLO, PREZZO_TITOLARE,
-  QUOTA_PIENA, QUOTA_ACCORDO, TETTO_INIZIALE,
+  QUOTA_PIENA, QUOTA_ACCORDO, TETTO_INIZIALE, quotaSuPrezzoPagato,
 } from '../listino';
 import { CONDUTTORI } from '../protocollo';
 
@@ -237,5 +237,50 @@ describe('l\'agenda è davvero collegata', () => {
   it('il tetto non impedisce di salvare', () => {
     expect(agenda).not.toMatch(/tetto[\s\S]{0,200}crossAlert\([^)]*[Tt]etto/);
     expect(agenda).not.toMatch(/livello === 'oltre'[\s\S]{0,120}return;/);
+  });
+});
+
+// ------------------------------------------------------------
+// LO SCONTO FEDELTÀ LO PAGANO IN DUE
+// ------------------------------------------------------------
+// Decisione del 28 settembre 2026. La quota del collaboratore si
+// calcola su quello che l'allievo paga davvero, non sul listino
+// pieno. Un allievo che resta due anni è un allievo che il
+// collaboratore ha tenuto: la fedeltà l'hanno costruita in due, e il
+// suo costo lo pagano in due.
+
+describe('la quota quando c\'è uno sconto', () => {
+  const dopo = new Date('2026-10-05');
+  const seduta = { conduce: 'collaboratore' as const };
+
+  it('seduta da 35 € scontata del 20%: al collaboratore vanno 14, non 17,50', () => {
+    const pagato = 35 * 0.8; // 28
+    expect(quotaSuPrezzoPagato(seduta, dopo, pagato)).toBe(14);
+    // e non la quota sul listino pieno
+    expect(quotaSuPrezzoPagato(seduta, dopo, pagato))
+      .not.toBe(quotaCollaboratore(seduta, dopo));
+  });
+
+  it('senza sconto il conto coincide con quello di listino', () => {
+    expect(quotaSuPrezzoPagato(seduta, dopo, PREZZO_SINGOLO))
+      .toBe(quotaCollaboratore(seduta, dopo));
+  });
+
+  it('lo studio e il collaboratore perdono la stessa cifra', () => {
+    const pieno = PREZZO_SINGOLO;               // 35
+    const scontato = Math.round(pieno * 0.8 * 100) / 100; // 28
+    const quotaPrima = quotaCollaboratore(seduta, dopo);
+    const quotaDopo = quotaSuPrezzoPagato(seduta, dopo, scontato);
+    const studioPrima = pieno - quotaPrima;
+    const studioDopo = scontato - quotaDopo;
+    expect(quotaPrima - quotaDopo).toBeCloseTo(studioPrima - studioDopo, 2);
+  });
+
+  it('al titolare non va niente nemmeno con lo sconto', () => {
+    expect(quotaSuPrezzoPagato({ conduce: 'titolare' }, dopo, 32)).toBe(0);
+  });
+
+  it('un prezzo assurdo non genera una quota negativa', () => {
+    expect(quotaSuPrezzoPagato(seduta, dopo, -50)).toBe(0);
   });
 });
