@@ -259,6 +259,48 @@ export const quotaCollaboratore = (s: Seduta, quando: Date): number => {
   return Math.round(t.prezzo * quotaDelGiorno(quando) * 100) / 100;
 };
 
+export interface Ripartizione {
+  /** quello che l'allievo paga davvero, sconto già tolto */
+  incassato: number;
+  /** quanto va al collaboratore */
+  collaboratore: number;
+  /** quanto resta allo studio */
+  studio: number;
+  /** la percentuale usata, che dipende dalla data */
+  quota: number;
+}
+
+/**
+ * Come si divide un incasso fra studio e collaboratore.
+ *
+ * Si calcola SUL TOTALE GIÀ SCONTATO: è la decisione del 28 settembre
+ * 2026 — lo sconto fedeltà lo pagano in due, metà per uno.
+ *
+ * La percentuale non si passa: viene dalla data. Così non può
+ * succedere che una schermata usi il sessanta per cento e un'altra il
+ * cinquanta, che è esattamente il genere di divergenza che si scopre
+ * a fine mese guardando due numeri diversi per lo stesso lavoro.
+ *
+ * ATTENZIONE: questo conto è INTERNO. Non finisce mai sul foglio che
+ * si consegna all'allievo — quanto prende il collaboratore non è
+ * affar suo, e vederlo cambierebbe il modo in cui guarda chi lo
+ * allena.
+ */
+export const ripartizioneIncasso = (
+  totaleScontato: number,
+  quando: Date
+): Ripartizione => {
+  const incassato = Math.round(Math.max(0, totaleScontato || 0) * 100) / 100;
+  const quota = quotaDelGiorno(quando);
+  const collaboratore = Math.round(incassato * quota * 100) / 100;
+  return {
+    incassato,
+    collaboratore,
+    studio: Math.round((incassato - collaboratore) * 100) / 100,
+    quota,
+  };
+};
+
 /**
  * La quota quando all'allievo è stato fatto uno sconto fedeltà.
  *

@@ -1,5 +1,6 @@
 import { CAMPI_TUTTI } from '../data/onboardingForm';
 import { applicaSconto, rateScontate, TipoSconto, Conto } from './sconti';
+import { ripartizioneIncasso, Ripartizione } from './listino';
 import { EsitoOnboarding, Risposte } from './onboarding';
 import { PERIMETRO } from './perimetro';
 
@@ -94,6 +95,17 @@ export interface Carta {
   rate: number;
   /** la rata calcolata sul DOVUTO, non sul pieno */
   importoRata: number;
+  /**
+   * Come si divide l'incasso fra studio e collaboratore, sul totale
+   * GIÀ SCONTATO.
+   *
+   * NON SI STAMPA sul foglio del cliente: quanto prende chi lo allena
+   * non è affar suo, e vederlo cambierebbe il modo in cui lo guarda.
+   * Sta qui perché il preventivo è il momento in cui quel numero
+   * serve a chi decide — e chiederglielo a mente, ogni volta, è il
+   * modo migliore per sbagliarlo.
+   */
+  ripartizione: Ripartizione;
   /** righe vuote da riempire a penna, se il preventivo non è stato scritto */
   righeDaRiempire: number;
   validoGiorni: number;
@@ -225,6 +237,7 @@ export const componiCarta = (input: {
     voci,
     totale,
     sconto,
+    ripartizione: ripartizioneIncasso(sconto.dovuto, input.data || new Date()),
     rate,
     // Sul DOVUTO. Dividere il pieno farebbe pagare a rate il prezzo
     // intero, con lo sconto scritto sul foglio e mai tolto davvero.

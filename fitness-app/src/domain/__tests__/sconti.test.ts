@@ -241,3 +241,64 @@ describe('la stampa mostra lo sconto, non solo il risultato', () => {
     expect(stampa).toContain('spiegaSconto(c.sconto)');
   });
 });
+
+// ------------------------------------------------------------
+// QUANTO VA AL COLLABORATORE, CALCOLATO DALL'APP
+// ------------------------------------------------------------
+
+import { ripartizioneIncasso } from '../listino';
+
+describe('la ripartizione si fa sul totale scontato', () => {
+  const dopo = new Date('2026-10-05');   // 50%
+  const prima = new Date('2026-09-15');  // 60%
+
+  it('500 € scontati del 20% fanno 400: 200 e 200', () => {
+    const c = applicaSconto(500, 'storico');
+    const r = ripartizioneIncasso(c.dovuto, dopo);
+    expect(r.incassato).toBe(400);
+    expect(r.collaboratore).toBe(200);
+    expect(r.studio).toBe(200);
+  });
+
+  // La sostanza di «lo sconto lo pagano in due».
+  it('lo sconto toglie la stessa cifra a tutti e due', () => {
+    const pieno = ripartizioneIncasso(500, dopo);
+    const scontato = ripartizioneIncasso(applicaSconto(500, 'storico').dovuto, dopo);
+    expect(pieno.collaboratore - scontato.collaboratore)
+      .toBeCloseTo(pieno.studio - scontato.studio, 2);
+  });
+
+  it('i conti tornano sempre: collaboratore + studio = incassato', () => {
+    [100, 310, 387, 400, 1234.56].forEach((t) => {
+      const r = ripartizioneIncasso(t, dopo);
+      expect(r.collaboratore + r.studio).toBeCloseTo(r.incassato, 2);
+    });
+  });
+
+  // La percentuale viene dalla data, non si passa a mano: così non
+  // può succedere che una schermata usi il 60% e un'altra il 50%.
+  it('la percentuale la decide la data, non chi chiama', () => {
+    expect(ripartizioneIncasso(100, prima).collaboratore).toBe(60);
+    expect(ripartizioneIncasso(100, dopo).collaboratore).toBe(50);
+  });
+
+  it('il preventivo porta il conto già fatto', () => {
+    const c = componiCarta({
+      allievo: 'Prova', risposte: {}, esito: {} as any,
+      voci: [{ descrizione: 'Percorso', importo: 500 }],
+      sconto: 'storico', data: dopo,
+    });
+    expect(c.ripartizione.incassato).toBe(400);
+    expect(c.ripartizione.collaboratore).toBe(200);
+  });
+
+  // Quanto prende chi lo allena non è affare dell'allievo, e vederlo
+  // cambierebbe il modo in cui lo guarda.
+  it('ma NON finisce sul foglio che si consegna', () => {
+    const stampa = fs.readFileSync(
+      path.join(__dirname, '..', '..', 'utils', 'printUtils.ts'), 'utf8'
+    );
+    expect(stampa).not.toContain('ripartizione');
+    expect(stampa).not.toContain('collaboratore');
+  });
+});
