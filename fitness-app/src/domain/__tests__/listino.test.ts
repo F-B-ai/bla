@@ -6,6 +6,9 @@ import {
   PREZZO_ANNUALE, PREZZO_SINGOLO, PREZZO_TITOLARE,
   QUOTA_PIENA, QUOTA_ACCORDO, TETTO_INIZIALE, quotaSuPrezzoPagato,
 } from '../listino';
+import {
+  PREZZO_PRIMA_VALUTAZIONE, PREZZO_VALUTAZIONE,
+} from '../protocollo';
 import { CONDUTTORI } from '../protocollo';
 
 // ============================================================
@@ -282,5 +285,38 @@ describe('la quota quando c\'è uno sconto', () => {
 
   it('un prezzo assurdo non genera una quota negativa', () => {
     expect(quotaSuPrezzoPagato(seduta, dopo, -50)).toBe(0);
+  });
+});
+
+// ------------------------------------------------------------
+// LA VALUTAZIONE: LA PRIMA HA UN PREZZO, LE ALTRE LE DECIDE LUI
+// ------------------------------------------------------------
+// Deciso il 28 settembre 2026. Una rivalutazione può essere il ciclo
+// completo o il controllo di due test: far pagare uguale due lavori
+// diversi fa sentire qualcuno preso in giro.
+
+describe('prima valutazione e rivalutazioni', () => {
+  const fs = require('fs');
+  const path = require('path');
+
+  it('la prima ha un prezzo di listino', () => {
+    expect(PREZZO_PRIMA_VALUTAZIONE).toBe(150);
+  });
+
+  it('il nome vecchio continua a funzionare e punta allo stesso numero', () => {
+    expect(PREZZO_VALUTAZIONE).toBe(PREZZO_PRIMA_VALUTAZIONE);
+  });
+
+  // Il sito non deve far credere che ogni valutazione costi 150: chi
+  // torna dopo tre mesi arriverebbe con l'aspettativa sbagliata, e
+  // qualunque cifra diversa sembrerebbe un'improvvisazione.
+  it('il sito dice «prima valutazione», e che le altre si concordano', () => {
+    const studio = fs.readFileSync(
+      path.join(__dirname, '..', '..', '..', 'public', 'studio.html'), 'utf8'
+    );
+    expect(studio).toContain('Prima valutazione');
+    expect(studio).toContain('Valutazioni successive');
+    expect(studio).toContain('si concordano');
+    expect(studio).not.toContain('Valutazione completa');
   });
 });
