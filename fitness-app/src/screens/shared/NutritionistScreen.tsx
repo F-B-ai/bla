@@ -44,15 +44,16 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
+import { grigliaOrari } from '../../domain/orariStudio';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
 import { motivoSalvataggio } from '../../domain/salvataggio';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
-const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00',
-  '14:00', '15:00', '16:00', '17:00', '18:00',
-];
+// Era una lista a parte con le sole ore piene, e nessuno sapeva
+// perché la nutrizione avesse orari diversi dal resto. Stessa
+// griglia di tutti. Vedi domain/orariStudio.ts.
+const TIME_SLOTS = grigliaOrari();
 
 export const NutritionistScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
