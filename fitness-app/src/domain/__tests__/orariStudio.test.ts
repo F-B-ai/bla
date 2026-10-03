@@ -1,5 +1,6 @@
 import {
   APERTURA, ULTIMO_INIZIO, ULTIMO_INIZIO_ECCEZIONE, PASSO_MINUTI,
+  grigliaOrari, oraPiena,
   DURATA_STANDARD, inMinuti, inOra, slotLiberi, descriviSlot,
   regolaDellaGiornata, AVVISO_SOLA_LETTURA, ORARI_STUDIO_VERSION,
 } from '../orariStudio';
@@ -203,5 +204,75 @@ describe('chi legge NON prenota', () => {
 describe('versione', () => {
   it('tracciata', () => {
     expect(ORARI_STUDIO_VERSION).toBe(1);
+  });
+});
+
+// ============================================================
+// LA GRIGLIA A UN QUARTO D'ORA
+// ------------------------------------------------------------
+// 3 ottobre 2026. Era mezz'ora: un allievo che poteva solo alle
+// 10:15 andava spostato alle 10:00 o alle 10:30, e spesso quello
+// spostamento era il motivo per cui non veniva.
+// ============================================================
+
+describe('la griglia degli orari', () => {
+  it('va di quindici minuti in quindici', () => {
+    expect(PASSO_MINUTI).toBe(15);
+    const g = grigliaOrari();
+    expect(g).toContain('10:15');
+    expect(g).toContain('10:45');
+    expect(g).toContain('18:15');
+  });
+
+  it('comincia e finisce dove deve', () => {
+    const g = grigliaOrari();
+    expect(g[0]).toBe('07:00');
+    expect(g[g.length - 1]).toBe('22:00');
+  });
+
+  it('nessun orario è ripetuto e sono in ordine', () => {
+    const g = grigliaOrari();
+    expect(new Set(g).size).toBe(g.length);
+    const m = g.map(inMinuti);
+    expect(m).toEqual([...m].sort((a, b) => a - b));
+  });
+
+  it('ogni orario è multiplo del passo', () => {
+    grigliaOrari().forEach((o) => expect(inMinuti(o) % PASSO_MINUTI).toBe(0));
+  });
+
+  // Servono a dare un appiglio all'occhio in una lista di 61 voci.
+  it('le ore piene si riconoscono', () => {
+    expect(oraPiena('10:00')).toBe(true);
+    expect(oraPiena('10:15')).toBe(false);
+    expect(oraPiena('10:30')).toBe(false);
+    expect(grigliaOrari().filter(oraPiena).length).toBe(16); // dalle 7 alle 22
+  });
+
+  it('si può chiedere un passo diverso senza toccare il resto', () => {
+    expect(grigliaOrari('09:00', '10:00', 30)).toEqual(['09:00', '09:30', '10:00']);
+  });
+});
+
+describe('gli orari non sono più scritti a mano da nessuna parte', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const schermate = [
+    ['screens', 'shared', 'calendar', 'AppointmentModal.tsx'],
+    ['screens', 'shared', 'ScheduleSessionScreen.tsx'],
+    ['screens', 'shared', 'NutritionistScreen.tsx'],
+  ];
+
+  // Erano quattro liste diverse in quattro file: cambiare il passo
+  // avrebbe voluto dire toccarne quattro e dimenticarne una — e
+  // quella sarebbe rimasta a mezz'ora per mesi.
+  it('tutte e tre le schermate usano la griglia del dominio', () => {
+    schermate.forEach((parti) => {
+      const src = fs.readFileSync(
+        path.join(__dirname, '..', '..', ...parti), 'utf8'
+      );
+      expect(src).toContain('grigliaOrari()');
+      expect(src).not.toMatch(/const TIME_SLOTS = \[/);
+    });
   });
 });
