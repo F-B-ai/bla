@@ -19,6 +19,7 @@ import {
 } from '../../domain/cartaIntestata';
 import { printCartaIntestata } from '../../utils/printUtils';
 import { TipoSconto, REGOLE_SCONTO, regolaDi } from '../../domain/sconti';
+import { VOCI_LISTINO, euroIt } from '../../domain/listino';
 
 /** Le scelte del selettore: «nessuno» più le regole del dominio. */
 const SCELTE_SCONTO: { tipo: TipoSconto; etichetta: string }[] = [
@@ -656,6 +657,36 @@ export function OnboardingScreen() {
               ancora non si è misurato niente. Per il documento CON le misure —
               e con il numero di sedute — usa il Protocollo di lavoro.
             </Text>
+
+            {/* Le voci che un prezzo l'hanno già. Si toccano e si
+                scrivono nella prima riga libera: il prezzo viene dal
+                listino, non dalla memoria di chi compila. */}
+            <Text style={[s.label, { marginTop: spacing.md }]}>
+              Voci di listino
+            </Text>
+            <View style={s.scontoRiga}>
+              {VOCI_LISTINO.map((voce) => (
+                <TouchableOpacity
+                  key={voce.chiave}
+                  style={s.scontoChip}
+                  onPress={() => setVoci((x) => {
+                    const libera = x.findIndex((y) => !y.descrizione.trim());
+                    const riga = {
+                      descrizione: voce.descrizione,
+                      importo: euroIt(voce.importo),
+                    };
+                    // Nessuna riga libera: si aggiunge, invece di
+                    // sovrascrivere una voce già scritta.
+                    if (libera === -1) return [...x, riga];
+                    return x.map((y, j) => (j === libera ? riga : y));
+                  })}
+                >
+                  <Text style={s.scontoTxt}>
+                    {voce.etichetta} · {euroIt(voce.importo)} €
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {voci.map((v, i) => (
               <View key={i} style={s.vocePreventivo}>

@@ -39,6 +39,193 @@ export const PREZZO_SINGOLO = 35;
 export const PREZZO_TITOLARE = 40;
 
 // ------------------------------------------------------------
+// IL PERSONAL DI GRUPPO
+// ------------------------------------------------------------
+//
+// Deciso l'8 ottobre 2026. Fino a oggi la quota del gruppo era un
+// campo libero: si scriveva a mano, una persona alla volta, e due
+// coppie uguali potevano pagare due cifre diverse senza che nessuno
+// se ne accorgesse. Adesso il numero viene dal listino.
+//
+//   due persone      20 € a testa   →  40 € la seduta
+//   tre persone      15 € a testa   →  45 € la seduta
+//   quattro persone  11,50 € a testa →  46 € la seduta
+//
+// LA COSA DA GUARDARE NON È LA QUOTA, È L'ULTIMA COLONNA. La quota
+// scende — a testa si paga quasi la metà in quattro che in due — e
+// l'incasso dell'ora sale. È il senso del gruppo: all'allievo costa
+// meno, allo studio rende più di una seduta individuale (40 €), e
+// nessuno dei due ci rimette. Chi guarda solo la quota pensa di
+// svendere; chi guarda l'ora vede che non è così.
+//
+// CINQUE PERSONE non ha un prezzo. Il selettore arriva a cinque
+// perché oltre non è più personal, ma il listino si fermava a
+// quattro: la quinta quota non si inventa, si chiede. Finché non
+// c'è, con cinque persone il campo resta libero e lo dice.
+
+/** La quota a persona, per numero di partecipanti. In un posto solo. */
+export const QUOTE_GRUPPO: Record<number, number> = {
+  2: 20,
+  3: 15,
+  4: 11.5,
+};
+
+/**
+ * Quanto paga ciascuno in un gruppo di tante persone.
+ *
+ * Torna `null` quando il listino non lo dice — e `null` non è un
+ * errore: è l'unica risposta onesta per un numero che il titolare non
+ * ha ancora deciso. Chi la riceve lascia il campo libero, non mette
+ * uno zero.
+ */
+export const quotaGruppoDi = (persone: number): number | null => {
+  const q = QUOTE_GRUPPO[persone];
+  return typeof q === 'number' ? q : null;
+};
+
+/** Quanto rende l'ora con tante persone, a prezzo di listino. */
+export const incassoGruppoDi = (persone: number): number | null => {
+  const q = quotaGruppoDi(persone);
+  return q === null ? null : Math.round(persone * q * 100) / 100;
+};
+
+/** «11,50», non «11.5»: i prezzi si scrivono come si leggono. */
+export const euroIt = (n: number): string =>
+  (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '').replace('.', ',');
+
+/**
+ * Questa cifra viene dal listino, o l'ha scritta qualcuno a mano?
+ *
+ * Serve a una cosa sola: una quota scritta a mano non si sovrascrive
+ * mai con la proposta. Chi ha digitato un numero aveva un motivo, e
+ * quel motivo vale più del listino.
+ */
+export const eQuotaDiListino = (valore: string): boolean => {
+  const n = parseFloat(String(valore || '').replace(',', '.'));
+  if (!Number.isFinite(n)) return false;
+  return Object.values(QUOTE_GRUPPO).some((q) => Math.abs(q - n) < 0.005);
+};
+
+/** La riga del listino per un gruppo, già pronta da mostrare. */
+export const rigaGruppo = (persone: number): string => {
+  const q = quotaGruppoDi(persone);
+  if (q === null) {
+    return `In ${persone} il listino non ha una quota: la decidi tu.`;
+  }
+  return `In ${persone}: ${euroIt(q)} € a persona · ${euroIt(persone * q)} € la seduta.`;
+};
+
+// ------------------------------------------------------------
+// L'AFFIANCAMENTO
+// ------------------------------------------------------------
+//
+// Deciso l'8 ottobre 2026. Quattro a sei lezioni al mese, 35 € la
+// lezione, condotte da un collaboratore, da un manager o dal
+// titolare.
+//
+// IL MINIMO È LA COSA IMPORTANTE, non il prezzo. Sotto le quattro
+// lezioni al mese non è un affiancamento: è una lezione ogni tanto,
+// e una lezione ogni tanto non cambia niente in chi la riceve. Il
+// massimo esiste per il motivo opposto — oltre le sei si sta
+// sostituendo l'allenamento della persona, non affiancandolo.
+
+export const PREZZO_AFFIANCAMENTO = 35;
+export const AFFIANCAMENTO_MIN_MESE = 4;
+export const AFFIANCAMENTO_MAX_MESE = 6;
+
+/** Chi può condurre un affiancamento. */
+export type ConduttoreAffiancamento = 'collaboratore' | 'manager' | 'titolare';
+
+export const CONDUTTORI_AFFIANCAMENTO: ConduttoreAffiancamento[] = [
+  'collaboratore',
+  'manager',
+  'titolare',
+];
+
+export interface EsitoAffiancamento {
+  ok: boolean;
+  lezioni: number;
+  totale: number;
+  motivo: string;
+}
+
+/**
+ * Controlla quante lezioni al mese, e dice il totale.
+ *
+ * Il prezzo non cambia con il conduttore: 35 € la lezione anche con
+ * il titolare, ed è una scelta — l'affiancamento non è una seduta
+ * individuale e non ne segue il listino.
+ */
+export const controllaAffiancamento = (lezioniMese: number): EsitoAffiancamento => {
+  const n = Math.round(lezioniMese || 0);
+  const totale = Math.round(n * PREZZO_AFFIANCAMENTO * 100) / 100;
+
+  if (!Number.isFinite(lezioniMese) || n < AFFIANCAMENTO_MIN_MESE) {
+    return {
+      ok: false,
+      lezioni: n,
+      totale,
+      motivo: `L'affiancamento parte da ${AFFIANCAMENTO_MIN_MESE} lezioni al mese: `
+        + 'sotto quel numero non è un affiancamento, è una lezione ogni tanto.',
+    };
+  }
+  if (n > AFFIANCAMENTO_MAX_MESE) {
+    return {
+      ok: false,
+      lezioni: n,
+      totale,
+      motivo: `L'affiancamento arriva a ${AFFIANCAMENTO_MAX_MESE} lezioni al mese. `
+        + 'Oltre, non si affianca l\'allenamento di quella persona: lo si sostituisce.',
+    };
+  }
+  return {
+    ok: true,
+    lezioni: n,
+    totale,
+    motivo: `${n} lezioni × ${PREZZO_AFFIANCAMENTO} € = ${euroIt(totale)} € al mese.`,
+  };
+};
+
+// ------------------------------------------------------------
+// LE VOCI PRONTE PER IL PREVENTIVO
+// ------------------------------------------------------------
+//
+// Il preventivo è tre righe libere: descrizione e importo, scritti a
+// mano. Va bene per il caso particolare, ed è il modo più rapido di
+// sbagliare una cifra sulle voci che invece un prezzo l'hanno.
+//
+// Queste sono quelle voci, già scritte. Si toccano i prezzi qui e
+// cambiano nel preventivo: non c'è una seconda lista da ricordarsi.
+
+export interface VoceListino {
+  chiave: string;
+  /** il testo breve del bottone */
+  etichetta: string;
+  /** come finisce scritto sul foglio dell'allievo */
+  descrizione: string;
+  importo: number;
+}
+
+export const VOCI_LISTINO: VoceListino[] = [
+  ...Object.keys(QUOTE_GRUPPO)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((n) => ({
+      chiave: `gruppo${n}`,
+      etichetta: `Gruppo in ${n}`,
+      descrizione: `Personal di gruppo in ${n} · ${euroIt(QUOTE_GRUPPO[n])} € a persona `
+        + 'a seduta',
+      importo: QUOTE_GRUPPO[n],
+    })),
+  ...[AFFIANCAMENTO_MIN_MESE, 5, AFFIANCAMENTO_MAX_MESE].map((n) => ({
+    chiave: `affiancamento${n}`,
+    etichetta: `Affiancamento ${n}/mese`,
+    descrizione: `Affiancamento · ${n} lezioni al mese, ${PREZZO_AFFIANCAMENTO} € a lezione`,
+    importo: Math.round(n * PREZZO_AFFIANCAMENTO * 100) / 100,
+  })),
+];
+
+// ------------------------------------------------------------
 // LA VALUTAZIONE A DISTANZA
 // ------------------------------------------------------------
 //

@@ -82,7 +82,7 @@ import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequ
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
-import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
+import { controllaGruppo, costoPerAllievo, quotaProposta } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
   eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
@@ -91,6 +91,7 @@ import { motivoSalvataggio } from '../../domain/salvataggio';
 import {
   tariffaDi, avvisoAnnualeColTitolare, eAnnuale, statoTetto,
   stessaSettimana, TETTO_INIZIALE, Conduttore,
+  eQuotaDiListino, euroIt,
 } from '../../domain/listino';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
@@ -507,6 +508,19 @@ export const CalendarScreen: React.FC = () => {
     if (!isOwner && !isManager) return;
     setFormCost(String(tariffa.prezzo));
   }, [showModal, editingItem, formKind, tariffa.prezzo, isOwner, isManager]);
+
+  // La quota del gruppo segue il numero di persone, perché è il numero
+  // di persone a decidere il prezzo: 20 in due, 15 in tre, 11,50 in
+  // quattro. Una cifra scritta a mano non si tocca — chi l'ha digitata
+  // aveva un motivo — e con cinque persone, che nel listino non c'è, il
+  // campo si svuota invece di proporre un numero inventato.
+  useEffect(() => {
+    if (!showModal || editingItem) return;
+    if (formKind !== 'gruppo') return;
+    if (formQuota && !eQuotaDiListino(formQuota)) return;
+    const q = quotaProposta(formPersone);
+    setFormQuota(q === null ? '' : euroIt(q));
+  }, [showModal, editingItem, formKind, formPersone]);
 
   const filteredAppointments = useMemo(() => {
     if (!canSeeAll || !selectedStaffId) return allAppointments;

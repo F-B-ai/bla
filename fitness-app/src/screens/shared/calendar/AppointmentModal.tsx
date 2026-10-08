@@ -10,7 +10,9 @@ import { Button } from '../../../components/common/Button';
 import { StudentSearchPicker } from '../../../components/common/StudentSearchPicker';
 import {
   PERSONE_POSSIBILI, incassoSeduta, confrontaConIndividuale, controllaGruppo,
+  listinoDelGruppo, quotaProposta,
 } from '../../../domain/gruppo';
+import { euroIt } from '../../../domain/listino';
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
@@ -220,12 +222,18 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   ))}
                 </View>
 
+                <Text style={styles.gruppoNota}>{listinoDelGruppo(formPersone)}</Text>
+
                 <InputField
                   label="Quota a persona (€)"
                   value={formQuota}
                   onChangeText={setFormQuota}
                   keyboardType="decimal-pad"
-                  placeholder="25"
+                  placeholder={
+                    quotaProposta(formPersone) === null
+                      ? 'da decidere'
+                      : euroIt(quotaProposta(formPersone) as number)
+                  }
                 />
 
                 {ok && conf && (
