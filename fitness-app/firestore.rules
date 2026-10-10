@@ -688,5 +688,26 @@ service cloud.firestore {
       allow update: if isStaff();
       allow delete: if isStaff();
     }
+
+    // ----------------------------------------------------------
+    // IL REGISTRO DEI GUASTI
+    // ----------------------------------------------------------
+    // Chi subisce un guasto lo può SCRIVERE — altrimenti si
+    // registrerebbero solo i guasti dello staff, e un'App che non
+    // parte in mano a un allievo resterebbe muta come prima.
+    //
+    // Ma NESSUNO lo può rileggere tranne il titolare, e nessuno lo
+    // può modificare: un registro che si può correggere non è un
+    // registro. Le righe non si cancellano nemmeno una per una —
+    // la ripulitura si fa dal server, non dall'App.
+    //
+    // Dentro non finiscono dati di allievi: solo il messaggio, la
+    // schermata, la versione e il ruolo. Vedi domain/guasti.ts.
+    match /guasti/{guastoId} {
+      allow read: if isOwner();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }

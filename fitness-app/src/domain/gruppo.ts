@@ -17,7 +17,22 @@
 // quello che hai preso. Qui le due cose non si toccano mai.
 // ============================================================
 
+import { quotaGruppoDi, rigaGruppo } from './listino';
+
 export const GRUPPO_VERSION = 1;
+
+/**
+ * La quota che il listino propone per un gruppo di tante persone.
+ *
+ * Sta qui perché chi compila l'agenda guarda questo file, e il prezzo
+ * sta nel listino: una riesporta, non un secondo numero. `null`
+ * significa che il listino non lo dice — con cinque persone — e il
+ * campo va lasciato libero, non riempito di zeri.
+ */
+export const quotaProposta = (persone: number): number | null => quotaGruppoDi(persone);
+
+/** La riga di listino da mostrare accanto al selettore. */
+export const listinoDelGruppo = (persone: number): string => rigaGruppo(persone);
 
 /** Sotto due non è un gruppo: è una seduta individuale. */
 export const MIN_PERSONE = 2;

@@ -78,28 +78,28 @@
 </head>
 <body>
   <div id="root"></div>
-  <script>
-    // Auto-recovery: if app doesn't load within 8s, clear caches and reload
-    var _appLoaded = false;
-    window.__markAppLoaded = function() { _appLoaded = true; };
-    setTimeout(function() {
-      if (!_appLoaded && 'caches' in window) {
-        caches.keys().then(function(keys) {
-          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-        }).then(function() {
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              regs.forEach(function(r) { r.unregister(); });
-              if (!sessionStorage.getItem('_recovery')) {
-                sessionStorage.setItem('_recovery', '1');
-                window.location.reload();
-              }
-            });
-          }
-        });
-      }
-    }, 8000);
-  </script>
+  <!--
+    Qui viveva una rete di sicurezza: «se l'App non parte entro 8
+    secondi, svuota le cache e ricarica». Sembrava una protezione, e
+    per mesi tutti l'abbiamo creduta attiva.
+
+    NON È MAI ARRIVATA IN PRODUZIONE. Expo genera `dist/index.html`
+    da sé: questo file non è il sorgente della pagina, è la copia
+    leggibile. In produzione finisce solo ciò che `postbuild-web.js`
+    inietta — e quel blocco lì non c'era. `App.tsx` chiamava
+    `window.__markAppLoaded()`, una funzione che sul sito vero non
+    è mai esistita.
+
+    Aveva anche due difetti suoi: si fidava di un segnale che l'App
+    doveva ricordarsi di mandare, invece di guardare se la schermata
+    era davvero piena; e se una delle pulizie falliva, la catena
+    moriva zitta senza ricaricare niente.
+
+    La rete nuova sta in fondo a questo file E in postbuild-web.js,
+    guarda il DOM invece di un flag, e ricarica comunque se le
+    pulizie si piantano. Un test verifica che le due copie non
+    divergano — perché è esattamente così che è nato questo buco.
+  -->
   <script>
     // ============================================================
     // AGGIORNAMENTO — dirlo, invece di sperare in un ricaricamento
@@ -121,11 +121,70 @@
     // quando c'è una versione nuova COMPARE UNA RIGA che lo dice. Non si
     // ricarica di nascosto: un ricaricamento a sorpresa mentre stai
     // scrivendo una scheda è peggio del problema che risolve.
+    //
+    // ------------------------------------------------------------
+    // 23 SETTEMBRE 2026 — «L'APP NON SI APRE, SCHERMO NERO»
+    //
+    // La riga qui sopra — «non si ricarica di nascosto» — era vera
+    // nelle intenzioni e falsa nei fatti. Il service worker faceva
+    // `skipWaiting()` appena installato: prendeva il comando di
+    // un'App APERTA, e un istante dopo cancellava le cache vecchie.
+    // A una pagina viva veniva tolto il pavimento da sotto, e al
+    // primo file che le serviva — un'icona, un font, un pezzo
+    // caricato al momento — schermo nero.
+    //
+    // L'avviso qui sotto non faceva in tempo a comparire: il
+    // ricambio avveniva prima che ci fosse qualcosa da toccare.
+    // Una porta che c'era e che nessuno riusciva ad aprire.
+    //
+    // Adesso la versione nuova ASPETTA. L'avviso compare davvero, e
+    // il ricambio parte da un dito su quella riga — a lezione
+    // finita, non a metà. E se malgrado tutto la schermata resta
+    // vuota, l'App si ripara da sola invece di aspettare che
+    // qualcuno sappia come si svuota la cache di una PWA.
     // ============================================================
     (function () {
-      if (!('serviceWorker' in navigator)) return;
+      var SEGNO = 'essere-riparato';
+      var ricaricato = false;
 
-      function mostraAvviso() {
+      function vuota() {
+        var r = document.getElementById('root');
+        return !r || r.childElementCount === 0;
+      }
+
+      function ricarica() {
+        if (ricaricato) return;
+        ricaricato = true;
+        window.location.reload();
+      }
+
+      // La rete di sicurezza. Se la schermata è ancora vuota vuol dire
+      // che qualcosa è rimasto a metà fra due versioni: si butta via
+      // tutto e si riparte. UNA volta sola — il segno in sessionStorage
+      // impedisce il giro infinito, che sarebbe peggio dello schermo
+      // nero perché non lo vedresti nemmeno.
+      function riparaUnaVolta() {
+        try {
+          if (sessionStorage.getItem(SEGNO)) return;
+          sessionStorage.setItem(SEGNO, '1');
+        } catch (e) { return; }
+        var lavori = [];
+        if (window.caches && caches.keys) {
+          lavori.push(caches.keys().then(function (nomi) {
+            return Promise.all(nomi.map(function (n) { return caches.delete(n); }));
+          }));
+        }
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+          lavori.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+            return Promise.all(rs.map(function (r) { return r.unregister(); }));
+          }));
+        }
+        Promise.all(lavori).then(ricarica).catch(ricarica);
+        // Se una delle pulizie si pianta, si riparte lo stesso.
+        setTimeout(ricarica, 4000);
+      }
+
+      function mostraAvviso(reg) {
         if (document.getElementById('essere-aggiornamento')) return;
         var b = document.createElement('div');
         b.id = 'essere-aggiornamento';
@@ -146,12 +205,30 @@
           '<br><span style="font-weight:400;opacity:.75">Tocca qui per aggiornare.</span></span>';
         b.addEventListener('click', function () {
           b.style.opacity = '.5';
-          window.location.reload();
+          // Qui c'era solo un `reload()`. Non bastava: la versione nuova
+          // adesso aspetta, e finché non le si dice di passare avanti un
+          // ricaricamento ripresenta la stessa versione di prima.
+          // Le si dice, e si ricarica quando ha preso il comando davvero
+          // — così la pagina nuova parte con i file nuovi, tutti insieme.
+          var atteso = reg && reg.waiting;
+          if (!atteso) { ricarica(); return; }
+          navigator.serviceWorker.addEventListener('controllerchange', ricarica);
+          atteso.postMessage({ type: 'SKIP_WAITING' });
+          // Se il cambio non arriva, si ricarica lo stesso: meglio una
+          // versione vecchia che un dito premuto a vuoto.
+          setTimeout(ricarica, 3000);
         });
         document.body.appendChild(b);
       }
 
       window.addEventListener('load', function () {
+        // Prima di ogni altra cosa: l'App è partita?
+        setTimeout(function () {
+          if (vuota()) riparaUnaVolta();
+          else { try { sessionStorage.removeItem(SEGNO); } catch (e) {} }
+        }, 15000);
+
+        if (!('serviceWorker' in navigator)) return;
         // `updateViaCache: 'none'` non e' un dettaglio: senza, il browser
         // controlla se c'e' un service worker nuovo LEGGENDOLO DALLA
         // PROPRIA CACHE HTTP. Il 13 settembre 2026 sw.js veniva servito
@@ -164,7 +241,7 @@
         // Con questo, il controllo va SEMPRE in rete.
         navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function (reg) {
           // Una versione nuova già pronta e in attesa: lo si dice subito.
-          if (reg.waiting && navigator.serviceWorker.controller) mostraAvviso();
+          if (reg.waiting && navigator.serviceWorker.controller) mostraAvviso(reg);
 
           reg.addEventListener('updatefound', function () {
             var nuovo = reg.installing;
@@ -177,7 +254,7 @@
             // (Trovato dal controllo in Chromium, non a ragionamento.)
             var eAggiornamento = !!navigator.serviceWorker.controller;
             nuovo.addEventListener('statechange', function () {
-              if (nuovo.state === 'installed' && eAggiornamento) mostraAvviso();
+              if (nuovo.state === 'installed' && eAggiornamento) mostraAvviso(reg);
             });
           });
 

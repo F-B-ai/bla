@@ -36,8 +36,13 @@ const firebase = JSON.parse(
 
 // I commenti nominano apposta il difetto vecchio, per spiegarlo. Il
 // test guarda il CODICE: senza questa riga cadrebbe su una spiegazione.
+// Anche i commenti HTML: in web/index.html il racconto di che cosa non
+// funzionava sta fra <!-- e -->, e nomina il codice che non c'è più.
 const senzaCommenti = (t: string): string =>
-  t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  t
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
 
 const html = senzaCommenti(htmlGrezzo);
 
@@ -169,6 +174,84 @@ describe('che cosa succede quando c\'è una versione nuova', () => {
   });
 });
 
+// ============================================================
+// «L'APP NON SI APRE, SCHERMO NERO» — 23 settembre 2026
+// ------------------------------------------------------------
+// Poco dopo una pubblicazione. Il service worker faceva
+// `skipWaiting()` appena installato: prendeva il comando di un'App
+// APERTA e un istante dopo cancellava le cache vecchie. A una
+// pagina viva veniva tolto il pavimento da sotto.
+//
+// L'avviso «c'è una versione nuova» esisteva già, e non faceva mai
+// in tempo a comparire: il ricambio avveniva prima che ci fosse
+// qualcosa da toccare.
+// ============================================================
+
+const sw = fs.readFileSync(path.join(radice, 'web', 'sw.js'), 'utf8');
+
+describe('la versione nuova aspetta il suo turno', () => {
+  const swPulito = senzaCommenti(sw);
+
+  it('il service worker NON prende il comando da solo', () => {
+    // `skipWaiting` può esistere solo dentro il gestore dei messaggi,
+    // cioè quando è la pagina a chiederlo. Mai nell'install.
+    const install = swPulito.match(/addEventListener\('install'[\s\S]*?\n\}\);/);
+    expect(install).not.toBeNull();
+    expect(install![0]).not.toContain('skipWaiting');
+  });
+
+  it('passa avanti solo se glielo chiede la pagina', () => {
+    expect(swPulito).toContain("'SKIP_WAITING'");
+    expect(swPulito).toMatch(/addEventListener\('message'/);
+  });
+
+  it('e la pagina lo chiede quando qualcuno tocca l\'avviso', () => {
+    [iniettato, html].forEach((c) => {
+      expect(c).toContain('SKIP_WAITING');
+      expect(c).toContain('postMessage');
+      // Si ricarica quando il ricambio è avvenuto davvero.
+      expect(c).toContain('controllerchange');
+    });
+  });
+});
+
+describe('se malgrado tutto la schermata resta vuota', () => {
+  // Il difetto che ha permesso allo schermo nero di restare nero: la
+  // rete di sicurezza esisteva SOLO nella copia leggibile. Expo non
+  // usa web/index.html come sorgente — in produzione finisce solo ciò
+  // che postbuild-web.js inietta. Per mesi abbiamo creduto attiva una
+  // protezione che sul sito vero non c'era.
+  it('la riparazione sta nella copia che finisce in produzione', () => {
+    expect(iniettato).toContain('riparaUnaVolta');
+    expect(iniettato).toContain("getElementById('root')");
+  });
+
+  it('guarda se la schermata è piena, non un segnale da ricordarsi', () => {
+    // `__markAppLoaded` si fidava di una chiamata che l'App doveva
+    // fare. Se l'App moriva prima, il segnale non arrivava; se la
+    // funzione non c'era, non serviva a niente. Adesso: il DOM.
+    [iniettato, html].forEach((c) => expect(c).toContain('childElementCount'));
+    expect(postbuild).not.toContain('__markAppLoaded');
+    expect(html).not.toContain('__markAppLoaded');
+  });
+
+  it('ricarica una volta sola: un giro infinito è peggio del nero', () => {
+    [iniettato, html].forEach((c) => {
+      expect(c).toContain('sessionStorage');
+      expect(c).toMatch(/setItem\(SEGNO/);
+    });
+  });
+
+  it('e ricarica lo stesso se le pulizie si piantano', () => {
+    // Il difetto della rete vecchia: nessun catch. Se `caches.keys()`
+    // rigettava, la catena moriva zitta e lo schermo restava nero.
+    [iniettato, html].forEach((c) => {
+      expect(c).toMatch(/\.then\(ricarica\)\s*\.catch\(ricarica\)/);
+      expect(c).toMatch(/setTimeout\(ricarica,\s*4000\)/);
+    });
+  });
+});
+
 describe('le due copie non divergono', () => {
   // Non si confrontano carattere per carattere — una è minificata.
   // Si confronta che facciano le stesse cose.
@@ -181,6 +264,12 @@ describe('le due copie non divergono', () => {
     'essere-aggiornamento',
     'location.reload',
     '60000',
+    // Aggiunti il 23 settembre 2026: sono esattamente i pezzi che
+    // stavano in una copia sola, ed è così che è nato lo schermo nero.
+    'SKIP_WAITING',
+    'controllerchange',
+    'riparaUnaVolta',
+    'childElementCount',
   ];
 
   it('ogni pezzo che conta sta in tutte e due', () => {

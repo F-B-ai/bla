@@ -111,8 +111,22 @@ export const aiMessages = onRequest(
   {
     region: "europe-west1",
     secrets: [ANTHROPIC_API_KEY],
-    timeoutSeconds: 120,
-    memory: "256MiB",
+    // 27 settembre 2026, 19:16, con un allievo davanti: «errore 502»
+    // sull'analisi posturale.
+    //
+    // 502 vuol dire che la funzione è MORTA, non che ha risposto male.
+    // Qui c'erano 256 MiB. Quattro foto posturali arrivano a 1-2 MB
+    // l'una (la qualità è già al 50%, ma non c'è ridimensionamento), e
+    // in base64 crescono di un terzo. Node le tiene in memoria più
+    // volte — il corpo grezzo, l'oggetto letto, la richiesta in uscita
+    // verso Anthropic — e a quel punto 256 MiB finiscono.
+    //
+    // Il costo di questo cambio è trascurabile: le analisi posturali
+    // sono poche al giorno, e si paga a memoria-per-secondo solo
+    // mentre girano. Il costo di NON farlo era un errore davanti a un
+    // allievo.
+    timeoutSeconds: 300,
+    memory: "1GiB",
     cors: true, // PWA same-origin via rewrite; native app cross-origin
   },
   async (req, res) => {

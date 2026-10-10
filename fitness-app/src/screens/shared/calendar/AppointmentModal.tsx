@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { grigliaOrari, oraPiena } from '../../../domain/orariStudio';
 import { colors, spacing, fontSize, borderRadius } from '../../../config/theme';
 import { Student, Collaborator } from '../../../types';
 import { InputField } from '../../../components/common/InputField';
@@ -9,7 +10,9 @@ import { Button } from '../../../components/common/Button';
 import { StudentSearchPicker } from '../../../components/common/StudentSearchPicker';
 import {
   PERSONE_POSSIBILI, incassoSeduta, confrontaConIndividuale, controllaGruppo,
+  listinoDelGruppo, quotaProposta,
 } from '../../../domain/gruppo';
+import { euroIt } from '../../../domain/listino';
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
@@ -30,12 +33,9 @@ type AppointmentItem = {
   quotaPersona?: number;
 };
 
-const TIME_SLOTS = [
-  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-  '19:00', '19:30', '20:00', '20:30', '21:00',
-];
+// Gli orari vengono dal dominio: unica lista per tutta l'applicazione,
+// passo di 15 minuti. Vedi domain/orariStudio.ts.
+const TIME_SLOTS = grigliaOrari();
 
 const toDateStr = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -69,6 +69,14 @@ export interface AppointmentModalProps {
   setFormQuota: (v: string) => void;
   /** tariffa individuale del conduttore, per il confronto */
   prezzoIndividuale: number;
+  /** perché il costo proposto è quello: si legge, non si indovina */
+  tariffaPerche?: string;
+  /** quando il listino e la situazione non combaciano (annuale col titolare) */
+  avvisoTariffa?: string | null;
+  /** i posti del titolare in questa settimana, se è lui a condurre */
+  tettoFrase?: string | null;
+  /** 'pieno' e 'oltre' si vedono da lontano */
+  tettoLivello?: 'sotto' | 'vicino' | 'pieno' | 'oltre';
   /** solo per la consulenza: il nome di chi viene, se non è in anagrafica */
   formNomeOspite: string;
   setFormNomeOspite: (v: string) => void;
@@ -101,6 +109,10 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   setFormEndTime,
   formCost,
   setFormCost,
+  tariffaPerche,
+  avvisoTariffa,
+  tettoFrase,
+  tettoLivello,
   formNotes,
   setFormNotes,
   formPersone,
@@ -210,12 +222,18 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                   ))}
                 </View>
 
+                <Text style={styles.gruppoNota}>{listinoDelGruppo(formPersone)}</Text>
+
                 <InputField
                   label="Quota a persona (€)"
                   value={formQuota}
                   onChangeText={setFormQuota}
                   keyboardType="decimal-pad"
-                  placeholder="25"
+                  placeholder={
+                    quotaProposta(formPersone) === null
+                      ? 'da decidere'
+                      : euroIt(quotaProposta(formPersone) as number)
+                  }
                 />
 
                 {ok && conf && (
@@ -386,12 +404,14 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       key={`s-${t}`}
                       style={{
                         ...styles.timeChip,
+                        ...(oraPiena(t) ? styles.chipOraPiena : {}),
                         ...(formStartTime === t ? styles.chipActive : {}),
                       }}
                       onPress={() => setFormStartTime(t)}
                     >
                       <Text style={{
                         ...styles.chipText,
+                        ...(oraPiena(t) ? styles.chipTextOraPiena : {}),
                         ...(formStartTime === t ? styles.chipTextActive : {}),
                       }}>{t}</Text>
                     </TouchableOpacity>
@@ -408,6 +428,7 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
                       key={`e-${t}`}
                       style={{
                         ...styles.timeChip,
+                        ...(oraPiena(t) ? styles.chipOraPiena : {}),
                         ...(formEndTime === t ? styles.chipActive : {}),
                       }}
                       onPress={() => setFormEndTime(t)}
@@ -425,13 +446,38 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
 
           {/* Cost */}
           {(isOwner || isManager) && (
-            <InputField
-              label="Costo sessione (€)"
-              value={formCost}
-              onChangeText={setFormCost}
-              placeholder="0"
-              keyboardType="numeric"
-            />
+            <>
+              <InputField
+                label="Costo sessione (€)"
+                value={formCost}
+                onChangeText={setFormCost}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+              {/* Il prezzo proposto dice da dove viene. Un campo libero
+                  senza spiegazione è come non averlo: chi compila tira
+                  a indovinare, e il listino resta nella testa di uno. */}
+              {!!tariffaPerche && (
+                <Text style={styles.tariffaPerche}>{tariffaPerche}</Text>
+              )}
+              {!!avvisoTariffa && (
+                <Text style={styles.tariffaAvviso}>{avvisoTariffa}</Text>
+              )}
+            </>
+          )}
+
+          {/* I posti del titolare in questa settimana. Un contatore, non
+              un blocco: il carico lo decide chi si allena. */}
+          {!!tettoFrase && (
+            <Text
+              style={[
+                styles.tetto,
+                tettoLivello === 'pieno' && styles.tettoPieno,
+                tettoLivello === 'oltre' && styles.tettoOltre,
+              ]}
+            >
+              {tettoFrase}
+            </Text>
           )}
 
           <InputField
@@ -506,6 +552,35 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     lineHeight: 16,
     marginTop: spacing.xs,
+  },
+  // Con 61 orari da scorrere servono degli appigli: le ore piene si
+  // distinguono, e l'occhio trova le 15:45 passando dalle 15:00.
+  chipOraPiena: { borderColor: colors.textSecondary },
+  chipTextOraPiena: { color: colors.text, fontWeight: '700' },
+  tariffaPerche: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
+  tariffaAvviso: {
+    color: colors.warning,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+  },
+  tetto: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    marginTop: spacing.md,
+  },
+  tettoPieno: {
+    color: colors.warning,
+    fontWeight: '600',
+  },
+  tettoOltre: {
+    color: colors.error,
+    fontWeight: '700',
   },
   gruppoBox: {
     backgroundColor: colors.surfaceLight,
