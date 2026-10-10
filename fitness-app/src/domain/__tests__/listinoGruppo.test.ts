@@ -223,6 +223,83 @@ describe('l\'agenda propone la quota giusta', () => {
   });
 });
 
+// ------------------------------------------------------------
+// LA SCHERMATA CHE SI CHIAMA «LISTINO PREZZI»
+// ------------------------------------------------------------
+//
+// Il 10 ottobre 2026 i prezzi del gruppo erano in agenda e nel
+// preventivo, ma NON nella schermata che si chiama Listino Prezzi —
+// cioè l'unico posto dove uno va a cercare un listino. Il prezzo
+// c'era e non si vedeva, che è lo stesso che non averlo.
+
+describe('il Listino Prezzi mostra il gruppo e l\'affiancamento', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { TIERS, PRICING_NOTES } = require('../../data/pricingData');
+  const voce = (id: string) => TIERS.find((t: { id: string }) => t.id === id);
+
+  it('ci sono le tre voci di gruppo, al prezzo del listino', () => {
+    [2, 3, 4].forEach((n) => {
+      const t = voce(`gruppo_${n}`);
+      expect(t).toBeDefined();
+      expect(t.amount).toBe(QUOTE_GRUPPO[n]);
+      expect(t.category).toBe('gruppo');
+    });
+  });
+
+  it('la quota del gruppo è quella a persona, non l\'incasso della seduta', () => {
+    // Confonderle significa far pagare a una persona il conto di tutte.
+    expect(voce('gruppo_4').amount).toBe(11.5);
+    expect(voce('gruppo_4').amount).not.toBe(incassoGruppoDi(4));
+    expect(voce('gruppo_4').priceNote).toContain('a persona');
+  });
+
+  it('ci sono i tre affiancamenti, da quattro a sei lezioni', () => {
+    [4, 5, 6].forEach((n) => {
+      const t = voce(`affiancamento_${n}`);
+      expect(t).toBeDefined();
+      expect(t.amount).toBe(n * PREZZO_AFFIANCAMENTO);
+      expect(t.category).toBe('affiancamento');
+    });
+    expect(voce('affiancamento_3')).toBeUndefined();
+    expect(voce('affiancamento_7')).toBeUndefined();
+  });
+
+  it('nessuna delle voci nuove porta la quota di iscrizione', () => {
+    TIERS.filter((t: { category: string }) => t.category === 'gruppo' || t.category === 'affiancamento')
+      .forEach((t: { registrationFee: number }) => expect(t.registrationFee).toBe(0));
+  });
+
+  it('l\'assistente sa dirle, e dice anche che in cinque decidi tu', () => {
+    const note = PRICING_NOTES.join(' ');
+    expect(note).toMatch(/Personal di gruppo/);
+    expect(note).toMatch(/Affiancamento/);
+    expect(note).toContain('11,50');
+    expect(note).toMatch(/cinque/i);
+  });
+
+  it('la schermata mostra le due sezioni nuove', () => {
+    const s = leggi('screens/owner/PricingScreen.tsx');
+    expect(s).toMatch(/category === 'gruppo'/);
+    expect(s).toMatch(/category === 'affiancamento'/);
+    expect(s).toMatch(/Personal di gruppo/);
+    expect(s).toMatch(/Affiancamento/);
+  });
+
+  it('e non riscrive un solo prezzo a mano', () => {
+    const s = leggi('screens/owner/PricingScreen.tsx')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(s.match(/€\s?\d+/g) || []).toEqual([]);
+  });
+
+  it('pricingData prende i prezzi dal listino, non li ricopia', () => {
+    const src = leggi('data/pricingData.ts');
+    expect(src).toMatch(/from '\.\.\/domain\/listino'/);
+    const corpo = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(corpo).not.toMatch(/\b11[.,]5\b/);
+  });
+});
+
 describe('il preventivo ha le voci di listino a portata di mano', () => {
   const schermata = leggi('screens/staff/OnboardingScreen.tsx');
 
