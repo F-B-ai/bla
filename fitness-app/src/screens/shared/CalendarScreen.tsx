@@ -88,6 +88,8 @@ import {
   eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
 } from '../../domain/appuntamento';
 import { motivoSalvataggio, motivoEliminazione } from '../../domain/salvataggio';
+import { registraGuasto } from '../../services/guastiService';
+import { ConfirmModal } from '../../components/common/ConfirmModal';
 import {
   tariffaDi, avvisoAnnualeColTitolare, eAnnuale, statoTetto,
   stessaSettimana, TETTO_INIZIALE, Conduttore,
@@ -216,6 +218,13 @@ export const CalendarScreen: React.FC = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  // L'eliminazione di un task: quale, se è in corso, e perché non è
+  // andata. Tre stati invece di un dialogo del browser — vedi
+  // `chiediEliminaTask`.
+  const [taskDaEliminare, setTaskDaEliminare] = useState<DailyTask | null>(null);
+  const [eliminandoTask, setEliminandoTask] = useState(false);
+  const [erroreEliminaTask, setErroreEliminaTask] = useState<string | null>(null);
 
   // Staff filter (owner only)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
@@ -1369,30 +1378,45 @@ export const CalendarScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteTask = (task: DailyTask) => {
-    crossAlert('Conferma', 'Eliminare questo task?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Elimina',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteTask(task.id);
-            // Si toglie SUBITO dalla lista, senza aspettare la
-            // rilettura: se il server risponde dalla cache, il task
-            // cancellato ricompare e sembra che l'eliminazione non
-            // funzioni. Era già andato; tornava solo in pagina.
-            setTasks((p) => p.filter((t) => t.id !== task.id));
-            loadData();
-          } catch (err) {
-            // «Impossibile eliminare» non diceva niente: né se era la
-            // linea, né se era il ruolo, né se era già stato
-            // cancellato altrove. Quindi non diceva se riprovare.
-            crossAlert('Non l\'ho eliminato', motivoEliminazione(err));
-          }
-        },
-      },
-    ]);
+  // L'eliminazione di un task non passa più dal dialogo del browser.
+  // Segnalato l'11 ottobre 2026: «non fa nulla». Un `window.confirm`
+  // può essere soppresso — app installata sulla schermata home,
+  // impostazione del telefono — e allora risponde «no» da solo, in
+  // silenzio: il pulsante funziona e sembra morto. La conferma adesso
+  // è un riquadro dell'app, e nessuno può rispondere al posto suo.
+  const chiediEliminaTask = (task: DailyTask) => {
+    setErroreEliminaTask(null);
+    setTaskDaEliminare(task);
+  };
+
+  const eliminaTaskConfermato = async () => {
+    const task = taskDaEliminare;
+    if (!task) return;
+    setEliminandoTask(true);
+    try {
+      await deleteTask(task.id);
+      // Si toglie SUBITO dalla lista, senza aspettare la rilettura: se
+      // il server risponde dalla cache, il task cancellato ricompare e
+      // sembra che l'eliminazione non funzioni. Era già andato;
+      // tornava solo in pagina.
+      setTasks((p) => p.filter((t) => t.id !== task.id));
+      setTaskDaEliminare(null);
+      loadData();
+    } catch (err) {
+      // Il motivo resta SOTTO GLI OCCHI, dentro il riquadro: un avviso
+      // che si chiude da solo non si legge mai, e questo è il momento
+      // in cui serve leggerlo.
+      setErroreEliminaTask(motivoEliminazione(err));
+      // E finisce nel registro guasti, perché il lunedì si deve poter
+      // leggere che cos'è successo anche se nessuno l'ha riferito.
+      registraGuasto({
+        errore: err,
+        schermata: 'Agenda · eliminazione task',
+        ruolo: user?.role || '',
+      });
+    } finally {
+      setEliminandoTask(false);
+    }
   };
 
   // Next 30 days for date picker
@@ -1491,7 +1515,7 @@ export const CalendarScreen: React.FC = () => {
       task={task}
       onToggle={handleToggleTask}
       onEdit={openEditTask}
-      onDelete={handleDeleteTask}
+      onDelete={chiediEliminaTask}
     />
   );
 
@@ -2553,6 +2577,27 @@ export const CalendarScreen: React.FC = () => {
 
   function renderTaskModal() {
     return (
+      <>
+      {/* La conferma di eliminazione vive qui perché renderTaskModal()
+          è chiamata da tutte e tre le viste — agenda, timeline e
+          calendario. Metterla in una sola vorrebbe dire che il
+          cestino funziona in una e tace nelle altre, che è peggio di
+          non funzionare affatto. */}
+      <ConfirmModal
+        visible={!!taskDaEliminare}
+        titolo="Eliminare questo task?"
+        messaggio={
+          taskDaEliminare
+            ? `«${taskDaEliminare.title}» viene cancellato e non torna indietro.`
+            : ''
+        }
+        azione="Elimina"
+        distruttiva
+        errore={erroreEliminaTask}
+        inCorso={eliminandoTask}
+        onConferma={eliminaTaskConfermato}
+        onAnnulla={() => { setTaskDaEliminare(null); setErroreEliminaTask(null); }}
+      />
       <TaskModal
         visible={showTaskModal}
         editingTask={editingTask}
@@ -2572,6 +2617,7 @@ export const CalendarScreen: React.FC = () => {
         onSave={handleSaveTask}
         onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
       />
+      </>
     );
   }
 
