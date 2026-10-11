@@ -65,9 +65,13 @@ describe('i numeri stampati sono quelli calcolati', () => {
   const dati = base();
   const d = documentoRegistro(dati);
 
-  it('due sedute, un ingresso', () => {
-    expect(d.html).toMatch(/<div class="v">2<\/div><div class="e">Sedute registrate/);
+  it('due sedute svolte, un ingresso', () => {
+    expect(d.html).toMatch(/<div class="v">2<\/div><div class="e">Sedute svolte/);
     expect(d.html).toMatch(/<div class="v">1<\/div><div class="e">Ingressi registrati/);
+  });
+
+  it('e nessuna ancora da svolgere, perché sono tutte passate', () => {
+    expect(d.html).toMatch(/<div class="v">0<\/div><div class="e">Ancora da svolgere/);
   });
 
   it('una sola seduta risulta scritta dopo', () => {
@@ -83,14 +87,14 @@ describe('i numeri stampati sono quelli calcolati', () => {
 
   it('la seduta scritta puntualmente NON finisce nell\'elenco dei ritardi', () => {
     const sezione = d.html.slice(
-      d.html.indexOf('2 · Sedute scritte dopo'),
-      d.html.indexOf('3 · Ingressi senza')
+      d.html.indexOf('3 · Sedute scritte dopo'),
+      d.html.indexOf('4 · Ingressi di chi svolge')
     );
     expect(sezione).not.toContain('07/10/2026');
   });
 
   it('l\'ingresso scoperto compare col nome e l\'ora', () => {
-    const sezione = d.html.slice(d.html.indexOf('3 · Ingressi senza'));
+    const sezione = d.html.slice(d.html.indexOf('4 · Ingressi di chi svolge'));
     expect(sezione).toContain('09/10/2026');
     expect(sezione).toContain('18:30');
     expect(sezione).toContain('Arianna Russo');
@@ -109,6 +113,7 @@ describe('quando non c\'è niente da segnalare, lo dice', () => {
     expect(vuoto.html).toContain('Nessuna seduta nel periodo');
     expect(vuoto.html).toMatch(/Nessuna seduta risulta scritta dopo/);
     expect(vuoto.html).toMatch(/Ogni ingresso registrato trova una seduta/);
+    expect(vuoto.html).toContain('Nessuna seduta svolta nel periodo');
   });
 
   it('e stampa lo stesso le avvertenze: valgono anche per un foglio vuoto', () => {
@@ -179,5 +184,102 @@ describe('il foglio è impaginato per la carta', () => {
 
   it('i numeri in colonna sono allineati per essere confrontati', () => {
     expect(d.css).toMatch(/tabular-nums/);
+  });
+});
+
+// ============================================================
+// LE TRE CORREZIONI DEL 12 OTTOBRE 2026
+// ------------------------------------------------------------
+// Sui dati veri il primo documento presentava numeri veri in modo
+// fuorviante. Per un foglio destinato a un professionista è peggio di
+// un errore di calcolo, perché non si nota.
+// ============================================================
+
+describe('il documento separa il fatto dal da fare', () => {
+  const conFutura = documentoRegistro({
+    ...base(),
+    registro: componiRegistro({
+      sedute: [
+        {
+          id: 'p', studentId: 'a1', collaboratorId: 'c1',
+          date: new Date('2026-10-05T10:00:00'), startTime: '10:00',
+          status: 'completed', createdAt: new Date('2026-10-05T10:00:00'),
+        },
+        {
+          id: 'f', studentId: 'a1', collaboratorId: 'c1',
+          date: new Date('2026-10-20T10:00:00'), startTime: '10:00',
+          status: 'scheduled', createdAt: new Date('2026-10-05T10:00:00'),
+        },
+      ],
+      ingressi: [], nomeAllievo: () => 'A', nomeConduttore: () => 'G',
+    }, new Date('2026-10-12T12:00:00')),
+  });
+
+  it('una svolta e una ancora da svolgere, in due caselle diverse', () => {
+    expect(conFutura.html).toMatch(/<div class="v">1<\/div><div class="e">Sedute svolte/);
+    expect(conFutura.html).toMatch(/<div class="v">1<\/div><div class="e">Ancora da svolgere/);
+  });
+
+  it('e non esiste più una casella che somma le due cose', () => {
+    expect(conFutura.html).not.toContain('Sedute registrate');
+  });
+});
+
+describe('la tabella mese per mese', () => {
+  const d = documentoRegistro({
+    ...base(),
+    registro: componiRegistro({
+      sedute: [
+        { id: '1', studentId: 'a1', collaboratorId: 'c1', date: new Date('2026-09-03T10:00:00'), startTime: '9:00', status: 'completed', createdAt: new Date('2026-09-03T10:00:00') },
+        { id: '2', studentId: 'a1', collaboratorId: 'c2', date: new Date('2026-10-01T10:00:00'), startTime: '9:00', status: 'completed', createdAt: new Date('2026-10-01T10:00:00') },
+      ],
+      ingressi: [],
+      nomeAllievo: () => 'A',
+      nomeConduttore: (id: string) => (id === 'c1' ? 'Giuseppe' : 'Francesco'),
+    }, new Date('2026-10-12T12:00:00')),
+    nomeConduttore: (id: string) => (id === 'c1' ? 'Giuseppe' : 'Francesco'),
+  });
+
+  it('i mesi sono scritti a parole, non come codici', () => {
+    expect(d.html).toContain('set 2026');
+    expect(d.html).toContain('ott 2026');
+  });
+
+  it('ogni conduttore ha la sua colonna, e c\'è il totale del mese', () => {
+    const sezione = d.html.slice(d.html.indexOf('1 · Sedute per mese'), d.html.indexOf('2 · Riepilogo'));
+    expect(sezione).toContain('Giuseppe');
+    expect(sezione).toContain('Francesco');
+    expect(sezione).toContain('Totale');
+  });
+});
+
+describe('chi viene solo in sala non riempie l\'elenco', () => {
+  const d = documentoRegistro({
+    ...base(),
+    registro: componiRegistro({
+      sedute: [
+        { id: 's', studentId: 'a1', collaboratorId: 'c1', date: new Date('2026-10-05T10:00:00'), startTime: '10:00', status: 'completed', createdAt: new Date('2026-10-05T10:00:00') },
+      ],
+      ingressi: [
+        { id: 'i1', studentId: 'a1', studentName: 'Arianna', timestamp: new Date('2026-10-09T18:00:00') },
+        { id: 'i2', studentId: 'sala', studentName: 'Chi viene in sala', timestamp: new Date('2026-10-09T19:00:00') },
+        { id: 'i3', studentId: 'sala', studentName: 'Chi viene in sala', timestamp: new Date('2026-10-10T19:00:00') },
+      ],
+      nomeAllievo: () => 'Arianna', nomeConduttore: () => 'Giuseppe',
+    }, new Date('2026-10-12T12:00:00')),
+  });
+
+  it('l\'elenco tiene solo chi le sedute le fa', () => {
+    const sezione = d.html.slice(d.html.indexOf('4 · Ingressi di chi svolge'));
+    expect(sezione).toContain('Arianna');
+    expect(sezione).not.toContain('Chi viene in sala');
+  });
+
+  it('ma dice quanti ingressi ha lasciato fuori, e di quante persone', () => {
+    expect(d.html).toMatch(/restano fuori 2 ingressi di 1 iscritti/);
+  });
+
+  it('e li chiama per quello che sono: persone che si allenano in autonomia', () => {
+    expect(d.html).toMatch(/si allenano in autonomia/);
   });
 });

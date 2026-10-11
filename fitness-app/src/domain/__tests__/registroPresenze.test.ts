@@ -85,6 +85,8 @@ describe('quando è stata scritta una seduta', () => {
 });
 
 describe('gli ingressi senza seduta', () => {
+  // `ingressiSenzaSeduta` ora torna anche il conto di chi è stato
+  // lasciato fuori: qui si guardano le righe.
   const ingresso = (p: Partial<IngressoRegistro> = {}): IngressoRegistro => ({
     id: 'i1',
     studentId: 'a1',
@@ -94,7 +96,7 @@ describe('gli ingressi senza seduta', () => {
   });
 
   it('un ingresso in un giorno senza sedute compare', () => {
-    const r = ingressiSenzaSeduta([ingresso()], [seduta()], nomeAllievo);
+    const { righe: r } = ingressiSenzaSeduta([ingresso()], [seduta()], nomeAllievo);
     expect(r).toHaveLength(1);
     expect(r[0].giorno).toBe('2026-10-06');
     expect(r[0].ora).toBe('18:30');
@@ -102,7 +104,7 @@ describe('gli ingressi senza seduta', () => {
   });
 
   it('se quel giorno una seduta c\'era, NON compare', () => {
-    const r = ingressiSenzaSeduta(
+    const { righe: r } = ingressiSenzaSeduta(
       [ingresso({ timestamp: new Date('2026-10-05T18:30:00') })],
       [seduta()],
       nomeAllievo
@@ -111,7 +113,7 @@ describe('gli ingressi senza seduta', () => {
   });
 
   it('basta una seduta ANNULLATA perché non compaia: si sbaglia per difetto', () => {
-    const r = ingressiSenzaSeduta(
+    const { righe: r } = ingressiSenzaSeduta(
       [ingresso({ timestamp: new Date('2026-10-05T18:30:00') })],
       [seduta({ status: 'cancelled_by_student' })],
       nomeAllievo
@@ -120,16 +122,52 @@ describe('gli ingressi senza seduta', () => {
   });
 
   it('la seduta di un ALTRO allievo quel giorno non copre questo ingresso', () => {
-    const r = ingressiSenzaSeduta(
+    const { righe: r } = ingressiSenzaSeduta(
       [ingresso({ timestamp: new Date('2026-10-05T18:30:00') })],
-      [seduta({ studentId: 'a2' })],
+      // a2 si allena quel giorno; a1 ha una seduta in un altro giorno,
+      // quindi è una persona che fa sedute e il suo ingresso conta
+      [seduta({ studentId: 'a2' }), seduta({ id: 's9', studentId: 'a1', date: d('2026-10-01') })],
       nomeAllievo
     );
     expect(r).toHaveLength(1);
   });
 
+  // ------------------------------------------------------------
+  // CHI VIENE SOLO IN SALA NON È UN CASO DA SEGNALARE
+  // ------------------------------------------------------------
+  // 12 ottobre 2026, sui dati veri: 90 ingressi su 109 risultavano
+  // «senza seduta», e quasi tutti erano iscritti che vengono ad
+  // allenarsi da soli — non hanno mai fatto un personal in vita loro.
+  // Un elenco così non dice niente, e trascina con sé anche le poche
+  // righe che qualcosa direbbero.
+
+  it('l\'ingresso di chi non ha MAI una seduta non finisce nell\'elenco', () => {
+    const e = ingressiSenzaSeduta(
+      [ingresso({ studentId: 'solo_sala', studentName: 'Chi viene in sala' })],
+      [seduta()],
+      nomeAllievo
+    );
+    expect(e.righe).toHaveLength(0);
+    expect(e.esclusi).toBe(1);
+    expect(e.personeEscluse).toBe(1);
+  });
+
+  it('ma viene contato, perché nascondere un numero è un\'altra bugia', () => {
+    const e = ingressiSenzaSeduta(
+      [
+        ingresso({ id: 'x1', studentId: 'solo_sala' }),
+        ingresso({ id: 'x2', studentId: 'solo_sala' }),
+        ingresso({ id: 'x3', studentId: 'altro_sala' }),
+      ],
+      [seduta()],
+      nomeAllievo
+    );
+    expect(e.esclusi).toBe(3);
+    expect(e.personeEscluse).toBe(2);
+  });
+
   it('un ingresso senza data o senza allievo si scarta invece di indovinare', () => {
-    const r = ingressiSenzaSeduta(
+    const { righe: r } = ingressiSenzaSeduta(
       [ingresso({ timestamp: null }), ingresso({ id: 'i2', studentId: '' })],
       [],
       nomeAllievo
@@ -138,22 +176,24 @@ describe('gli ingressi senza seduta', () => {
   });
 
   it('se il nome non è nell\'ingresso lo cerca, e non lascia mai vuoto', () => {
-    const r = ingressiSenzaSeduta(
-      [ingresso({ studentName: '' })], [], nomeAllievo
+    const { righe: r } = ingressiSenzaSeduta(
+      [ingresso({ studentName: '' })], [seduta()], nomeAllievo
     );
     expect(r[0].allievo).toBe('Arianna Russo');
-    const s = ingressiSenzaSeduta(
-      [ingresso({ studentName: '', studentId: 'ignoto' })], [], nomeAllievo
+    const { righe: s } = ingressiSenzaSeduta(
+      [ingresso({ studentName: '', studentId: 'ignoto' })],
+      [seduta({ studentId: 'ignoto', date: d('2026-10-01') })],
+      nomeAllievo
     );
     expect(s[0].allievo).toBe('Allievo');
   });
 
   it('escono in ordine di giorno e di ora', () => {
-    const r = ingressiSenzaSeduta([
+    const { righe: r } = ingressiSenzaSeduta([
       ingresso({ id: 'b', timestamp: new Date('2026-10-07T09:00:00') }),
       ingresso({ id: 'a', timestamp: new Date('2026-10-06T19:00:00') }),
       ingresso({ id: 'c', timestamp: new Date('2026-10-06T08:00:00') }),
-    ], [], nomeAllievo);
+    ], [seduta({ date: d('2026-10-01') })], nomeAllievo);
     expect(r.map((x) => x.id)).toEqual(['c', 'a', 'b']);
   });
 });
@@ -291,5 +331,78 @@ describe('il giorno si scrive sempre allo stesso modo', () => {
   it('con lo zero davanti, altrimenti l\'ordinamento mente', () => {
     expect(giornoDi(new Date(2026, 0, 5))).toBe('2026-01-05');
     expect(giornoDi(new Date(2026, 11, 31))).toBe('2026-12-31');
+  });
+});
+
+// ============================================================
+// QUELLO CHE I DATI VERI HANNO INSEGNATO — 12 ottobre 2026
+// ------------------------------------------------------------
+// Il primo documento estratto sui dati reali ha mostrato tre difetti
+// che sui dati finti non si vedevano. Nessuno dei tre era un errore
+// di calcolo: erano tre modi di presentare numeri veri in maniera
+// fuorviante — che per un foglio destinato a un professionista è
+// peggio di un errore, perché non si nota.
+// ============================================================
+
+describe('le sedute non ancora svolte si contano a parte', () => {
+  const oggi = new Date('2026-10-12T12:00:00');
+
+  it('un appuntamento della settimana prossima non è lavoro fatto', () => {
+    const r = componiRegistro({
+      sedute: [
+        seduta({ id: 'passata', date: d('2026-10-05') }),
+        seduta({ id: 'futura', date: d('2026-10-20') }),
+      ],
+      ingressi: [], nomeAllievo, nomeConduttore,
+    }, oggi);
+    expect(r.totaleSedute).toBe(2);
+    expect(r.seduteFuture).toBe(1);
+  });
+
+  it('il giorno stesso non è futuro', () => {
+    const r = componiRegistro({
+      sedute: [seduta({ date: d('2026-10-12') })],
+      ingressi: [], nomeAllievo, nomeConduttore,
+    }, oggi);
+    expect(r.seduteFuture).toBe(0);
+  });
+});
+
+describe('le sedute per mese', () => {
+  const oggi = new Date('2026-10-12T12:00:00');
+  const dati = {
+    sedute: [
+      seduta({ id: '1', date: d('2026-09-03') }),
+      seduta({ id: '2', date: d('2026-09-10') }),
+      seduta({ id: '3', date: d('2026-10-01'), collaboratorId: 'c2' }),
+      seduta({ id: '4', date: d('2026-10-20') }), // futura
+    ],
+    ingressi: [], nomeAllievo, nomeConduttore,
+  };
+
+  it('dicono quante ne risultano a ciascuno, mese per mese', () => {
+    const m = componiRegistro(dati, oggi).mensili;
+    expect(m.map((x) => x.mese)).toEqual(['2026-09', '2026-10']);
+    expect(m[0].perConduttore).toEqual([{ nome: 'Giuseppe', sedute: 2 }]);
+    expect(m[1].perConduttore).toEqual([{ nome: 'Francesco', sedute: 1 }]);
+  });
+
+  it('e non contano quelle ancora da fare', () => {
+    const m = componiRegistro(dati, oggi).mensili;
+    const ottobre = m.find((x) => x.mese === '2026-10');
+    expect(ottobre?.perConduttore.reduce((a, b) => a + b.sedute, 0)).toBe(1);
+  });
+});
+
+describe('un solo «Non indicato», non uno per ogni id sconosciuto', () => {
+  it('due conduttori senza nome fanno una riga sola', () => {
+    const r = riepilogoPerConduttore([
+      seduta({ id: '1', collaboratorId: 'sparito1' }),
+      seduta({ id: '2', collaboratorId: 'sparito2' }),
+      seduta({ id: '3', collaboratorId: '' }),
+    ], nomeConduttore);
+    expect(r).toHaveLength(1);
+    expect(r[0].nome).toBe('Non indicato');
+    expect(r[0].sedute).toBe(3);
   });
 });

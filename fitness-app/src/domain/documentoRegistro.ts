@@ -62,7 +62,10 @@ const MAX_RIGHE = 200;
 export interface DatiDocumentoRegistro {
   registro: {
     dal: string; al: string;
-    totaleSedute: number; totaleIngressi: number; seduteSenzaScrittura: number;
+    totaleSedute: number; seduteFuture: number;
+    totaleIngressi: number; seduteSenzaScrittura: number;
+    ingressiDiNonAllenati: number; personeNonAllenate: number;
+    mensili: { mese: string; perConduttore: { nome: string; sedute: number }[] }[];
     righeInRitardo: { id: string; studentId: string; collaboratorId: string;
       giorno: string; ora: string; giornoScrittura: string; ritardo: number | null }[];
     spaiati: { id: string; allievo: string; giorno: string; ora: string }[];
@@ -91,6 +94,28 @@ export const documentoRegistro = (
   const tagliata = (n: number) => (n > MAX_RIGHE
     ? `<p class="nota">Elencate le prime ${MAX_RIGHE} righe su ${n}. L'elenco completo è disponibile su richiesta.</p>`
     : '');
+
+  const mesiIt = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const meseIt = (m: string): string => {
+    const [a, n] = m.split('-');
+    return `${mesiIt[Number(n) - 1] || n} ${a}`;
+  };
+
+  const nomiMensili = Array.from(new Set(
+    r.mensili.flatMap((m) => m.perConduttore.map((c) => c.nome))
+  ));
+
+  const tabellaMensile = r.mensili.length ? `
+    <table>
+      <tr><th>Mese</th>${nomiMensili.map((n) => `<th style="text-align:right">${esc(n)}</th>`).join('')}<th style="text-align:right">Totale</th></tr>
+      ${r.mensili.map((m) => {
+        const tot = m.perConduttore.reduce((a, b) => a + b.sedute, 0);
+        return `<tr><td>${meseIt(m.mese)}</td>${nomiMensili.map((n) => {
+          const v = m.perConduttore.find((c) => c.nome === n);
+          return `<td class="n">${v ? v.sedute : '-'}</td>`;
+        }).join('')}<td class="n">${tot}</td></tr>`;
+      }).join('')}
+    </table>` : '<p class="vuoto">Nessuna seduta svolta nel periodo.</p>';
 
   const tabellaConduttori = r.conduttori.length ? `
     <table>
@@ -158,30 +183,36 @@ export const documentoRegistro = (
     </div>
 
     <div class="cifre">
-      <div class="cifra"><div class="v">${r.totaleSedute}</div><div class="e">Sedute registrate</div></div>
+      <div class="cifra"><div class="v">${r.totaleSedute - r.seduteFuture}</div><div class="e">Sedute svolte</div></div>
+      <div class="cifra"><div class="v">${r.seduteFuture}</div><div class="e">Ancora da svolgere</div></div>
       <div class="cifra"><div class="v">${r.totaleIngressi}</div><div class="e">Ingressi registrati</div></div>
       <div class="cifra"><div class="v">${r.righeInRitardo.length}</div><div class="e">Scritte dopo</div></div>
-      <div class="cifra"><div class="v">${r.spaiati.length}</div><div class="e">Ingressi senza seduta</div></div>
-      <div class="cifra"><div class="v">${r.seduteSenzaScrittura}</div><div class="e">Senza data di scrittura</div></div>
+      <div class="cifra"><div class="v">${r.spaiati.length}</div><div class="e">Ingressi da approfondire</div></div>
     </div>
 
-    <h2>1 · Riepilogo per conduttore</h2>
+    <h2>1 · Sedute per mese</h2>
+    <p class="nota">Sedute già svolte, mese per mese e conduttore per conduttore.
+    Gli appuntamenti futuri non sono conteggiati.</p>
+    ${tabellaMensile}
+
+    <h2>2 · Riepilogo per conduttore</h2>
     ${tabellaConduttori}
 
-    <h2>2 · Sedute scritte dopo il giorno in cui si sono svolte</h2>
+    <h2>3 · Sedute scritte dopo il giorno in cui si sono svolte</h2>
     <p class="nota">L'ultima colonna dice quanti giorni sono passati fra lo
     svolgimento della seduta e il momento in cui la riga è stata creata
     nell'applicazione. Zero giorni — cioè la scrittura lo stesso giorno o in
     anticipo — non compare in questo elenco.</p>
     ${tabellaRitardi}
 
-    <h2>3 · Ingressi senza una seduta corrispondente</h2>
-    <p class="nota">Ingressi registrati dall'allievo in giornate nelle quali, per
-    quello stesso nome, non risulta alcuna seduta: né svolta, né programmata, né
-    annullata.</p>
+    <h2>4 · Ingressi di chi svolge sedute, in giornate senza seduta</h2>
+    <p class="nota">Ingressi registrati in giornate nelle quali, per quello stesso
+    nome, non risulta alcuna seduta: né svolta, né programmata, né annullata.
+    L'elenco riguarda <b>soltanto le persone che nel periodo hanno svolto almeno
+    una seduta</b>${r.ingressiDiNonAllenati ? `: restano fuori ${r.ingressiDiNonAllenati} ingressi di ${r.personeNonAllenate} iscritti che si allenano in autonomia e per i quali una seduta non è prevista` : ''}.</p>
     ${tabellaSpaiati}
 
-    <h2>4 · Che cosa questi dati dicono, e che cosa no</h2>
+    <h2>5 · Che cosa questi dati dicono, e che cosa no</h2>
     <ol class="avvertenze">
       ${avvertenze.map((a) => `<li>${esc(a)}</li>`).join('')}
     </ol>

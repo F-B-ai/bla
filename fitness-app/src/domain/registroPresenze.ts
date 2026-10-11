@@ -153,23 +153,44 @@ export interface IngressoSpaiato {
  * sbaglia per eccesso non serve a niente, perché la prima riga
  * sbagliata che qualcuno trova toglie credito a tutte le altre.
  */
+export interface EsitoSpaiati {
+  righe: IngressoSpaiato[];
+  /**
+   * Gli ingressi lasciati fuori perché appartengono a persone che in
+   * tutto il periodo non hanno MAI avuto una seduta: vengono in sala e
+   * basta. Non è un dato da nascondere — è un dato da contare a parte,
+   * altrimenti l'elenco si riempie di righe che non vogliono dire
+   * niente e trascina con sé anche quelle che qualcosa vogliono dire.
+   */
+  esclusi: number;
+  /** quante persone sono state escluse */
+  personeEscluse: number;
+}
+
 export const ingressiSenzaSeduta = (
   ingressi: IngressoRegistro[],
   sedute: SedutaRegistro[],
   nomeAllievo: (id: string) => string
-): IngressoSpaiato[] => {
+): EsitoSpaiati => {
   const coperti = new Set<string>();
+  const faSedute = new Set<string>();
   (sedute || []).forEach((s) => {
     const d = aData(s.date);
-    if (d && s.studentId) coperti.add(`${s.studentId}|${giornoDi(d)}`);
+    if (d && s.studentId) {
+      coperti.add(`${s.studentId}|${giornoDi(d)}`);
+      faSedute.add(s.studentId);
+    }
   });
 
   const fuori: IngressoSpaiato[] = [];
+  const escl = new Set<string>();
+  let esclusi = 0;
   (ingressi || []).forEach((i) => {
     const d = aData(i.timestamp);
     if (!d || !i.studentId) return;
     const g = giornoDi(d);
     if (coperti.has(`${i.studentId}|${g}`)) return;
+    if (!faSedute.has(i.studentId)) { esclusi += 1; escl.add(i.studentId); return; }
     fuori.push({
       id: i.id,
       studentId: i.studentId,
@@ -179,9 +200,13 @@ export const ingressiSenzaSeduta = (
     });
   });
 
-  return fuori.sort((a, b) => (a.giorno === b.giorno
-    ? a.ora.localeCompare(b.ora)
-    : a.giorno.localeCompare(b.giorno)));
+  return {
+    righe: fuori.sort((a, b) => (a.giorno === b.giorno
+      ? a.ora.localeCompare(b.ora)
+      : a.giorno.localeCompare(b.giorno))),
+    esclusi,
+    personeEscluse: escl.size,
+  };
 };
 
 // ------------------------------------------------------------
@@ -212,7 +237,12 @@ export const riepilogoPerConduttore = (
   (sedute || []).forEach((s) => {
     const r = rigaSeduta(s);
     if (!r) return;
-    const k = r.collaboratorId || 'sconosciuto';
+    // Chi non ha un nome finisce tutto in UNA riga. Prima ogni id
+    // sconosciuto faceva una riga a sé, tutte chiamate «Non
+    // indicato»: un documento con due righe identiche sembra
+    // sbagliato, e chi lo legge smette di fidarsi del resto.
+    const nome = nomeConduttore(r.collaboratorId) || '';
+    const k = nome ? r.collaboratorId : 'sconosciuto';
     if (!per.has(k)) per.set(k, []);
     (per.get(k) as RigaSeduta[]).push(r);
   });
@@ -250,43 +280,106 @@ export interface DatiRegistro {
   nomeConduttore: (id: string) => string;
 }
 
+export interface MeseConduttore {
+  /** AAAA-MM */
+  mese: string;
+  /** quante sedute per ciascun conduttore, per nome */
+  perConduttore: { nome: string; sedute: number }[];
+}
+
 export interface Registro {
   dal: string;
   al: string;
   totaleSedute: number;
+  /**
+   * Quante delle sedute contate sono ancora da svolgere.
+   *
+   * Un appuntamento fissato per la settimana prossima è una riga del
+   * registro come le altre, ma non è lavoro fatto. Contarlo insieme
+   * alle altre gonfia il totale di un documento che qualcuno leggerà
+   * come un rendiconto.
+   */
+  seduteFuture: number;
   totaleIngressi: number;
   seduteSenzaScrittura: number;
   righeInRitardo: RigaSeduta[];
   spaiati: IngressoSpaiato[];
+  /** ingressi di persone che non fanno sedute: contati, non elencati */
+  ingressiDiNonAllenati: number;
+  personeNonAllenate: number;
+  mensili: MeseConduttore[];
   conduttori: RiepilogoConduttore[];
 }
+
+/**
+ * Quante sedute per mese, conduttore per conduttore.
+ *
+ * È la tabella che dice la cosa più difficile da discutere: non «hai
+ * segnato poco», ma «a settembre risultano queste, e a ottobre
+ * queste». Un numero per mese non si contesta con la memoria.
+ */
+export const sedutePerMese = (
+  sedute: SedutaRegistro[],
+  nomeConduttore: (id: string) => string,
+  adesso: Date = new Date()
+): MeseConduttore[] => {
+  const oggi = giornoDi(adesso);
+  const mappa = new Map<string, Map<string, number>>();
+
+  (sedute || []).forEach((s) => {
+    const r = rigaSeduta(s);
+    if (!r || r.giorno > oggi) return;
+    const mese = r.giorno.slice(0, 7);
+    const nome = nomeConduttore(r.collaboratorId) || 'Non indicato';
+    if (!mappa.has(mese)) mappa.set(mese, new Map());
+    const m = mappa.get(mese) as Map<string, number>;
+    m.set(nome, (m.get(nome) || 0) + 1);
+  });
+
+  return [...mappa.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([mese, m]) => ({
+      mese,
+      perConduttore: [...m.entries()]
+        .map(([nome, n]) => ({ nome, sedute: n }))
+        .sort((a, b) => b.sedute - a.sedute),
+    }));
+};
 
 const estremi = (giorni: string[]): { dal: string; al: string } => {
   const puliti = giorni.filter(Boolean).sort();
   return { dal: puliti[0] || '', al: puliti[puliti.length - 1] || '' };
 };
 
-export const componiRegistro = (d: DatiRegistro): Registro => {
+export const componiRegistro = (
+  d: DatiRegistro,
+  adesso: Date = new Date()
+): Registro => {
   const righe = (d.sedute || [])
     .map(rigaSeduta)
     .filter((r): r is RigaSeduta => r !== null);
 
-  const spaiati = ingressiSenzaSeduta(d.ingressi, d.sedute, d.nomeAllievo);
+  const esito = ingressiSenzaSeduta(d.ingressi, d.sedute, d.nomeAllievo);
+  const oggi = giornoDi(adesso);
 
   const giorni = [
     ...righe.map((r) => r.giorno),
-    ...spaiati.map((s) => s.giorno),
+    ...esito.righe.map((s) => s.giorno),
   ];
 
   return {
     ...estremi(giorni),
     totaleSedute: righe.length,
+    seduteFuture: righe.filter((r) => r.giorno > oggi).length,
     totaleIngressi: (d.ingressi || []).length,
     seduteSenzaScrittura: righe.filter((r) => r.ritardo === null).length,
     righeInRitardo: righe
       .filter((r) => r.ritardo !== null && (r.ritardo as number) > 0)
       .sort((a, b) => (b.ritardo as number) - (a.ritardo as number)),
-    spaiati,
+    spaiati: esito.righe,
+    ingressiDiNonAllenati: esito.esclusi,
+    personeNonAllenate: esito.personeEscluse,
+    mensili: sedutePerMese(d.sedute, d.nomeConduttore, adesso),
     conduttori: riepilogoPerConduttore(d.sedute, d.nomeConduttore),
   };
 };
