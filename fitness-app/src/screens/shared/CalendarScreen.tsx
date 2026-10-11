@@ -1649,7 +1649,21 @@ export const CalendarScreen: React.FC = () => {
   );
   const riepilogoOggi = useMemo(() => riepilogoGiornata(giornataOggi), [giornataOggi]);
 
-  /** Una riga della giornata: appuntamento, ospite o task, stessa forma. */
+  /**
+   * Una riga della giornata: appuntamento, ospite o task, stessa forma.
+   *
+   * L'11 ottobre 2026: «non riesco né ad eliminare né a spuntare come
+   * fatto». Qui dentro c'era il motivo, e non era dove lo cercavo.
+   * In questa riga la casella del task era un DISEGNO da 12 px dentro
+   * la riga di sottotitolo — sembrava una casella da spuntare, e non
+   * era un pulsante. Il cestino non c'era affatto: toccare la riga
+   * apriva la modifica, e nella modifica non c'era modo di eliminare.
+   *
+   * Tre schermi diversi mostrano i task e due di loro non potevano
+   * toccarli. Adesso la riga ha due pulsanti veri da 44 px — spunta e
+   * cestino — e non sono dentro il tocco della riga: sono accanto, per
+   * non dipendere dal fatto che un tocco annidato si propaghi o no.
+   */
   const renderVoce = (v: VoceGiornata, conData = false) => {
     const tono = v.genere === 'task'
       ? colors.info
@@ -1661,13 +1675,11 @@ export const CalendarScreen: React.FC = () => {
       : v.genere === 'ospite'
         ? 'person-add-outline'
         : aspetto(v.tipo || 'training').icona;
-    return (
-      <TouchableOpacity
-        key={`${v.genere}-${v.id}`}
-        style={styles.agendaRow}
-        onPress={() => apriVoce(v)}
-        activeOpacity={0.85}
-      >
+    const eTask = v.genere === 'task';
+    const task = eTask ? (v.fonte as DailyTask) : null;
+
+    const corpo = (
+      <>
         <View style={{ ...styles.agendaTimeCol, borderLeftColor: tono }}>
           <Text style={styles.agendaTime}>{v.ora || '—'}</Text>
           {conData ? (
@@ -1696,8 +1708,60 @@ export const CalendarScreen: React.FC = () => {
             <Text style={{ ...styles.agendaKind, color: tono }}>{v.sottotitolo}</Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
-      </TouchableOpacity>
+      </>
+    );
+
+    // Un appuntamento o un ospite: la riga intera apre la cosa.
+    if (!eTask || !task) {
+      return (
+        <TouchableOpacity
+          key={`${v.genere}-${v.id}`}
+          style={styles.agendaRow}
+          onPress={() => apriVoce(v)}
+          activeOpacity={0.85}
+        >
+          {corpo}
+          <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+        </TouchableOpacity>
+      );
+    }
+
+    // Un task: la riga apre la modifica, e accanto ci sono i due
+    // pulsanti che prima non esistevano. Stanno FUORI dal tocco della
+    // riga — non annidati dentro — così non dipendono dal fatto che un
+    // tocco dentro un altro tocco si propaghi: una cosa che si comporta
+    // diversamente sul telefono e nel browser, e che qui farebbe
+    // aprire la modifica mentre si spunta.
+    return (
+      <View key={`${v.genere}-${v.id}`} style={styles.agendaRow}>
+        <TouchableOpacity
+          style={styles.agendaRowTocco}
+          onPress={() => apriVoce(v)}
+          activeOpacity={0.85}
+        >
+          {corpo}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.vocePulsante}
+          onPress={() => handleToggleTask(task)}
+          accessibilityLabel={v.completato ? 'Segna come da fare' : 'Segna come fatto'}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons
+            name={v.completato ? 'checkmark-circle' : 'ellipse-outline'}
+            size={24}
+            color={v.completato ? colors.success : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.vocePulsante}
+          onPress={() => chiediEliminaTask(task)}
+          accessibilityLabel="Elimina il task"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -2616,6 +2680,14 @@ export const CalendarScreen: React.FC = () => {
         savingTask={savingTask}
         onSave={handleSaveTask}
         onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
+        onDelete={editingTask ? () => {
+          // Si chiude la modifica e si apre la conferma: due riquadri
+          // sovrapposti, sul telefono, si coprono a vicenda.
+          const t = editingTask;
+          setShowTaskModal(false);
+          resetTaskForm();
+          chiediEliminaTask(t);
+        } : undefined}
       />
       </>
     );
@@ -3131,6 +3203,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  // La parte della riga che apre la cosa. I pulsanti del task stanno
+  // accanto, non dentro: vedi renderVoce.
+  agendaRowTocco: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // 44 px, la misura sotto la quale un dito non centra il bersaglio.
+  vocePulsante: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.md,
   },
   agendaTimeCol: {
     borderLeftWidth: 3,

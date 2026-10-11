@@ -105,6 +105,89 @@ describe('il pulsante si può centrare col dito', () => {
 // vede. Non c'è più nessuno che possa rispondere al posto del
 // titolare.
 
+// ------------------------------------------------------------
+// «NÉ ELIMINARE NÉ SPUNTARE» — la riga della giornata
+// ------------------------------------------------------------
+//
+// Lo schermo che il titolare usa davvero non era quello che stavo
+// aggiustando. Nella riga della giornata — quella con l'ora a
+// sinistra e la freccia a destra — la casella del task era un
+// DISEGNO da 12 px dentro il sottotitolo: sembrava una casella da
+// spuntare e non era un pulsante. Il cestino non c'era affatto.
+// Toccando la riga si apriva la modifica, e nella modifica non c'era
+// modo di eliminare: si chiudeva, e il task era ancora lì.
+//
+// Tre schermi mostravano i task e due non potevano toccarli.
+
+describe('la riga della giornata: spuntare e eliminare', () => {
+  const schermata = leggi('screens/shared/CalendarScreen.tsx');
+  const i = schermata.indexOf('const renderVoce =');
+  const blocco = schermata.slice(i, schermata.indexOf('const renderOspiteRow'));
+
+  it('la spunta è un pulsante vero, non un\'icona del sottotitolo', () => {
+    expect(blocco).toMatch(/onPress=\{\(\) => handleToggleTask\(task\)\}/);
+    expect(blocco).toMatch(/accessibilityLabel=\{v\.completato \? 'Segna come da fare'/);
+  });
+
+  it('il cestino c\'è, e apre la conferma dell\'app', () => {
+    expect(blocco).toMatch(/onPress=\{\(\) => chiediEliminaTask\(task\)\}/);
+  });
+
+  it('i due pulsanti sono 44 px', () => {
+    const j = schermata.indexOf('vocePulsante: {');
+    const stile = schermata.slice(j, j + 220);
+    expect(stile).toMatch(/width:\s*44/);
+    expect(stile).toMatch(/height:\s*44/);
+  });
+
+  it('e NON sono annidati dentro il tocco della riga', () => {
+    // Un tocco dentro un altro tocco si comporta diversamente sul
+    // telefono e nel browser: spuntando si aprirebbe la modifica.
+    const apre = blocco.indexOf('style={styles.agendaRowTocco}');
+    const spunta = blocco.indexOf('handleToggleTask(task)');
+    expect(apre).toBeGreaterThan(0);
+    expect(spunta).toBeGreaterThan(apre);
+    // il tocco della riga si chiude prima che comincino i pulsanti
+    const chiusura = blocco.indexOf('</TouchableOpacity>', apre);
+    expect(chiusura).toBeLessThan(spunta);
+  });
+
+  it('un appuntamento resta una riga sola che si apre toccandola', () => {
+    expect(blocco).toMatch(/if \(!eTask \|\| !task\)/);
+  });
+});
+
+describe('si elimina anche dalla schermata di modifica', () => {
+  const modale = leggi('screens/shared/calendar/TaskModal.tsx');
+  const schermata = leggi('screens/shared/CalendarScreen.tsx');
+
+  it('il pulsante c\'è, ed è largo quanto lo schermo', () => {
+    expect(modale).toMatch(/Elimina questo task/);
+    const i = modale.indexOf('eliminaBtn: {');
+    expect(modale.slice(i, i + 200)).toMatch(/height:\s*48/);
+  });
+
+  it('compare solo quando si sta modificando, mai creando', () => {
+    expect(modale).toMatch(/\{!!editingTask && !!onDelete &&/);
+  });
+
+  it('e porta alla stessa conferma, non a una seconda strada', () => {
+    const i = schermata.indexOf('onDelete={editingTask ?');
+    expect(schermata.slice(i, i + 400)).toMatch(/chiediEliminaTask\(t\)/);
+  });
+
+  it('chiude la modifica prima di aprire la conferma', () => {
+    const i = schermata.indexOf('onDelete={editingTask ?');
+    const b = schermata.slice(i, i + 400);
+    expect(b.indexOf('setShowTaskModal(false)')).toBeLessThan(b.indexOf('chiediEliminaTask(t)'));
+  });
+
+  it('e gli orari del task vengono dal dominio, a 15 minuti', () => {
+    expect(modale).toMatch(/const TIME_SLOTS = grigliaOrari\(\)/);
+    expect(modale).not.toMatch(/'07:30', '08:00'/);
+  });
+});
+
 describe('la conferma è dentro l\'app, non nel browser', () => {
   const schermata = leggi('screens/shared/CalendarScreen.tsx');
 
