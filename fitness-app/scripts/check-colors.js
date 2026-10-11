@@ -26,6 +26,10 @@ const WHITELIST = new Set([
   'src/config/theme.ts',   // la palette: qui i colori DEVONO stare
   'src/config/brand.ts',   // config white-label per cliente
   'src/utils/printUtils.ts',     // template HTML stampa
+  // Il foglio del registro: è carta, non schermo. I suoi grigi sono
+  // inchiostro su bianco e non seguono il tema dell'app — che è scuro,
+  // e stampato diventerebbe illeggibile.
+  'src/domain/documentoRegistro.ts',
   'src/services/reportService.ts', // template HTML report
   'src/components/common/EnsōLogo.tsx', // asset di brand (SVG): i colori sono il disegno
 ]);

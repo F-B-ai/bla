@@ -136,3 +136,40 @@ export const getRecentCheckins = async (days: number = 7): Promise<CheckinRecord
     };
   });
 };
+
+/**
+ * Gli ingressi per il documento del registro.
+ *
+ * Esiste a parte da `getRecentCheckins` perché quella serve a vedere
+ * chi è entrato in settimana: sette giorni e duecento righe bastano e
+ * avanzano. Qui si costruisce un documento che va letto da fuori, e un
+ * documento che si ferma a duecento righe senza dirlo è un documento
+ * che mente per omissione.
+ */
+export const getCheckinsPerRegistro = async (
+  giorni = 180,
+  massimo = 1000
+): Promise<CheckinRecord[]> => {
+  const da = new Date();
+  da.setDate(da.getDate() - giorni);
+  da.setHours(0, 0, 0, 0);
+
+  const snapshot = await getDocs(
+    query(
+      collection(db, CHECKIN_COLLECTION),
+      where('timestamp', '>=', Timestamp.fromDate(da)),
+      orderBy('timestamp', 'desc'),
+      limit(massimo)
+    )
+  );
+
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      studentId: data.studentId,
+      studentName: data.studentName,
+      timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
+    } as CheckinRecord;
+  });
+};

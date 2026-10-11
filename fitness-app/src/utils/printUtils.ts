@@ -5,6 +5,9 @@ import {
 } from '../domain/schedaSemplice';
 import { componiCarta, Carta, VocePreventivo } from '../domain/cartaIntestata';
 import { spiegaSconto, TipoSconto } from '../domain/sconti';
+import {
+  documentoRegistro, DatiDocumentoRegistro,
+} from '../domain/documentoRegistro';
 
 const LOGO_CHAR = brand.appName;
 
@@ -931,3 +934,15 @@ export function printPaymentReceipt({
     (window as any).alert('Errore ricevuta: ' + String(e));
   }
 }
+
+// ─── Registro sedute e ingressi — documento per il commercialista ──────
+//
+// L'impaginazione sta nel dominio (domain/documentoRegistro.ts) e non
+// qui: è un documento che esce dallo studio e finisce sul tavolo di un
+// professionista, e una cosa del genere va potuta guardare e provare
+// senza aprire l'applicazione.
+
+export const printRegistroPresenze = (dati: DatiDocumentoRegistro) => {
+  const d = documentoRegistro(dati);
+  showPrintOverlay(d.html, d.css);
+};
