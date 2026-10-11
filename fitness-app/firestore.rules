@@ -92,10 +92,23 @@ service cloud.firestore {
     }
 
     // Check-in accessi palestra (QR/codice alla reception)
+    //
+    // L'ingresso lo registra l'allievo, entrando: è l'unico dato dello
+    // studio che non dipende da chi conduce le sedute. Proprio per
+    // questo cancellarlo o modificarlo non è un gesto da collaboratore
+    // — chiunque sia il collaboratore e qualunque sia il motivo.
+    //
+    // Fino all'11 ottobre 2026 lo poteva fare tutto lo staff. Era la
+    // stessa cosa che lasciare a chi è controllato la gomma per
+    // cancellare il controllo: finché nessuno guarda i due registri
+    // insieme non si nota, e quando si guardano è tardi.
+    //
+    // Vale la regola già data per gli annullamenti e le cancellazioni:
+    // togliere qualcosa dai registri è un gesto del titolare.
     match /checkins/{checkinId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isStaff();
+      allow update, delete: if isOwner();
     }
 
     // Stato ESSĒRE (check-in mente-corpo quotidiano)
