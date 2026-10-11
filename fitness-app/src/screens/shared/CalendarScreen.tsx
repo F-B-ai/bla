@@ -87,7 +87,7 @@ import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
   eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
 } from '../../domain/appuntamento';
-import { motivoSalvataggio } from '../../domain/salvataggio';
+import { motivoSalvataggio, motivoEliminazione } from '../../domain/salvataggio';
 import {
   tariffaDi, avvisoAnnualeColTitolare, eAnnuale, statoTetto,
   stessaSettimana, TETTO_INIZIALE, Conduttore,
@@ -1281,7 +1281,9 @@ export const CalendarScreen: React.FC = () => {
             if (eSessione(item.kind)) await deleteSession(item.id);
             else await deleteAppointment(item.id);
             loadData();
-          } catch { crossAlert('Errore', 'Impossibile eliminare'); }
+          } catch (err) {
+            crossAlert('Non l\'ho eliminato', motivoEliminazione(err));
+          }
         },
       },
     ]);
@@ -1376,8 +1378,18 @@ export const CalendarScreen: React.FC = () => {
         onPress: async () => {
           try {
             await deleteTask(task.id);
+            // Si toglie SUBITO dalla lista, senza aspettare la
+            // rilettura: se il server risponde dalla cache, il task
+            // cancellato ricompare e sembra che l'eliminazione non
+            // funzioni. Era già andato; tornava solo in pagina.
+            setTasks((p) => p.filter((t) => t.id !== task.id));
             loadData();
-          } catch { crossAlert('Errore', 'Impossibile eliminare'); }
+          } catch (err) {
+            // «Impossibile eliminare» non diceva niente: né se era la
+            // linea, né se era il ruolo, né se era già stato
+            // cancellato altrove. Quindi non diceva se riprovare.
+            crossAlert('Non l\'ho eliminato', motivoEliminazione(err));
+          }
         },
       },
     ]);

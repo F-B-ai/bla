@@ -153,3 +153,40 @@ export const motivoSalvataggio = (err: unknown): string => {
 
   return `Il salvataggio non è riuscito.\n\n${testo}`;
 };
+
+/**
+ * Che cosa è andato storto in una ELIMINAZIONE.
+ *
+ * Esiste perché «Impossibile eliminare» non è un messaggio: è una
+ * porta chiusa senza spiegazione. Chi lo legge non sa se la colpa è
+ * della linea, del ruolo, o di una cosa già cancellata da un'altra
+ * postazione — e quindi non sa nemmeno se riprovare.
+ *
+ * I codici sono gli stessi del salvataggio, perché il server è lo
+ * stesso; cambiano le due righe che parlano di scrittura, che qui
+ * sarebbero fuori posto.
+ */
+export const motivoEliminazione = (err: unknown): string => {
+  const codice = codiceDi(err);
+  const testo = testoDi(err).trim();
+
+  if (codice === 'not-found') {
+    return 'Non c\'era più niente da eliminare: era già stato cancellato, '
+      + 'forse da un\'altra postazione. Chiudi e riapri, e sparisce anche '
+      + 'dalla lista.\n\n(not-found)';
+  }
+  if (codice === 'permission-denied') {
+    return 'Il server ha rifiutato l\'eliminazione: con il tuo ruolo non è '
+      + 'permessa. Se serve davvero, chiedila al titolare.\n\n(permission-denied)';
+  }
+  if (codice && CODICI[codice]) {
+    return `${CODICI[codice]}\n\n(${codice})`;
+  }
+  if (!testo) {
+    return codice
+      ? `L'eliminazione non è riuscita.\n\n(${codice})`
+      : 'L\'eliminazione non è riuscita, e il server non ha detto perché. '
+        + 'Riprova; se succede ancora, segnalalo.';
+  }
+  return `L'eliminazione non è riuscita.\n\n${testo}`;
+};

@@ -65,12 +65,28 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onToggle, onEdit, onDe
           </View>
         </View>
       </View>
+      {/* I due pulsanti erano due quadratini da 24 px, uno sopra
+          l'altro e a 4 px di distanza: col pollice si prendeva la
+          matita invece del cestino, si apriva la modifica, e sembrava
+          che il task non si potesse eliminare. Adesso sono due
+          bersagli da 44 px — il minimo perché un dito li centri —
+          affiancati e separati. */}
       <View style={styles.taskActions}>
-        <TouchableOpacity onPress={() => onEdit(task)} style={styles.taskActionBtn}>
-          <Ionicons name="create-outline" size={16} color={colors.info} />
+        <TouchableOpacity
+          onPress={() => onEdit(task)}
+          style={styles.taskActionBtn}
+          accessibilityLabel="Modifica il task"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons name="create-outline" size={20} color={colors.info} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => onDelete(task)} style={styles.taskActionBtn}>
-          <Ionicons name="trash-outline" size={16} color={colors.error} />
+        <TouchableOpacity
+          onPress={() => onDelete(task)}
+          style={styles.taskActionBtn}
+          accessibilityLabel="Elimina il task"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
         </TouchableOpacity>
       </View>
     </View>
@@ -128,11 +144,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   taskActions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
+  // 44 px: la misura sotto la quale un dito non centra più il
+  // bersaglio che vede. Non è una preferenza grafica.
   taskActionBtn: {
-    padding: 4,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.md,
   },
   taskTimeBadge: {
     flexDirection: 'row',
