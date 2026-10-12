@@ -61,21 +61,36 @@ describe('le quote del personal di gruppo', () => {
   });
 });
 
+// Il 12 ottobre 2026 il buco si è chiuso dal lato giusto: invece di
+// inventare un prezzo per cinque persone, il titolare ha tolto il
+// cinque. «Con cinque non è un personal, è un mini gruppo.»
+describe('ogni numero che si può scegliere ha un prezzo', () => {
+  it('il selettore si ferma a quattro', () => {
+    expect(MAX_PERSONE).toBe(4);
+  });
+
+  it('e tutti i numeri possibili hanno una quota di listino', () => {
+    [2, 3, 4].forEach((n) => {
+      expect(quotaGruppoDi(n)).not.toBeNull();
+      expect(incassoGruppoDi(n)).not.toBeNull();
+    });
+  });
+});
+
 describe('la quota che il listino NON ha', () => {
-  it('con cinque persone torna null, non zero e non un numero inventato', () => {
-    expect(quotaGruppoDi(MAX_PERSONE)).toBeNull();
-    expect(incassoGruppoDi(MAX_PERSONE)).toBeNull();
+  // Non capita più dall'interfaccia, e resta previsto lo stesso: il
+  // giorno che si aggiunge una taglia nuova, il buco si vede invece
+  // di diventare uno zero.
+  it('un numero fuori listino torna null, non zero', () => {
+    expect(quotaGruppoDi(6)).toBeNull();
+    expect(incassoGruppoDi(6)).toBeNull();
+    expect(QUOTE_GRUPPO[6]).toBeUndefined();
   });
 
   it('e lo dice a parole, invece di tacere', () => {
-    expect(rigaGruppo(MAX_PERSONE)).toMatch(/decidi tu/i);
+    expect(rigaGruppo(6)).toMatch(/decidi tu/i);
     expect(rigaGruppo(3)).toContain('15');
     expect(rigaGruppo(3)).toContain('45');
-  });
-
-  it('il selettore arriva a cinque: il buco è reale, non teorico', () => {
-    expect(MAX_PERSONE).toBe(5);
-    expect(QUOTE_GRUPPO[5]).toBeUndefined();
   });
 });
 
