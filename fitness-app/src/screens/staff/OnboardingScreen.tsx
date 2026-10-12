@@ -20,6 +20,8 @@ import {
 import { printCartaIntestata } from '../../utils/printUtils';
 import { TipoSconto, REGOLE_SCONTO, regolaDi } from '../../domain/sconti';
 import { VOCI_LISTINO, euroIt } from '../../domain/listino';
+import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { motivoEliminazione } from '../../domain/salvataggio';
 
 /** Le scelte del selettore: «nessuno» più le regole del dominio. */
 const SCELTE_SCONTO: { tipo: TipoSconto; etichetta: string }[] = [
@@ -67,6 +69,12 @@ export function OnboardingScreen() {
   // Quale consulenza si sta modificando. Se è aperta, salvare AGGIORNA
   // quella invece di crearne una seconda con lo stesso nome.
   const [schedaApertaId, setSchedaApertaId] = useState<string | null>(null);
+  // La cancellazione di una consulenza: quale, se è in corso, e perché
+  // non è andata. La conferma è un riquadro dell'app e non un dialogo
+  // del browser — vedi components/common/ConfirmModal.
+  const [daCancellare, setDaCancellare] = useState<SchedaOnboarding | null>(null);
+  const [cancellando, setCancellando] = useState(false);
+  const [erroreCancella, setErroreCancella] = useState<string | null>(null);
 
   // --- la carta intestata col preventivo ---
   const [voci, setVoci] = useState<Array<{ descrizione: string; importo: string }>>([
@@ -248,22 +256,29 @@ export function OnboardingScreen() {
   };
 
   const cancella = (sch: SchedaOnboarding) => {
-    const nome = sch.ospiteNome || 'questa persona';
-    crossAlert('Cancellare la scheda?', confermaCancellazione(nome), [
-      { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Cancella',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await cancellaInteressato(sch.id);
-            ricaricaInteressati();
-          } catch {
-            crossAlert('Errore', 'Non sono riuscito a cancellarla.');
-          }
-        },
-      },
-    ]);
+    setErroreCancella(null);
+    setDaCancellare(sch);
+  };
+
+  const cancellaConfermato = async () => {
+    const sch = daCancellare;
+    if (!sch) return;
+    setCancellando(true);
+    try {
+      await cancellaInteressato(sch.id);
+      // Se era quella aperta qui sotto, il modulo va chiuso: restare
+      // su una scheda che non esiste più fa salvare una cosa
+      // cancellata un minuto fa.
+      if (schedaApertaId === sch.id) chiudiScheda();
+      setDaCancellare(null);
+      ricaricaInteressati();
+    } catch (err) {
+      // «Non sono riuscito a cancellarla» non diceva se fosse la
+      // linea, il ruolo o una scheda già tolta da un'altra postazione.
+      setErroreCancella(motivoEliminazione(err));
+    } finally {
+      setCancellando(false);
+    }
   };
 
   const collega = (sch: SchedaOnboarding) => {
@@ -509,11 +524,26 @@ export function OnboardingScreen() {
                       : `${sch.date.toLocaleDateString('it-IT')} — ${descriviScadenza(sch.date)}`}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => collega(sch)} style={s.interessatoBtn}>
-                  <Ionicons name="link-outline" size={17} color={colors.accent} />
+                {/* Erano due bersagli da 25 px attaccati alla riga che
+                    apre la scheda: col pollice si prendeva la riga, si
+                    apriva la consulenza, e sembrava che non si potesse
+                    cancellare. 44 px è la misura sotto la quale un dito
+                    non centra quello che vede. */}
+                <TouchableOpacity
+                  onPress={() => collega(sch)}
+                  style={s.interessatoBtn}
+                  accessibilityLabel={`Collega ${sch.ospiteNome || 'questa consulenza'} a un allievo`}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="link-outline" size={20} color={colors.accent} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => cancella(sch)} style={s.interessatoBtn}>
-                  <Ionicons name="trash-outline" size={17} color={colors.error} />
+                <TouchableOpacity
+                  onPress={() => cancella(sch)}
+                  style={s.interessatoBtn}
+                  accessibilityLabel={`Cancella la consulenza di ${sch.ospiteNome || 'questa persona'}`}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
                 </TouchableOpacity>
               </View>
             );
@@ -766,6 +796,23 @@ export function OnboardingScreen() {
           </Text>
         </>
       )}
+
+      {/* La conferma è un riquadro dell'app: un `window.confirm` del
+          browser può essere soppresso senza dire niente, e allora il
+          cestino funziona e sembra morto. */}
+      <ConfirmModal
+        visible={!!daCancellare}
+        titolo="Cancellare la consulenza?"
+        messaggio={daCancellare
+          ? confermaCancellazione(daCancellare.ospiteNome || 'questa persona')
+          : ''}
+        azione="Cancella"
+        distruttiva
+        errore={erroreCancella}
+        inCorso={cancellando}
+        onConferma={cancellaConfermato}
+        onAnnulla={() => { setDaCancellare(null); setErroreCancella(null); }}
+      />
     </ScrollView>
   );
 }
@@ -788,7 +835,12 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm,
   },
   chiudiTxt: { fontSize: fontSize.sm, color: colors.accent, fontWeight: '600' },
-  interessatoBtn: { padding: spacing.xs },
+  // 44 px: la misura sotto la quale un dito non centra il bersaglio.
+  interessatoBtn: {
+    width: 44, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: borderRadius.md,
+  },
   soggettoRiga: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
   soggettoChip: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
