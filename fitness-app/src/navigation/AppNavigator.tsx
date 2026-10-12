@@ -10,6 +10,8 @@ import { colors, fontSize } from '../config/theme';
 import { useAuth } from '../hooks/useAuth';
 import { OfflineIndicator } from '../components/common/OfflineIndicator';
 import { OnboardingOverlay, hasCompletedOnboarding, markOnboardingComplete } from '../components/common/OnboardingOverlay';
+import { IngressoGate } from '../components/common/IngressoGate';
+import { chiedeIngresso } from '../domain/ingresso';
 
 // --- Persist loginMode so Academy mode survives refresh ---
 const LOGIN_MODE_KEY = 'essere_login_mode';
@@ -1169,6 +1171,10 @@ export const AppNavigator: React.FC = () => {
   const [loginMode, setLoginMode] = useState<'app' | 'academy' | null>(null);
   const [loginModeLoaded, setLoginModeLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // La domanda sull'ingresso: una volta per apertura dell'app. Il
+  // «quando chiederla» sta in domain/ingresso.ts; qui si tiene solo
+  // conto del fatto che per questa sessione è già stata chiusa.
+  const [ingressoChiuso, setIngressoChiuso] = useState(false);
   const [license, setLicense] = useState<{ active: boolean; message?: string }>({ active: true });
   const [consentNeeded, setConsentNeeded] = useState(false);
 
@@ -1351,6 +1357,16 @@ export const AppNavigator: React.FC = () => {
             userName={user.name}
             userId={user.id}
             onComplete={() => setShowOnboarding(false)}
+          />
+        )}
+        {/* L'ingresso si chiede PRIMA di tutto il resto, ma DOPO la
+            presentazione dell'app a chi entra per la prima volta: due
+            schermate piene una sopra l'altra non si leggono. */}
+        {!showOnboarding && !ingressoChiuso && user && chiedeIngresso(role) && (
+          <IngressoGate
+            userId={user.id}
+            ruolo={role}
+            onChiuso={() => setIngressoChiuso(true)}
           />
         )}
       </View>

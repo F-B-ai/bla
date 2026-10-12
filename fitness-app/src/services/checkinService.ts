@@ -32,7 +32,16 @@ const isToday = (date: Date): boolean => {
 export const registerCheckin = async (
   studentId: string,
   studentName: string,
-  method: 'qr' | 'manuale' = 'qr'
+  method: 'qr' | 'manuale' = 'qr',
+  /**
+   * Chi è entrato: allievo, collaboratore, manager, nutrizionista.
+   *
+   * Dal 12 ottobre 2026 l'ingresso lo registra anche chi lavora qui, e
+   * un registro che non distingue le due cose non serve a nessuno:
+   * dieci presenze in un pomeriggio sono una cosa se sono allievi e
+   * un'altra se sono tre collaboratori che entrano ed escono.
+   */
+  ruolo = 'student'
 ): Promise<{ success: boolean; alreadyCheckedIn?: boolean }> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -53,6 +62,7 @@ export const registerCheckin = async (
   const ref = await addDoc(collection(db, CHECKIN_COLLECTION), {
     studentId,
     studentName,
+    ruolo,
     timestamp: Timestamp.now(),
   });
 
@@ -172,4 +182,42 @@ export const getCheckinsPerRegistro = async (
       timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(),
     } as CheckinRecord;
   });
+};
+
+
+/**
+ * Questa persona ha già registrato l'ingresso oggi?
+ *
+ * Serve alla domanda che l'app fa all'apertura: chiederla a chi ha
+ * già inquadrato il QR mezz'ora fa è il modo più rapido di far
+ * disinstallare l'applicazione.
+ */
+export const ultimoIngressoDiOggi = async (
+  userId: string
+): Promise<Date | null> => {
+  if (!userId) return null;
+  const inizio = new Date();
+  inizio.setHours(0, 0, 0, 0);
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, CHECKIN_COLLECTION),
+        where('timestamp', '>=', Timestamp.fromDate(inizio))
+      )
+    );
+    const miei = snapshot.docs
+      .filter((d) => d.data().studentId === userId)
+      .map((d) => {
+        const t = d.data().timestamp;
+        return t?.toDate ? t.toDate() : null;
+      })
+      .filter((d): d is Date => !!d)
+      .sort((a, b) => b.getTime() - a.getTime());
+    return miei[0] || null;
+  } catch {
+    // Se la lettura non riesce NON si conclude che la persona non sia
+    // entrata: si risponde «non lo so» tornando null, e chi chiama
+    // deciderà di non insistere. Vedi il commento in IngressoGate.
+    return null;
+  }
 };
