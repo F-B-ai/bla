@@ -34,6 +34,40 @@ export const AVVIO_VERSION = 1;
  */
 export const SECONDI_PAZIENZA = 12;
 
+/**
+ * Quanto si aspetta UNA SOLA lettura prima di dichiararla persa.
+ *
+ * Otto secondi, cioè meno della pazienza complessiva: serve a che
+ * l'app arrivi a una conclusione — «non ci sono riuscito» — invece di
+ * restare appesa a una promessa che non si risolve mai. Un conto è
+ * aspettare, un altro è non sapere nemmeno di stare aspettando.
+ */
+export const SECONDI_PROFILO = 8;
+
+/**
+ * Una promessa che non può restare appesa per sempre.
+ *
+ * La lettura del profilo su Firestore, con la copia locale attiva, in
+ * certe condizioni NON risponde: né riesce né fallisce. Un `catch` non
+ * serve a niente contro una cosa che non finisce — serve una sveglia.
+ */
+export const attendiAlMassimo = <T>(
+  lavoro: Promise<T>,
+  millisecondi: number,
+  motivo: string
+): Promise<T> => new Promise<T>((risolvi, rifiuta) => {
+  let finito = false;
+  const sveglia = setTimeout(() => {
+    if (finito) return;
+    finito = true;
+    rifiuta(new Error(motivo));
+  }, millisecondi);
+  lavoro.then(
+    (v) => { if (!finito) { finito = true; clearTimeout(sveglia); risolvi(v); } },
+    (e) => { if (!finito) { finito = true; clearTimeout(sveglia); rifiuta(e); } }
+  );
+});
+
 export interface DatiAvvio {
   /** l'autenticazione sta ancora rispondendo */
   caricando: boolean;
@@ -77,6 +111,16 @@ export interface SchermataBlocco {
  */
 export const spiegaBlocco = (errore?: string | null): SchermataBlocco => {
   const dettaglio = (errore || '').trim();
+
+  if (/copia locale|IndexedDB|persistence/i.test(dettaglio)) {
+    return {
+      titolo: 'La copia salvata sul telefono si è incartata',
+      testo: 'I tuoi dati sul server stanno bene: è la copia locale che non '
+        + 'risponde. Tocca «Ripara l\'app»: la cancella e la riscarica. '
+        + 'Dovrai rifare l\'accesso, e basta.',
+      dettaglio,
+    };
+  }
 
   if (/permission|permesso|denied/i.test(dettaglio)) {
     return {

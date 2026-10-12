@@ -23,7 +23,26 @@ export interface AvvioBloccatoProps {
   onEsci: () => void;
 }
 
-/** Cancella la copia salvata sul telefono e ricarica. */
+/**
+ * Cancella tutto quello che l'app tiene sul telefono, e ricarica.
+ *
+ * TRE DEPOSITI, non uno — ed è la ragione per cui la prima versione di
+ * questa riparazione non bastava e il blocco tornava:
+ *
+ *   · le CACHE del browser (i file dell'app);
+ *   · il SERVICE WORKER, che quelle cache le riempie;
+ *   · e IndexedDB, dove Firestore tiene la copia locale dei dati e
+ *     Firebase tiene l'accesso.
+ *
+ * Il terzo era rimasto fuori. È proprio quello che si incarta sulle
+ * app installate dalla schermata home, e finché resta lì il blocco
+ * ritorna al primo riavvio: si ripara la vetrina e si lascia il guasto
+ * nel retro.
+ *
+ * Cancellando IndexedDB si perde anche l'accesso, e va detto a chi
+ * tocca il pulsante: si rientra con email e password, e non si perde
+ * nessun dato — quelli stanno sul server.
+ */
 export const riparaApp = (): void => {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
   const ricarica = () => { try { window.location.reload(); } catch { /* niente */ } };
@@ -31,6 +50,10 @@ export const riparaApp = (): void => {
   try {
     const w = window as unknown as {
       caches?: { keys: () => Promise<string[]>; delete: (n: string) => Promise<boolean> };
+      indexedDB?: {
+        databases?: () => Promise<{ name?: string }[]>;
+        deleteDatabase: (n: string) => { onsuccess: unknown; onerror: unknown };
+      };
       navigator?: { serviceWorker?: { getRegistrations?: () => Promise<{ unregister: () => Promise<boolean> }[]> } };
     };
     if (w.caches?.keys) {
@@ -40,12 +63,48 @@ export const riparaApp = (): void => {
     if (sw?.getRegistrations) {
       lavori.push(sw.getRegistrations().then((rs) => Promise.all(rs.map((r) => r.unregister()))));
     }
+
+    const idb = w.indexedDB;
+    if (idb) {
+      const cancella = (nome: string) => new Promise<void>((fine) => {
+        try {
+          const r = idb.deleteDatabase(nome) as unknown as Record<string, unknown>;
+          // `onblocked` succede quando l'app è aperta anche altrove: non
+          // si aspetta all'infinito, si va avanti e si ricarica.
+          r.onsuccess = () => fine();
+          r.onerror = () => fine();
+          r.onblocked = () => fine();
+          setTimeout(fine, 2500);
+        } catch { fine(); }
+      });
+
+      if (idb.databases) {
+        lavori.push(
+          idb.databases()
+            .then((elenco) => Promise.all(
+              elenco.map((d) => (d.name ? cancella(d.name) : Promise.resolve()))
+            ))
+            // Safari non sempre sa elencarli: allora si cancellano
+            // quelli noti, che sono quelli che si incartano.
+            .catch(() => Promise.all(NOMI_NOTI.map(cancella)))
+        );
+      } else {
+        lavori.push(Promise.all(NOMI_NOTI.map(cancella)));
+      }
+    }
   } catch { /* si ricarica lo stesso */ }
   Promise.all(lavori).then(ricarica).catch(ricarica);
   // Se qualcosa resta appeso, si ricarica comunque: meglio una
   // riparazione a metà che una schermata ferma per sempre.
-  setTimeout(ricarica, 4000);
+  setTimeout(ricarica, 6000);
 };
+
+/** I depositi di Firebase, per i browser che non sanno elencarli. */
+const NOMI_NOTI = [
+  'firebaseLocalStorageDb',
+  'firebase-heartbeat-database',
+  'firebase-installations-database',
+];
 
 export const AvvioBloccato: React.FC<AvvioBloccatoProps> = ({ errore, onRiprova, onEsci }) => {
   const s = spiegaBlocco(errore);
@@ -68,6 +127,10 @@ export const AvvioBloccato: React.FC<AvvioBloccatoProps> = ({ errore, onRiprova,
       >
         <Text style={styles.secondarioTxt}>Ripara l'app</Text>
       </TouchableOpacity>
+      <Text style={styles.piccolo}>
+        «Ripara» cancella la copia tenuta sul telefono: dovrai rifare l'accesso.
+        I dati stanno sul server e non si toccano.
+      </Text>
 
       <TouchableOpacity style={styles.terziario} onPress={onEsci} accessibilityLabel="Esci e rientra">
         <Text style={styles.terziarioTxt}>Esci e rientra</Text>
@@ -146,6 +209,13 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  piccolo: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    lineHeight: 16,
   },
   dettaglio: {
     fontSize: fontSize.xs,

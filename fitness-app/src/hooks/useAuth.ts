@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useContext, createContext } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { attendiAlMassimo, SECONDI_PROFILO } from '../domain/avvio';
 import { auth } from '../config/firebase';
 import { User, UserRole } from '../types';
 import { getUserProfile, signIn, signOut } from '../services/authService';
@@ -45,7 +46,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const profile = await getUserProfile(fbUser.uid);
+          // La lettura del profilo NON può restare appesa.
+          //
+          // 12 ottobre 2026: l'app si fermava su «Caricamento…» senza
+          // fine. Firestore tiene una copia locale sul telefono
+          // (IndexedDB) e, quando quella si incarta — succede sulle app
+          // installate dalla schermata home, e quando la stessa app è
+          // aperta in due posti — la lettura non riesce e non
+          // fallisce: resta lì. Un `catch` non serve contro una cosa
+          // che non finisce mai; serve una sveglia.
+          const profile = await attendiAlMassimo(
+            getUserProfile(fbUser.uid),
+            SECONDI_PROFILO * 1000,
+            'La copia locale dei dati non risponde (timeout lettura profilo).'
+          );
           setState({
             firebaseUser: fbUser,
             userProfile: profile,
@@ -58,7 +72,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             firebaseUser: fbUser,
             userProfile: null,
             loading: false,
-            error: 'Errore nel caricamento del profilo',
+            // Il motivo vero, non una frase generica: è quello che
+            // compare in fondo alla schermata di blocco, ed è l'unica
+            // cosa che dice se riprovare, riparare o uscire.
+            error: (err as { message?: string })?.message
+              || 'Errore nel caricamento del profilo',
           });
         }
       } else {
