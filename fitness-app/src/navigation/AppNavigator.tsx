@@ -11,6 +11,8 @@ import { useAuth } from '../hooks/useAuth';
 import { OfflineIndicator } from '../components/common/OfflineIndicator';
 import { OnboardingOverlay, hasCompletedOnboarding, markOnboardingComplete } from '../components/common/OnboardingOverlay';
 import { IngressoGate } from '../components/common/IngressoGate';
+import { AvvioBloccato } from '../components/common/AvvioBloccato';
+import { statoAvvio } from '../domain/avvio';
 import { chiedeIngresso } from '../domain/ingresso';
 
 // --- Persist loginMode so Academy mode survives refresh ---
@@ -1164,7 +1166,10 @@ const LoadingScreen = () => (
 
 // --- Main Navigator ---
 export const AppNavigator: React.FC = () => {
-  const { isAuthenticated, loading, role, user, logout } = useAuth();
+  const { isAuthenticated, loading, role, user, logout, error: erroreAuth } = useAuth();
+  // Da quanti secondi stiamo aspettando di aprire. Serve a non girare
+  // la rotella per sempre: vedi domain/avvio.ts.
+  const [secondiAttesa, setSecondiAttesa] = useState(0);
   // Le route dipendono dal ruolo: 'studio' deve risolvere a UNA sola schermata.
   const linking = React.useMemo(() => buildLinking(role), [role]);
   // null = selector, 'app' = ESSĒRE login, 'academy' = Academy login
@@ -1190,11 +1195,26 @@ export const AppNavigator: React.FC = () => {
 
   // Load persisted loginMode on mount
   useEffect(() => {
-    loadLoginMode().then((mode) => {
-      setLoginMode(mode);
-      setLoginModeLoaded(true);
-    });
+    loadLoginMode()
+      .then((mode) => {
+        setLoginMode(mode);
+        setLoginModeLoaded(true);
+      })
+      // Senza questa riga, una memoria del telefono che risponde male
+      // lasciava l'app sulla rotella per sempre: `loginModeLoaded` non
+      // diventava mai vero e nessuno lo sapeva.
+      .catch(() => setLoginModeLoaded(true));
   }, []);
+
+  // Il cronometro dell'attesa. Gira solo finché c'è da aspettare, e si
+  // azzera appena l'app è pronta: così un rallentamento momentaneo non
+  // lascia il conteggio avanti per la prossima volta.
+  const inAttesa = loading || !loginModeLoaded || (isAuthenticated && !user);
+  useEffect(() => {
+    if (!inAttesa) { setSecondiAttesa(0); return; }
+    const t = setInterval(() => setSecondiAttesa((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [inAttesa]);
 
   // Track whether loginMode was set by the user clicking on the selector (not loaded from storage)
   const loginModeSetByUser = useRef(false);
@@ -1253,12 +1273,43 @@ export const AppNavigator: React.FC = () => {
     setLoginModeAndPersist(null);
   }, [logout, setLoginModeAndPersist]);
 
-  if (loading || !loginModeLoaded) {
-    return <LoadingScreen />;
+  // L'apertura dell'app. Finché è questione di secondi si aspetta;
+  // passata la pazienza si smette di girare e si dice che cosa sta
+  // succedendo, con qualcosa da toccare.
+  //
+  // Il caso che ha fatto nascere questa parte: Firebase ricorda chi
+  // sei anche senza rete, quindi `isAuthenticated` è vero subito; se
+  // poi il profilo non arriva, «autenticato e senza profilo» veniva
+  // letto come «sto ancora caricando», per sempre. E l'errore era già
+  // lì, messo da parte da chi aveva provato a leggerlo: nessuno lo
+  // mostrava. Vedi domain/avvio.ts.
+  const avvio = statoAvvio({
+    caricando: loading || !loginModeLoaded,
+    autenticato: isAuthenticated,
+    profilo: !!user,
+    errore: erroreAuth,
+    secondiPassati: secondiAttesa,
+  });
+
+  if (avvio === 'bloccato') {
+    return (
+      <AvvioBloccato
+        errore={erroreAuth}
+        onRiprova={() => {
+          // Riprovare davvero vuol dire rifare il giro da capo:
+          // azzerare il cronometro e basta rimetterebbe la stessa
+          // rotella per altri dodici secondi.
+          setSecondiAttesa(0);
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            try { window.location.reload(); } catch { /* resta il contatore azzerato */ }
+          }
+        }}
+        onEsci={handleLogoutAndReset}
+      />
+    );
   }
 
-  // If authenticated but profile not loaded yet, show loading
-  if (isAuthenticated && !user) {
+  if (avvio === 'attesa') {
     return <LoadingScreen />;
   }
 
