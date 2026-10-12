@@ -47,6 +47,14 @@ import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
 import { grigliaOrari } from '../../domain/orariStudio';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
 import { motivoSalvataggio } from '../../domain/salvataggio';
+import {
+  FASCE, FasciaOraria, MAX_NOTA, controllaRichiesta, richiestaAperta,
+  spiegaStato, descriviFasce, RichiestaNutrizione,
+} from '../../domain/richiestaNutrizione';
+import {
+  creaRichiestaNutrizione, mieRichiesteNutrizione,
+  richiesteNutrizioneInAttesa, chiudiRichiestaNutrizione,
+} from '../../services/richiesteNutrizioneService';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
@@ -82,6 +90,16 @@ export const NutritionistScreen: React.FC = () => {
   // Visite
   const [appointments, setAppointments] = useState<NutritionistAppointment[]>([]);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+
+  // --- la richiesta di consulenza nutrizionale ---
+  // L'allievo chiede, il titolare risponde. Vedi
+  // domain/richiestaNutrizione.ts per il perché di ogni regola.
+  const [mieRichieste, setMieRichieste] = useState<RichiestaNutrizione[]>([]);
+  const [richiesteAperte, setRichiesteAperte] = useState<RichiestaNutrizione[]>([]);
+  const [showRichiestaModal, setShowRichiestaModal] = useState(false);
+  const [fasceScelte, setFasceScelte] = useState<FasciaOraria[]>([]);
+  const [notaRichiesta, setNotaRichiesta] = useState('');
+  const [inviandoRichiesta, setInviandoRichiesta] = useState(false);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
     date: '', startTime: '09:00', endTime: '10:00', notes: '',
@@ -125,7 +143,21 @@ export const NutritionistScreen: React.FC = () => {
     } catch (err) {
       console.error('Errore caricamento dati nutrizionista:', err);
     }
-  }, [selectedStudentId, isStudent, isOwner]);
+
+    // Le richieste di consulenza si leggono a parte, e un errore qui
+    // NON deve far fallire il resto: misure e visite valgono anche
+    // senza. Prima erano tutte in un Promise.all, ed è il modo in cui
+    // una schermata intera resta vuota per colpa di una riga.
+    try {
+      if (isStudent && user?.id) {
+        setMieRichieste(await mieRichiesteNutrizione(user.id));
+      } else if (isOwner) {
+        setRichiesteAperte(await richiesteNutrizioneInAttesa());
+      }
+    } catch (err) {
+      console.error('Errore caricamento richieste nutrizione:', err);
+    }
+  }, [selectedStudentId, isStudent, isOwner, user?.id]);
 
   useEffect(() => {
     loadStudents();
@@ -134,6 +166,55 @@ export const NutritionistScreen: React.FC = () => {
   useEffect(() => {
     if (selectedStudentId) loadData();
   }, [selectedStudentId, loadData]);
+
+  /** L'allievo manda la richiesta. */
+  const inviaRichiesta = async () => {
+    if (!user?.id) return;
+    const controllo = controllaRichiesta({ fasce: fasceScelte, nota: notaRichiesta });
+    if (!controllo.valido) {
+      crossAlert('Manca una cosa', controllo.problemi.join('\n\n'));
+      return;
+    }
+    setInviandoRichiesta(true);
+    try {
+      await creaRichiestaNutrizione({
+        studentId: user.id,
+        allievo: `${user.name || ''} ${user.surname || ''}`.trim(),
+        fasce: fasceScelte,
+        nota: notaRichiesta,
+      });
+      setShowRichiestaModal(false);
+      setFasceScelte([]);
+      setNotaRichiesta('');
+      setMieRichieste(await mieRichiesteNutrizione(user.id));
+      crossAlert(
+        'Richiesta inviata',
+        'È arrivata al titolare dello studio. Ti farà sapere quando può fissarla.'
+      );
+    } catch (err) {
+      crossAlert('Non sono riuscito a inviarla', motivoSalvataggio(err));
+    } finally {
+      setInviandoRichiesta(false);
+    }
+  };
+
+  /** Il titolare chiude una richiesta: fissata, oppure no con un perché. */
+  const chiudiRichiesta = async (
+    r: RichiestaNutrizione,
+    stato: 'fissata' | 'chiusa'
+  ) => {
+    if (!r.id) return;
+    try {
+      await chiudiRichiestaNutrizione(
+        r.id,
+        stato,
+        stato === 'chiusa' ? 'Richiesta chiusa dal titolare.' : undefined
+      );
+      setRichiesteAperte(await richiesteNutrizioneInAttesa());
+    } catch (err) {
+      crossAlert('Non sono riuscito a chiuderla', motivoSalvataggio(err));
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -508,8 +589,107 @@ export const NutritionistScreen: React.FC = () => {
     </>
   );
 
+  /** Quello che l'allievo vede: o il pulsante, o lo stato della sua richiesta. */
+  const renderRichiestaAllievo = () => {
+    const aperta = richiestaAperta(mieRichieste);
+    const ultima = mieRichieste[0] || null;
+    const stato = spiegaStato(aperta || ultima);
+
+    if (aperta) {
+      return (
+        <Card variant="elevated">
+          <View style={styles.richiestaTesta}>
+            <Ionicons name="hourglass-outline" size={18} color={colors.warning} />
+            <Text style={styles.richiestaTitolo}>{stato?.titolo}</Text>
+          </View>
+          <Text style={styles.richiestaTesto}>{stato?.testo}</Text>
+          <Text style={styles.richiestaDettaglio}>
+            Hai detto che puoi {descriviFasce(aperta.fasce)}.
+            {aperta.nota ? ` «${aperta.nota}»` : ''}
+          </Text>
+        </Card>
+      );
+    }
+
+    return (
+      <Card variant="elevated">
+        <View style={styles.richiestaTesta}>
+          <Ionicons name="nutrition-outline" size={18} color={colors.accent} />
+          <Text style={styles.richiestaTitolo}>Vuoi parlare con il nutrizionista?</Text>
+        </View>
+        <Text style={styles.richiestaTesto}>
+          Chiedi una consulenza: dici quando puoi venire, e allo studio
+          pensiamo noi a fissarla. Non è un appuntamento, è una richiesta.
+        </Text>
+        {!!ultima && ultima.stato === 'chiusa' && (
+          <Text style={styles.richiestaDettaglio}>{stato?.testo}</Text>
+        )}
+        <TouchableOpacity
+          style={styles.richiestaBtn}
+          onPress={() => setShowRichiestaModal(true)}
+          accessibilityLabel="Chiedi una consulenza nutrizionale"
+        >
+          <Ionicons name="paper-plane-outline" size={18} color={colors.white} />
+          <Text style={styles.richiestaBtnTxt}>Chiedi una consulenza</Text>
+        </TouchableOpacity>
+      </Card>
+    );
+  };
+
+  /** Quello che vede il titolare: chi ha chiesto, e cosa farne. */
+  const renderRichiesteTitolare = () => {
+    if (richiesteAperte.length === 0) return null;
+    return (
+      <Card variant="elevated">
+        <View style={styles.richiestaTesta}>
+          <Ionicons name="mail-unread-outline" size={18} color={colors.warning} />
+          <Text style={styles.richiestaTitolo}>
+            {richiesteAperte.length === 1
+              ? 'Una richiesta di consulenza'
+              : `${richiesteAperte.length} richieste di consulenza`}
+          </Text>
+        </View>
+        {richiesteAperte.map((r) => (
+          <View key={r.id} style={styles.richiestaRiga}>
+            <Text style={styles.richiestaNome}>{r.allievo}</Text>
+            <Text style={styles.richiestaDettaglio}>
+              Può {descriviFasce(r.fasce)} · chiesta il{' '}
+              {r.creataIl.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
+            </Text>
+            {!!r.nota && <Text style={styles.richiestaNota}>«{r.nota}»</Text>}
+            <View style={styles.richiestaAzioni}>
+              <TouchableOpacity
+                style={styles.richiestaAzione}
+                onPress={() => {
+                  // Si apre la prenotazione già sull'allievo giusto: il
+                  // passaggio «adesso cercalo nell'elenco» è dove le
+                  // cose si perdono.
+                  setSelectedStudentId(r.studentId);
+                  setShowAppointmentModal(true);
+                  chiudiRichiesta(r, 'fissata');
+                }}
+                accessibilityLabel={`Fissa la visita per ${r.allievo}`}
+              >
+                <Text style={styles.richiestaAzioneTxt}>Fissa la visita</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ ...styles.richiestaAzione, ...styles.richiestaAzioneGrigia }}
+                onPress={() => chiudiRichiesta(r, 'chiusa')}
+                accessibilityLabel={`Chiudi la richiesta di ${r.allievo}`}
+              >
+                <Text style={styles.richiestaAzioneGrigiaTxt}>Chiudi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </Card>
+    );
+  };
+
   const renderAppointments = () => (
     <>
+      {isStudent && renderRichiestaAllievo()}
+      {isOwner && renderRichiesteTitolare()}
       {!isStudent && (
         <View style={styles.addButtonContainer}>
           <Button title="+ Prenota Visita" onPress={() => setShowAppointmentModal(true)} />
@@ -649,6 +829,77 @@ export const NutritionistScreen: React.FC = () => {
         )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Modale «Chiedi una consulenza» — solo l'allievo.
+          Due domande e basta: quando puoi, e se vuoi dirmi qualcosa.
+          Niente salute, niente obiettivi da spuntare: quella roba si
+          dice in visita, davanti a chi la sa ascoltare. */}
+      <Modal visible={showRichiestaModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title="Chiedi una consulenza"
+              onClose={() => setShowRichiestaModal(false)}
+            />
+            <Text style={styles.richiestaTesto}>
+              Quando puoi venire? Scegli una o più fasce: servono a trovare un
+              orario senza doverci scrivere dieci volte.
+            </Text>
+            <View style={styles.fasceRiga}>
+              {FASCE.map((f) => {
+                const attiva = fasceScelte.includes(f.valore);
+                return (
+                  <TouchableOpacity
+                    key={f.valore}
+                    style={{
+                      ...styles.fasciaChip,
+                      ...(attiva ? styles.fasciaChipAttiva : {}),
+                    }}
+                    onPress={() => setFasceScelte((p) => (attiva
+                      ? p.filter((x) => x !== f.valore)
+                      : [...p, f.valore]))}
+                    accessibilityLabel={`${f.etichetta}, ${f.quando}`}
+                  >
+                    <Text style={{
+                      ...styles.fasciaTxt,
+                      ...(attiva ? { color: colors.accent } : {}),
+                    }}>{f.etichetta}</Text>
+                    <Text style={styles.fasciaOre}>{f.quando}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <InputField
+              label="Vuoi aggiungere una riga? (non obbligatorio)"
+              value={notaRichiesta}
+              onChangeText={(v) => setNotaRichiesta(v.slice(0, MAX_NOTA))}
+              placeholder="Es. vorrei capire come mangiare nei giorni di allenamento"
+              multiline
+            />
+            <Text style={styles.richiestaDettaglio}>
+              Qui non serve scrivere nulla di medico: quello che riguarda la tua
+              salute lo dirai in visita, al professionista.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <Button
+                title="Annulla"
+                variant="outline"
+                onPress={() => setShowRichiestaModal(false)}
+                style={styles.modalButton}
+              />
+              <Button
+                title={inviandoRichiesta ? 'Invio…' : 'Invia la richiesta'}
+                onPress={inviaRichiesta}
+                loading={inviandoRichiesta}
+                style={styles.modalButton}
+              />
+            </View>
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Modale Nuove Misure */}
       <Modal visible={showMeasureModal} animationType="slide" transparent>
@@ -890,6 +1141,119 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.md,
+  },
+  // --- la richiesta di consulenza ---
+  richiestaTesta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  richiestaTitolo: {
+    flex: 1,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  richiestaTesto: {
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  richiestaDettaglio: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  richiestaNota: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  richiestaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+    marginTop: spacing.md,
+  },
+  richiestaBtnTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  richiestaRiga: {
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    paddingTop: spacing.md,
+    marginTop: spacing.md,
+  },
+  richiestaNome: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  richiestaAzioni: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  richiestaAzione: {
+    flex: 1,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+  },
+  richiestaAzioneTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  richiestaAzioneGrigia: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  richiestaAzioneGrigiaTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  fasceRiga: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  fasciaChip: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  fasciaChipAttiva: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+  },
+  fasciaTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  fasciaOre: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginTop: 2,
   },
   addButtonContainer: {
     marginBottom: spacing.md,
