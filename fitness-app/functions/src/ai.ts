@@ -16,6 +16,20 @@ import {defineSecret} from "firebase-functions/params";
 //     ad alto volume) e registra token/costi in aiUsage/
 // ============================================================
 
+// La chiave vive in Secret Manager del progetto essere-3fe6f, MAI nel
+// codice e mai nel client. Le funzioni la leggono all'avvio: dopo aver
+// caricato una versione nuova del segreto vanno riavviate, altrimenti
+// continuano a usare quella vecchia finché non si spengono da sole.
+//
+// RUOTARE LA CHIAVE (12 ottobre 2026, la prima è scaduta dopo un anno):
+//   1. console.anthropic.com → API keys → crea la chiave SENZA SCADENZA;
+//   2. Secret Manager → ANTHROPIC_API_KEY → nuova versione;
+//   3. deploy delle funzioni, con [deploy] e [deploy-functions] nella
+//      prima riga del messaggio di commit;
+//   4. verificata la risposta, si disattiva la versione vecchia.
+//
+// Senza, si fermano tutte insieme: composizione corporea, cammino,
+// squat, valutazione Mind Movement, assistente e segreteria.
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 const db = () => admin.firestore();
