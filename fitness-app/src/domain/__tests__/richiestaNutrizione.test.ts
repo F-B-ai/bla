@@ -166,6 +166,31 @@ describe('la schermata della nutrizione', () => {
     expect(blocco).toMatch(/setShowAppointmentModal\(true\)/);
   });
 
+  // 12 ottobre 2026: le richieste si leggevano dentro `loadData`, che
+  // comincia con «se non c'è un allievo selezionato esci». Al
+  // titolare — che apre la schermata senza aver scelto nessuno — non
+  // comparivano MAI. Una richiesta che esiste e non si vede è una
+  // persona che ha chiesto e non riceve risposta: esattamente la cosa
+  // che questa funzione doveva togliere di mezzo.
+  it('le richieste si leggono senza aspettare che si scelga un allievo', () => {
+    const i = schermata.indexOf('const loadRichieste');
+    expect(i).toBeGreaterThan(0);
+    // solo il corpo della funzione, fino alla sua lista di dipendenze
+    const blocco = schermata.slice(i, schermata.indexOf('}, [', i) + 40);
+    expect(blocco).not.toMatch(/selectedStudentId/);
+    // e la lettura parte da sola all'apertura
+    expect(schermata).toMatch(/useEffect\(\(\) => \{\s*loadRichieste\(\);/);
+  });
+
+  it('il titolare vede il pallino sulle Visite senza entrarci', () => {
+    expect(schermata).toMatch(/tab\.key === 'visite' && isOwner && richiesteAperte\.length > 0/);
+  });
+
+  it('e tirando giù si ricaricano anche loro', () => {
+    const i = schermata.indexOf('const onRefresh');
+    expect(schermata.slice(i, i + 250)).toMatch(/loadRichieste\(\)/);
+  });
+
   it('un errore sulle richieste non svuota misure e visite', () => {
     // Erano tutte in un Promise.all: una riga che fallisce lasciava
     // la schermata intera vuota.
@@ -173,6 +198,9 @@ describe('la schermata della nutrizione', () => {
     expect(i).toBeGreaterThan(0);
     const prima = schermata.slice(i - 700, i);
     expect(prima).toMatch(/try \{/);
+    // e sta in una funzione sua, non nella stessa di misure e visite
+    expect(schermata.indexOf('const loadRichieste'))
+      .toBeLessThan(i);
   });
 });
 

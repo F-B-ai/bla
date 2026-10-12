@@ -144,10 +144,22 @@ export const NutritionistScreen: React.FC = () => {
       console.error('Errore caricamento dati nutrizionista:', err);
     }
 
-    // Le richieste di consulenza si leggono a parte, e un errore qui
-    // NON deve far fallire il resto: misure e visite valgono anche
-    // senza. Prima erano tutte in un Promise.all, ed è il modo in cui
-    // una schermata intera resta vuota per colpa di una riga.
+  }, [selectedStudentId, isStudent, isOwner]);
+
+  /**
+   * Le richieste di consulenza si leggono PER CONTO LORO.
+   *
+   * Stavano dentro `loadData`, che comincia con «se non c'è un
+   * allievo selezionato esci»: al titolare, che apre la schermata
+   * senza aver scelto nessuno, non comparivano mai. Una richiesta che
+   * esiste e non si vede è una persona che ha chiesto e non riceve
+   * risposta — cioè esattamente la cosa che questa funzione doveva
+   * togliere di mezzo.
+   *
+   * E si leggono a parte anche per un secondo motivo: se la lettura
+   * fallisce, misure e visite devono restare al loro posto.
+   */
+  const loadRichieste = useCallback(async () => {
     try {
       if (isStudent && user?.id) {
         setMieRichieste(await mieRichiesteNutrizione(user.id));
@@ -157,11 +169,15 @@ export const NutritionistScreen: React.FC = () => {
     } catch (err) {
       console.error('Errore caricamento richieste nutrizione:', err);
     }
-  }, [selectedStudentId, isStudent, isOwner, user?.id]);
+  }, [isStudent, isOwner, user?.id]);
 
   useEffect(() => {
     loadStudents();
   }, [loadStudents]);
+
+  useEffect(() => {
+    loadRichieste();
+  }, [loadRichieste]);
 
   useEffect(() => {
     if (selectedStudentId) loadData();
@@ -186,7 +202,7 @@ export const NutritionistScreen: React.FC = () => {
       setShowRichiestaModal(false);
       setFasceScelte([]);
       setNotaRichiesta('');
-      setMieRichieste(await mieRichiesteNutrizione(user.id));
+      await loadRichieste();
       crossAlert(
         'Richiesta inviata',
         'È arrivata al titolare dello studio. Ti farà sapere quando può fissarla.'
@@ -210,7 +226,7 @@ export const NutritionistScreen: React.FC = () => {
         stato,
         stato === 'chiusa' ? 'Richiesta chiusa dal titolare.' : undefined
       );
-      setRichiesteAperte(await richiesteNutrizioneInAttesa());
+      await loadRichieste();
     } catch (err) {
       crossAlert('Non sono riuscito a chiuderla', motivoSalvataggio(err));
     }
@@ -218,7 +234,7 @@ export const NutritionistScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), loadRichieste()]);
     setRefreshing(false);
   };
 
@@ -806,6 +822,15 @@ export const NutritionistScreen: React.FC = () => {
             <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
               {tab.label}
             </Text>
+            {/* Il pallino sulle Visite: una richiesta che aspetta non
+                deve stare dietro a un tocco. Chi apre questa schermata
+                deve vedere subito che c'è qualcuno in attesa, anche se
+                sta guardando le misure. */}
+            {tab.key === 'visite' && isOwner && richiesteAperte.length > 0 && (
+              <View style={styles.tabPallino}>
+                <Text style={styles.tabPallinoTxt}>{richiesteAperte.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -1142,6 +1167,22 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: spacing.md,
   },
+  tabPallino: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  tabPallinoTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.white,
+  },
+
   // --- la richiesta di consulenza ---
   richiestaTesta: {
     flexDirection: 'row',
