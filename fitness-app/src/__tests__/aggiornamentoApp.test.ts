@@ -85,6 +85,27 @@ describe('lo script di aggiornamento esiste dove serve', () => {
 // Ogni `reg.update()` rileggeva gli stessi byte vecchi.
 // ============================================================
 
+// ------------------------------------------------------------
+// DUE SPAZI DI PUBBLICAZIONE, NON UNO
+// ------------------------------------------------------------
+// Dal 15 ottobre 2026 il progetto pubblica due cose: l'applicazione
+// (sito «essere-3fe6f») e il sito pubblico di mindmovementlab.it
+// (sito «mindmovementlab»). In firebase.json `hosting` è quindi un
+// elenco, e queste regole riguardano SOLO l'applicazione: prenderne
+// un'altra significherebbe controllare le intestazioni del sito
+// vetrina credendo di controllare quelle dell'app.
+const hostingApp = (() => {
+  const h = (firebase as { hosting: unknown }).hosting;
+  const elenco = Array.isArray(h) ? h : [h];
+  const app = (elenco as Array<{ site?: string; public?: string }>)
+    .find((x) => x.site === 'essere-3fe6f' || x.public === 'dist');
+  if (!app) throw new Error('firebase.json: manca lo spazio dell\'applicazione');
+  return app as {
+    rewrites: Array<{ source: string; function?: { functionId: string }; destination?: string }>;
+    headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+  };
+})();
+
 describe('il browser deve poter VEDERE una versione nuova', () => {
   it('il controllo non passa mai dalla cache HTTP', () => {
     [iniettato, html].forEach((c) => expect(c).toContain('updateViaCache'));
@@ -92,10 +113,7 @@ describe('il browser deve poter VEDERE una versione nuova', () => {
   });
 
   it('e il service worker non si serve con una cache lunga', () => {
-    const regole = firebase.hosting.headers as Array<{
-      source: string;
-      headers: Array<{ key: string; value: string }>;
-    }>;
+    const regole = hostingApp.headers;
     // Vince l'ultima regola che combacia: quella di `sw.js` deve stare
     // DOPO `**/*.js`, altrimenti il service worker eredita «un anno».
     const indice = (s: string) => regole.findIndex((r) => r.source === s);
@@ -113,17 +131,13 @@ describe('il browser deve poter VEDERE una versione nuova', () => {
   });
 
   it('il documento dell\'App non resta in cache un\'ora', () => {
-    const generica = (firebase.hosting.headers as Array<{
-      source: string; headers: Array<{ key: string; value: string }>;
-    }>).find((r) => r.source === '**');
+    const generica = hostingApp.headers.find((r) => r.source === '**');
     const cc = generica?.headers.find((h) => h.key.toLowerCase() === 'cache-control');
     expect(cc?.value).toContain('no-store');
   });
 
   it('ma i file con l\'impronta nel nome restano immutable', () => {
-    const js = (firebase.hosting.headers as Array<{
-      source: string; headers: Array<{ key: string; value: string }>;
-    }>).find((r) => r.source === '**/*.js');
+    const js = hostingApp.headers.find((r) => r.source === '**/*.js');
     const cc = js?.headers.find((h) => h.key.toLowerCase() === 'cache-control');
     expect(cc?.value).toContain('immutable');
   });
