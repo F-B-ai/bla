@@ -45,7 +45,10 @@ const PAGINE = {
 };
 
 const RISORSE = [
-  'sito.css', 'logo-essere.svg', 'favicon.ico',
+  'sito.css', 'favicon.ico',
+  // i tre marchi: lo studio, la persona, l'applicazione
+  'logo-essere.svg', 'logo-essere-app.png',
+  'logo-mindmovementlab.jpg', 'logo-francesco.jpg',
   'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 

@@ -220,3 +220,28 @@ footer .disclaimer { margin-top: 10px; }
   font-size: .95rem; color: var(--tenue);
 }
 .app-punti b { color: var(--testo); font-weight: 600; }
+
+
+/* ---------- i marchi, grandi ----------
+   Tre marchi, tre posti: Mind Movement Lab apre la pagina del metodo
+   — è la casa; Francesco Busanca apre «Chi sono» — è la persona;
+   ESSĒRE sta nel riquadro dell'applicazione — è lo strumento.
+   Messi tutti e tre nello stesso punto non se ne ricorderebbe
+   nessuno. */
+.marchio-grande {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 26px;
+  border-radius: 10px;
+}
+/* Il marchio dello studio è verticale: misurato in larghezza
+   mangerebbe tutta la prima schermata e spingerebbe il titolo sotto
+   la piega. Un marchio che copre la frase per cui si è arrivati non
+   sta aiutando nessuno. */
+.marchio-studio { max-width: 232px; }
+/* Quello personale è disteso: alla stessa altezza serve più larghezza. */
+.marchio-persona { max-width: 400px; }
+/* L'icona dell'applicazione è già un quadrato con i suoi angoli:
+   non va incorniciata una seconda volta. */
+.app-blocco img.icona { width: 104px; height: 104px; border-radius: 22px; }
