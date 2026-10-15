@@ -45,7 +45,7 @@ const PAGINE = {
 };
 
 const RISORSE = [
-  'sito.css', 'favicon.ico',
+  'sito.css', 'logo-essere.svg', 'favicon.ico',
   'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 

@@ -34,6 +34,12 @@ body {
 
 /* ---------- testata e navigazione ---------- */
 header { border-bottom: 1px solid var(--bordo); padding: 22px 0 0; }
+
+/* Il marchio: il cerchio e la parola, uno accanto all'altra. Il
+   cerchio non si rimpicciolisce mai sotto i 30 px — sotto quella
+   misura il tratto di pennello diventa una macchia. */
+.testata-marchio { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.testata-marchio img { width: 34px; height: 34px; flex: 0 0 34px; }
 .marchio {
   font-family: var(--display); font-size: 1.35rem; font-weight: 700;
   letter-spacing: .22em; color: var(--testo); text-decoration: none; display: block;
@@ -183,3 +189,34 @@ footer .disclaimer { margin-top: 10px; }
   section { padding: 44px 0; }
   .riquadro { padding: 22px; }
 }
+
+
+/* ---------- l'applicazione, sul sito ----------
+   Una sezione sola, col marchio grande. Non è una pagina di prodotto:
+   è il posto dove chi sta leggendo capisce che quello che misuriamo
+   non finisce in un quaderno. Tre righe, poi si torna a parlare di
+   movimento. */
+.app-blocco {
+  border: 1px solid var(--bordo);
+  border-radius: 14px;
+  padding: 28px 22px;
+  text-align: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(212, 0, 0, .10), transparent 60%),
+    var(--fondo-alto);
+}
+.app-blocco img { width: 92px; height: 92px; margin-bottom: 14px; }
+.app-blocco h3 {
+  font-family: var(--display); font-size: 1.5rem; font-weight: 700;
+  letter-spacing: .14em; margin-bottom: 6px;
+}
+.app-blocco .occhiello { margin-bottom: 0; }
+.app-blocco p { color: var(--tenue); margin-top: 10px; }
+.app-punti {
+  display: grid; gap: 10px; margin: 20px 0 6px; text-align: left;
+}
+.app-punti div {
+  border-top: 1px solid var(--bordo); padding-top: 10px;
+  font-size: .95rem; color: var(--tenue);
+}
+.app-punti b { color: var(--testo); font-weight: 600; }
