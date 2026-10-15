@@ -15,6 +15,45 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/sito.css">
+<!-- I dati che Google legge per mostrare lo studio nelle ricerche locali.
+     DA COMPLETARE: "streetAddress" e le coordinate, quando arriva
+     l'indirizzo esatto. Senza via, Google colloca lo studio in città
+     ma non sulla mappa. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HealthAndBeautyBusiness",
+  "additionalType": "https://schema.org/SportsActivityLocation",
+  "name": "ESSĒRE — Mind Movement Lab",
+  "legalName": "A.S.D. Evolution Sport",
+  "description": "Studio di valutazione e allenamento a Gragnano. Si parte dalla misura: postura, movimento, cammino, respiro. Poi si scrive il protocollo.",
+  "telephone": "+39 334 309 7680",
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Gragnano",
+    "addressRegion": "NA",
+    "addressCountry": "IT"
+  },
+  "openingHoursSpecification": [
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+      "opens": "08:30",
+      "closes": "22:00"
+    },
+    {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": "Saturday",
+      "opens": "08:30",
+      "closes": "14:00"
+    }
+  ],
+  "founder": {
+    "@type": "Person",
+    "name": "Francesco Busanca"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -26,6 +65,7 @@
       <a href="/metodo.html" aria-current="page">Il metodo</a>
       <a href="/studio.html">In studio</a>
       <a href="/premium.html">A distanza</a>
+      <a href="/chi-sono.html">Chi sono</a>
       <a href="/contatti.html">Contatti</a>
     </nav>
   </div>
@@ -113,7 +153,7 @@
   </section>
 
   <section>
-    <h2>Che cosa c\'è, qui dentro</h2>
+    <h2>Che cosa c'è, qui dentro</h2>
     <div class="pila">
       <div class="riquadro">
         <div class="capo"><h3>Il percorso in studio</h3><span class="etichetta">Gragnano</span></div>
@@ -125,7 +165,7 @@
       <div class="riquadro">
         <div class="capo"><h3>Kickboxing</h3><span class="etichetta">corso</span></div>
         <p>Tecnica, condizionamento e lavoro sul tatami, seguiti da un istruttore
-          del settore. Anche chi fa kickboxing passa dall\'osservazione iniziale:
+          del settore. Anche chi fa kickboxing passa dall'osservazione iniziale:
           prima si guarda come ti muovi, poi si decide che cosa puoi fare e in che
           forma.</p>
         <p style="margin-top:10px"><a href="/studio.html#kickboxing">Il corso →</a></p>
@@ -142,7 +182,7 @@
 
       <div class="riquadro">
         <div class="capo"><h3>A distanza</h3><span class="etichetta">ESSĒRE Premium</span></div>
-        <p>L\'applicazione completa e tre appuntamenti al mese. Per chi non può
+        <p>L'applicazione completa e tre appuntamenti al mese. Per chi non può
           venire in studio ma non vuole un programma da scaricare.</p>
         <p style="margin-top:10px"><a href="/premium.html">Il percorso a distanza →</a></p>
       </div>
@@ -175,7 +215,10 @@
       orientamento del lavoro educativo-motorio. Non costituiscono atto diagnostico
       e non sostituiscono alcuna valutazione o terapia sanitaria.
     </div>
-    <div style="margin-top:10px"><a href="/">Accedi all'applicazione</a></div>
+    <div style="margin-top:10px">
+      <a href="/note-legali.html">Note legali e privacy</a> ·
+      <a href="/">Accedi all'applicazione</a>
+    </div>
   </div>
 </footer>
 
