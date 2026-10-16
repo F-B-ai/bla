@@ -140,7 +140,12 @@ section p + p { margin-top: 12px; }
 }
 .cifra span { font-size: 1rem; color: var(--tenue); font-weight: 400; letter-spacing: 0; }
 .rate { margin-top: 16px; border-top: 1px solid var(--bordo); padding-top: 14px; }
-.rata { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: .94rem; }
+/* La riga va a capo sugli schermi stretti: la voce a sinistra e il
+   valore a destra non ci stanno sempre affiancati, e senza questo è la
+   PAGINA intera a scorrere di lato — difetto che non si vede sul
+   portatile e che vede chiunque abbia un telefono piccolo. */
+.rata { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 7px 0; font-size: .94rem; }
+.rata > span:first-child { min-width: 0; }
 .rata span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rata.somma { border-top: 1px solid var(--bordo); margin-top: 6px; padding-top: 12px; font-weight: 600; }
 .rata .quando { color: var(--tenue); font-size: .84rem; display: block; font-weight: 400; }
