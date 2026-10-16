@@ -377,14 +377,46 @@ describe('chi entra nel percorso non paga la valutazione', () => {
     expect(valutazioneOnlineDovuta(false, 10)).toBe(VALUTAZIONE_ONLINE_MIN);
   });
 
-  // Un numero solo si decide; due numeri si confrontano, e mentre si
-  // confrontano non si compra.
-  it('la pagina dice che è compresa, e che il colloquio non si paga', () => {
-    const pagina = fs.readFileSync(
-      path.join(__dirname, '..', '..', '..', 'public', 'premium.html'), 'utf8'
-    );
-    expect(pagina).toContain('La valutazione iniziale è compresa');
-    expect(pagina).toContain('da 50 a 100');
-    expect(pagina).toContain('Il colloquio non si paga');
+  // ------------------------------------------------------------
+  // 16 ottobre 2026 — decisione del titolare: sul sito niente cifre,
+  // «saranno una conseguenza naturale».
+  //
+  // Il test non sparisce, cambia mestiere. Prima difendeva che la
+  // forchetta fosse scritta sulla pagina; adesso difende la decisione
+  // opposta, che è più facile da violare: basta che qualcuno rimetta un
+  // prezzo «solo per comodità» e il sito torna a trattare prima di aver
+  // guardato la persona. Quello che invece deve restare scritto è
+  // l'unica cosa che fa scrivere chi legge: che il primo incontro non
+  // si paga.
+  //
+  // Il listino vero resta nel dominio e nell'applicazione, dove serve a
+  // chi fa il preventivo. Qui si difende solo che cosa è PUBBLICO.
+  // ------------------------------------------------------------
+  const paginaSito = (nome: string): string => fs.readFileSync(
+    path.join(__dirname, '..', '..', '..', 'public', nome), 'utf8'
+  );
+
+  it('la pagina a distanza non espone cifre, e dice che il colloquio non si paga', () => {
+    const pagina = paginaSito('premium.html');
+    expect(pagina).toContain('non si paga');
+    expect(pagina).toContain('compresa');
+    expect(pagina).not.toMatch(/€/);
+    expect(pagina).not.toContain('da 50 a 100');
+  });
+
+  it('nemmeno la pagina dello studio espone cifre', () => {
+    const pagina = paginaSito('studio.html');
+    expect(pagina).not.toMatch(/€/);
+    // e resta scritto che la mezz'ora iniziale è compresa: è la ragione
+    // per cui una persona scrive invece di chiudere la pagina
+    expect(pagina).toContain('compresa');
+  });
+
+  it('nessuna pagina del sito promette un prezzo che poi non c\'è', () => {
+    // un collegamento «e quanto costa» che porta a una pagina senza
+    // cifre è peggio del non averlo scritto: chi clicca si sente preso
+    // in giro proprio nel momento in cui stava decidendo
+    ['metodo.html', 'studio.html', 'premium.html', 'contatti.html', 'chi-sono.html']
+      .forEach((f) => expect(paginaSito(f).toLowerCase()).not.toContain('quanto costa</a>'));
   });
 });
