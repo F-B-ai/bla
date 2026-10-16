@@ -49,6 +49,8 @@ const RISORSE = [
   // i tre marchi: lo studio, la persona, l'applicazione
   'logo-essere.svg', 'logo-essere-app.png',
   'logo-mindmovementlab.jpg', 'logo-francesco.jpg',
+  // la foto di gara, nella pagina «Chi sono»
+  'foto-mondiale.jpg',
   'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 

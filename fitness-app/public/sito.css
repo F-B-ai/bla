@@ -245,3 +245,24 @@ footer .disclaimer { margin-top: 10px; }
 /* L'icona dell'applicazione è già un quadrato con i suoi angoli:
    non va incorniciata una seconda volta. */
 .app-blocco img.icona { width: 104px; height: 104px; border-radius: 22px; }
+
+/* ---------- la foto di gara ----------
+   Sta nella pagina «Chi sono», sotto i titoli. È una foto verticale:
+   a tutta larghezza su un telefono occuperebbe uno schermo intero e
+   chi scorre perderebbe il filo prima di arrivare ai titoli. Tenuta
+   stretta resta una prova, non una gigantografia. */
+.foto-gara {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  margin: 22px auto 8px;
+  border-radius: 12px;
+  border: 1px solid var(--bordo);
+}
+.didascalia {
+  text-align: center;
+  color: var(--tenue);
+  font-size: .86rem;
+  margin-bottom: 20px;
+}
