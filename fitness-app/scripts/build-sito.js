@@ -51,6 +51,8 @@ const RISORSE = [
   'logo-mindmovementlab.jpg', 'logo-francesco.jpg',
   // la foto di gara, nella pagina «Chi sono»
   'foto-mondiale.jpg',
+  // la copertina del libro, nella stessa pagina
+  'libro-mind-movement.jpg',
   'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 
