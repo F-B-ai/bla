@@ -53,6 +53,8 @@ const RISORSE = [
   'foto-mondiale.jpg',
   // la copertina del libro, nella stessa pagina
   'libro-mind-movement.jpg',
+  // l'immagine dell'anteprima quando il link viene incollato
+  'anteprima.jpg',
   'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png',
 ];
 
@@ -85,6 +87,36 @@ const aggiungiCanonical = (html, file) => {
   if (/<meta property="og:title"/.test(out) && !/og:url/.test(out)) {
     out = out.replace('<meta property="og:title"',
       `<meta property="og:url" content="${url}">\n<meta property="og:title"`);
+  }
+  return anteprimaCondivisione(out);
+};
+
+/**
+ * L'immagine che si vede quando il link viene incollato.
+ *
+ * WhatsApp, Facebook e Telegram NON accettano un indirizzo relativo:
+ * `/icon-512.png` per loro non esiste, e il link appare come un
+ * rettangolo di testo grigio. È il difetto che non si nota mai, perché
+ * chi lo manda vede l'anteprima presa dalla propria cache e crede che
+ * funzioni per tutti.
+ *
+ * Qui l'indirizzo diventa assoluto, e l'immagine diventa quella giusta:
+ * 1200×630, il formato che quelle applicazioni ritagliano senza tagliare
+ * niente. Un quadrato di 512 veniva mostrato piccolo e di lato.
+ */
+const anteprimaCondivisione = (html) => {
+  let out = html.replace(
+    /<meta property="og:image" content="[^"]*">/,
+    `<meta property="og:image" content="${DOMINIO}/anteprima.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="it_IT">
+<meta name="twitter:card" content="summary_large_image">`
+  );
+  // og:site_name: è il nome che compare in grigio sopra l'anteprima
+  if (/<meta property="og:title"/.test(out) && !/og:site_name/.test(out)) {
+    out = out.replace('<meta property="og:title"',
+      '<meta property="og:site_name" content="Mind Movement Lab">\n<meta property="og:title"');
   }
   return out;
 };
