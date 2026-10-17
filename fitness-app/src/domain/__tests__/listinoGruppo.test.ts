@@ -206,35 +206,47 @@ describe('il gruppo legge il listino, non un secondo numero', () => {
 // CHE IL PREZZO ARRIVI DOVE SI COMPILA
 // ------------------------------------------------------------
 
-describe('l\'agenda propone la quota giusta', () => {
+// ------------------------------------------------------------
+// 17 ottobre 2026 — LA QUOTA ESCE DALL'AGENDA
+// ------------------------------------------------------------
+// I prezzi del gruppo restano, e restano dove servono: nel listino e
+// nei preventivi. Quello che sparisce è la richiesta della quota
+// mentre si registra una seduta — con i contratti mensili quel numero
+// non lo decide chi compila l'agenda.
+//
+// Quante persone erano insieme resta: è un fatto della seduta.
+
+describe('l\'agenda registra le persone, non la quota', () => {
   const schermata = leggi('screens/shared/CalendarScreen.tsx');
+  const modale = leggi('screens/shared/calendar/AppointmentModal.tsx');
 
-  it('CalendarScreen chiede la proposta al dominio', () => {
-    expect(schermata).toMatch(/quotaProposta/);
-    expect(schermata).toMatch(/setFormQuota\(/);
+  it('non c\'è più nessun campo quota', () => {
+    expect(schermata).not.toMatch(/formQuota/);
+    expect(modale).not.toMatch(/formQuota/);
+    expect(modale).not.toMatch(/Quota a persona/);
   });
 
-  it('la proposta segue il numero di persone', () => {
-    const effetto = schermata.slice(
-      schermata.indexOf('quotaProposta(formPersone)') - 700,
-      schermata.indexOf('quotaProposta(formPersone)') + 300
-    );
-    expect(effetto).toMatch(/formPersone/);
+  // Come sopra: le sedute di gruppo già registrate hanno la loro
+  // quota e si continuano a leggere. Nuove scritture, nessuna.
+  it('e nessuna seduta di gruppo nasce con una quota addosso', () => {
+    const scritture = (schermata.match(/quotaPersona: [^,\n]+/g) || [])
+      .filter((r) => !/quotaPersona: s\.quotaPersona/.test(r));
+    expect(scritture).toEqual([]);
+    expect(schermata).not.toMatch(/costoPerAllievo\(/);
   });
 
-  it('non tocca una cifra scritta a mano', () => {
-    expect(schermata).toMatch(/eQuotaDiListino\(formQuota\)/);
+  it('il numero di persone si chiede ancora, e si salva', () => {
+    expect(modale).toMatch(/PERSONE_POSSIBILI/);
+    expect(schermata).toMatch(/persone: formPersone/);
   });
 
-  it('non riempie mai una quota in modifica: quel numero è già deciso', () => {
-    const i = schermata.indexOf('quotaProposta(formPersone)');
-    const prima = schermata.slice(i - 700, i);
-    expect(prima).toMatch(/editingItem/);
-  });
-
-  it('il modale mostra la riga di listino accanto al selettore', () => {
-    const modale = leggi('screens/shared/calendar/AppointmentModal.tsx');
-    expect(modale).toMatch(/listinoDelGruppo\(formPersone\)/);
+  // Senza quota, il controllo del gruppo non può più essere quello
+  // che pretende anche il denaro: ne serve uno che guardi solo le
+  // persone, altrimenti ogni salvataggio fallirebbe chiedendo una
+  // cifra che non c'è più.
+  it('il gruppo si valida sulle persone, non sulla quota', () => {
+    expect(schermata).toMatch(/controllaPersone\(formPersone\)/);
+    expect(schermata).not.toMatch(/controllaGruppo\(/);
   });
 });
 

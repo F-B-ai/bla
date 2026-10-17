@@ -117,9 +117,12 @@ const leggi = (p: string) =>
 describe('l\'agenda è davvero collegata', () => {
   const src = leggi('screens/shared/CalendarScreen.tsx');
 
-  it('legge il costo con leggiCosto, non con parseFloat nudo', () => {
-    expect(src).toContain('leggiCosto(formCost)');
-    expect(src).not.toContain('formCost ? parseFloat(formCost) : undefined');
+  // Il costo della seduta non si chiede più (17 ottobre 2026: tutti
+  // con contratto mensile), quindi non c'è più niente da leggere.
+  // Il test resta a guardia del contrario: che non rientri.
+  it('non chiede più il costo di una seduta', () => {
+    expect(src).not.toContain('formCost');
+    expect(src).not.toContain('leggiCosto(');
   });
 
   it('non dice più «Impossibile salvare» e basta quando salva un appuntamento', () => {

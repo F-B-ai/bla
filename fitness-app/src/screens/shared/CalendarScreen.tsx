@@ -64,7 +64,7 @@ import {
   updateTask,
   deleteTask,
 } from '../../services/taskService';
-import { scalaDalPercorso, getStudentPaymentPlans } from '../../services/paymentService';
+import { scalaDalPercorso } from '../../services/paymentService';
 import {
   giaScalata, registrazionePassata, giorno, Avviso,
 } from '../../domain/piani';
@@ -82,24 +82,21 @@ import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequ
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
-import { controllaGruppo, costoPerAllievo, quotaProposta } from '../../domain/gruppo';
+import { controllaPersone } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
-  eSessione, tipoPercorso, aspetto, tipoDaSeduta, leggiCosto,
+  eSessione, tipoPercorso, aspetto, tipoDaSeduta,
 } from '../../domain/appuntamento';
 import { motivoSalvataggio, motivoEliminazione } from '../../domain/salvataggio';
 import { registraGuasto } from '../../services/guastiService';
 import { ConfirmModal } from '../../components/common/ConfirmModal';
 import {
-  tariffaDi, avvisoAnnualeColTitolare, eAnnuale, statoTetto,
-  stessaSettimana, TETTO_INIZIALE, Conduttore,
-  eQuotaDiListino, euroIt,
+  statoTetto, stessaSettimana, TETTO_INIZIALE,
 } from '../../domain/listino';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
 import { creaOspite } from '../../services/agendaRequestService';
-import { conduttore } from '../../domain/protocollo';
 import { TaskModal } from './calendar/TaskModal';
 import { AppointmentModal } from './calendar/AppointmentModal';
 import { StudentDetailModal } from './calendar/StudentDetailModal';
@@ -117,10 +114,6 @@ const TIME_SLOTS = [
 ];
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
-
-/** La tariffa di riferimento per capire se il gruppo conviene.
- *  Vive nel listino di domain/protocollo.ts, non qui. */
-const PREZZO_SEDUTA_INDIVIDUALE = conduttore('francesco').prezzo;
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -241,14 +234,10 @@ export const CalendarScreen: React.FC = () => {
   const [formDate, setFormDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('09:00');
   const [formEndTime, setFormEndTime] = useState('10:00');
-  const [formCost, setFormCost] = useState('');
   // personal di gruppo: quante persone e quanto paga ciascuna
   const [formPersone, setFormPersone] = useState(2);
-  const [formQuota, setFormQuota] = useState('');
-  // L'allievo è su un percorso annuale? Cambia la tariffa proposta.
   // Non c'è un contrassegno sui percorsi: si legge dalla durata, che è
   // un dato già presente su tutti quelli esistenti. Vedi listino.ts.
-  const [allievoAnnuale, setAllievoAnnuale] = useState(false);
   // consulenza con chi non è ancora in anagrafica
   const [formNomeOspite, setFormNomeOspite] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -445,13 +434,16 @@ export const CalendarScreen: React.FC = () => {
   }, [sessions, nutritionAppts]);
 
   // ------------------------------------------------------------
-  // IL LISTINO, MENTRE SI COMPILA
+  // PERCHÉ QUI NON SI PARLA PIÙ DI SOLDI
   // ------------------------------------------------------------
-  // Il costo era un campo libero: chiunque poteva scriverci qualsiasi
-  // cifra, e la tariffa giusta viveva solo nella testa del titolare.
-  // Adesso si propone da sola e dice da dove viene. Resta
-  // modificabile: il caso particolare esiste sempre, ma non deve
-  // diventare la norma per distrazione. Vedi domain/listino.ts.
+  // 17 ottobre 2026. Il costo della singola seduta non si chiede più:
+  // chi si allena ha un contratto e paga a mese, quindi il prezzo di
+  // una lezione non è un dato della lezione — è una divisione fatta
+  // dopo, e teneva aperto un campo libero in cui bastava una
+  // distrazione per scrivere la cifra sbagliata su una seduta vera.
+  //
+  // Resta tutto il resto: chi, quando, con chi, e in quanti. Il
+  // listino continua a vivere dove serve davvero, nei preventivi.
 
   /** Conduce il titolare in persona? Solo lui può esserlo. */
   const conduceIlTitolare = useMemo(() => {
@@ -459,17 +451,6 @@ export const CalendarScreen: React.FC = () => {
     const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
     return staffId === user.id;
   }, [isOwner, user, canSeeAll, formCollabId]);
-
-  const sedutaPerListino = useMemo(() => ({
-    conduce: (conduceIlTitolare ? 'titolare' : 'collaboratore') as Conduttore,
-    annuale: allievoAnnuale,
-  }), [conduceIlTitolare, allievoAnnuale]);
-
-  const tariffa = useMemo(() => tariffaDi(sedutaPerListino), [sedutaPerListino]);
-  const avvisoTariffa = useMemo(
-    () => avvisoAnnualeColTitolare(sedutaPerListino),
-    [sedutaPerListino]
-  );
 
   // I posti del titolare nella settimana del giorno scelto. Si conta da
   // quello che è già in agenda, senza altre letture.
@@ -488,48 +469,6 @@ export const CalendarScreen: React.FC = () => {
     // sarà la settimana se salvi, non com'era prima di aprire.
     return statoTetto(fatte + 1, TETTO_INIZIALE);
   }, [conduceIlTitolare, user, formDate, allAppointments, editingItem]);
-
-  // Il percorso dell'allievo scelto, per sapere se è annuale.
-  // Se la lettura non riesce NON si finge che sia ordinario in
-  // silenzio: si lascia la proposta a zero e il campo parla da sé.
-  useEffect(() => {
-    let vivo = true;
-    if (!formStudentId) { setAllievoAnnuale(false); return; }
-    getStudentPaymentPlans(formStudentId)
-      .then((piani) => {
-        if (!vivo) return;
-        setAllievoAnnuale(piani.some((p) => eAnnuale({
-          inizio: toSafeDate(p.startDate),
-          fine: toSafeDate(p.endDate),
-        })));
-      })
-      .catch(() => { if (vivo) setAllievoAnnuale(false); });
-    return () => { vivo = false; };
-  }, [formStudentId]);
-
-  // La proposta riempie il campo SOLO quando è vuoto e si sta creando.
-  // In modifica non si tocca mai: quel numero è già stato deciso una
-  // volta, e sovrascriverlo cambierebbe i conti alle spalle di chi apre.
-  useEffect(() => {
-    if (!showModal || editingItem) return;
-    if (formCost) return;
-    if (formKind === 'gruppo') return; // il gruppo ha la sua quota
-    if (!isOwner && !isManager) return;
-    setFormCost(String(tariffa.prezzo));
-  }, [showModal, editingItem, formKind, tariffa.prezzo, isOwner, isManager]);
-
-  // La quota del gruppo segue il numero di persone, perché è il numero
-  // di persone a decidere il prezzo: 20 in due, 15 in tre, 11,50 in
-  // quattro. Una cifra scritta a mano non si tocca — chi l'ha digitata
-  // aveva un motivo — e con cinque persone, che nel listino non c'è, il
-  // campo si svuota invece di proporre un numero inventato.
-  useEffect(() => {
-    if (!showModal || editingItem) return;
-    if (formKind !== 'gruppo') return;
-    if (formQuota && !eQuotaDiListino(formQuota)) return;
-    const q = quotaProposta(formPersone);
-    setFormQuota(q === null ? '' : euroIt(q));
-  }, [showModal, editingItem, formKind, formPersone]);
 
   const filteredAppointments = useMemo(() => {
     if (!canSeeAll || !selectedStaffId) return allAppointments;
@@ -757,10 +696,8 @@ export const CalendarScreen: React.FC = () => {
     setFormCustomDate('');
     setFormStartTime('09:00');
     setFormEndTime('10:00');
-    setFormCost('');
     setFormNotes('');
     setFormPersone(2);
-    setFormQuota('');
     setFormNomeOspite('');
     setEditingItem(null);
   };
@@ -779,7 +716,6 @@ export const CalendarScreen: React.FC = () => {
     setFormDate(item.dateStr);
     setFormStartTime(item.startTime);
     setFormEndTime(item.endTime);
-    setFormCost(item.sessionCost ? String(item.sessionCost) : '');
     setFormNotes(item.notes);
     setShowModal(true);
   };
@@ -846,13 +782,6 @@ export const CalendarScreen: React.FC = () => {
     // Vuoto vuol dire zero: la seduta sta dentro un pacchetto già
     // pagato. Prima «vuoto» diventava `undefined` e il salvataggio
     // cadeva intero. Vedi domain/appuntamento.ts.
-    const letturaCosto = leggiCosto(formCost);
-    if (!letturaCosto.ok) {
-      crossAlert('Controlla il costo', letturaCosto.motivo);
-      return;
-    }
-    const cost = letturaCosto.valore;
-
     setSaving(true);
     try {
       if (editingItem) {
@@ -864,7 +793,6 @@ export const CalendarScreen: React.FC = () => {
             startTime: formStartTime,
             endTime: formEndTime,
             notes: formNotes,
-            sessionCost: cost,
           });
         } else {
           await updateAppointment(editingItem.id, {
@@ -874,7 +802,6 @@ export const CalendarScreen: React.FC = () => {
             startTime: formStartTime,
             endTime: formEndTime,
             notes: formNotes,
-            sessionCost: cost,
           });
         }
         crossAlert('Successo', 'Appuntamento aggiornato!');
@@ -890,12 +817,9 @@ export const CalendarScreen: React.FC = () => {
           : {};
         let nuovoId = '';
         if (formKind === 'gruppo') {
-          // Nel costo entra la QUOTA di questa persona, mai l'incasso
-          // del gruppo: vedi domain/gruppo.ts. Gli altri partecipanti
-          // hanno un appuntamento ciascuno, e il totale torna da solo.
-          const quota = parseFloat((formQuota || '').replace(',', '.'));
-          const seduta = { persone: formPersone, quotaPersona: quota };
-          const esito = controllaGruppo(seduta);
+          // Del gruppo resta il numero di persone: è un dato della
+          // seduta. La quota no — quella sta nel contratto mensile.
+          const esito = controllaPersone(formPersone);
           if (!esito.valido) {
             crossAlert('Gruppo da completare', esito.problemi.join('\n'));
             setSaving(false);
@@ -909,11 +833,9 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: costoPerAllievo(seduta),
             isCountedAsCompleted: isPastDate,
             tipoSeduta: 'gruppo',
             persone: formPersone,
-            quotaPersona: costoPerAllievo(seduta),
             ...segnoScalo,
           });
         } else if (formKind === 'training' || formKind === 'consulenza') {
@@ -925,7 +847,6 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             tipoSeduta: formKind === 'consulenza' ? 'consulenza' : 'individuale',
             ...segnoScalo,
@@ -939,7 +860,6 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             createdAt: new Date(),
             ...segnoScalo,
@@ -956,17 +876,11 @@ export const CalendarScreen: React.FC = () => {
             if (formKind === 'nutrition') await updateAppointment(nuovoId, segno);
             else await updateSession(nuovoId, segno);
           }
-          if (cost && cost > 0) {
-            await addTransaction({
-              type: 'income',
-              category: 'student_payment',
-              amount: cost,
-              description: `${ETICHETTA_SEDUTA[formKind]} - ${getStudentName(formStudentId)} (${new Date(formDate).toLocaleDateString('it-IT')})`,
-              date: new Date(formDate),
-              collaboratorId: staffId,
-              studentId: formStudentId,
-            });
-          }
+          // Qui, fino al 17 ottobre 2026, ogni seduta passata scriveva
+          // anche un incasso in cassa, preso dal costo della seduta.
+          // Con i contratti mensili quell'incasso arriverebbe due
+          // volte: una dalla rata e una dalla lezione. L'entrata resta
+          // una sola, e viene dal percorso pagato.
         }
         // Prima qui c'era «Appuntamento passato registrato!» — un
         // punto esclamativo che diceva che era andato tutto bene
@@ -2712,17 +2626,10 @@ export const CalendarScreen: React.FC = () => {
         setFormStartTime={setFormStartTime}
         formEndTime={formEndTime}
         setFormEndTime={setFormEndTime}
-        formCost={formCost}
-        setFormCost={setFormCost}
         formNotes={formNotes}
         setFormNotes={setFormNotes}
         formPersone={formPersone}
         setFormPersone={setFormPersone}
-        formQuota={formQuota}
-        setFormQuota={setFormQuota}
-        prezzoIndividuale={PREZZO_SEDUTA_INDIVIDUALE}
-        tariffaPerche={tariffa.perche}
-        avvisoTariffa={avvisoTariffa}
         tettoFrase={tetto ? tetto.frase : null}
         tettoLivello={tetto ? tetto.livello : undefined}
         formNomeOspite={formNomeOspite}

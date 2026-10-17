@@ -8,11 +8,7 @@ import { InputField } from '../../../components/common/InputField';
 import { ModalHeader } from '../../../components/common/ModalHeader';
 import { Button } from '../../../components/common/Button';
 import { StudentSearchPicker } from '../../../components/common/StudentSearchPicker';
-import {
-  PERSONE_POSSIBILI, incassoSeduta, confrontaConIndividuale, controllaGruppo,
-  listinoDelGruppo, quotaProposta,
-} from '../../../domain/gruppo';
-import { euroIt } from '../../../domain/listino';
+import { PERSONE_POSSIBILI } from '../../../domain/gruppo';
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
 
@@ -57,22 +53,11 @@ export interface AppointmentModalProps {
   setFormStartTime: (v: string) => void;
   formEndTime: string;
   setFormEndTime: (v: string) => void;
-  formCost: string;
-  setFormCost: (v: string) => void;
   formNotes: string;
   setFormNotes: (v: string) => void;
-  /** solo per il personal di gruppo: quante persone, 2-5 */
+  /** solo per il personal di gruppo: quante persone, da 2 a 4 */
   formPersone: number;
   setFormPersone: (v: number) => void;
-  /** solo per il personal di gruppo: quanto paga ciascuna, a seduta */
-  formQuota: string;
-  setFormQuota: (v: string) => void;
-  /** tariffa individuale del conduttore, per il confronto */
-  prezzoIndividuale: number;
-  /** perché il costo proposto è quello: si legge, non si indovina */
-  tariffaPerche?: string;
-  /** quando il listino e la situazione non combaciano (annuale col titolare) */
-  avvisoTariffa?: string | null;
   /** i posti del titolare in questa settimana, se è lui a condurre */
   tettoFrase?: string | null;
   /** 'pieno' e 'oltre' si vedono da lontano */
@@ -107,19 +92,12 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
   setFormStartTime,
   formEndTime,
   setFormEndTime,
-  formCost,
-  setFormCost,
-  tariffaPerche,
-  avvisoTariffa,
   tettoFrase,
   tettoLivello,
   formNotes,
   setFormNotes,
   formPersone,
   setFormPersone,
-  formQuota,
-  setFormQuota,
-  prezzoIndividuale,
   formNomeOspite,
   setFormNomeOspite,
   students,
@@ -191,77 +169,42 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </>
           )}
 
-          {/* --- personal di gruppo: quante persone, e quanto paga ciascuna --- */}
-          {formKind === 'gruppo' && (() => {
-            const quota = parseFloat((formQuota || '').replace(',', '.'));
-            const seduta = { persone: formPersone, quotaPersona: quota };
-            const ok = controllaGruppo(seduta).valido;
-            const conf = ok ? confrontaConIndividuale(seduta, prezzoIndividuale) : null;
-            return (
-              <View style={styles.gruppoBox}>
-                <Text style={styles.fieldLabel}>Quante persone</Text>
-                <View style={styles.typeRow}>
-                  {PERSONE_POSSIBILI.map((n) => (
-                    <TouchableOpacity
-                      key={n}
-                      style={{
-                        ...styles.personaChip,
-                        ...(formPersone === n ? styles.typeChipActive : {}),
-                      }}
-                      onPress={() => setFormPersone(n)}
-                    >
-                      <Text
-                        style={{
-                          ...styles.typeChipText,
-                          ...(formPersone === n ? { color: colors.accent } : {}),
-                        }}
-                      >
-                        {n}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.gruppoNota}>{listinoDelGruppo(formPersone)}</Text>
-
-                <InputField
-                  label="Quota a persona (€)"
-                  value={formQuota}
-                  onChangeText={setFormQuota}
-                  keyboardType="decimal-pad"
-                  placeholder={
-                    quotaProposta(formPersone) === null
-                      ? 'da decidere'
-                      : euroIt(quotaProposta(formPersone) as number)
-                  }
-                />
-
-                {ok && conf && (
-                  <>
-                    <Text style={styles.gruppoTotale}>
-                      La seduta vale {incassoSeduta(seduta)} € in tutto
-                      · questa persona ne paga {quota}
-                    </Text>
+          {/* --- personal di gruppo: quante persone ---
+                 La quota non si chiede: chi si allena ha un contratto
+                 mensile, e il prezzo di una singola seduta sarebbe una
+                 divisione fatta dopo. Quante persone erano insieme,
+                 invece, è un dato della seduta e resta. */}
+          {formKind === 'gruppo' && (
+            <View style={styles.gruppoBox}>
+              <Text style={styles.fieldLabel}>Quante persone</Text>
+              <View style={styles.typeRow}>
+                {PERSONE_POSSIBILI.map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    style={{
+                      ...styles.personaChip,
+                      ...(formPersone === n ? styles.typeChipActive : {}),
+                    }}
+                    onPress={() => setFormPersone(n)}
+                  >
                     <Text
                       style={{
-                        ...styles.gruppoNota,
-                        ...(conf.esito === 'non_conviene' ? { color: colors.error } : {}),
+                        ...styles.typeChipText,
+                        ...(formPersone === n ? { color: colors.accent } : {}),
                       }}
                     >
-                      {conf.spiegazione}
+                      {n}
                     </Text>
-                  </>
-                )}
-
-                <Text style={styles.gruppoAiuto}>
-                  Nel costo di questo appuntamento entra la quota di questa persona,
-                  non l'incasso del gruppo. Per gli altri partecipanti si crea un
-                  appuntamento ciascuno: così ognuno ha la sua storia, e il totale
-                  torna da solo.
-                </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            );
-          })()}
+
+              <Text style={styles.gruppoAiuto}>
+                Per ogni partecipante si crea un appuntamento: così ognuno ha la
+                sua storia e il conto delle sedute torna da solo.
+              </Text>
+            </View>
+          )}
 
           {/* Student */}
           <StudentSearchPicker
@@ -444,28 +387,6 @@ export const AppointmentModal: React.FC<AppointmentModalProps> = ({
             </View>
           </View>
 
-          {/* Cost */}
-          {(isOwner || isManager) && (
-            <>
-              <InputField
-                label="Costo sessione (€)"
-                value={formCost}
-                onChangeText={setFormCost}
-                placeholder="0"
-                keyboardType="numeric"
-              />
-              {/* Il prezzo proposto dice da dove viene. Un campo libero
-                  senza spiegazione è come non averlo: chi compila tira
-                  a indovinare, e il listino resta nella testa di uno. */}
-              {!!tariffaPerche && (
-                <Text style={styles.tariffaPerche}>{tariffaPerche}</Text>
-              )}
-              {!!avvisoTariffa && (
-                <Text style={styles.tariffaAvviso}>{avvisoTariffa}</Text>
-              )}
-            </>
-          )}
-
           {/* I posti del titolare in questa settimana. Un contatore, non
               un blocco: il carico lo decide chi si allena. */}
           {!!tettoFrase && (
@@ -557,18 +478,6 @@ const styles = StyleSheet.create({
   // distinguono, e l'occhio trova le 15:45 passando dalle 15:00.
   chipOraPiena: { borderColor: colors.textSecondary },
   chipTextOraPiena: { color: colors.text, fontWeight: '700' },
-  tariffaPerche: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-    lineHeight: 16,
-    marginTop: spacing.xs,
-  },
-  tariffaAvviso: {
-    color: colors.warning,
-    fontSize: fontSize.xs,
-    lineHeight: 16,
-    marginTop: spacing.xs,
-  },
   tetto: {
     color: colors.textSecondary,
     fontSize: fontSize.sm,
@@ -595,17 +504,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  gruppoTotale: {
-    color: colors.text,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    marginTop: spacing.xs,
-  },
-  gruppoNota: {
-    color: colors.textSecondary,
-    fontSize: fontSize.xs,
-    marginTop: 2,
   },
   gruppoAiuto: {
     color: colors.textSecondary,

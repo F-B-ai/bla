@@ -73,9 +73,28 @@ export interface EsitoGruppo {
  * errore: chi compila lo legge mentre ha una persona davanti.
  */
 export const controllaGruppo = (s: SedutaGruppo): EsitoGruppo => {
-  const problemi: string[] = [];
-  const n = s?.persone;
+  const problemi = [...controllaPersone(s?.persone).problemi];
   const q = s?.quotaPersona;
+
+  if (typeof q !== 'number' || !isFinite(q) || q <= 0) {
+    problemi.push('Manca la quota a persona.');
+  }
+
+  return { valido: problemi.length === 0, problemi };
+};
+
+/**
+ * Solo il numero di persone, senza il denaro.
+ *
+ * Serve a chi registra una seduta: lì il prezzo non si chiede più — chi
+ * si allena ha un contratto e paga a mese — ma quante persone erano
+ * insieme resta un dato della seduta, non del portafoglio. Per gli usi
+ * col prezzo (preventivi, listino) c'è `controllaGruppo`, che aggiunge
+ * il controllo sulla quota e riusa questo.
+ */
+export const controllaPersone = (persone: number): EsitoGruppo => {
+  const problemi: string[] = [];
+  const n = persone;
 
   if (!Number.isInteger(n)) {
     problemi.push('Il numero di persone dev\'essere un numero intero.');
@@ -89,10 +108,6 @@ export const controllaGruppo = (s: SedutaGruppo): EsitoGruppo => {
       `Oltre ${MAX_PERSONE} persone non è più un personal: è un mini gruppo, `
       + 'e si organizza diversamente.'
     );
-  }
-
-  if (typeof q !== 'number' || !isFinite(q) || q <= 0) {
-    problemi.push('Manca la quota a persona.');
   }
 
   return { valido: problemi.length === 0, problemi };

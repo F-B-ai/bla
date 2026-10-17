@@ -212,23 +212,55 @@ describe('l\'agenda è davvero collegata', () => {
   const agenda = leggi('screens/shared/CalendarScreen.tsx');
   const modale = leggi('screens/shared/calendar/AppointmentModal.tsx');
 
-  it('la tariffa si propone dal listino, non a mano', () => {
-    expect(agenda).toContain("from '../../domain/listino'");
-    expect(agenda).toContain('tariffaDi(');
-    expect(agenda).toContain('setFormCost(String(tariffa.prezzo))');
+  // ------------------------------------------------------------
+  // 17 ottobre 2026 — IL PREZZO ESCE DALL'AGENDA
+  // ------------------------------------------------------------
+  // Decisione del titolare: tutti avranno un contratto e pagheranno a
+  // mese, quindi il costo della singola seduta non è un dato della
+  // seduta. Era un campo libero su una schermata usata di corsa, con
+  // una persona davanti: il posto perfetto per scrivere la cifra
+  // sbagliata su un fatto vero.
+  //
+  // Questi test prima pretendevano che il prezzo ci fosse e venisse
+  // dal listino. Adesso pretendono che non ci sia: è la direzione
+  // facile da violare per distrazione, mentre il listino non torna
+  // indietro da solo.
+
+  it('nell\'agenda non si chiede più il costo di una seduta', () => {
+    expect(agenda).not.toContain('formCost');
+    expect(agenda).not.toContain('setFormCost');
+    expect(agenda).not.toContain('tariffaDi(');
   });
 
-  // In modifica il costo è già stato deciso una volta: riscriverlo
-  // cambierebbe i conti alle spalle di chi apre la schermata.
-  it('in modifica il costo non si sovrascrive mai', () => {
-    const blocco = agenda.slice(agenda.indexOf('La proposta riempie il campo'));
-    expect(blocco).toContain('if (!showModal || editingItem) return;');
-    expect(blocco).toContain('if (formCost) return;');
+  // Le sedute registrate PRIMA di oggi un prezzo ce l'hanno, e la
+  // schermata continua a leggerlo: la storia non si riscrive. Quello
+  // che non deve esistere è una SCRITTURA nuova con un prezzo dentro,
+  // quindi ogni `sessionCost` rimasto dev'essere una copia del dato
+  // letto, mai un valore calcolato qui.
+  it('e nessuna seduta nuova nasce con un prezzo addosso', () => {
+    const scritture = (agenda.match(/sessionCost: [^,\n]+/g) || [])
+      .filter((r) => !/sessionCost: [sa]\.sessionCost/.test(r));
+    expect(scritture).toEqual([]);
   });
 
-  it('il modale dice da dove viene il prezzo', () => {
-    expect(modale).toContain('tariffaPerche');
-    expect(modale).toContain('avvisoTariffa');
+  it('il modale non mostra nessun campo in euro', () => {
+    expect(modale).not.toContain('Costo sessione');
+    expect(modale).not.toContain('Quota a persona');
+    expect(modale).not.toContain('tariffaPerche');
+  });
+
+  // Quante persone erano insieme NON è denaro: è un fatto della
+  // seduta, e resta.
+  it('ma quante persone erano insieme si chiede ancora', () => {
+    expect(modale).toContain('Quante persone');
+    expect(modale).toContain('PERSONE_POSSIBILI');
+    expect(agenda).toContain('persone: formPersone');
+  });
+
+  // Una seduta passata scriveva anche un incasso in cassa. Con la
+  // rata mensile quell'entrata arriverebbe due volte.
+  it('e non scrive più un incasso per ogni lezione', () => {
+    expect(agenda).not.toMatch(/category: 'student_payment'/);
   });
 
   it('e mostra i posti del titolare nella settimana', () => {
