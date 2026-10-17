@@ -28,10 +28,13 @@ describe('che cos\'è un gruppo, e che cosa non lo è', () => {
     expect(r.problemi.join(' ')).toContain('seduta individuale');
   });
 
-  it('sopra cinque è un corso, non un personal', () => {
-    const r = controllaGruppo(g(6, 25));
+  // Dal 12 ottobre 2026 il tetto è quattro: «con cinque persone non
+  // è un personal, è un mini gruppo». In quattro si segue ancora
+  // ognuno sul suo programma; dal quinto si conduce una lezione.
+  it('sopra quattro non è più un personal', () => {
+    const r = controllaGruppo(g(5, 25));
     expect(r.valido).toBe(false);
-    expect(r.problemi.join(' ')).toContain('corso');
+    expect(r.problemi.join(' ')).toContain('mini gruppo');
   });
 
   it('senza quota non si può registrare', () => {
@@ -45,8 +48,8 @@ describe('che cos\'è un gruppo, e che cosa non lo è', () => {
     expect(controllaGruppo(g(2.5, 25)).valido).toBe(false);
   });
 
-  it('il selettore offre esattamente 2, 3, 4, 5', () => {
-    expect(PERSONE_POSSIBILI).toEqual([2, 3, 4, 5]);
+  it('il selettore offre esattamente 2, 3, 4 — e ognuno ha un prezzo', () => {
+    expect(PERSONE_POSSIBILI).toEqual([2, 3, 4]);
   });
 });
 
@@ -61,12 +64,12 @@ describe('i due conti non si toccano', () => {
 
   it('la quota dell\'allievo non cresce se il gruppo cresce', () => {
     expect(costoPerAllievo(g(2, 30))).toBe(30);
-    expect(costoPerAllievo(g(5, 30))).toBe(30);
+    expect(costoPerAllievo(g(4, 30))).toBe(30);
   });
 
   it('l\'incasso invece cresce con le persone', () => {
     expect(incassoSeduta(g(2, 30))).toBe(60);
-    expect(incassoSeduta(g(5, 30))).toBe(150);
+    expect(incassoSeduta(g(4, 30))).toBe(120);
   });
 
   it('i centesimi non si perdono per strada', () => {
@@ -195,7 +198,7 @@ describe('il piano economico con le sedute di gruppo', () => {
   it('le rate si calcolano su ciò che paga l\'allievo', () => {
     const p = componiPiano({
       voci: [],
-      gruppi: [{ conduttore: 'giuseppe', quante: 10, persone: 5, quotaPersona: 20 }],
+      gruppi: [{ conduttore: 'giuseppe', quante: 10, persone: 4, quotaPersona: 20 }],
       valutazioneGiaPagata: true,
       numeroRate: 2,
     });

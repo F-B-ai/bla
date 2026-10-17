@@ -82,16 +82,21 @@ import { getOspitiConfermati, RichiestaSalvata } from '../../services/agendaRequ
 import { addTransaction } from '../../services/financialService';
 import { TaskCard } from './calendar/TaskCard';
 import { AppointmentCard, AppointmentItem } from './calendar/AppointmentCard';
-import { controllaGruppo, costoPerAllievo } from '../../domain/gruppo';
+import { controllaPersone } from '../../domain/gruppo';
 import {
   controllaAppuntamento, messaggioMancante, nomeOspiteValido,
   eSessione, tipoPercorso, aspetto, tipoDaSeduta,
 } from '../../domain/appuntamento';
+import { motivoSalvataggio, motivoEliminazione } from '../../domain/salvataggio';
+import { registraGuasto } from '../../services/guastiService';
+import { ConfirmModal } from '../../components/common/ConfirmModal';
+import {
+  statoTetto, stessaSettimana, TETTO_INIZIALE,
+} from '../../domain/listino';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
 import { creaOspite } from '../../services/agendaRequestService';
-import { conduttore } from '../../domain/protocollo';
 import { TaskModal } from './calendar/TaskModal';
 import { AppointmentModal } from './calendar/AppointmentModal';
 import { StudentDetailModal } from './calendar/StudentDetailModal';
@@ -109,10 +114,6 @@ const TIME_SLOTS = [
 ];
 
 type AppointmentKind = 'training' | 'nutrition' | 'consulenza' | 'gruppo';
-
-/** La tariffa di riferimento per capire se il gruppo conviene.
- *  Vive nel listino di domain/protocollo.ts, non qui. */
-const PREZZO_SEDUTA_INDIVIDUALE = conduttore('francesco').prezzo;
 
 const TONO = { accento: colors.accent, verde: colors.success, ambra: colors.warning } as const;
 
@@ -211,6 +212,13 @@ export const CalendarScreen: React.FC = () => {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // L'eliminazione di un task: quale, se è in corso, e perché non è
+  // andata. Tre stati invece di un dialogo del browser — vedi
+  // `chiediEliminaTask`.
+  const [taskDaEliminare, setTaskDaEliminare] = useState<DailyTask | null>(null);
+  const [eliminandoTask, setEliminandoTask] = useState(false);
+  const [erroreEliminaTask, setErroreEliminaTask] = useState<string | null>(null);
+
   // Staff filter (owner only)
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
 
@@ -226,10 +234,10 @@ export const CalendarScreen: React.FC = () => {
   const [formDate, setFormDate] = useState('');
   const [formStartTime, setFormStartTime] = useState('09:00');
   const [formEndTime, setFormEndTime] = useState('10:00');
-  const [formCost, setFormCost] = useState('');
   // personal di gruppo: quante persone e quanto paga ciascuna
   const [formPersone, setFormPersone] = useState(2);
-  const [formQuota, setFormQuota] = useState('');
+  // Non c'è un contrassegno sui percorsi: si legge dalla durata, che è
+  // un dato già presente su tutti quelli esistenti. Vedi listino.ts.
   // consulenza con chi non è ancora in anagrafica
   const [formNomeOspite, setFormNomeOspite] = useState('');
   const [formNotes, setFormNotes] = useState('');
@@ -424,6 +432,43 @@ export const CalendarScreen: React.FC = () => {
     items.sort((a, b) => a.startTime.localeCompare(b.startTime));
     return items;
   }, [sessions, nutritionAppts]);
+
+  // ------------------------------------------------------------
+  // PERCHÉ QUI NON SI PARLA PIÙ DI SOLDI
+  // ------------------------------------------------------------
+  // 17 ottobre 2026. Il costo della singola seduta non si chiede più:
+  // chi si allena ha un contratto e paga a mese, quindi il prezzo di
+  // una lezione non è un dato della lezione — è una divisione fatta
+  // dopo, e teneva aperto un campo libero in cui bastava una
+  // distrazione per scrivere la cifra sbagliata su una seduta vera.
+  //
+  // Resta tutto il resto: chi, quando, con chi, e in quanti. Il
+  // listino continua a vivere dove serve davvero, nei preventivi.
+
+  /** Conduce il titolare in persona? Solo lui può esserlo. */
+  const conduceIlTitolare = useMemo(() => {
+    if (!isOwner || !user) return false;
+    const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
+    return staffId === user.id;
+  }, [isOwner, user, canSeeAll, formCollabId]);
+
+  // I posti del titolare nella settimana del giorno scelto. Si conta da
+  // quello che è già in agenda, senza altre letture.
+  const tetto = useMemo(() => {
+    if (!conduceIlTitolare || !user || !formDate) return null;
+    const quando = new Date(formDate);
+    if (isNaN(quando.getTime())) return null;
+    const fatte = allAppointments.filter(
+      (a) => a.staffId === user.id
+        && a.status !== 'cancelled'
+        && a.status !== 'cancelled_by_student'
+        && stessaSettimana(a.date, quando)
+        && a.id !== editingItem?.id
+    ).length;
+    // Quella che si sta scrivendo conta: il numero deve dire come
+    // sarà la settimana se salvi, non com'era prima di aprire.
+    return statoTetto(fatte + 1, TETTO_INIZIALE);
+  }, [conduceIlTitolare, user, formDate, allAppointments, editingItem]);
 
   const filteredAppointments = useMemo(() => {
     if (!canSeeAll || !selectedStaffId) return allAppointments;
@@ -651,10 +696,8 @@ export const CalendarScreen: React.FC = () => {
     setFormCustomDate('');
     setFormStartTime('09:00');
     setFormEndTime('10:00');
-    setFormCost('');
     setFormNotes('');
     setFormPersone(2);
-    setFormQuota('');
     setFormNomeOspite('');
     setEditingItem(null);
   };
@@ -673,7 +716,6 @@ export const CalendarScreen: React.FC = () => {
     setFormDate(item.dateStr);
     setFormStartTime(item.startTime);
     setFormEndTime(item.endTime);
-    setFormCost(item.sessionCost ? String(item.sessionCost) : '');
     setFormNotes(item.notes);
     setShowModal(true);
   };
@@ -729,16 +771,17 @@ export const CalendarScreen: React.FC = () => {
         resetForm();
         setShowModal(false);
         loadData();
-      } catch {
-        crossAlert('Errore', 'Impossibile salvare');
+      } catch (err) {
+        crossAlert('Non è stato salvato', motivoSalvataggio(err));
       } finally {
         setSaving(false);
       }
       return;
     }
     const staffId = canSeeAll ? (formCollabId || user.id) : user.id;
-    const cost = formCost ? parseFloat(formCost) : undefined;
-
+    // Vuoto vuol dire zero: la seduta sta dentro un pacchetto già
+    // pagato. Prima «vuoto» diventava `undefined` e il salvataggio
+    // cadeva intero. Vedi domain/appuntamento.ts.
     setSaving(true);
     try {
       if (editingItem) {
@@ -750,7 +793,6 @@ export const CalendarScreen: React.FC = () => {
             startTime: formStartTime,
             endTime: formEndTime,
             notes: formNotes,
-            sessionCost: cost,
           });
         } else {
           await updateAppointment(editingItem.id, {
@@ -760,7 +802,6 @@ export const CalendarScreen: React.FC = () => {
             startTime: formStartTime,
             endTime: formEndTime,
             notes: formNotes,
-            sessionCost: cost,
           });
         }
         crossAlert('Successo', 'Appuntamento aggiornato!');
@@ -776,12 +817,9 @@ export const CalendarScreen: React.FC = () => {
           : {};
         let nuovoId = '';
         if (formKind === 'gruppo') {
-          // Nel costo entra la QUOTA di questa persona, mai l'incasso
-          // del gruppo: vedi domain/gruppo.ts. Gli altri partecipanti
-          // hanno un appuntamento ciascuno, e il totale torna da solo.
-          const quota = parseFloat((formQuota || '').replace(',', '.'));
-          const seduta = { persone: formPersone, quotaPersona: quota };
-          const esito = controllaGruppo(seduta);
+          // Del gruppo resta il numero di persone: è un dato della
+          // seduta. La quota no — quella sta nel contratto mensile.
+          const esito = controllaPersone(formPersone);
           if (!esito.valido) {
             crossAlert('Gruppo da completare', esito.problemi.join('\n'));
             setSaving(false);
@@ -795,11 +833,9 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: costoPerAllievo(seduta),
             isCountedAsCompleted: isPastDate,
             tipoSeduta: 'gruppo',
             persone: formPersone,
-            quotaPersona: costoPerAllievo(seduta),
             ...segnoScalo,
           });
         } else if (formKind === 'training' || formKind === 'consulenza') {
@@ -811,7 +847,6 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             tipoSeduta: formKind === 'consulenza' ? 'consulenza' : 'individuale',
             ...segnoScalo,
@@ -825,7 +860,6 @@ export const CalendarScreen: React.FC = () => {
             endTime: formEndTime,
             status: appointmentStatus,
             notes: formNotes,
-            sessionCost: cost,
             isCountedAsCompleted: isPastDate,
             createdAt: new Date(),
             ...segnoScalo,
@@ -842,17 +876,11 @@ export const CalendarScreen: React.FC = () => {
             if (formKind === 'nutrition') await updateAppointment(nuovoId, segno);
             else await updateSession(nuovoId, segno);
           }
-          if (cost && cost > 0) {
-            await addTransaction({
-              type: 'income',
-              category: 'student_payment',
-              amount: cost,
-              description: `${ETICHETTA_SEDUTA[formKind]} - ${getStudentName(formStudentId)} (${new Date(formDate).toLocaleDateString('it-IT')})`,
-              date: new Date(formDate),
-              collaboratorId: staffId,
-              studentId: formStudentId,
-            });
-          }
+          // Qui, fino al 17 ottobre 2026, ogni seduta passata scriveva
+          // anche un incasso in cassa, preso dal costo della seduta.
+          // Con i contratti mensili quell'incasso arriverebbe due
+          // volte: una dalla rata e una dalla lezione. L'entrata resta
+          // una sola, e viene dal percorso pagato.
         }
         // Prima qui c'era «Appuntamento passato registrato!» — un
         // punto esclamativo che diceva che era andato tutto bene
@@ -883,8 +911,11 @@ export const CalendarScreen: React.FC = () => {
       resetForm();
       setShowModal(false);
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare');
+    } catch (err) {
+      // «Impossibile salvare» e basta: due parole che non dicevano né
+      // che cosa era successo né che cosa fare. Il motivo arrivava fin
+      // qui e veniva buttato via sulla soglia.
+      crossAlert('Non è stato salvato', motivoSalvataggio(err));
     } finally {
       setSaving(false);
     }
@@ -1173,7 +1204,9 @@ export const CalendarScreen: React.FC = () => {
             if (eSessione(item.kind)) await deleteSession(item.id);
             else await deleteAppointment(item.id);
             loadData();
-          } catch { crossAlert('Errore', 'Impossibile eliminare'); }
+          } catch (err) {
+            crossAlert('Non l\'ho eliminato', motivoEliminazione(err));
+          }
         },
       },
     ]);
@@ -1259,20 +1292,45 @@ export const CalendarScreen: React.FC = () => {
     }
   };
 
-  const handleDeleteTask = (task: DailyTask) => {
-    crossAlert('Conferma', 'Eliminare questo task?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Elimina',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteTask(task.id);
-            loadData();
-          } catch { crossAlert('Errore', 'Impossibile eliminare'); }
-        },
-      },
-    ]);
+  // L'eliminazione di un task non passa più dal dialogo del browser.
+  // Segnalato l'11 ottobre 2026: «non fa nulla». Un `window.confirm`
+  // può essere soppresso — app installata sulla schermata home,
+  // impostazione del telefono — e allora risponde «no» da solo, in
+  // silenzio: il pulsante funziona e sembra morto. La conferma adesso
+  // è un riquadro dell'app, e nessuno può rispondere al posto suo.
+  const chiediEliminaTask = (task: DailyTask) => {
+    setErroreEliminaTask(null);
+    setTaskDaEliminare(task);
+  };
+
+  const eliminaTaskConfermato = async () => {
+    const task = taskDaEliminare;
+    if (!task) return;
+    setEliminandoTask(true);
+    try {
+      await deleteTask(task.id);
+      // Si toglie SUBITO dalla lista, senza aspettare la rilettura: se
+      // il server risponde dalla cache, il task cancellato ricompare e
+      // sembra che l'eliminazione non funzioni. Era già andato;
+      // tornava solo in pagina.
+      setTasks((p) => p.filter((t) => t.id !== task.id));
+      setTaskDaEliminare(null);
+      loadData();
+    } catch (err) {
+      // Il motivo resta SOTTO GLI OCCHI, dentro il riquadro: un avviso
+      // che si chiude da solo non si legge mai, e questo è il momento
+      // in cui serve leggerlo.
+      setErroreEliminaTask(motivoEliminazione(err));
+      // E finisce nel registro guasti, perché il lunedì si deve poter
+      // leggere che cos'è successo anche se nessuno l'ha riferito.
+      registraGuasto({
+        errore: err,
+        schermata: 'Agenda · eliminazione task',
+        ruolo: user?.role || '',
+      });
+    } finally {
+      setEliminandoTask(false);
+    }
   };
 
   // Next 30 days for date picker
@@ -1371,7 +1429,7 @@ export const CalendarScreen: React.FC = () => {
       task={task}
       onToggle={handleToggleTask}
       onEdit={openEditTask}
-      onDelete={handleDeleteTask}
+      onDelete={chiediEliminaTask}
     />
   );
 
@@ -1505,7 +1563,21 @@ export const CalendarScreen: React.FC = () => {
   );
   const riepilogoOggi = useMemo(() => riepilogoGiornata(giornataOggi), [giornataOggi]);
 
-  /** Una riga della giornata: appuntamento, ospite o task, stessa forma. */
+  /**
+   * Una riga della giornata: appuntamento, ospite o task, stessa forma.
+   *
+   * L'11 ottobre 2026: «non riesco né ad eliminare né a spuntare come
+   * fatto». Qui dentro c'era il motivo, e non era dove lo cercavo.
+   * In questa riga la casella del task era un DISEGNO da 12 px dentro
+   * la riga di sottotitolo — sembrava una casella da spuntare, e non
+   * era un pulsante. Il cestino non c'era affatto: toccare la riga
+   * apriva la modifica, e nella modifica non c'era modo di eliminare.
+   *
+   * Tre schermi diversi mostrano i task e due di loro non potevano
+   * toccarli. Adesso la riga ha due pulsanti veri da 44 px — spunta e
+   * cestino — e non sono dentro il tocco della riga: sono accanto, per
+   * non dipendere dal fatto che un tocco annidato si propaghi o no.
+   */
   const renderVoce = (v: VoceGiornata, conData = false) => {
     const tono = v.genere === 'task'
       ? colors.info
@@ -1517,13 +1589,11 @@ export const CalendarScreen: React.FC = () => {
       : v.genere === 'ospite'
         ? 'person-add-outline'
         : aspetto(v.tipo || 'training').icona;
-    return (
-      <TouchableOpacity
-        key={`${v.genere}-${v.id}`}
-        style={styles.agendaRow}
-        onPress={() => apriVoce(v)}
-        activeOpacity={0.85}
-      >
+    const eTask = v.genere === 'task';
+    const task = eTask ? (v.fonte as DailyTask) : null;
+
+    const corpo = (
+      <>
         <View style={{ ...styles.agendaTimeCol, borderLeftColor: tono }}>
           <Text style={styles.agendaTime}>{v.ora || '—'}</Text>
           {conData ? (
@@ -1552,8 +1622,60 @@ export const CalendarScreen: React.FC = () => {
             <Text style={{ ...styles.agendaKind, color: tono }}>{v.sottotitolo}</Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
-      </TouchableOpacity>
+      </>
+    );
+
+    // Un appuntamento o un ospite: la riga intera apre la cosa.
+    if (!eTask || !task) {
+      return (
+        <TouchableOpacity
+          key={`${v.genere}-${v.id}`}
+          style={styles.agendaRow}
+          onPress={() => apriVoce(v)}
+          activeOpacity={0.85}
+        >
+          {corpo}
+          <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+        </TouchableOpacity>
+      );
+    }
+
+    // Un task: la riga apre la modifica, e accanto ci sono i due
+    // pulsanti che prima non esistevano. Stanno FUORI dal tocco della
+    // riga — non annidati dentro — così non dipendono dal fatto che un
+    // tocco dentro un altro tocco si propaghi: una cosa che si comporta
+    // diversamente sul telefono e nel browser, e che qui farebbe
+    // aprire la modifica mentre si spunta.
+    return (
+      <View key={`${v.genere}-${v.id}`} style={styles.agendaRow}>
+        <TouchableOpacity
+          style={styles.agendaRowTocco}
+          onPress={() => apriVoce(v)}
+          activeOpacity={0.85}
+        >
+          {corpo}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.vocePulsante}
+          onPress={() => handleToggleTask(task)}
+          accessibilityLabel={v.completato ? 'Segna come da fare' : 'Segna come fatto'}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons
+            name={v.completato ? 'checkmark-circle' : 'ellipse-outline'}
+            size={24}
+            color={v.completato ? colors.success : colors.textSecondary}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.vocePulsante}
+          onPress={() => chiediEliminaTask(task)}
+          accessibilityLabel="Elimina il task"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons name="trash-outline" size={20} color={colors.error} />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -2433,6 +2555,27 @@ export const CalendarScreen: React.FC = () => {
 
   function renderTaskModal() {
     return (
+      <>
+      {/* La conferma di eliminazione vive qui perché renderTaskModal()
+          è chiamata da tutte e tre le viste — agenda, timeline e
+          calendario. Metterla in una sola vorrebbe dire che il
+          cestino funziona in una e tace nelle altre, che è peggio di
+          non funzionare affatto. */}
+      <ConfirmModal
+        visible={!!taskDaEliminare}
+        titolo="Eliminare questo task?"
+        messaggio={
+          taskDaEliminare
+            ? `«${taskDaEliminare.title}» viene cancellato e non torna indietro.`
+            : ''
+        }
+        azione="Elimina"
+        distruttiva
+        errore={erroreEliminaTask}
+        inCorso={eliminandoTask}
+        onConferma={eliminaTaskConfermato}
+        onAnnulla={() => { setTaskDaEliminare(null); setErroreEliminaTask(null); }}
+      />
       <TaskModal
         visible={showTaskModal}
         editingTask={editingTask}
@@ -2451,7 +2594,16 @@ export const CalendarScreen: React.FC = () => {
         savingTask={savingTask}
         onSave={handleSaveTask}
         onClose={() => { setShowTaskModal(false); resetTaskForm(); }}
+        onDelete={editingTask ? () => {
+          // Si chiude la modifica e si apre la conferma: due riquadri
+          // sovrapposti, sul telefono, si coprono a vicenda.
+          const t = editingTask;
+          setShowTaskModal(false);
+          resetTaskForm();
+          chiediEliminaTask(t);
+        } : undefined}
       />
+      </>
     );
   }
 
@@ -2474,15 +2626,12 @@ export const CalendarScreen: React.FC = () => {
         setFormStartTime={setFormStartTime}
         formEndTime={formEndTime}
         setFormEndTime={setFormEndTime}
-        formCost={formCost}
-        setFormCost={setFormCost}
         formNotes={formNotes}
         setFormNotes={setFormNotes}
         formPersone={formPersone}
         setFormPersone={setFormPersone}
-        formQuota={formQuota}
-        setFormQuota={setFormQuota}
-        prezzoIndividuale={PREZZO_SEDUTA_INDIVIDUALE}
+        tettoFrase={tetto ? tetto.frase : null}
+        tettoLivello={tetto ? tetto.livello : undefined}
         formNomeOspite={formNomeOspite}
         setFormNomeOspite={setFormNomeOspite}
         students={students}
@@ -2961,6 +3110,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  // La parte della riga che apre la cosa. I pulsanti del task stanno
+  // accanto, non dentro: vedi renderVoce.
+  agendaRowTocco: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // 44 px, la misura sotto la quale un dito non centra il bersaglio.
+  vocePulsante: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.md,
   },
   agendaTimeCol: {
     borderLeftWidth: 3,

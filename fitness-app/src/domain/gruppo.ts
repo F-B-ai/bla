@@ -17,13 +17,43 @@
 // quello che hai preso. Qui le due cose non si toccano mai.
 // ============================================================
 
+import { quotaGruppoDi, rigaGruppo } from './listino';
+
 export const GRUPPO_VERSION = 1;
+
+/**
+ * La quota che il listino propone per un gruppo di tante persone.
+ *
+ * Sta qui perché chi compila l'agenda guarda questo file, e il prezzo
+ * sta nel listino: una riesporta, non un secondo numero. `null`
+ * significa che il listino non lo dice, e il campo va lasciato
+ * libero invece che riempito di zeri. Oggi non capita — il selettore
+ * arriva a quattro e tutti e tre i numeri hanno un prezzo — ma la
+ * risposta onesta resta prevista: il giorno che si aggiunge una
+ * taglia nuova, il buco si vede invece di diventare uno zero.
+ */
+export const quotaProposta = (persone: number): number | null => quotaGruppoDi(persone);
+
+/** La riga di listino da mostrare accanto al selettore. */
+export const listinoDelGruppo = (persone: number): string => rigaGruppo(persone);
 
 /** Sotto due non è un gruppo: è una seduta individuale. */
 export const MIN_PERSONE = 2;
 
-/** Sopra cinque non è personal: è un corso, e si organizza diverso. */
-export const MAX_PERSONE = 5;
+/**
+ * Sopra quattro non è più personal.
+ *
+ * Deciso il 12 ottobre 2026 dal titolare, e la ragione è nel lavoro,
+ * non nel prezzo: «con cinque persone non è un personal, è un mini
+ * gruppo». In quattro si riesce ancora a seguire ognuno sul suo
+ * programma; dal quinto in poi si conduce una lezione, che è un altro
+ * mestiere e si organizza diversamente.
+ *
+ * Il numero era cinque e il listino arrivava a quattro: c'era un
+ * posto nel selettore senza prezzo. Adesso ogni numero che si può
+ * scegliere ha la sua quota.
+ */
+export const MAX_PERSONE = 4;
 
 export interface SedutaGruppo {
   /** quante persone si allenano insieme, da 2 a 5 */
@@ -43,9 +73,28 @@ export interface EsitoGruppo {
  * errore: chi compila lo legge mentre ha una persona davanti.
  */
 export const controllaGruppo = (s: SedutaGruppo): EsitoGruppo => {
-  const problemi: string[] = [];
-  const n = s?.persone;
+  const problemi = [...controllaPersone(s?.persone).problemi];
   const q = s?.quotaPersona;
+
+  if (typeof q !== 'number' || !isFinite(q) || q <= 0) {
+    problemi.push('Manca la quota a persona.');
+  }
+
+  return { valido: problemi.length === 0, problemi };
+};
+
+/**
+ * Solo il numero di persone, senza il denaro.
+ *
+ * Serve a chi registra una seduta: lì il prezzo non si chiede più — chi
+ * si allena ha un contratto e paga a mese — ma quante persone erano
+ * insieme resta un dato della seduta, non del portafoglio. Per gli usi
+ * col prezzo (preventivi, listino) c'è `controllaGruppo`, che aggiunge
+ * il controllo sulla quota e riusa questo.
+ */
+export const controllaPersone = (persone: number): EsitoGruppo => {
+  const problemi: string[] = [];
+  const n = persone;
 
   if (!Number.isInteger(n)) {
     problemi.push('Il numero di persone dev\'essere un numero intero.');
@@ -56,13 +105,9 @@ export const controllaGruppo = (s: SedutaGruppo): EsitoGruppo => {
     );
   } else if (n > MAX_PERSONE) {
     problemi.push(
-      `Oltre ${MAX_PERSONE} persone non è più personal di gruppo: è un corso, `
-      + 'e va organizzato diversamente.'
+      `Oltre ${MAX_PERSONE} persone non è più un personal: è un mini gruppo, `
+      + 'e si organizza diversamente.'
     );
-  }
-
-  if (typeof q !== 'number' || !isFinite(q) || q <= 0) {
-    problemi.push('Manca la quota a persona.');
   }
 
   return { valido: problemi.length === 0, problemi };

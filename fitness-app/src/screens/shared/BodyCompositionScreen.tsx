@@ -30,7 +30,6 @@ import {
 import {
   estimateBodyComposition,
   AIBodyCompositionResult,
-  ensureAIApiKey,
 } from '../../services/aiService';
 import { useAuth } from '../../hooks/useAuth';
 import { getStudents } from '../../services/authService';
@@ -225,13 +224,11 @@ export const BodyCompositionScreen: React.FC = () => {
       crossAlert('Errore', 'Carica tutte e 4 le foto per l\'analisi AI (frontale, lato sinistro, lato destro, retro)');
       return;
     }
-    if (!(await ensureAIApiKey())) {
-      crossAlert(
-        'API Key mancante',
-        'Inserisci la chiave API Anthropic nelle impostazioni per usare l\'analisi AI.'
-      );
-      return;
-    }
+    // NIENTE controllo sulla chiave client. L'analisi passa dal
+    // gateway, che la chiave ce l'ha sul server: chiedere qui una
+    // chiave locale bloccava una funzione che avrebbe funzionato,
+    // e mandava a cercarla in Impostazioni AI dove non serve più.
+    // 23 settembre 2026, vedi domain/guastoAI.ts.
 
     setAiAnalyzing(true);
     try {

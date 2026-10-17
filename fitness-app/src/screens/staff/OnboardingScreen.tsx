@@ -15,6 +15,23 @@ import {
 } from '../../data/onboardingForm';
 import { valutaOnboarding, Risposte } from '../../domain/onboarding';
 import {
+  componiCarta, controllaCarta, riepilogaCarta, VocePreventivo,
+} from '../../domain/cartaIntestata';
+import { printCartaIntestata } from '../../utils/printUtils';
+import { TipoSconto, REGOLE_SCONTO, regolaDi } from '../../domain/sconti';
+import { VOCI_LISTINO, euroIt } from '../../domain/listino';
+import { ConfirmModal } from '../../components/common/ConfirmModal';
+import { motivoEliminazione } from '../../domain/salvataggio';
+
+/** Le scelte del selettore: «nessuno» più le regole del dominio. */
+const SCELTE_SCONTO: { tipo: TipoSconto; etichetta: string }[] = [
+  { tipo: 'nessuno', etichetta: 'Nessuno' },
+  ...REGOLE_SCONTO.map((r) => ({
+    tipo: r.tipo,
+    etichetta: `${r.etichetta.replace('Sconto ', '')} −${Math.round(r.percentuale * 100)}%`,
+  })),
+];
+import {
   saveOnboarding, getOnboarding, elencaInteressati,
   cancellaInteressato, collegaAllievo, aggiornaInteressato, SchedaOnboarding,
 } from '../../services/onboardingService';
@@ -52,6 +69,24 @@ export function OnboardingScreen() {
   // Quale consulenza si sta modificando. Se è aperta, salvare AGGIORNA
   // quella invece di crearne una seconda con lo stesso nome.
   const [schedaApertaId, setSchedaApertaId] = useState<string | null>(null);
+  // La cancellazione di una consulenza: quale, se è in corso, e perché
+  // non è andata. La conferma è un riquadro dell'app e non un dialogo
+  // del browser — vedi components/common/ConfirmModal.
+  const [daCancellare, setDaCancellare] = useState<SchedaOnboarding | null>(null);
+  const [cancellando, setCancellando] = useState(false);
+  const [erroreCancella, setErroreCancella] = useState<string | null>(null);
+
+  // --- la carta intestata col preventivo ---
+  const [voci, setVoci] = useState<Array<{ descrizione: string; importo: string }>>([
+    { descrizione: '', importo: '' },
+    { descrizione: '', importo: '' },
+    { descrizione: '', importo: '' },
+  ]);
+  const [rateCarta, setRateCarta] = useState('');
+  // Lo sconto fedeltà. Non si applica da solo e non si deduce dai
+  // dati: il criterio dice chi PUÒ averlo, la mano resta del titolare.
+  // Vedi domain/sconti.ts.
+  const [scontoCarta, setScontoCarta] = useState<TipoSconto>('nessuno');
 
   // Un elenco vuoto e un elenco che non si è potuto leggere sono due
   // cose diverse, e il 13 settembre 2026 sullo schermo erano la stessa:
@@ -93,6 +128,53 @@ export function OnboardingScreen() {
       const cur = Array.isArray(p[id]) ? (p[id] as string[]) : [];
       return { ...p, [id]: cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt] };
     });
+
+  /**
+   * La carta intestata col preventivo.
+   *
+   * Prima di stampare passa dal controllo del dominio: è l'ultima
+   * rete prima che il foglio esca dallo studio, e se un testo
+   * sensibile è finito dentro dice QUALE campo, non «errore».
+   */
+  const stampaCarta = () => {
+    const nomeCarta = tipo === 'allievo'
+      ? (student ? `${student.name} ${student.surname}` : '')
+      : ospiteNome;
+
+    const vociPulite: VocePreventivo[] = voci
+      .map((v) => ({
+        descrizione: v.descrizione.trim(),
+        importo: parseFloat(v.importo.replace(',', '.')) || 0,
+      }))
+      .filter((v) => v.descrizione && v.importo > 0);
+
+    const carta = componiCarta({
+      allievo: nomeCarta,
+      risposte,
+      esito,
+      voci: vociPulite,
+      rate: parseInt(rateCarta, 10) || 1,
+      sconto: scontoCarta,
+    });
+
+    const verifica = controllaCarta(carta, risposte);
+    if (!verifica.ok) {
+      crossAlert('Non la stampo così', verifica.problemi.join('\n\n'));
+      return;
+    }
+
+    crossAlert('Prima di consegnarla', riepilogaCarta(carta), [
+      { text: 'Aspetta', style: 'cancel' },
+      {
+        text: 'Stampa',
+        onPress: () => printCartaIntestata({
+          allievo: nomeCarta, risposte, esito,
+          voci: vociPulite, rate: parseInt(rateCarta, 10) || 1,
+          sconto: scontoCarta,
+        }),
+      },
+    ]);
+  };
 
   const salva = async () => {
     if (!user) return;
@@ -174,22 +256,29 @@ export function OnboardingScreen() {
   };
 
   const cancella = (sch: SchedaOnboarding) => {
-    const nome = sch.ospiteNome || 'questa persona';
-    crossAlert('Cancellare la scheda?', confermaCancellazione(nome), [
-      { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Cancella',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await cancellaInteressato(sch.id);
-            ricaricaInteressati();
-          } catch {
-            crossAlert('Errore', 'Non sono riuscito a cancellarla.');
-          }
-        },
-      },
-    ]);
+    setErroreCancella(null);
+    setDaCancellare(sch);
+  };
+
+  const cancellaConfermato = async () => {
+    const sch = daCancellare;
+    if (!sch) return;
+    setCancellando(true);
+    try {
+      await cancellaInteressato(sch.id);
+      // Se era quella aperta qui sotto, il modulo va chiuso: restare
+      // su una scheda che non esiste più fa salvare una cosa
+      // cancellata un minuto fa.
+      if (schedaApertaId === sch.id) chiudiScheda();
+      setDaCancellare(null);
+      ricaricaInteressati();
+    } catch (err) {
+      // «Non sono riuscito a cancellarla» non diceva se fosse la
+      // linea, il ruolo o una scheda già tolta da un'altra postazione.
+      setErroreCancella(motivoEliminazione(err));
+    } finally {
+      setCancellando(false);
+    }
   };
 
   const collega = (sch: SchedaOnboarding) => {
@@ -435,11 +524,26 @@ export function OnboardingScreen() {
                       : `${sch.date.toLocaleDateString('it-IT')} — ${descriviScadenza(sch.date)}`}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => collega(sch)} style={s.interessatoBtn}>
-                  <Ionicons name="link-outline" size={17} color={colors.accent} />
+                {/* Erano due bersagli da 25 px attaccati alla riga che
+                    apre la scheda: col pollice si prendeva la riga, si
+                    apriva la consulenza, e sembrava che non si potesse
+                    cancellare. 44 px è la misura sotto la quale un dito
+                    non centra quello che vede. */}
+                <TouchableOpacity
+                  onPress={() => collega(sch)}
+                  style={s.interessatoBtn}
+                  accessibilityLabel={`Collega ${sch.ospiteNome || 'questa consulenza'} a un allievo`}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="link-outline" size={20} color={colors.accent} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => cancella(sch)} style={s.interessatoBtn}>
-                  <Ionicons name="trash-outline" size={17} color={colors.error} />
+                <TouchableOpacity
+                  onPress={() => cancella(sch)}
+                  style={s.interessatoBtn}
+                  accessibilityLabel={`Cancella la consulenza di ${sch.ospiteNome || 'questa persona'}`}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
                 </TouchableOpacity>
               </View>
             );
@@ -557,6 +661,129 @@ export function OnboardingScreen() {
               value={note} onChangeText={setNote} />
           </View>
 
+          {/* ----------------------------------------------------
+              La carta intestata col preventivo.
+              Questo è l'unico foglio che ESCE dallo studio: finisce
+              in una borsa, su un tavolo, in mano a un familiare. Che
+              cosa può uscire lo decide domain/cartaIntestata.ts.
+              ---------------------------------------------------- */}
+          <View style={[s.card, { borderColor: colors.info }]}>
+            <Text style={[s.cardTitle, { color: colors.info }]}>
+              Carta intestata e preventivo
+            </Text>
+            <Text style={s.muted}>
+              Il foglio da consegnare: l'obiettivo con le sue parole, da dove si parte,
+              e la proposta. Il dettaglio di salute e le tue note non ci finiscono —
+              questo foglio esce dallo studio.{'\n'}
+              Se lasci le righe vuote, escono da riempire a penna.
+            </Text>
+
+            {/* Due documenti si somigliano e nessuno dice quale serve
+                quando. Chi cerca le misure le cerca qui, non le trova,
+                e conclude che l'app non le mostra — mentre stanno nel
+                documento accanto. Una riga lo risolve. */}
+            <Text style={[s.muted, { marginTop: spacing.sm, fontStyle: 'italic' }]}>
+              Qui non ci sono le misure: è il foglio del primo incontro, quando
+              ancora non si è misurato niente. Per il documento CON le misure —
+              e con il numero di sedute — usa il Protocollo di lavoro.
+            </Text>
+
+            {/* Le voci che un prezzo l'hanno già. Si toccano e si
+                scrivono nella prima riga libera: il prezzo viene dal
+                listino, non dalla memoria di chi compila. */}
+            <Text style={[s.label, { marginTop: spacing.md }]}>
+              Voci di listino
+            </Text>
+            <View style={s.scontoRiga}>
+              {VOCI_LISTINO.map((voce) => (
+                <TouchableOpacity
+                  key={voce.chiave}
+                  style={s.scontoChip}
+                  onPress={() => setVoci((x) => {
+                    const libera = x.findIndex((y) => !y.descrizione.trim());
+                    const riga = {
+                      descrizione: voce.descrizione,
+                      importo: euroIt(voce.importo),
+                    };
+                    // Nessuna riga libera: si aggiunge, invece di
+                    // sovrascrivere una voce già scritta.
+                    if (libera === -1) return [...x, riga];
+                    return x.map((y, j) => (j === libera ? riga : y));
+                  })}
+                >
+                  <Text style={s.scontoTxt}>
+                    {voce.etichetta} · {euroIt(voce.importo)} €
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {voci.map((v, i) => (
+              <View key={i} style={s.vocePreventivo}>
+                <TextInput
+                  style={[s.input, { flex: 1 }]}
+                  placeholder={i === 0 ? 'es. Valutazione completa e protocollo' : 'Voce'}
+                  placeholderTextColor={colors.textLight}
+                  value={v.descrizione}
+                  onChangeText={(t) => setVoci((x) => x.map(
+                    (y, j) => (j === i ? { ...y, descrizione: t } : y)
+                  ))}
+                />
+                <TextInput
+                  style={[s.input, { width: 92 }]}
+                  placeholder="€" keyboardType="numeric"
+                  placeholderTextColor={colors.textLight}
+                  value={v.importo}
+                  onChangeText={(t) => setVoci((x) => x.map(
+                    (y, j) => (j === i ? { ...y, importo: t } : y)
+                  ))}
+                />
+              </View>
+            ))}
+
+            <Text style={[s.label, { marginTop: spacing.md }]}>
+              In quante rate (lascia vuoto per pagamento unico)
+            </Text>
+            <TextInput
+              style={s.input} keyboardType="numeric" placeholder="3"
+              placeholderTextColor={colors.textLight}
+              value={rateCarta} onChangeText={setRateCarta}
+            />
+
+            <Text style={[s.label, { marginTop: spacing.md }]}>
+              Sconto fedeltà
+            </Text>
+            <View style={s.scontoRiga}>
+              {SCELTE_SCONTO.map((sc) => {
+                const attivo = scontoCarta === sc.tipo;
+                return (
+                  <TouchableOpacity
+                    key={sc.tipo}
+                    style={[s.scontoChip, attivo && s.scontoChipAttivo]}
+                    onPress={() => setScontoCarta(sc.tipo)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[s.scontoTxt, attivo && s.scontoTxtAttivo]}>
+                      {sc.etichetta}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {scontoCarta !== 'nessuno' && (
+              <Text style={s.scontoNota}>
+                {regolaDi(scontoCarta)?.criterio}
+              </Text>
+            )}
+
+            <TouchableOpacity style={s.btnChiaro} onPress={stampaCarta} activeOpacity={0.85}>
+              <Ionicons name="newspaper-outline" size={18} color={colors.info} />
+              <Text style={[s.btnChiaroTxt, { color: colors.info }]}>
+                Stampa la carta col preventivo
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity style={[s.btn, saving && { opacity: 0.6 }]}
             onPress={salva} disabled={saving} activeOpacity={0.85}>
             {saving ? <ActivityIndicator color={colors.textOnAccent} />
@@ -569,6 +796,23 @@ export function OnboardingScreen() {
           </Text>
         </>
       )}
+
+      {/* La conferma è un riquadro dell'app: un `window.confirm` del
+          browser può essere soppresso senza dire niente, e allora il
+          cestino funziona e sembra morto. */}
+      <ConfirmModal
+        visible={!!daCancellare}
+        titolo="Cancellare la consulenza?"
+        messaggio={daCancellare
+          ? confermaCancellazione(daCancellare.ospiteNome || 'questa persona')
+          : ''}
+        azione="Cancella"
+        distruttiva
+        errore={erroreCancella}
+        inCorso={cancellando}
+        onConferma={cancellaConfermato}
+        onAnnulla={() => { setDaCancellare(null); setErroreCancella(null); }}
+      />
     </ScrollView>
   );
 }
@@ -591,7 +835,12 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: spacing.sm,
   },
   chiudiTxt: { fontSize: fontSize.sm, color: colors.accent, fontWeight: '600' },
-  interessatoBtn: { padding: spacing.xs },
+  // 44 px: la misura sotto la quale un dito non centra il bersaglio.
+  interessatoBtn: {
+    width: 44, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+    borderRadius: borderRadius.md,
+  },
   soggettoRiga: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.md },
   soggettoChip: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -634,12 +883,31 @@ const s = StyleSheet.create({
   campo: { marginTop: spacing.md },
   label: { color: colors.text, fontSize: fontSize.sm, fontWeight: '600', marginBottom: 4 },
   aiuto: { color: colors.textLight, fontSize: fontSize.xs, marginBottom: 6 },
+  scontoRiga: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  scontoChip: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.lg,
+    paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.surfaceLight,
+  },
+  scontoChipAttivo: { borderColor: colors.accent, backgroundColor: colors.accent },
+  scontoTxt: { color: colors.textLight, fontSize: fontSize.xs, fontWeight: '600' },
+  scontoTxtAttivo: { color: colors.textOnAccent },
+  // Il criterio sotto la scelta: è la risposta pronta a «perché lui sì».
+  scontoNota: {
+    color: colors.textLight, fontSize: fontSize.xs, marginTop: 6, lineHeight: 16,
+  },
   input: {
     borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.sm,
     color: colors.text, paddingHorizontal: 11, paddingVertical: 9,
     backgroundColor: colors.surfaceLight, fontSize: fontSize.sm,
   },
   lungo: { minHeight: 74, textAlignVertical: 'top' },
+  vocePreventivo: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  btnChiaro: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 1, borderColor: colors.info, borderRadius: borderRadius.md,
+    paddingVertical: 12, marginTop: spacing.md, backgroundColor: colors.surfaceLight,
+  },
+  btnChiaroTxt: { fontWeight: '700', fontSize: fontSize.sm },
   opts: { gap: 6 },
   opt: {
     flexDirection: 'row', alignItems: 'center', gap: 9,

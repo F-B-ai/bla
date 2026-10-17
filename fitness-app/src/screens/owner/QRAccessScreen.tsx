@@ -12,9 +12,21 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
-import { getTodayCheckins, getRecentCheckins, CheckinRecord } from '../../services/checkinService';
+import {
+  getTodayCheckins, getRecentCheckins, getCheckinsPerRegistro, CheckinRecord,
+} from '../../services/checkinService';
 import QRCode from 'qrcode';
 import { brand } from '../../config/brand';
+import { useAuth } from '../../hooks/useAuth';
+import { getAllSessions } from '../../services/sessionService';
+import { getStudents, getCollaborators, getManagers } from '../../services/authService';
+import { componiRegistro, AVVERTENZE } from '../../domain/registroPresenze';
+import { printRegistroPresenze } from '../../utils/printUtils';
+import { crossAlert } from '../../utils/alert';
+
+// L'ente, per l'intestazione del documento che esce dallo studio.
+const ENTE = 'A.S.D. Evolution Sport';
+const SEDE = 'Mind Movement Lab · Gragnano (NA)';
 
 const CHECKIN_CODE = brand.checkinQRCode;
 // Codice da digitare a mano (deve combaciare con CheckinScreen)
@@ -45,6 +57,9 @@ export const QRAccessScreen: React.FC = () => {
   const [recentCheckins, setRecentCheckins] = useState<CheckinRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRecent, setShowRecent] = useState(false);
+  const { user } = useAuth();
+  const isOwner = user?.role === 'owner';
+  const [preparandoRegistro, setPreparandoRegistro] = useState(false);
 
   useEffect(() => {
     QRCode.toDataURL(CHECKIN_CODE, {
@@ -72,6 +87,78 @@ export const QRAccessScreen: React.FC = () => {
   useEffect(() => {
     loadCheckins();
   }, [loadCheckins]);
+
+  /**
+   * Il documento che confronta i due registri.
+   *
+   * Lo prepara l'app e non una persona: nessun dato viene scelto,
+   * inserito o tolto a mano. È la ragione per cui un foglio del genere
+   * vale qualcosa fuori da qui — e per cui la riga che lo dice è
+   * stampata in fondo al documento.
+   */
+  const preparaRegistro = async () => {
+    if (Platform.OS !== 'web') {
+      crossAlert(
+        'Serve il browser',
+        'Il documento si prepara dall\'app aperta nel browser, da dove si può '
+        + 'stampare o salvare in PDF.'
+      );
+      return;
+    }
+    setPreparandoRegistro(true);
+    try {
+      const [sedute, ingressi, allievi, collaboratori, manager] = await Promise.all([
+        getAllSessions(2000),
+        getCheckinsPerRegistro(365, 2000),
+        getStudents(),
+        getCollaborators(),
+        getManagers(),
+      ]);
+
+      const nomiAllievi = new Map(allievi.map((a) => [a.id, `${a.name} ${a.surname}`.trim()]));
+      const nomiStaff = new Map<string, string>();
+      [...collaboratori, ...manager].forEach((c: { id: string; name?: string; surname?: string }) => {
+        nomiStaff.set(c.id, `${c.name || ''} ${c.surname || ''}`.trim());
+      });
+      if (user?.id) {
+        nomiStaff.set(user.id, `${user.name || ''} ${user.surname || ''}`.trim() || 'Titolare');
+      }
+
+      const nomeAllievo = (id: string) => nomiAllievi.get(id) || '';
+      const nomeConduttore = (id: string) => nomiStaff.get(id) || '';
+
+      const registro = componiRegistro({
+        sedute: sedute as never,
+        ingressi: ingressi as never,
+        nomeAllievo,
+        nomeConduttore,
+      });
+
+      if (registro.totaleSedute === 0 && registro.totaleIngressi === 0) {
+        crossAlert(
+          'Non c\'è niente da estrarre',
+          'Nell\'ultimo anno non risultano né sedute né ingressi registrati.'
+        );
+        return;
+      }
+
+      printRegistroPresenze({
+        registro,
+        avvertenze: AVVERTENZE,
+        nomeAllievo,
+        nomeConduttore,
+        ente: ENTE,
+        sede: SEDE,
+      });
+    } catch (e) {
+      crossAlert(
+        'Non sono riuscito a preparare il documento',
+        String((e as { message?: string })?.message || e)
+      );
+    } finally {
+      setPreparandoRegistro(false);
+    }
+  };
 
   const handlePrint = () => {
     if (Platform.OS !== 'web') return;
@@ -286,6 +373,35 @@ export const QRAccessScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Il documento del registro. Solo il titolare: dentro ci sono
+            i nomi degli allievi e il lavoro di ogni conduttore messo
+            in fila, e non è una cosa che si lascia aperta a chi è
+            dentro quelle righe. */}
+        {isOwner && (
+          <View style={styles.registroCard}>
+            <Text style={styles.registroTitolo}>Documento del registro</Text>
+            <Text style={styles.registroTesto}>
+              Mette a confronto le sedute registrate dai conduttori e gli ingressi
+              registrati dagli allievi, e per ogni seduta riporta quando è stata
+              scritta nell'app — un dato del server, che nessuno digita.
+              {'\n\n'}
+              Lo prepara l'applicazione: nessun dato viene scelto o inserito a mano.
+              Dal browser si stampa o si salva in PDF.
+            </Text>
+            <TouchableOpacity
+              style={{ ...styles.registroBtn, ...(preparandoRegistro ? { opacity: 0.6 } : {}) }}
+              onPress={preparaRegistro}
+              disabled={preparandoRegistro}
+              accessibilityLabel="Prepara il documento del registro"
+            >
+              <Ionicons name="document-text-outline" size={18} color={colors.white} />
+              <Text style={styles.registroBtnTxt}>
+                {preparandoRegistro ? 'Preparo il documento…' : 'Prepara il documento'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Today's checkins */}
         <View style={styles.sectionHeader}>
           <Ionicons name="today" size={20} color={colors.accent} />
@@ -406,6 +522,40 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
 
+  registroCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  registroTitolo: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  registroTesto: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    lineHeight: 19,
+  },
+  registroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+    marginTop: spacing.md,
+  },
+  registroBtnTxt: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.white,
+  },
   qrSection: {
     alignItems: 'center',
     marginBottom: spacing.xl,

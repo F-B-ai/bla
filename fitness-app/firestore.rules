@@ -91,11 +91,48 @@ service cloud.firestore {
         && inTempo(resource.data.date);
     }
 
+    // Richieste di consulenza nutrizionale fatte dall'allievo.
+    //
+    // La richiesta la scrive l'allievo per sé: `studentId` deve essere
+    // il suo, altrimenti chiunque potrebbe chiedere un appuntamento a
+    // nome di un altro. La legge il titolare, e l'allievo legge solo
+    // la propria — per sapere a che punto è.
+    //
+    // NON la leggono i collaboratori, e nemmeno il nutrizionista: per
+    // decisione dichiarata del titolare le richieste arrivano a lui e
+    // a nessun altro. Il nutrizionista riceve l'appuntamento quando è
+    // stato fissato, che è un'altra cosa.
+    //
+    // Risponde solo il titolare: lo stato di una richiesta non si
+    // cambia da soli, e cancellarla non si può — una richiesta
+    // sparita è una persona che non ha avuto risposta e non lo sa.
+    match /richiesteNutrizione/{richiestaId} {
+      allow read: if isOwner() || resource.data.studentId == request.auth.uid;
+      allow create: if isAuthenticated()
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.stato == 'in_attesa';
+      allow update: if isOwner();
+      allow delete: if false;
+    }
+
     // Check-in accessi palestra (QR/codice alla reception)
+    //
+    // L'ingresso lo registra l'allievo, entrando: è l'unico dato dello
+    // studio che non dipende da chi conduce le sedute. Proprio per
+    // questo cancellarlo o modificarlo non è un gesto da collaboratore
+    // — chiunque sia il collaboratore e qualunque sia il motivo.
+    //
+    // Fino all'11 ottobre 2026 lo poteva fare tutto lo staff. Era la
+    // stessa cosa che lasciare a chi è controllato la gomma per
+    // cancellare il controllo: finché nessuno guarda i due registri
+    // insieme non si nota, e quando si guardano è tardi.
+    //
+    // Vale la regola già data per gli annullamenti e le cancellazioni:
+    // togliere qualcosa dai registri è un gesto del titolare.
     match /checkins/{checkinId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update, delete: if isStaff();
+      allow update, delete: if isOwner();
     }
 
     // Stato ESSĒRE (check-in mente-corpo quotidiano)
@@ -687,6 +724,27 @@ service cloud.firestore {
       allow create: if isStaff();
       allow update: if isStaff();
       allow delete: if isStaff();
+    }
+
+    // ----------------------------------------------------------
+    // IL REGISTRO DEI GUASTI
+    // ----------------------------------------------------------
+    // Chi subisce un guasto lo può SCRIVERE — altrimenti si
+    // registrerebbero solo i guasti dello staff, e un'App che non
+    // parte in mano a un allievo resterebbe muta come prima.
+    //
+    // Ma NESSUNO lo può rileggere tranne il titolare, e nessuno lo
+    // può modificare: un registro che si può correggere non è un
+    // registro. Le righe non si cancellano nemmeno una per una —
+    // la ripulitura si fa dal server, non dall'App.
+    //
+    // Dentro non finiscono dati di allievi: solo il messaggio, la
+    // schermata, la versione e il ruolo. Vedi domain/guasti.ts.
+    match /guasti/{guastoId} {
+      allow read: if isOwner();
+      allow create: if isAuthenticated();
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

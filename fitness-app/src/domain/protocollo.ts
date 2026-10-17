@@ -27,6 +27,7 @@ import { Quadro, Traccia } from './humanInterface';
 // ============================================================
 
 import { controllaGruppo, incassoSeduta } from './gruppo';
+import { PREZZO_TITOLARE, PREZZO_SINGOLO } from './listino';
 
 export const PROTOCOLLO_VERSION = 1;
 
@@ -43,13 +44,34 @@ export interface Listino {
   prezzo: number;
 }
 
+// I due numeri stavano scritti qui, e dal 23 settembre 2026 anche in
+// domain/listino.ts insieme alle regole che li governano. Due copie
+// dello stesso prezzo divergono sempre, e quella sbagliata la scopre
+// un allievo. Il listino ha un posto solo: è quello.
 export const CONDUTTORI: Listino[] = [
-  { id: 'francesco', nome: 'Francesco', ruolo: 'Direttore tecnico', prezzo: 40 },
-  { id: 'giuseppe', nome: 'Giuseppe', ruolo: 'Istruttore', prezzo: 35 },
+  { id: 'francesco', nome: 'Francesco', ruolo: 'Direttore tecnico', prezzo: PREZZO_TITOLARE },
+  { id: 'giuseppe', nome: 'Giuseppe', ruolo: 'Istruttore', prezzo: PREZZO_SINGOLO },
 ];
 
-/** La valutazione completa: test, lettura integrata, protocollo scritto. */
-export const PREZZO_VALUTAZIONE = 150;
+/**
+ * La PRIMA valutazione di un allievo: test, lettura integrata,
+ * protocollo scritto.
+ *
+ * Vale una volta sola, ed è giusto che costi di più: lì dentro c'è la
+ * costruzione del quadro da zero, che è il lavoro più lungo e quello
+ * che poi regge tutto il resto.
+ *
+ * LE VALUTAZIONI SUCCESSIVE LE STABILISCE IL TITOLARE (deciso il 28
+ * settembre 2026). Non hanno un prezzo di listino perché non hanno una
+ * misura fissa: una rivalutazione può essere il ciclo completo o il
+ * controllo di due test, e far pagare uguale due lavori diversi è il
+ * modo più veloce di far sentire qualcuno preso in giro. Si passa
+ * l'importo a `componiProtocollo` con `valutazioneEuro`.
+ */
+export const PREZZO_PRIMA_VALUTAZIONE = 150;
+
+/** Il nome di prima, tenuto perché lo usano il listino e i test. */
+export const PREZZO_VALUTAZIONE = PREZZO_PRIMA_VALUTAZIONE;
 
 export const conduttore = (id: Conduttore): Listino =>
   CONDUTTORI.find((c) => c.id === id)!;
@@ -325,6 +347,12 @@ export const componiPiano = (input: {
   seduteASettimana?: number;
   /** true = la valutazione è già stata pagata e non rientra nel totale */
   valutazioneGiaPagata?: boolean;
+  /**
+   * Quanto costa la valutazione di QUESTO protocollo.
+   * Si passa solo per le rivalutazioni, che il titolare stabilisce
+   * caso per caso. Omesso, vale il prezzo della prima valutazione.
+   */
+  valutazioneEuro?: number;
   numeroRate?: number;
 }): PianoLavoro => {
   const voci = (input.voci || []).filter((v) => v.quante > 0);
@@ -362,7 +390,11 @@ export const componiPiano = (input: {
   const totaleSedute = voci.reduce((s, v) => s + v.quante, 0)
     + gruppi.reduce((s, g) => s + g.quante, 0);
   const totaleSeduteEuro = arrotonda2(righe.reduce((s, r) => s + r.totale, 0));
-  const valutazioneEuro = input.valutazioneGiaPagata ? 0 : PREZZO_VALUTAZIONE;
+  const valutazioneEuro = input.valutazioneGiaPagata
+    ? 0
+    : (typeof input.valutazioneEuro === 'number'
+      ? arrotonda2(Math.max(0, input.valutazioneEuro))
+      : PREZZO_PRIMA_VALUTAZIONE);
   const totaleEuro = arrotonda2(totaleSeduteEuro + valutazioneEuro);
 
   const aSettimana = Math.max(1, input.seduteASettimana || 2);
