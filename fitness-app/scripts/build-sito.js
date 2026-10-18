@@ -42,6 +42,44 @@ const PAGINE = {
   'chi-sono.html': 'chi-sono.html',
   'contatti.html': 'contatti.html',
   'note-legali.html': 'note-legali.html',
+  'diario.html': 'diario.html',
+};
+
+/**
+ * Pagine che si ricevono, non si trovano.
+ *
+ * Il diario è la risposta a chi scrive «DIARIO» in privato: quel
+ * passaggio è il motivo per cui esiste. Se finisse nella mappa del
+ * sito e nei motori di ricerca lo scaricherebbero tutti senza mai
+ * scrivere una riga, e il foglio resterebbe — ma la conversazione no.
+ * Resta fuori dalla sitemap; la pagina dichiara anche `noindex`.
+ */
+const SENZA_INDICE = new Set(['diario.html']);
+
+/**
+ * Le trenta righe del diario.
+ *
+ * Scritte qui e non a runtime: è un modulo da stampare, e uno che
+ * dipende da JavaScript è uno che un giorno esce vuoto — e se ne
+ * accorge chi ha già premuto «stampa». Scritte a mano nella pagina
+ * sarebbero trenta blocchi identici, e il giorno in cui cambia una
+ * colonna se ne sbaglia una.
+ */
+const righeDelMese = (giorni = 30) => {
+  const ripeti = (n, cosa) => Array.from({ length: n }, () => cosa).join('');
+  const pallini = `<div class="pallini">${ripeti(5, '<span class="pallino"></span>')}</div>`;
+  const caselle = `<div class="caselle">${ripeti(3, '<span class="casella"></span>')}</div>`;
+  const riquadro = '<div class="riquadrino"></div>';
+  return Array.from({ length: giorni }, (_, i) => `
+        <tr>
+          <td class="giorno">${i + 1}</td>
+          <td>${riquadro}</td>
+          <td>${pallini}</td>
+          <td>${pallini}</td>
+          <td>${caselle}</td>
+          <td>${riquadro}</td>
+          <td class="note"></td>
+        </tr>`).join('');
 };
 
 const RISORSE = [
@@ -137,6 +175,7 @@ const main = () => {
       return;
     }
     let html = fs.readFileSync(sorgente, 'utf8');
+    html = html.replace('<!--RIGHE-DEL-MESE-->', righeDelMese());
     html = riscriviCollegamenti(html);
     html = aggiungiCanonical(html, destinazione);
     fs.writeFileSync(path.join(A, destinazione), html);
@@ -151,7 +190,7 @@ const main = () => {
     }
   });
 
-  const pagine = Object.values(PAGINE);
+  const pagine = Object.values(PAGINE).filter((f) => !SENZA_INDICE.has(f));
   const oggi = new Date().toISOString().slice(0, 10);
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
