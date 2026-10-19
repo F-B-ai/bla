@@ -19,8 +19,9 @@
 import fs from 'fs';
 import path from 'path';
 import {
-  FASCE, MAX_NOTA, controllaRichiesta, richiestaAperta, puoChiedere,
-  descriviFasce, spiegaStato, rigaPerTitolare, RichiestaNutrizione,
+  FASCE, MAX_NOTA, MAX_ORARIO, controllaRichiesta, controllaProposta,
+  richiestaAperta, puoChiedere, descriviFasce, spiegaStato, rigaPerTitolare,
+  RichiestaNutrizione, GIORNI_CONTROLLO, TESTO_CONTROLLO, prossimoControllo,
 } from '../richiestaNutrizione';
 
 const leggi = (relativo: string): string =>
@@ -155,8 +156,15 @@ describe('la schermata della nutrizione', () => {
     expect(blocco).toMatch(/if \(aperta\)/);
   });
 
-  it('al titolare mostra chi ha chiesto', () => {
-    expect(schermata).toMatch(/isOwner && renderRichiesteTitolare\(\)/);
+  it('mostra l\'elenco al titolare E al nutrizionista', () => {
+    // Il nutrizionista deve vederle: senza, non potrebbe proporre
+    // niente e la richiesta resterebbe ferma ad aspettare lui.
+    expect(schermata).toMatch(/\(isOwner \|\| isNutritionist\) && renderRichiesteTitolare\(\)/);
+  });
+
+  it('e all\'allievo dice del controllo gratuito ogni quindici giorni', () => {
+    expect(schermata).toMatch(/isStudent && renderControlloQuindicinale\(\)/);
+    expect(schermata).toMatch(/TESTO_CONTROLLO/);
   });
 
   it('e «Fissa la visita» apre la prenotazione già sull\'allievo giusto', () => {
@@ -218,15 +226,121 @@ describe('le regole del server', () => {
     expect(blocco).toMatch(/request\.resource\.data\.stato == 'in_attesa'/);
   });
 
-  it('la legge il titolare, e l\'allievo solo la propria', () => {
-    expect(blocco).toMatch(/allow read: if isOwner\(\) \|\| resource\.data\.studentId == request\.auth\.uid/);
+  it('la leggono titolare e nutrizionista, e l\'allievo solo la propria', () => {
+    expect(blocco).toMatch(/allow read: if isOwner\(\)/);
+    expect(blocco).toMatch(/isNutritionist\(\)/);
+    expect(blocco).toMatch(/resource\.data\.studentId == request\.auth\.uid/);
   });
 
-  it('risponde solo il titolare', () => {
+  it('il titolare può tutto; il nutrizionista solo proporre', () => {
     expect(blocco).toMatch(/allow update: if isOwner\(\)/);
+    // il permesso del nutrizionista è ritagliato sui campi, non
+    // lasciato al buon senso di chi lo usa
+    expect(blocco).toMatch(/affectedKeys\(\)/);
+    expect(blocco).toMatch(/hasOnly\(\['stato', 'orarioProposto', 'propostoDa', 'propostoIl'\]\)/);
+  });
+
+  it('e non può proporre su una richiesta già evasa', () => {
+    expect(blocco).toMatch(/resource\.data\.stato == 'in_attesa'/);
+    expect(blocco).toMatch(/request\.resource\.data\.stato == 'proposta'/);
   });
 
   it('e non si cancella: una richiesta sparita è una persona senza risposta', () => {
     expect(blocco).toMatch(/allow delete: if false/);
+  });
+});
+
+// ============================================================
+// 19 ottobre 2026 — L'ORARIO LO DÀ IL NUTRIZIONISTA
+// ------------------------------------------------------------
+// Prima la richiesta aspettava che il titolare trovasse un buco
+// nell'agenda di un'altra persona. Adesso lo propone chi quell'agenda
+// ce l'ha. Il titolare resta in mezzo per confermare: un tocco, ma è
+// il tocco che tiene il controllo dello studio dove deve stare.
+// ============================================================
+
+const base = (s: Partial<RichiestaNutrizione> = {}): RichiestaNutrizione => ({
+  studentId: 'a1', allievo: 'Maria', fasce: ['sera'], nota: '',
+  stato: 'in_attesa', creataIl: new Date('2026-10-19T09:00:00'), ...s,
+});
+
+describe('il nutrizionista propone un orario', () => {
+  it('serve scrivere quando, e un orario vuoto non passa', () => {
+    expect(controllaProposta('').valido).toBe(false);
+    expect(controllaProposta('   ').valido).toBe(false);
+    expect(controllaProposta('mar').valido).toBe(false);
+  });
+
+  it('«martedì 21, alle 18:30» va benissimo', () => {
+    expect(controllaProposta('martedì 21, alle 18:30').valido).toBe(true);
+  });
+
+  it('e non diventa il posto dove si racconta la visita', () => {
+    const lungo = 'a'.repeat(MAX_ORARIO + 1);
+    const e = controllaProposta(lungo);
+    expect(e.valido).toBe(false);
+    expect(e.problemi.join(' ')).toMatch(/solo quando/i);
+  });
+});
+
+describe('che cosa legge l\'allievo quando l\'orario arriva', () => {
+  const r = base({
+    stato: 'proposta',
+    orarioProposto: 'martedì 21, alle 18:30',
+    propostoDa: 'Alessia',
+  });
+
+  it('vede chi lo aspetta e quando', () => {
+    const s = spiegaStato(r);
+    expect(s?.testo).toContain('Alessia');
+    expect(s?.testo).toContain('martedì 21, alle 18:30');
+  });
+
+  it('e sa che non è ancora definitiva: nessuno si presenta per sbaglio', () => {
+    expect(spiegaStato(r)?.testo).toMatch(/conferma/i);
+  });
+
+  it('una richiesta con l\'orario proposto è ancora aperta: non se ne fa una seconda', () => {
+    expect(richiestaAperta([r])).toBe(r);
+    expect(puoChiedere([r])).toBe(false);
+  });
+
+  it('e il titolare, nell\'elenco, legge la proposta invece delle fasce', () => {
+    expect(rigaPerTitolare(r)).toContain('Alessia propone: martedì 21, alle 18:30');
+    expect(rigaPerTitolare(base())).toContain('può sera');
+  });
+});
+
+// ------------------------------------------------------------
+// IL CONTROLLO GENERALE
+// ------------------------------------------------------------
+// Esisteva, ed esisteva solo a voce: lo sapeva chi per caso era in
+// sala quando se ne parlava. Un servizio che nessuno sa che c'è è un
+// servizio che non c'è.
+
+describe('il controllo generale ogni quindici giorni', () => {
+  it('è ogni quindici giorni, gratuito, in studio, e con Francesco', () => {
+    expect(GIORNI_CONTROLLO).toBe(15);
+    expect(TESTO_CONTROLLO).toMatch(/quindici giorni/i);
+    expect(TESTO_CONTROLLO).toMatch(/gratuito/i);
+    expect(TESTO_CONTROLLO).toMatch(/studio/i);
+    expect(TESTO_CONTROLLO).toMatch(/Francesco/);
+  });
+
+  it('non si prenota: è una cosa che c\'è, non una da chiedere', () => {
+    expect(TESTO_CONTROLLO).toMatch(/non devi prenotarlo/i);
+  });
+
+  it('il prossimo cade di quindici in quindici dal primo', () => {
+    const primo = new Date('2026-10-01T18:00:00');
+    expect(prossimoControllo(primo, new Date('2026-10-02T10:00:00')))
+      .toEqual(new Date('2026-10-16T18:00:00'));
+    expect(prossimoControllo(primo, new Date('2026-10-20T10:00:00')))
+      .toEqual(new Date('2026-10-31T18:00:00'));
+  });
+
+  it('e se la data di partenza non c\'è non si inventa un giorno', () => {
+    expect(prossimoControllo(null)).toBeNull();
+    expect(prossimoControllo(new Date('non è una data'))).toBeNull();
   });
 });

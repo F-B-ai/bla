@@ -23,6 +23,7 @@ interface AuthContextValue {
   isManager: boolean;
   isCollaborator: boolean;
   isStudent: boolean;
+  isNutritionist: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -132,6 +133,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isManager: state.userProfile?.role === 'manager',
     isCollaborator: state.userProfile?.role === 'collaborator',
     isStudent: state.userProfile?.role === 'student',
+    // Il nutrizionista non è un ruolo a sé: è un collaboratore con il
+    // tipo 'nutritionist'. Chiederlo come ruolo non avrebbe mai dato
+    // vero, e il permesso sarebbe stato muto invece che negato.
+    isNutritionist: state.userProfile?.role === 'collaborator'
+      && (state.userProfile as { collaboratorType?: string })?.collaboratorType === 'nutritionist',
     login,
     logout,
     refreshProfile,

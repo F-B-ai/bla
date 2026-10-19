@@ -48,12 +48,14 @@ import { grigliaOrari } from '../../domain/orariStudio';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
 import { motivoSalvataggio } from '../../domain/salvataggio';
 import {
-  FASCE, FasciaOraria, MAX_NOTA, controllaRichiesta, richiestaAperta,
-  spiegaStato, descriviFasce, RichiestaNutrizione,
+  FASCE, FasciaOraria, MAX_NOTA, MAX_ORARIO, controllaRichiesta, controllaProposta,
+  richiestaAperta, spiegaStato, descriviFasce, RichiestaNutrizione,
+  TITOLO_CONTROLLO, TESTO_CONTROLLO,
 } from '../../domain/richiestaNutrizione';
 import {
   creaRichiestaNutrizione, mieRichiesteNutrizione,
-  richiesteNutrizioneInAttesa, chiudiRichiestaNutrizione,
+  richiesteNutrizioneDaEvadere, chiudiRichiestaNutrizione,
+  proponiOrarioNutrizione,
 } from '../../services/richiesteNutrizioneService';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
@@ -64,7 +66,7 @@ type ActiveTab = 'misure' | 'bia' | 'visite';
 const TIME_SLOTS = grigliaOrari();
 
 export const NutritionistScreen: React.FC = () => {
-  const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
+  const { user, isOwner, isManager, isCollaborator, isStudent, isNutritionist } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('misure');
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -97,6 +99,10 @@ export const NutritionistScreen: React.FC = () => {
   const [mieRichieste, setMieRichieste] = useState<RichiestaNutrizione[]>([]);
   const [richiesteAperte, setRichiesteAperte] = useState<RichiestaNutrizione[]>([]);
   const [showRichiestaModal, setShowRichiestaModal] = useState(false);
+  /** la richiesta su cui il nutrizionista sta scrivendo l'orario */
+  const [richiestaDaProporre, setRichiestaDaProporre] = useState<RichiestaNutrizione | null>(null);
+  const [orarioProposto, setOrarioProposto] = useState('');
+  const [proponendo, setProponendo] = useState(false);
   const [fasceScelte, setFasceScelte] = useState<FasciaOraria[]>([]);
   const [notaRichiesta, setNotaRichiesta] = useState('');
   const [inviandoRichiesta, setInviandoRichiesta] = useState(false);
@@ -163,13 +169,13 @@ export const NutritionistScreen: React.FC = () => {
     try {
       if (isStudent && user?.id) {
         setMieRichieste(await mieRichiesteNutrizione(user.id));
-      } else if (isOwner) {
-        setRichiesteAperte(await richiesteNutrizioneInAttesa());
+      } else if (isOwner || isNutritionist) {
+        setRichiesteAperte(await richiesteNutrizioneDaEvadere());
       }
     } catch (err) {
       console.error('Errore caricamento richieste nutrizione:', err);
     }
-  }, [isStudent, isOwner, user?.id]);
+  }, [isStudent, isOwner, isNutritionist, user?.id]);
 
   useEffect(() => {
     loadStudents();
@@ -229,6 +235,37 @@ export const NutritionistScreen: React.FC = () => {
       await loadRichieste();
     } catch (err) {
       crossAlert('Non sono riuscito a chiuderla', motivoSalvataggio(err));
+    }
+  };
+
+  /** Il nutrizionista scrive quando può ricevere. Non fissa: propone. */
+  const inviaProposta = async () => {
+    const r = richiestaDaProporre;
+    if (!r?.id) return;
+    const controllo = controllaProposta(orarioProposto);
+    if (!controllo.valido) {
+      crossAlert('Manca una cosa', controllo.problemi.join('\n\n'));
+      return;
+    }
+    setProponendo(true);
+    try {
+      await proponiOrarioNutrizione(
+        r.id,
+        orarioProposto,
+        `${user?.name || ''} ${user?.surname || ''}`.trim()
+      );
+      setRichiestaDaProporre(null);
+      setOrarioProposto('');
+      await loadRichieste();
+      crossAlert(
+        'Orario proposto',
+        `${r.allievo} lo vede subito nella sua area. La visita diventa `
+        + 'definitiva quando il titolare la conferma.'
+      );
+    } catch (err) {
+      crossAlert('Non sono riuscito a proporlo', motivoSalvataggio(err));
+    } finally {
+      setProponendo(false);
     }
   };
 
@@ -652,20 +689,41 @@ export const NutritionistScreen: React.FC = () => {
     );
   };
 
-  /** Quello che vede il titolare: chi ha chiesto, e cosa farne. */
+  /**
+   * L'elenco delle richieste, letto da due persone diverse.
+   *
+   * Il nutrizionista ci trova una cosa sola da fare: scrivere quando
+   * può ricevere. Il titolare ne trova due: confermare quello che è
+   * stato proposto, o chiudere. Stessa lista, azioni diverse — e
+   * nessuna delle due vede un pulsante che non le compete.
+   */
   const renderRichiesteTitolare = () => {
     if (richiesteAperte.length === 0) return null;
+    const daProporre = richiesteAperte.filter((r) => r.stato === 'in_attesa');
+    const daConfermare = richiesteAperte.filter((r) => r.stato === 'proposta');
+    const quante = isNutritionist ? daProporre.length : richiesteAperte.length;
+    if (quante === 0) return null;
+
     return (
       <Card variant="elevated">
         <View style={styles.richiestaTesta}>
           <Ionicons name="mail-unread-outline" size={18} color={colors.warning} />
           <Text style={styles.richiestaTitolo}>
-            {richiesteAperte.length === 1
+            {quante === 1
               ? 'Una richiesta di consulenza'
-              : `${richiesteAperte.length} richieste di consulenza`}
+              : `${quante} richieste di consulenza`}
           </Text>
         </View>
-        {richiesteAperte.map((r) => (
+
+        {!isNutritionist && daConfermare.length > 0 && (
+          <Text style={styles.richiestaTesto}>
+            {daConfermare.length === 1
+              ? 'Una ha già un orario proposto: ti basta confermarla.'
+              : `${daConfermare.length} hanno già un orario proposto: ti basta confermarle.`}
+          </Text>
+        )}
+
+        {(isNutritionist ? daProporre : richiesteAperte).map((r) => (
           <View key={r.id} style={styles.richiestaRiga}>
             <Text style={styles.richiestaNome}>{r.allievo}</Text>
             <Text style={styles.richiestaDettaglio}>
@@ -673,28 +731,52 @@ export const NutritionistScreen: React.FC = () => {
               {r.creataIl.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
             </Text>
             {!!r.nota && <Text style={styles.richiestaNota}>«{r.nota}»</Text>}
+
+            {r.stato === 'proposta' && !!r.orarioProposto && (
+              <Text style={styles.richiestaProposta}>
+                {(r.propostoDa || 'Il nutrizionista')} propone: {r.orarioProposto}
+              </Text>
+            )}
+
             <View style={styles.richiestaAzioni}>
-              <TouchableOpacity
-                style={styles.richiestaAzione}
-                onPress={() => {
-                  // Si apre la prenotazione già sull'allievo giusto: il
-                  // passaggio «adesso cercalo nell'elenco» è dove le
-                  // cose si perdono.
-                  setSelectedStudentId(r.studentId);
-                  setShowAppointmentModal(true);
-                  chiudiRichiesta(r, 'fissata');
-                }}
-                accessibilityLabel={`Fissa la visita per ${r.allievo}`}
-              >
-                <Text style={styles.richiestaAzioneTxt}>Fissa la visita</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ ...styles.richiestaAzione, ...styles.richiestaAzioneGrigia }}
-                onPress={() => chiudiRichiesta(r, 'chiusa')}
-                accessibilityLabel={`Chiudi la richiesta di ${r.allievo}`}
-              >
-                <Text style={styles.richiestaAzioneGrigiaTxt}>Chiudi</Text>
-              </TouchableOpacity>
+              {isNutritionist ? (
+                <TouchableOpacity
+                  style={styles.richiestaAzione}
+                  onPress={() => {
+                    setRichiestaDaProporre(r);
+                    setOrarioProposto('');
+                  }}
+                  accessibilityLabel={`Proponi un orario a ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneTxt}>Proponi un orario</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.richiestaAzione}
+                  onPress={() => {
+                    // Si apre la prenotazione già sull'allievo giusto: il
+                    // passaggio «adesso cercalo nell'elenco» è dove le
+                    // cose si perdono.
+                    setSelectedStudentId(r.studentId);
+                    setShowAppointmentModal(true);
+                    chiudiRichiesta(r, 'fissata');
+                  }}
+                  accessibilityLabel={`Fissa la visita per ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneTxt}>
+                    {r.stato === 'proposta' ? 'Conferma la visita' : 'Fissa la visita'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {!isNutritionist && (
+                <TouchableOpacity
+                  style={{ ...styles.richiestaAzione, ...styles.richiestaAzioneGrigia }}
+                  onPress={() => chiudiRichiesta(r, 'chiusa')}
+                  accessibilityLabel={`Chiudi la richiesta di ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneGrigiaTxt}>Chiudi</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ))}
@@ -702,10 +784,28 @@ export const NutritionistScreen: React.FC = () => {
     );
   };
 
+  /**
+   * Il controllo generale, per chi si allena.
+   *
+   * Sta fuori dalla richiesta di consulenza e si vede sempre: non è
+   * una cosa da chiedere, è una cosa che c'è. Finché è esistito solo
+   * a voce, lo sapeva chi per caso era in sala quel giorno.
+   */
+  const renderControlloQuindicinale = () => (
+    <Card variant="elevated">
+      <View style={styles.richiestaTesta}>
+        <Ionicons name="people-outline" size={18} color={colors.success} />
+        <Text style={styles.richiestaTitolo}>{TITOLO_CONTROLLO}</Text>
+      </View>
+      <Text style={styles.richiestaTesto}>{TESTO_CONTROLLO}</Text>
+    </Card>
+  );
+
   const renderAppointments = () => (
     <>
       {isStudent && renderRichiestaAllievo()}
-      {isOwner && renderRichiesteTitolare()}
+      {isStudent && renderControlloQuindicinale()}
+      {(isOwner || isNutritionist) && renderRichiesteTitolare()}
       {!isStudent && (
         <View style={styles.addButtonContainer}>
           <Button title="+ Prenota Visita" onPress={() => setShowAppointmentModal(true)} />
@@ -921,6 +1021,58 @@ export const NutritionistScreen: React.FC = () => {
                 style={styles.modalButton}
               />
             </View>
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale «Proponi un orario» — solo il nutrizionista.
+          Campo libero e non un calendario: la sua agenda non sta in
+          questa applicazione, e un selettore di orari qui mentirebbe
+          su quali posti sono liberi. */}
+      <Modal visible={!!richiestaDaProporre} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title="Proponi un orario"
+              onClose={() => setRichiestaDaProporre(null)}
+            />
+            {!!richiestaDaProporre && (
+              <>
+                <Text style={styles.richiestaTesto}>
+                  {richiestaDaProporre.allievo} ha detto che può{' '}
+                  {descriviFasce(richiestaDaProporre.fasce)}.
+                  {richiestaDaProporre.nota
+                    ? ` «${richiestaDaProporre.nota}»`
+                    : ''}
+                </Text>
+                <InputField
+                  label="Quando puoi riceverlo"
+                  value={orarioProposto}
+                  onChangeText={(v) => setOrarioProposto(v.slice(0, MAX_ORARIO))}
+                  placeholder="Es. martedì 21, alle 18:30"
+                />
+                <Text style={styles.richiestaDettaglio}>
+                  Lo vede subito nella sua area. La visita diventa definitiva
+                  quando il titolare la conferma: fino ad allora resta una
+                  proposta, e nessuno si presenta per sbaglio.
+                </Text>
+                <View style={styles.modalButtons}>
+                  <Button
+                    title="Annulla"
+                    variant="outline"
+                    onPress={() => setRichiestaDaProporre(null)}
+                    style={styles.modalButton}
+                  />
+                  <Button
+                    title={proponendo ? 'Invio…' : 'Proponi'}
+                    onPress={inviaProposta}
+                    loading={proponendo}
+                    style={styles.modalButton}
+                  />
+                </View>
+              </>
+            )}
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </View>
@@ -1251,6 +1403,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: borderRadius.lg,
     backgroundColor: colors.accent,
+  },
+  richiestaProposta: {
+    color: colors.success,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    marginTop: spacing.xs,
   },
   richiestaAzioneTxt: {
     fontSize: fontSize.md,

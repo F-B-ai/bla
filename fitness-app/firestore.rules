@@ -30,6 +30,18 @@ service cloud.firestore {
       return isAttivo() && getUserRole() in ['owner', 'manager', 'collaborator'];
     }
 
+    // Il nutrizionista non ha un ruolo suo: è un collaboratore con
+    // `collaboratorType` uguale a 'nutritionist'. Scritto come ruolo
+    // questa funzione sarebbe stata sempre falsa, e il permesso
+    // sarebbe stato negato in silenzio — il guasto peggiore, perché
+    // sembra una scelta.
+    function isNutritionist() {
+      return isAttivo()
+        && getUserRole() == 'collaborator'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid))
+             .data.collaboratorType == 'nutritionist';
+    }
+
     // ------------------------------------------------------------
     // LE DIECI ORE — la regola, non il cartello
     // ------------------------------------------------------------
@@ -107,11 +119,27 @@ service cloud.firestore {
     // cambia da soli, e cancellarla non si può — una richiesta
     // sparita è una persona che non ha avuto risposta e non lo sa.
     match /richiesteNutrizione/{richiestaId} {
-      allow read: if isOwner() || resource.data.studentId == request.auth.uid;
+      // Il nutrizionista le legge perché deve proporre un orario: una
+      // richiesta che non vede è una richiesta che non evade.
+      allow read: if isOwner()
+        || isNutritionist()
+        || resource.data.studentId == request.auth.uid;
       allow create: if isAuthenticated()
         && request.resource.data.studentId == request.auth.uid
         && request.resource.data.stato == 'in_attesa';
-      allow update: if isOwner();
+      // Il titolare può tutto: conferma, chiude, scrive l'esito.
+      // Il nutrizionista può UNA cosa sola — proporre l'orario — e
+      // solo su una richiesta che aspetta ancora. Non può fissare,
+      // non può chiudere, non può toccare l'esito: il permesso è
+      // ritagliato sui campi, non sul buon senso di chi lo usa.
+      allow update: if isOwner()
+        || (
+          isNutritionist()
+          && resource.data.stato == 'in_attesa'
+          && request.resource.data.stato == 'proposta'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['stato', 'orarioProposto', 'propostoDa', 'propostoIl'])
+        );
       allow delete: if false;
     }
 

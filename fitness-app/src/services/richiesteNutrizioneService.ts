@@ -1,5 +1,5 @@
 import {
-  collection, addDoc, getDocs, updateDoc, doc, query, where, orderBy, Timestamp,
+  collection, addDoc, getDocs, updateDoc, doc, query, where, Timestamp,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { senzaIndefiniti } from '../domain/salvataggio';
@@ -27,6 +27,9 @@ const daDoc = (d: { id: string; data: () => Record<string, unknown> }): Richiest
     creataIl: aData(x.creataIl),
     chiusaIl: x.chiusaIl ? aData(x.chiusaIl) : null,
     esito: x.esito ? String(x.esito) : undefined,
+    orarioProposto: x.orarioProposto ? String(x.orarioProposto) : undefined,
+    propostoDa: x.propostoDa ? String(x.propostoDa) : undefined,
+    propostoIl: x.propostoIl ? aData(x.propostoIl) : null,
   };
 };
 
@@ -67,16 +70,46 @@ export const mieRichiesteNutrizione = async (
     .sort((a, b) => b.creataIl.getTime() - a.creataIl.getTime());
 };
 
-/** Quelle che aspettano una risposta. Solo il titolare le legge. */
-export const richiesteNutrizioneInAttesa = async (): Promise<RichiestaNutrizione[]> => {
+/**
+ * Quelle ancora da chiudere: chi non ha ancora un orario e chi ne ha
+ * uno proposto e aspetta la conferma.
+ *
+ * Le legge il titolare, e le legge il nutrizionista — che senza
+ * vederle non potrebbe proporre niente. L'ordinamento è qui e non sul
+ * server: con due stati da filtrare un `orderBy` chiederebbe un
+ * indice composito, e sono una manciata di righe.
+ */
+export const richiesteNutrizioneDaEvadere = async (): Promise<RichiestaNutrizione[]> => {
   const snap = await getDocs(
-    query(
-      collection(db, RICHIESTE),
-      where('stato', '==', 'in_attesa'),
-      orderBy('creataIl', 'asc')
-    )
+    query(collection(db, RICHIESTE), where('stato', 'in', ['in_attesa', 'proposta']))
   );
-  return snap.docs.map(daDoc);
+  return snap.docs
+    .map(daDoc)
+    .sort((a, b) => a.creataIl.getTime() - b.creataIl.getTime());
+};
+
+/** Il vecchio nome, perché la schermata lo chiama ancora così. */
+export const richiesteNutrizioneInAttesa = richiesteNutrizioneDaEvadere;
+
+/**
+ * Il nutrizionista propone un orario.
+ *
+ * Non fissa la visita: la mette in attesa di conferma. La differenza
+ * conta — l'allievo legge «ti aspetta martedì alle 18:30, manca la
+ * conferma», e non si presenta a un appuntamento che nessuno ha
+ * ancora messo in agenda.
+ */
+export const proponiOrarioNutrizione = async (
+  id: string,
+  orario: string,
+  propostoDa: string
+): Promise<void> => {
+  await updateDoc(doc(db, RICHIESTE, id), senzaIndefiniti({
+    stato: 'proposta' as StatoRichiestaNutrizione,
+    orarioProposto: orario.trim(),
+    propostoDa: (propostoDa || '').trim() || undefined,
+    propostoIl: Timestamp.now(),
+  }));
 };
 
 /**
