@@ -44,7 +44,7 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
-import { grigliaOrari } from '../../domain/orariStudio';
+import { grigliaOrari, fineProposta } from '../../domain/orariStudio';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
 import { motivoSalvataggio } from '../../domain/salvataggio';
 import {
@@ -1179,7 +1179,12 @@ export const NutritionistScreen: React.FC = () => {
                       <TouchableOpacity
                         key={`start-${t}`}
                         style={[styles.timeChip, appointmentForm.startTime === t && styles.chipActive]}
-                        onPress={() => setAppointmentForm({ ...appointmentForm, startTime: t })}
+                        onPress={() => setAppointmentForm({
+                          ...appointmentForm,
+                          startTime: t,
+                          // la fine segue l'inizio, e resta modificabile
+                          endTime: fineProposta(t) || appointmentForm.endTime,
+                        })}
                       >
                         <Text style={[styles.chipText, appointmentForm.startTime === t && styles.chipTextActive]}>{t}</Text>
                       </TouchableOpacity>

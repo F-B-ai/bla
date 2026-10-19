@@ -150,6 +150,36 @@ export const grigliaOrari = (
 /** È un'ora piena? Serve a dare un appiglio all'occhio in una lista lunga. */
 export const oraPiena = (ora: string): boolean => inMinuti(ora) % 60 === 0;
 
+/**
+ * La fine che segue l'inizio: un'ora dopo.
+ *
+ * Chiesta dal titolare il 19 ottobre 2026. Fino a oggi l'ora di fine
+ * si sceglieva a mano ogni volta, scorrendo una seconda lista di
+ * sessantuno orari — per scrivere quasi sempre lo stesso numero, cioè
+ * l'inizio più sessanta minuti. Un gesto ripetuto dieci volte al
+ * giorno che non decide niente: il posto esatto in cui, una volta su
+ * venti, si tocca la riga sbagliata.
+ *
+ * Resta una PROPOSTA: la fine è ancora un campo che si cambia. Una
+ * seduta di novanta minuti si fa, e si continua a fare come prima.
+ *
+ * Non si esce mai dalla griglia: se l'inizio è così tardi che un'ora
+ * dopo cadrebbe oltre l'ultimo orario, si propone l'ultimo — meglio
+ * un orario che esiste di uno che la lista non contiene, perché
+ * quello non si potrebbe nemmeno correggere.
+ */
+export const fineProposta = (
+  inizio: string,
+  durata: number = DURATA_STANDARD,
+  limite: string = GRIGLIA_A
+): string => {
+  const da = inMinuti(inizio);
+  if (isNaN(da)) return '';
+  const max = inMinuti(limite);
+  const fine = da + (durata > 0 ? durata : DURATA_STANDARD);
+  return inOra(isNaN(max) ? fine : Math.min(fine, max));
+};
+
 export const slotLiberi = (r: RichiestaSlot): Slot[] => {
   const durata = r.durata && r.durata > 0 ? r.durata : DURATA_STANDARD;
   const primo = inMinuti(APERTURA);

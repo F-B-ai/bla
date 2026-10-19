@@ -93,6 +93,7 @@ import { ConfirmModal } from '../../components/common/ConfirmModal';
 import {
   statoTetto, stessaSettimana, TETTO_INIZIALE,
 } from '../../domain/listino';
+import { fineProposta } from '../../domain/orariStudio';
 import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
@@ -718,6 +719,20 @@ export const CalendarScreen: React.FC = () => {
     setFormEndTime(item.endTime);
     setFormNotes(item.notes);
     setShowModal(true);
+  };
+
+  /**
+   * Scegliere l'ora di inizio propone anche la fine: un'ora dopo.
+   *
+   * Prima la fine si sceglieva a mano ogni volta, scorrendo una
+   * seconda lista di sessantuno orari per scrivere quasi sempre lo
+   * stesso numero. Resta una proposta: il campo della fine è ancora
+   * lì e si cambia, perché la seduta da novanta minuti esiste.
+   */
+  const scegliInizio = (ora: string) => {
+    setFormStartTime(ora);
+    const proposta = fineProposta(ora);
+    if (proposta) setFormEndTime(proposta);
   };
 
   const handleSave = async () => {
@@ -2623,7 +2638,7 @@ export const CalendarScreen: React.FC = () => {
         formCustomDate={formCustomDate}
         setFormCustomDate={setFormCustomDate}
         formStartTime={formStartTime}
-        setFormStartTime={setFormStartTime}
+        setFormStartTime={scegliInizio}
         formEndTime={formEndTime}
         setFormEndTime={setFormEndTime}
         formNotes={formNotes}

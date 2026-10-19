@@ -3,6 +3,7 @@ import {
   grigliaOrari, oraPiena,
   DURATA_STANDARD, inMinuti, inOra, slotLiberi, descriviSlot,
   regolaDellaGiornata, AVVISO_SOLA_LETTURA, ORARI_STUDIO_VERSION,
+  fineProposta, GRIGLIA_A,
 } from '../orariStudio';
 
 // ============================================================
@@ -274,5 +275,77 @@ describe('gli orari non sono più scritti a mano da nessuna parte', () => {
       expect(src).toContain('grigliaOrari()');
       expect(src).not.toMatch(/const TIME_SLOTS = \[/);
     });
+  });
+});
+
+import fs from 'fs';
+import path from 'path';
+
+// ============================================================
+// 19 ottobre 2026 — LA FINE SEGUE L'INIZIO
+// ------------------------------------------------------------
+// Il titolare: «quando fisso l'ora di un appuntamento, automaticamente
+// mi dà la fine dopo un'ora. Se voglio cambiare la fine posso farlo
+// comunque.»
+//
+// La seconda frase conta quanto la prima: è una PROPOSTA, non una
+// regola. La seduta da novanta minuti esiste e deve restare possibile
+// con lo stesso numero di tocchi di prima.
+// ============================================================
+
+describe('la fine proposta', () => {
+  it('è un\'ora dopo l\'inizio', () => {
+    expect(fineProposta('09:00')).toBe('10:00');
+    expect(fineProposta('17:30')).toBe('18:30');
+    expect(fineProposta('10:15')).toBe('11:15');
+  });
+
+  it('usa la durata standard dello studio, non un 60 scritto a mano', () => {
+    expect(fineProposta('09:00')).toBe(inOra(inMinuti('09:00') + DURATA_STANDARD));
+  });
+
+  it('cade sempre dentro la griglia: un orario che non esiste non si corregge', () => {
+    // 21:30 + un'ora sarebbe 22:30, fuori dall'ultimo orario scegliibile
+    expect(fineProposta('21:30')).toBe(GRIGLIA_A);
+    expect(grigliaOrari()).toContain(fineProposta('21:30'));
+  });
+
+  it('e l\'ora proposta è sempre una di quelle selezionabili', () => {
+    const griglia = grigliaOrari();
+    griglia.forEach((ora) => expect(griglia).toContain(fineProposta(ora)));
+  });
+
+  it('un inizio che non è un orario non produce una fine inventata', () => {
+    expect(fineProposta('')).toBe('');
+    expect(fineProposta('mezzogiorno')).toBe('');
+    expect(fineProposta('99:99')).toBe('');
+  });
+
+  it('la durata si può cambiare: novanta minuti restano possibili', () => {
+    expect(fineProposta('09:00', 90)).toBe('10:30');
+  });
+});
+
+describe('le schermate la usano davvero', () => {
+  const leggi = (r: string): string =>
+    fs.readFileSync(path.join(__dirname, '..', '..', r), 'utf8');
+
+  it('l\'agenda propone la fine quando si sceglie l\'inizio', () => {
+    const s = leggi('screens/shared/CalendarScreen.tsx');
+    expect(s).toMatch(/const scegliInizio = \(ora: string\)/);
+    expect(s).toMatch(/fineProposta\(ora\)/);
+    expect(s).toMatch(/setFormStartTime=\{scegliInizio\}/);
+  });
+
+  it('e la fine resta un campo che si cambia', () => {
+    // se sparisse il selettore della fine, la proposta diventerebbe
+    // una regola — ed è esattamente quello che non è stato chiesto
+    const m = leggi('screens/shared/calendar/AppointmentModal.tsx');
+    expect(m).toMatch(/setFormEndTime\(t\)/);
+  });
+
+  it('anche la visita dal nutrizionista si comporta allo stesso modo', () => {
+    const n = leggi('screens/shared/NutritionistScreen.tsx');
+    expect(n).toMatch(/endTime: fineProposta\(t\)/);
   });
 });
