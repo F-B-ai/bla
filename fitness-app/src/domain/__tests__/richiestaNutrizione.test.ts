@@ -160,7 +160,27 @@ describe('la schermata della nutrizione', () => {
   it('mostra l\'elenco al titolare E al nutrizionista', () => {
     // Il nutrizionista deve vederle: senza, non potrebbe proporre
     // niente e la richiesta resterebbe ferma ad aspettare lui.
-    expect(schermata).toMatch(/\(isOwner \|\| isNutritionist\) && renderRichiesteTitolare\(\)/);
+    expect(schermata).toMatch(/\(isOwner \|\| isNutritionist\)\s*\n?\s*&& renderRichiesteTitolare\(\)/);
+  });
+
+  // ------------------------------------------------------------
+  // 20 ottobre 2026 — LA CHIAVE DENTRO LA PORTA
+  // ------------------------------------------------------------
+  // L'elenco stava dentro la parte che si apre solo dopo aver scelto
+  // un allievo. Il pallino diceva «1» e per sapere CHI aveva chiesto
+  // bisognava prima selezionare la persona: cioè l'informazione che
+  // si stava cercando.
+  it('l\'elenco NON sta dietro alla scelta dell\'allievo', () => {
+    const cancello = schermata.indexOf('{!selectedStudentId ? (');
+    const elenco = schermata.indexOf('&& renderRichiesteTitolare()');
+    expect(elenco).toBeGreaterThan(0);
+    expect(elenco).toBeLessThan(cancello);
+  });
+
+  it('e nemmeno la richiesta dell\'allievo, né il controllo gratuito', () => {
+    const cancello = schermata.indexOf('{!selectedStudentId ? (');
+    expect(schermata.indexOf('isStudent && renderRichiestaAllievo()')).toBeLessThan(cancello);
+    expect(schermata.indexOf('isStudent && renderControlloQuindicinale()')).toBeLessThan(cancello);
   });
 
   it('e all\'allievo dice del controllo gratuito ogni quindici giorni', () => {

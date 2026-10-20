@@ -803,9 +803,6 @@ export const NutritionistScreen: React.FC = () => {
 
   const renderAppointments = () => (
     <>
-      {isStudent && renderRichiestaAllievo()}
-      {isStudent && renderControlloQuindicinale()}
-      {(isOwner || isNutritionist) && renderRichiesteTitolare()}
       {!isStudent && (
         <View style={styles.addButtonContainer}>
           <Button title="+ Prenota Visita" onPress={() => setShowAppointmentModal(true)} />
@@ -945,9 +942,29 @@ export const NutritionistScreen: React.FC = () => {
         contentContainerStyle={styles.contentContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* ------------------------------------------------------------
+            20 ottobre 2026 — PRIMA DEL CANCELLO, NON DOPO
+            ------------------------------------------------------------
+            L'elenco delle richieste stava dentro renderAppointments,
+            che si raggiunge solo dopo aver scelto un allievo. Il
+            pallino diceva «1» e per sapere CHI aveva chiesto bisognava
+            prima selezionare la persona: cioè l'informazione che si
+            stava cercando. Una porta che si apre con la chiave che sta
+            dentro.
+            Queste schede non dipendono dall'allievo scelto, quindi non
+            devono stare dietro a quella scelta. */}
+        {activeTab === 'visite' && (isOwner || isNutritionist)
+          && renderRichiesteTitolare()}
+        {activeTab === 'visite' && isStudent && renderRichiestaAllievo()}
+        {activeTab === 'visite' && isStudent && renderControlloQuindicinale()}
+
         {!selectedStudentId ? (
           <Card>
-            <Text style={styles.emptyText}>Seleziona un allievo per visualizzare i dati.</Text>
+            <Text style={styles.emptyText}>
+              {activeTab === 'visite'
+                ? 'Scegli un allievo per vedere le sue visite e prenotarne una.'
+                : 'Seleziona un allievo per visualizzare i dati.'}
+            </Text>
           </Card>
         ) : activeTab === 'misure' ? (
           renderMeasurements()
