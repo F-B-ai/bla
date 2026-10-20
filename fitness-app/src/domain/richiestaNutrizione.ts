@@ -163,6 +163,83 @@ export const prossimoControllo = (
   return prossimo;
 };
 
+// ------------------------------------------------------------
+// CHI DEVE SAPERE CHE QUALCUNO HA CHIESTO
+// ------------------------------------------------------------
+// 20 ottobre 2026, domanda del titolare: «come riceve il
+// nutrizionista la richiesta?». Risposta di allora: non la riceveva.
+// Era nell'elenco, e bisognava andare a guardare — cioè sapere già
+// che c'era qualcosa da vedere.
+//
+// È il guasto che torna sempre: una funzione che esiste e che nessuno
+// raggiunge. Il giorno prima gli avevo dato l'elenco e il pulsante, e
+// non il modo di accorgersene.
+//
+// Vanno avvisati tutti e due: il titolare perché lo studio è suo e le
+// richieste arrivano a lui, il nutrizionista perché è lui che deve
+// rispondere con un orario. Avvisarne uno solo vuol dire che quello
+// aspetta l'altro.
+
+export interface Avvisato {
+  id: string;
+  ruolo: 'titolare' | 'nutrizionista';
+}
+
+export interface AvvisoRichiesta {
+  titolo: string;
+  testo: string;
+}
+
+/**
+ * A chi va la notifica, senza doppioni.
+ *
+ * Se il titolare fosse per qualche ragione anche fra i nutrizionisti,
+ * riceverebbe due avvisi identici e penserebbe a due richieste.
+ */
+export const destinatariRichiesta = (
+  titolare: string | null | undefined,
+  nutrizionisti: string[]
+): Avvisato[] => {
+  const visti = new Set<string>();
+  const fuori: Avvisato[] = [];
+  const aggiungi = (id: string | null | undefined, ruolo: Avvisato['ruolo']) => {
+    const x = (id || '').trim();
+    if (!x || visti.has(x)) return;
+    visti.add(x);
+    fuori.push({ id: x, ruolo });
+  };
+  aggiungi(titolare, 'titolare');
+  (nutrizionisti || []).forEach((n) => aggiungi(n, 'nutrizionista'));
+  return fuori;
+};
+
+/**
+ * Che cosa legge chi riceve l'avviso.
+ *
+ * Diverso per i due, perché diversa è la cosa da fare: il titolare
+ * deve sapere che è arrivata, il nutrizionista che tocca a lui.
+ */
+export const avvisoRichiesta = (
+  allievo: string,
+  fasce: FasciaOraria[],
+  ruolo: Avvisato['ruolo']
+): AvvisoRichiesta => {
+  const chi = (allievo || '').trim() || 'Un allievo';
+  const quando = descriviFasce(fasce);
+  if (ruolo === 'nutrizionista') {
+    return {
+      titolo: 'Una consulenza da fissare',
+      testo: `${chi} ha chiesto una consulenza e può ${quando}. `
+        + 'Aprila e proponi un orario.',
+    };
+  }
+  return {
+    titolo: 'Richiesta di consulenza',
+    testo: `${chi} ha chiesto una consulenza nutrizionale e può ${quando}. `
+      + 'Il nutrizionista è stato avvisato.',
+  };
+};
+
 /**
  * Una richiesta aperta alla volta.
  *

@@ -926,7 +926,11 @@ export const NutritionistScreen: React.FC = () => {
                 deve stare dietro a un tocco. Chi apre questa schermata
                 deve vedere subito che c'è qualcuno in attesa, anche se
                 sta guardando le misure. */}
-            {tab.key === 'visite' && isOwner && richiesteAperte.length > 0 && (
+            {/* Il pallino vale anche per il nutrizionista: ieri gli
+                avevo dato l'elenco e il pulsante, e non il modo di
+                accorgersi che c'era qualcosa da fare. */}
+            {tab.key === 'visite' && (isOwner || isNutritionist)
+              && richiesteAperte.length > 0 && (
               <View style={styles.tabPallino}>
                 <Text style={styles.tabPallinoTxt}>{richiesteAperte.length}</Text>
               </View>

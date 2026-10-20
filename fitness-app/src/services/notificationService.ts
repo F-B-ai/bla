@@ -167,6 +167,8 @@ export const getNotificationIcon = (type: NotificationType): string => {
       return 'megaphone';
     case 'badge_milestone':
       return 'trophy';
+    case 'nutrition_request':
+      return 'nutrition';
     default:
       return 'notifications';
   }

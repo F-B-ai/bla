@@ -5,7 +5,10 @@ import { db } from '../config/firebase';
 import { senzaIndefiniti } from '../domain/salvataggio';
 import {
   RichiestaNutrizione, StatoRichiestaNutrizione, FasciaOraria,
+  destinatariRichiesta, avvisoRichiesta,
 } from '../domain/richiestaNutrizione';
+import { getOwner, getCollaborators } from './authService';
+import { createNotification } from './notificationService';
 
 const RICHIESTE = 'richiesteNutrizione';
 
@@ -33,6 +36,42 @@ const daDoc = (d: { id: string; data: () => Record<string, unknown> }): Richiest
   };
 };
 
+/**
+ * Avvisa chi deve rispondere.
+ *
+ * Separata, e con il suo `try` attorno a ogni invio: una notifica che
+ * non parte non deve far fallire la richiesta. Meglio una richiesta
+ * salvata senza avviso — che resta comunque nell'elenco — di una
+ * richiesta persa perché il telefono di qualcun altro non era
+ * raggiungibile.
+ */
+const avvisaChiDeveRispondere = async (
+  allievo: string,
+  fasce: FasciaOraria[],
+  richiestaId: string
+): Promise<void> => {
+  const [titolare, collaboratori] = await Promise.all([
+    getOwner().catch(() => null),
+    getCollaborators().catch(() => []),
+  ]);
+  const nutrizionisti = (collaboratori || [])
+    .filter((c) => (c as { collaboratorType?: string }).collaboratorType === 'nutritionist')
+    .map((c) => c.id);
+
+  const destinatari = destinatariRichiesta(titolare?.id, nutrizionisti);
+  await Promise.all(destinatari.map(async (d) => {
+    const avviso = avvisoRichiesta(allievo, fasce, d.ruolo);
+    try {
+      await createNotification(
+        d.id, 'nutrition_request', avviso.titolo, avviso.testo,
+        { richiestaId }
+      );
+    } catch (err) {
+      console.error('Avviso richiesta nutrizione non inviato a', d.ruolo, err);
+    }
+  }));
+};
+
 /** L'allievo chiede. Il titolare decide. */
 export const creaRichiestaNutrizione = async (input: {
   studentId: string;
@@ -48,6 +87,12 @@ export const creaRichiestaNutrizione = async (input: {
     stato: 'in_attesa' as StatoRichiestaNutrizione,
     creataIl: Timestamp.now(),
   }));
+
+  // L'avviso viene DOPO il salvataggio e non blocca niente: la
+  // richiesta è già al sicuro quando si prova a mandarlo.
+  await avvisaChiDeveRispondere(input.allievo, input.fasce, ref.id)
+    .catch((err) => console.error('Avvisi richiesta nutrizione:', err));
+
   return ref.id;
 };
 

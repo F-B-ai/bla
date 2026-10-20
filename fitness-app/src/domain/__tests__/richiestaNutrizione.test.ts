@@ -22,6 +22,7 @@ import {
   FASCE, MAX_NOTA, MAX_ORARIO, controllaRichiesta, controllaProposta,
   richiestaAperta, puoChiedere, descriviFasce, spiegaStato, rigaPerTitolare,
   RichiestaNutrizione, GIORNI_CONTROLLO, TESTO_CONTROLLO, prossimoControllo,
+  destinatariRichiesta, avvisoRichiesta,
 } from '../richiestaNutrizione';
 
 const leggi = (relativo: string): string =>
@@ -190,8 +191,10 @@ describe('la schermata della nutrizione', () => {
     expect(schermata).toMatch(/useEffect\(\(\) => \{\s*loadRichieste\(\);/);
   });
 
-  it('il titolare vede il pallino sulle Visite senza entrarci', () => {
-    expect(schermata).toMatch(/tab\.key === 'visite' && isOwner && richiesteAperte\.length > 0/);
+  it('il pallino sulle Visite si vede senza entrarci', () => {
+    // dal 20 ottobre 2026 lo vede anche il nutrizionista: e lui che
+    // deve rispondere, e prima non aveva modo di accorgersene
+    expect(schermata).toMatch(/tab\.key === 'visite' && \(isOwner \|\| isNutritionist\)/);
   });
 
   it('e tirando giù si ricaricano anche loro', () => {
@@ -342,5 +345,86 @@ describe('il controllo generale ogni quindici giorni', () => {
   it('e se la data di partenza non c\'è non si inventa un giorno', () => {
     expect(prossimoControllo(null)).toBeNull();
     expect(prossimoControllo(new Date('non è una data'))).toBeNull();
+  });
+});
+
+// ============================================================
+// 20 ottobre 2026 — «COME RICEVE IL NUTRIZIONISTA LA RICHIESTA?»
+// ------------------------------------------------------------
+// Risposta di quel giorno: non la riceveva. Era nell'elenco, e
+// bisognava andare a guardare — cioè sapere già che c'era qualcosa da
+// vedere. Il giorno prima gli era stato dato l'elenco e il pulsante,
+// e non il modo di accorgersene: il guasto che torna sempre, una
+// funzione che esiste e che nessuno raggiunge.
+// ============================================================
+
+describe('chi viene avvisato quando qualcuno chiede', () => {
+  it('il titolare e il nutrizionista, tutti e due', () => {
+    const d = destinatariRichiesta('titolare1', ['nutri1']);
+    expect(d).toEqual([
+      { id: 'titolare1', ruolo: 'titolare' },
+      { id: 'nutri1', ruolo: 'nutrizionista' },
+    ]);
+  });
+
+  it('più nutrizionisti: li avvisa tutti', () => {
+    expect(destinatariRichiesta('t', ['n1', 'n2'])).toHaveLength(3);
+  });
+
+  it('nessun doppione: due avvisi uguali sembrerebbero due richieste', () => {
+    const d = destinatariRichiesta('t', ['t', 'n1']);
+    expect(d.map((x) => x.id)).toEqual(['t', 'n1']);
+  });
+
+  it('e se manca qualcuno si avvisa chi c\'è, invece di non avvisare nessuno', () => {
+    expect(destinatariRichiesta(null, ['n1'])).toEqual([
+      { id: 'n1', ruolo: 'nutrizionista' },
+    ]);
+    expect(destinatariRichiesta('t', [])).toHaveLength(1);
+    expect(destinatariRichiesta('', [])).toEqual([]);
+  });
+});
+
+describe('che cosa legge chi riceve l\'avviso', () => {
+  it('al nutrizionista dice che tocca a lui', () => {
+    const a = avvisoRichiesta('Maria Rossi', ['sera'], 'nutrizionista');
+    expect(a.testo).toContain('Maria Rossi');
+    expect(a.testo).toContain('sera');
+    expect(a.testo).toMatch(/proponi un orario/i);
+  });
+
+  it('al titolare dice che è arrivata, e che l\'altro lo sa', () => {
+    const a = avvisoRichiesta('Maria Rossi', ['mattina', 'sera'], 'titolare');
+    expect(a.testo).toMatch(/nutrizionista è stato avvisato/i);
+    expect(a.testo).toContain('mattina o sera');
+  });
+
+  it('un nome vuoto non produce un avviso che comincia col nulla', () => {
+    expect(avvisoRichiesta('', ['sera'], 'titolare').testo)
+      .toMatch(/^Un allievo/);
+  });
+});
+
+describe('l\'avviso parte davvero, e non fa cadere la richiesta', () => {
+  const servizio = leggi('services/richiesteNutrizioneService.ts');
+
+  it('alla creazione si avvisa chi deve rispondere', () => {
+    expect(servizio).toMatch(/avvisaChiDeveRispondere\(/);
+    expect(servizio).toMatch(/createNotification\(/);
+    expect(servizio).toMatch(/'nutrition_request'/);
+  });
+
+  it('e un avviso che non parte non fa perdere la richiesta', () => {
+    // la richiesta è già salvata quando si prova a mandare l'avviso,
+    // e ogni invio ha il suo catch: il telefono di qualcun altro non
+    // può cancellare una persona che ha chiesto
+    const i = servizio.indexOf('await avvisaChiDeveRispondere(');
+    expect(i).toBeGreaterThan(servizio.indexOf('await addDoc(collection(db, RICHIESTE)'));
+    expect(servizio.slice(i, i + 220)).toMatch(/\.catch\(/);
+  });
+
+  it('il pallino lo vede anche il nutrizionista', () => {
+    const schermata = leggi('screens/shared/NutritionistScreen.tsx');
+    expect(schermata).toMatch(/\(isOwner \|\| isNutritionist\)\s*\n?\s*&& richiesteAperte\.length > 0/);
   });
 });
