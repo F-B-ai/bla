@@ -39,6 +39,12 @@ export interface StudentDetailModalProps {
   };
   upcoming: AppointmentItem[];
   past: AppointmentItem[];
+  /** la riga che riassume: «12 in tutto · 9 svolte · 2 passate e mai segnate» */
+  riepilogo?: string;
+  /** quante sono passate e sono rimaste «in programma» */
+  maiSegnate?: number;
+  /** la persona non è in anagrafica: ha solo consulenze */
+  ospite?: boolean;
   onClose: () => void;
 }
 
@@ -49,6 +55,9 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
   stats,
   upcoming,
   past,
+  riepilogo,
+  maiSegnate = 0,
+  ospite = false,
   onClose,
 }) => {
   return (
@@ -79,6 +88,32 @@ export const StudentDetailModal: React.FC<StudentDetailModalProps> = ({
               <Text style={styles.statLabel}>Rimanenti</Text>
             </View>
           </View>
+
+          {/* La riga che riassume, e l'avviso quando serve.
+
+              «Passate e mai segnate» non è un dettaglio contabile: è
+              una seduta che forse si è svolta e che nessuno ha
+              registrato, oppure che non si è svolta e nessuno l'ha
+              detto. In tutti e due i casi è un buco nel registro, e
+              dentro un totale sparirebbe. */}
+          {!!riepilogo && <Text style={styles.riepilogo}>{riepilogo}</Text>}
+
+          {maiSegnate > 0 && (
+            <View style={styles.avviso}>
+              <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
+              <Text style={styles.avvisoTxt}>
+                {maiSegnate === 1
+                  ? 'Un appuntamento è passato ed è rimasto «in programma»: o si è svolto e non è stato segnato, o è saltato e nessuno l\'ha detto.'
+                  : `${maiSegnate} appuntamenti sono passati e sono rimasti «in programma»: o si sono svolti e non sono stati segnati, o sono saltati e nessuno l'ha detto.`}
+              </Text>
+            </View>
+          )}
+
+          {ospite && (
+            <Text style={styles.riepilogo}>
+              Questa persona non è in anagrafica: qui ci sono le sue consulenze.
+            </Text>
+          )}
 
           {/* Upcoming */}
           <Text style={styles.sectionTitle}>Prossimi ({upcoming.length})</Text>
@@ -144,6 +179,30 @@ const styles = StyleSheet.create({
     borderTopRightRadius: borderRadius.xl,
     padding: spacing.lg,
     maxHeight: '90%',
+  },
+  riepilogo: {
+    color: colors.textSecondary,
+    fontSize: fontSize.sm,
+    lineHeight: 20,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  avviso: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.warning,
+  },
+  avvisoTxt: {
+    flex: 1,
+    color: colors.text,
+    fontSize: fontSize.sm,
+    lineHeight: 19,
   },
   statsRow: {
     flexDirection: 'row',

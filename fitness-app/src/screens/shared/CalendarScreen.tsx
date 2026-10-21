@@ -95,6 +95,10 @@ import {
 } from '../../domain/listino';
 import { fineProposta } from '../../domain/orariStudio';
 import {
+  trovaPersone, Trovato, riepilogoStorico, descriviRiepilogo, RiepilogoStorico,
+  normalizza,
+} from '../../domain/ricercaStorico';
+import {
   componiGiornata, riepilogoGiornata, VoceGiornata,
 } from '../../domain/giornata';
 import { creaOspite } from '../../services/agendaRequestService';
@@ -263,6 +267,9 @@ export const CalendarScreen: React.FC = () => {
     upcoming: AppointmentItem[];
     past: AppointmentItem[];
     stats: { total: number; completed: number; cancelled: number; remaining: number };
+    /** il conto per stato, con le passate mai segnate separate */
+    riepilogo: RiepilogoStorico;
+    ospite: boolean;
   } | null>(null);
 
   // View mode
@@ -570,14 +577,15 @@ export const CalendarScreen: React.FC = () => {
     return s ? `${s.name} ${s.surname}` : 'Allievo';
   };
 
-  // Allievi che corrispondono al testo di ricerca
-  const matchingStudents = useMemo(() => {
-    const q = searchName.trim().toLowerCase();
-    if (!q) return [];
-    return students
-      .filter((s) => `${s.name} ${s.surname}`.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [searchName, students]);
+  // Chi corrisponde al testo cercato: allievi in anagrafica E nomi
+  // scritti a mano sulle consulenze. Prima solo i primi — e una
+  // consulenza fissata a chi allievo non è ancora, cioè quasi tutte
+  // le prime volte, non si poteva più ritrovare.
+  const trovati = useMemo((): Trovato[] => trovaPersone(
+    students.map((s) => ({ id: s.id, nome: `${s.name} ${s.surname}` })),
+    ospiti.map((o) => ({ persona: o.persona })),
+    searchName
+  ), [searchName, students, ospiti]);
 
   // Carica lo storico COMPLETO degli appuntamenti di un allievo e apre il dettaglio
   const openStudentHistory = useCallback(async (studentId: string, studentName: string) => {
@@ -621,6 +629,8 @@ export const CalendarScreen: React.FC = () => {
         studentName,
         upcoming, past,
         stats: { total: items.length, completed, cancelled, remaining: upcoming.length },
+        riepilogo: riepilogoStorico(items, nowStr),
+        ospite: false,
       });
     } catch {
       crossAlert('Errore', 'Impossibile caricare gli appuntamenti dell\'allievo.');
@@ -628,6 +638,56 @@ export const CalendarScreen: React.FC = () => {
       setSearchLoading(false);
     }
   }, []);
+  /**
+   * Tutte le consulenze intestate a un nome scritto a mano.
+   *
+   * Non c'è niente da leggere dal server: gli ospiti sono già in
+   * memoria, perché l'agenda li mostra. Si filtrano per nome e si
+   * ordinano, e basta — una lettura in meno è un guasto in meno.
+   */
+  const openOspiteHistory = useCallback((persona: string) => {
+    const nowStr = toDateStr(new Date());
+    const suoi = ospiti.filter((o) => normalizza(o.persona) === normalizza(persona));
+    const items: AppointmentItem[] = suoi.map((o) => {
+      const d = toSafeDate(o.giorno);
+      return {
+        id: o.id,
+        kind: 'consulenza' as AppointmentKind,
+        studentId: o.studentId || '',
+        staffId: user?.id || '',
+        date: d,
+        dateStr: o.giorno,
+        startTime: o.ora,
+        endTime: o.ora,
+        // Un ospite che è diventato seduta non è più qui; quelli che
+        // restano sono appuntamenti fissati e mai trasformati.
+        status: o.stato === 'confermata' ? 'scheduled' : 'cancelled',
+        notes: o.note || '',
+        isCountedAsCompleted: false,
+      } as AppointmentItem;
+    });
+    const upcoming = items
+      .filter((a) => a.dateStr >= nowStr && a.status === 'scheduled')
+      .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+    const past = items
+      .filter((a) => a.dateStr < nowStr || a.status !== 'scheduled')
+      .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+    setSearchName('');
+    setSearchDetail({
+      studentName: persona,
+      upcoming,
+      past,
+      stats: {
+        total: items.length,
+        completed: 0,
+        cancelled: items.filter((a) => a.status.startsWith('cancelled')).length,
+        remaining: upcoming.length,
+      },
+      riepilogo: riepilogoStorico(items, nowStr),
+      ospite: true,
+    });
+  }, [ospiti, user?.id]);
+
   const getStudentPhone = (id: string) => {
     const s = students.find((st) => st.id === id);
     return s?.phone || '';
@@ -1886,7 +1946,7 @@ export const CalendarScreen: React.FC = () => {
                   style={styles.searchInput}
                   value={searchName}
                   onChangeText={setSearchName}
-                  placeholder="Cerca appuntamenti di un allievo..."
+                  placeholder="Cerca un allievo o un nome su una consulenza…"
                   placeholderTextColor={colors.textLight}
                   autoCapitalize="words"
                   autoCorrect={false}
@@ -1897,26 +1957,42 @@ export const CalendarScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
               </View>
-              {matchingStudents.length > 0 && (
+              {trovati.length > 0 && (
                 <View style={styles.searchResults}>
-                  {matchingStudents.map((s) => (
-                    <TouchableOpacity
-                      key={s.id}
-                      style={styles.searchResultRow}
-                      onPress={() => openStudentHistory(s.id, `${s.name} ${s.surname}`)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.searchAvatar}>
-                        <Text style={styles.searchAvatarText}>{s.name[0]}{s.surname[0]}</Text>
-                      </View>
-                      <Text style={styles.searchResultName}>{s.name} {s.surname}</Text>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
-                    </TouchableOpacity>
-                  ))}
+                  {trovati.map((p) => {
+                    const iniziali = p.nome.trim().split(/\s+/)
+                      .slice(0, 2).map((w) => w[0] || '').join('').toUpperCase();
+                    return (
+                      <TouchableOpacity
+                        key={`${p.ospite ? 'o' : 'a'}-${p.chiave}`}
+                        style={styles.searchResultRow}
+                        onPress={() => (p.ospite
+                          ? openOspiteHistory(p.chiave)
+                          : openStudentHistory(p.chiave, p.nome))}
+                        activeOpacity={0.7}
+                        accessibilityLabel={`Storico di ${p.nome}`}
+                      >
+                        <View style={styles.searchAvatar}>
+                          <Text style={styles.searchAvatarText}>{iniziali}</Text>
+                        </View>
+                        <Text style={styles.searchResultName}>{p.nome}</Text>
+                        {/* Chi non è in anagrafica si riconosce: la sua
+                            storia è fatta di sole consulenze, e saperlo
+                            prima di aprirla evita di cercare sedute che
+                            non ci sono mai state. */}
+                        {p.ospite && (
+                          <Text style={styles.searchOspite}>consulenza</Text>
+                        )}
+                        <Ionicons name="chevron-forward" size={16} color={colors.textLight} />
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               )}
-              {searchName.trim().length > 0 && matchingStudents.length === 0 && (
-                <Text style={styles.searchNoResult}>Nessun allievo trovato</Text>
+              {searchName.trim().length > 0 && trovati.length === 0 && (
+                <Text style={styles.searchNoResult}>
+                  Nessuno con questo nome, né fra gli allievi né fra le consulenze
+                </Text>
               )}
             </View>
           )}
@@ -2682,6 +2758,9 @@ export const CalendarScreen: React.FC = () => {
         studentName={searchDetail?.studentName || ''}
         isOwner={isOwner}
         stats={searchDetail?.stats || { total: 0, completed: 0, cancelled: 0, remaining: 0 }}
+        riepilogo={searchDetail ? descriviRiepilogo(searchDetail.riepilogo) : ''}
+        maiSegnate={searchDetail?.riepilogo.maiSegnate || 0}
+        ospite={searchDetail?.ospite || false}
         upcoming={searchDetail?.upcoming || []}
         past={searchDetail?.past || []}
         onClose={() => setSearchDetail(null)}
@@ -2776,6 +2855,16 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     color: colors.text,
     fontWeight: '500',
+  },
+  searchOspite: {
+    color: colors.textSecondary,
+    fontSize: fontSize.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    marginRight: spacing.xs,
   },
   searchNoResult: {
     fontSize: fontSize.sm,
