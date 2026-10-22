@@ -74,14 +74,52 @@ describe('il telefono si iscrive', () => {
 describe('il server bussa', () => {
   const fn = leggiFunzioni('src/avvisi.ts');
   const indice = leggiFunzioni('src/index.ts');
+  const avvisi = leggi('services/notificationService.ts');
 
-  it('parte da sola appena nasce un avviso', () => {
-    expect(fn).toMatch(/onDocumentCreated\(/);
-    expect(fn).toMatch(/document: "notifications\/\{avvisoId\}"/);
+  // ------------------------------------------------------------
+  // 22 ottobre 2026 — IL PRIMO TENTATIVO NON SI È POTUTO PUBBLICARE
+  // ------------------------------------------------------------
+  // Era una funzione che ascoltava il database e partiva da sola.
+  // Più elegante, e la pubblicazione l'ha rifiutata: quel tipo passa
+  // per Eventarc, che pretende permessi che l'account di
+  // pubblicazione non può concedersi da solo. Si poteva chiedere al
+  // titolare di assegnare tre ruoli a mano nella console Google
+  // Cloud — ma una strada che dipende da una configurazione fatta
+  // una volta e mai più guardata si rompe in silenzio il giorno che
+  // qualcuno tocca i permessi.
+  it('è dello stesso tipo delle altre funzioni, che si pubblicano', () => {
+    expect(fn).toMatch(/onCall\(/);
+    expect(fn).not.toMatch(/onDocumentCreated/);
   });
 
   it('ed è esportata: una funzione non esportata non viene pubblicata', () => {
-    expect(indice).toMatch(/export \{avvisaSulTelefono\} from ".\/avvisi";/);
+    expect(indice).toMatch(/export \{inviaAvvisoPush\} from ".\/avvisi";/);
+  });
+
+  it('la chiama l\'app subito dopo aver salvato l\'avviso', () => {
+    expect(avvisi).toMatch(/httpsCallable\(functions, 'inviaAvvisoPush'\)/);
+    const i = avvisi.indexOf('faiSquillare(docRef.id)');
+    expect(i).toBeGreaterThan(avvisi.indexOf('await addDoc(collection(db, NOTIFICATIONS_COLLECTION)'));
+  });
+
+  it('e se la chiamata fallisce non rompe quello che si stava facendo', () => {
+    const i = avvisi.indexOf('const faiSquillare');
+    const blocco = avvisi.slice(i, i + 400);
+    expect(blocco).toMatch(/\.catch\(/);
+    expect(blocco).not.toMatch(/await httpsCallable/);
+  });
+
+  it('il contenuto lo legge dal documento, non da chi chiama', () => {
+    // altrimenti chiunque potrebbe far comparire qualunque frase sul
+    // telefono di un altro
+    expect(fn).toMatch(/avviso\.get\("title"\)/);
+    expect(fn).toMatch(/avviso\.get\("body"\)/);
+    expect(fn).not.toMatch(/request\.data\?\.(title|body)/);
+  });
+
+  it('e un avviso vecchio non si può far risuonare a piacere', () => {
+    expect(fn).toMatch(/MINUTI_VALIDI/);
+    expect(fn).toMatch(/troppo vecchio/);
   });
 
   it('manda dati, non una notifica pronta: la disegna il nostro service worker', () => {
@@ -90,15 +128,13 @@ describe('il server bussa', () => {
   });
 
   it('senza indirizzo non fa niente, e non è un guasto', () => {
-    expect(fn).toMatch(/if \(!token\) return;/);
+    expect(fn).toMatch(/if \(!token\) return/);
   });
 
-  // L'avviso dentro l'app è già salvato quando questa funzione parte.
-  // Un errore che si propaga farebbe riprovare all'infinito per un
-  // telefono che non esiste più.
-  it('un telefono irraggiungibile non fa fallire niente', () => {
+  it('un telefono irraggiungibile non fa fallire la chiamata', () => {
     expect(fn).toMatch(/logger\.warn\(/);
-    expect(fn).not.toMatch(/throw /);
+    const i = fn.indexOf('logger.warn(');
+    expect(fn.slice(i - 400, i)).not.toMatch(/throw new HttpsError/);
   });
 
   it('e un indirizzo scaduto si cancella invece di essere ritentato per sempre', () => {
