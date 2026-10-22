@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { brand } from '../config/brand';
+import { CondizioniAvvisi } from '../domain/avvisoTelefono';
 
 let Notifications: any = null;
 
@@ -125,6 +126,48 @@ const registraIndirizzoWeb = async (userId: string): Promise<string | null> => {
     // l'avvio dell'app: la notifica è un di più, entrare è il minimo.
     return null;
   }
+};
+
+/**
+ * Le condizioni vere di QUESTO telefono, lette adesso.
+ *
+ * Non si fida di niente di salvato: permesso, installazione e
+ * indirizzo si rileggono ogni volta. Uno stato ricordato da ieri è
+ * esattamente il modo in cui una schermata dice «tutto a posto»
+ * mentre non arriva niente.
+ */
+export const condizioniAvvisi = async (): Promise<CondizioniAvvisi> => {
+  const iOS = isIOSWeb();
+  const installata = !iOS || isStandalonePWA();
+  const supportato = webNotificationsSupported();
+
+  let indirizzo = false;
+  if (supportato && getNotificationStatus() === 'granted') {
+    try {
+      const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
+      if (await isSupported()) {
+        const chiave = (brand as { vapidKey?: string }).vapidKey;
+        const sw = (navigator as { serviceWorker?: { ready: Promise<unknown> } }).serviceWorker;
+        if (chiave && sw) {
+          const token = await getToken(getMessaging(), {
+            vapidKey: chiave,
+            serviceWorkerRegistration: (await sw.ready) as never,
+          });
+          indirizzo = !!token;
+        }
+      }
+    } catch {
+      indirizzo = false;
+    }
+  }
+
+  return {
+    supportato,
+    permesso: getNotificationStatus(),
+    iOS,
+    installata,
+    indirizzo,
+  };
 };
 
 export const registerPushToken = async (userId: string): Promise<string | null> => {
