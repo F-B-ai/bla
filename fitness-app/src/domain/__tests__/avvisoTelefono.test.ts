@@ -129,3 +129,40 @@ describe('il pannello esiste e si raggiunge', () => {
     expect(comp).toMatch(/indirizzo \{condizioni\?\.indirizzo/);
   });
 });
+
+// ============================================================
+// 22 ottobre 2026, seconda diagnosi — IL MOTIVO VERO
+// ------------------------------------------------------------
+// Il pannello ha funzionato: «permesso granted · app installata ·
+// indirizzo assente». Permesso dato, app installata dalla schermata
+// home, e l'iscrizione che non riesce.
+//
+// Vero e insufficiente. Il perché lo stavo inghiottendo dentro un
+// `catch`, e senza quello restavano quattro ipotesi e nessun modo di
+// sceglierne una. Un messaggio tecnico in piccolo è brutto; un
+// guasto che non si può nominare è peggio.
+// ============================================================
+
+describe('quando l\'iscrizione fallisce si dice PERCHÉ', () => {
+  const leggi = (r: string): string =>
+    fs.readFileSync(path.join(__dirname, '..', '..', r), 'utf8');
+  const push = leggi('services/pushNotificationService.ts');
+  const pannello = leggi('components/common/StatoNotifiche.tsx');
+
+  it('ogni strada che non porta a un indirizzo lascia scritto il motivo', () => {
+    expect(push).toMatch(/motivo = 'questo browser non supporta/);
+    expect(push).toMatch(/motivo = 'manca la chiave/);
+    expect(push).toMatch(/motivo = 'service worker non disponibile'/);
+    expect(push).toMatch(/motivo = 'il sistema non ha restituito/);
+  });
+
+  it('e l\'errore del sistema non si perde dentro il catch', () => {
+    const i = push.indexOf('} catch (err) {', push.indexOf('condizioniAvvisi'));
+    expect(push.slice(i, i + 220)).toMatch(/e\?\.code \|\| e\?\.message/);
+  });
+
+  it('il motivo arriva fino allo schermo, e si può copiare', () => {
+    expect(pannello).toMatch(/condizioni\.motivo/);
+    expect(pannello).toMatch(/selectable/);
+  });
+});

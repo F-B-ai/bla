@@ -142,22 +142,33 @@ export const condizioniAvvisi = async (): Promise<CondizioniAvvisi> => {
   const supportato = webNotificationsSupported();
 
   let indirizzo = false;
+  let motivo: string | undefined;
+
   if (supportato && getNotificationStatus() === 'granted') {
     try {
       const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
-      if (await isSupported()) {
+      if (!(await isSupported())) {
+        motivo = 'questo browser non supporta i messaggi Firebase';
+      } else {
         const chiave = (brand as { vapidKey?: string }).vapidKey;
         const sw = (navigator as { serviceWorker?: { ready: Promise<unknown> } }).serviceWorker;
-        if (chiave && sw) {
+        if (!chiave) {
+          motivo = 'manca la chiave dei certificati push';
+        } else if (!sw) {
+          motivo = 'service worker non disponibile';
+        } else {
           const token = await getToken(getMessaging(), {
             vapidKey: chiave,
             serviceWorkerRegistration: (await sw.ready) as never,
           });
           indirizzo = !!token;
+          if (!token) motivo = 'il sistema non ha restituito nessun indirizzo';
         }
       }
-    } catch {
+    } catch (err) {
       indirizzo = false;
+      const e = err as { code?: string; message?: string };
+      motivo = e?.code || e?.message || String(err);
     }
   }
 
@@ -167,6 +178,7 @@ export const condizioniAvvisi = async (): Promise<CondizioniAvvisi> => {
     iOS,
     installata,
     indirizzo,
+    motivo,
   };
 };
 

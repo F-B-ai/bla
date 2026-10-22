@@ -40,6 +40,16 @@ export interface CondizioniAvvisi {
   installata: boolean;
   /** c'è un indirizzo salvato sulla scheda della persona */
   indirizzo: boolean;
+  /**
+   * Perché l'iscrizione non è riuscita, con le parole del sistema.
+   *
+   * 22 ottobre 2026: il pannello diceva «indirizzo assente» e si
+   * fermava lì. Vero e inutile — il motivo lo stavo inghiottendo in
+   * un `catch`, e senza quello restavano quattro ipotesi e nessun
+   * modo di sceglierne una. Un messaggio tecnico in piccolo è brutto;
+   * un guasto che non si può nominare è peggio.
+   */
+  motivo?: string;
 }
 
 /**

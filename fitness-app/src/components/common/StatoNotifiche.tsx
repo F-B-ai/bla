@@ -115,6 +115,13 @@ export const StatoNotifiche: React.FC<Props> = ({ userId }) => {
         {' · '}app {condizioni?.installata ? 'installata' : 'dal browser'}
         {' · '}indirizzo {condizioni?.indirizzo ? 'registrato' : 'assente'}
       </Text>
+
+      {/* Il motivo vero, con le parole del sistema. Brutto da
+          leggere, e senza di questo restano quattro ipotesi e nessun
+          modo di sceglierne una. */}
+      {!!condizioni?.motivo && (
+        <Text style={stili.motivo} selectable>{condizioni.motivo}</Text>
+      )}
     </Card>
   );
 };
@@ -150,6 +157,12 @@ const stili = StyleSheet.create({
     color: colors.textOnAccent,
     fontSize: fontSize.md,
     fontWeight: '600',
+  },
+  motivo: {
+    marginTop: spacing.xs,
+    color: colors.warning,
+    fontSize: fontSize.xs,
+    lineHeight: 16,
   },
   dettaglio: {
     marginTop: spacing.md,
