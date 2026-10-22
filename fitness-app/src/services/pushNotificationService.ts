@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { brand } from '../config/brand';
 
 let Notifications: any = null;
 
@@ -74,6 +75,58 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * L'indirizzo a cui il server può bussare.
+ *
+ * 22 ottobre 2026. Fino a oggi, sul telefono, l'app chiedeva il
+ * PERMESSO di mandare notifiche e poi non registrava niente: nessun
+ * indirizzo, nessuno a cui mandarle. Il permesso c'era, la notifica
+ * non arrivava mai, e sembrava una scelta.
+ *
+ * Qui si chiede a Firebase un indirizzo per questo telefono e lo si
+ * scrive sulla scheda della persona. Da quel momento una funzione sul
+ * server può raggiungerlo anche con l'app chiusa.
+ *
+ * Tre ragioni per cui può non succedere, e nessuna è un guasto:
+ *  · su iPhone funziona SOLO con l'app installata dalla schermata
+ *    home; da Safari il sistema non lo permette;
+ *  · se la persona ha negato il permesso, non si insiste;
+ *  · se il browser non sa fare i push, si esce e basta.
+ * In tutti e tre i casi resta l'avviso dentro l'app, che c'è sempre.
+ */
+const registraIndirizzoWeb = async (userId: string): Promise<string | null> => {
+  try {
+    if (!webNotificationsSupported()) return null;
+    if (getNotificationStatus() !== 'granted') return null;
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null;
+
+    const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
+    if (!(await isSupported())) return null;
+
+    const chiave = (brand as { vapidKey?: string }).vapidKey;
+    if (!chiave) return null;
+
+    // Si riusa il service worker che l'app ha già: due service worker
+    // sullo stesso sito litigano per chi mostra la notifica, e ne
+    // esce una doppia o nessuna.
+    const sw = (navigator as { serviceWorker?: { ready: Promise<unknown> } }).serviceWorker;
+    if (!sw) return null;
+    const registrazione = await sw.ready;
+    const token = await getToken(getMessaging(), {
+      vapidKey: chiave,
+      serviceWorkerRegistration: registrazione as never,
+    });
+    if (!token) return null;
+
+    await updateDoc(doc(db, 'users', userId), { pushToken: token }).catch(() => {});
+    return token;
+  } catch {
+    // Un indirizzo che non si riesce a prendere non deve rompere
+    // l'avvio dell'app: la notifica è un di più, entrare è il minimo.
+    return null;
+  }
+};
+
 export const registerPushToken = async (userId: string): Promise<string | null> => {
   if (isWeb) {
     if (webNotificationsSupported() && Notification.permission === 'default') {
@@ -81,7 +134,7 @@ export const registerPushToken = async (userId: string): Promise<string | null> 
         await requestNotificationPermissions();
       }
     }
-    return null;
+    return registraIndirizzoWeb(userId);
   }
   if (!Notifications) return null;
   try {

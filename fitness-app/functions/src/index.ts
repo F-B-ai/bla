@@ -5,6 +5,7 @@ export {aiMessages} from "./ai";
 export {nightlyBrain, brainRun} from "./brain";
 export {calIngest, calKeyRotate, calLiberi} from "./cal";
 export {validaInvito} from "./inviti";
+export {avvisaSulTelefono} from "./avvisi";
 
 admin.initializeApp();
 
