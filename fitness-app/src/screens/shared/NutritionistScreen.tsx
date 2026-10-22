@@ -44,17 +44,29 @@ import {
 import { getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { ORE_LIMITE, valutaAnnullamento } from '../../domain/annullamento';
+import { grigliaOrari, fineProposta } from '../../domain/orariStudio';
 import { permessiAgenda, spiegaNienteAnnullo } from '../../domain/permessiAgenda';
+import { motivoSalvataggio } from '../../domain/salvataggio';
+import {
+  FASCE, FasciaOraria, MAX_NOTA, MAX_ORARIO, controllaRichiesta, controllaProposta,
+  richiestaAperta, spiegaStato, descriviFasce, RichiestaNutrizione,
+  TITOLO_CONTROLLO, TESTO_CONTROLLO,
+} from '../../domain/richiestaNutrizione';
+import {
+  creaRichiestaNutrizione, mieRichiesteNutrizione,
+  richiesteNutrizioneDaEvadere, chiudiRichiestaNutrizione,
+  proponiOrarioNutrizione,
+} from '../../services/richiesteNutrizioneService';
 
 type ActiveTab = 'misure' | 'bia' | 'visite';
 
-const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00',
-  '14:00', '15:00', '16:00', '17:00', '18:00',
-];
+// Era una lista a parte con le sole ore piene, e nessuno sapeva
+// perché la nutrizione avesse orari diversi dal resto. Stessa
+// griglia di tutti. Vedi domain/orariStudio.ts.
+const TIME_SLOTS = grigliaOrari();
 
 export const NutritionistScreen: React.FC = () => {
-  const { user, isOwner, isManager, isCollaborator, isStudent } = useAuth();
+  const { user, isOwner, isManager, isCollaborator, isStudent, isNutritionist } = useAuth();
   const [activeTab, setActiveTab] = useState<ActiveTab>('misure');
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -80,6 +92,20 @@ export const NutritionistScreen: React.FC = () => {
   // Visite
   const [appointments, setAppointments] = useState<NutritionistAppointment[]>([]);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+
+  // --- la richiesta di consulenza nutrizionale ---
+  // L'allievo chiede, il titolare risponde. Vedi
+  // domain/richiestaNutrizione.ts per il perché di ogni regola.
+  const [mieRichieste, setMieRichieste] = useState<RichiestaNutrizione[]>([]);
+  const [richiesteAperte, setRichiesteAperte] = useState<RichiestaNutrizione[]>([]);
+  const [showRichiestaModal, setShowRichiestaModal] = useState(false);
+  /** la richiesta su cui il nutrizionista sta scrivendo l'orario */
+  const [richiestaDaProporre, setRichiestaDaProporre] = useState<RichiestaNutrizione | null>(null);
+  const [orarioProposto, setOrarioProposto] = useState('');
+  const [proponendo, setProponendo] = useState(false);
+  const [fasceScelte, setFasceScelte] = useState<FasciaOraria[]>([]);
+  const [notaRichiesta, setNotaRichiesta] = useState('');
+  const [inviandoRichiesta, setInviandoRichiesta] = useState(false);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState({
     date: '', startTime: '09:00', endTime: '10:00', notes: '',
@@ -123,19 +149,129 @@ export const NutritionistScreen: React.FC = () => {
     } catch (err) {
       console.error('Errore caricamento dati nutrizionista:', err);
     }
+
   }, [selectedStudentId, isStudent, isOwner]);
+
+  /**
+   * Le richieste di consulenza si leggono PER CONTO LORO.
+   *
+   * Stavano dentro `loadData`, che comincia con «se non c'è un
+   * allievo selezionato esci»: al titolare, che apre la schermata
+   * senza aver scelto nessuno, non comparivano mai. Una richiesta che
+   * esiste e non si vede è una persona che ha chiesto e non riceve
+   * risposta — cioè esattamente la cosa che questa funzione doveva
+   * togliere di mezzo.
+   *
+   * E si leggono a parte anche per un secondo motivo: se la lettura
+   * fallisce, misure e visite devono restare al loro posto.
+   */
+  const loadRichieste = useCallback(async () => {
+    try {
+      if (isStudent && user?.id) {
+        setMieRichieste(await mieRichiesteNutrizione(user.id));
+      } else if (isOwner || isNutritionist) {
+        setRichiesteAperte(await richiesteNutrizioneDaEvadere());
+      }
+    } catch (err) {
+      console.error('Errore caricamento richieste nutrizione:', err);
+    }
+  }, [isStudent, isOwner, isNutritionist, user?.id]);
 
   useEffect(() => {
     loadStudents();
   }, [loadStudents]);
 
   useEffect(() => {
+    loadRichieste();
+  }, [loadRichieste]);
+
+  useEffect(() => {
     if (selectedStudentId) loadData();
   }, [selectedStudentId, loadData]);
 
+  /** L'allievo manda la richiesta. */
+  const inviaRichiesta = async () => {
+    if (!user?.id) return;
+    const controllo = controllaRichiesta({ fasce: fasceScelte, nota: notaRichiesta });
+    if (!controllo.valido) {
+      crossAlert('Manca una cosa', controllo.problemi.join('\n\n'));
+      return;
+    }
+    setInviandoRichiesta(true);
+    try {
+      await creaRichiestaNutrizione({
+        studentId: user.id,
+        allievo: `${user.name || ''} ${user.surname || ''}`.trim(),
+        fasce: fasceScelte,
+        nota: notaRichiesta,
+      });
+      setShowRichiestaModal(false);
+      setFasceScelte([]);
+      setNotaRichiesta('');
+      await loadRichieste();
+      crossAlert(
+        'Richiesta inviata',
+        'È arrivata al titolare dello studio. Ti farà sapere quando può fissarla.'
+      );
+    } catch (err) {
+      crossAlert('Non sono riuscito a inviarla', motivoSalvataggio(err));
+    } finally {
+      setInviandoRichiesta(false);
+    }
+  };
+
+  /** Il titolare chiude una richiesta: fissata, oppure no con un perché. */
+  const chiudiRichiesta = async (
+    r: RichiestaNutrizione,
+    stato: 'fissata' | 'chiusa'
+  ) => {
+    if (!r.id) return;
+    try {
+      await chiudiRichiestaNutrizione(
+        r.id,
+        stato,
+        stato === 'chiusa' ? 'Richiesta chiusa dal titolare.' : undefined
+      );
+      await loadRichieste();
+    } catch (err) {
+      crossAlert('Non sono riuscito a chiuderla', motivoSalvataggio(err));
+    }
+  };
+
+  /** Il nutrizionista scrive quando può ricevere. Non fissa: propone. */
+  const inviaProposta = async () => {
+    const r = richiestaDaProporre;
+    if (!r?.id) return;
+    const controllo = controllaProposta(orarioProposto);
+    if (!controllo.valido) {
+      crossAlert('Manca una cosa', controllo.problemi.join('\n\n'));
+      return;
+    }
+    setProponendo(true);
+    try {
+      await proponiOrarioNutrizione(
+        r.id,
+        orarioProposto,
+        `${user?.name || ''} ${user?.surname || ''}`.trim()
+      );
+      setRichiestaDaProporre(null);
+      setOrarioProposto('');
+      await loadRichieste();
+      crossAlert(
+        'Orario proposto',
+        `${r.allievo} lo vede subito nella sua area. La visita diventa `
+        + 'definitiva quando il titolare la conferma.'
+      );
+    } catch (err) {
+      crossAlert('Non sono riuscito a proporlo', motivoSalvataggio(err));
+    } finally {
+      setProponendo(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), loadRichieste()]);
     setRefreshing(false);
   };
 
@@ -166,8 +302,8 @@ export const NutritionistScreen: React.FC = () => {
       setShowMeasureModal(false);
       setMeasureForm({ weight: '', height: '', bodyFat: '', muscleMass: '', waist: '', hips: '', chest: '', arms: '', thighs: '', notes: '' });
       loadData();
-    } catch {
-      crossAlert('Errore', 'Impossibile salvare le misure');
+    } catch (err) {
+      crossAlert('Le misure non sono state salvate', motivoSalvataggio(err));
     } finally {
       setSavingMeasure(false);
     }
@@ -506,6 +642,165 @@ export const NutritionistScreen: React.FC = () => {
     </>
   );
 
+  /** Quello che l'allievo vede: o il pulsante, o lo stato della sua richiesta. */
+  const renderRichiestaAllievo = () => {
+    const aperta = richiestaAperta(mieRichieste);
+    const ultima = mieRichieste[0] || null;
+    const stato = spiegaStato(aperta || ultima);
+
+    if (aperta) {
+      return (
+        <Card variant="elevated">
+          <View style={styles.richiestaTesta}>
+            <Ionicons name="hourglass-outline" size={18} color={colors.warning} />
+            <Text style={styles.richiestaTitolo}>{stato?.titolo}</Text>
+          </View>
+          <Text style={styles.richiestaTesto}>{stato?.testo}</Text>
+          <Text style={styles.richiestaDettaglio}>
+            Hai detto che puoi {descriviFasce(aperta.fasce)}.
+            {aperta.nota ? ` «${aperta.nota}»` : ''}
+          </Text>
+        </Card>
+      );
+    }
+
+    return (
+      <Card variant="elevated">
+        <View style={styles.richiestaTesta}>
+          <Ionicons name="nutrition-outline" size={18} color={colors.accent} />
+          <Text style={styles.richiestaTitolo}>Vuoi parlare con il nutrizionista?</Text>
+        </View>
+        <Text style={styles.richiestaTesto}>
+          Chiedi una consulenza: dici quando puoi venire, e allo studio
+          pensiamo noi a fissarla. Non è un appuntamento, è una richiesta.
+        </Text>
+        {!!ultima && ultima.stato === 'chiusa' && (
+          <Text style={styles.richiestaDettaglio}>{stato?.testo}</Text>
+        )}
+        <TouchableOpacity
+          style={styles.richiestaBtn}
+          onPress={() => setShowRichiestaModal(true)}
+          accessibilityLabel="Chiedi una consulenza nutrizionale"
+        >
+          <Ionicons name="paper-plane-outline" size={18} color={colors.white} />
+          <Text style={styles.richiestaBtnTxt}>Chiedi una consulenza</Text>
+        </TouchableOpacity>
+      </Card>
+    );
+  };
+
+  /**
+   * L'elenco delle richieste, letto da due persone diverse.
+   *
+   * Il nutrizionista ci trova una cosa sola da fare: scrivere quando
+   * può ricevere. Il titolare ne trova due: confermare quello che è
+   * stato proposto, o chiudere. Stessa lista, azioni diverse — e
+   * nessuna delle due vede un pulsante che non le compete.
+   */
+  const renderRichiesteTitolare = () => {
+    if (richiesteAperte.length === 0) return null;
+    const daProporre = richiesteAperte.filter((r) => r.stato === 'in_attesa');
+    const daConfermare = richiesteAperte.filter((r) => r.stato === 'proposta');
+    const quante = isNutritionist ? daProporre.length : richiesteAperte.length;
+    if (quante === 0) return null;
+
+    return (
+      <Card variant="elevated">
+        <View style={styles.richiestaTesta}>
+          <Ionicons name="mail-unread-outline" size={18} color={colors.warning} />
+          <Text style={styles.richiestaTitolo}>
+            {quante === 1
+              ? 'Una richiesta di consulenza'
+              : `${quante} richieste di consulenza`}
+          </Text>
+        </View>
+
+        {!isNutritionist && daConfermare.length > 0 && (
+          <Text style={styles.richiestaTesto}>
+            {daConfermare.length === 1
+              ? 'Una ha già un orario proposto: ti basta confermarla.'
+              : `${daConfermare.length} hanno già un orario proposto: ti basta confermarle.`}
+          </Text>
+        )}
+
+        {(isNutritionist ? daProporre : richiesteAperte).map((r) => (
+          <View key={r.id} style={styles.richiestaRiga}>
+            <Text style={styles.richiestaNome}>{r.allievo}</Text>
+            <Text style={styles.richiestaDettaglio}>
+              Può {descriviFasce(r.fasce)} · chiesta il{' '}
+              {r.creataIl.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
+            </Text>
+            {!!r.nota && <Text style={styles.richiestaNota}>«{r.nota}»</Text>}
+
+            {r.stato === 'proposta' && !!r.orarioProposto && (
+              <Text style={styles.richiestaProposta}>
+                {(r.propostoDa || 'Il nutrizionista')} propone: {r.orarioProposto}
+              </Text>
+            )}
+
+            <View style={styles.richiestaAzioni}>
+              {isNutritionist ? (
+                <TouchableOpacity
+                  style={styles.richiestaAzione}
+                  onPress={() => {
+                    setRichiestaDaProporre(r);
+                    setOrarioProposto('');
+                  }}
+                  accessibilityLabel={`Proponi un orario a ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneTxt}>Proponi un orario</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.richiestaAzione}
+                  onPress={() => {
+                    // Si apre la prenotazione già sull'allievo giusto: il
+                    // passaggio «adesso cercalo nell'elenco» è dove le
+                    // cose si perdono.
+                    setSelectedStudentId(r.studentId);
+                    setShowAppointmentModal(true);
+                    chiudiRichiesta(r, 'fissata');
+                  }}
+                  accessibilityLabel={`Fissa la visita per ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneTxt}>
+                    {r.stato === 'proposta' ? 'Conferma la visita' : 'Fissa la visita'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {!isNutritionist && (
+                <TouchableOpacity
+                  style={{ ...styles.richiestaAzione, ...styles.richiestaAzioneGrigia }}
+                  onPress={() => chiudiRichiesta(r, 'chiusa')}
+                  accessibilityLabel={`Chiudi la richiesta di ${r.allievo}`}
+                >
+                  <Text style={styles.richiestaAzioneGrigiaTxt}>Chiudi</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        ))}
+      </Card>
+    );
+  };
+
+  /**
+   * Il controllo generale, per chi si allena.
+   *
+   * Sta fuori dalla richiesta di consulenza e si vede sempre: non è
+   * una cosa da chiedere, è una cosa che c'è. Finché è esistito solo
+   * a voce, lo sapeva chi per caso era in sala quel giorno.
+   */
+  const renderControlloQuindicinale = () => (
+    <Card variant="elevated">
+      <View style={styles.richiestaTesta}>
+        <Ionicons name="people-outline" size={18} color={colors.success} />
+        <Text style={styles.richiestaTitolo}>{TITOLO_CONTROLLO}</Text>
+      </View>
+      <Text style={styles.richiestaTesto}>{TESTO_CONTROLLO}</Text>
+    </Card>
+  );
+
   const renderAppointments = () => (
     <>
       {!isStudent && (
@@ -624,6 +919,19 @@ export const NutritionistScreen: React.FC = () => {
             <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
               {tab.label}
             </Text>
+            {/* Il pallino sulle Visite: una richiesta che aspetta non
+                deve stare dietro a un tocco. Chi apre questa schermata
+                deve vedere subito che c'è qualcuno in attesa, anche se
+                sta guardando le misure. */}
+            {/* Il pallino vale anche per il nutrizionista: ieri gli
+                avevo dato l'elenco e il pulsante, e non il modo di
+                accorgersi che c'era qualcosa da fare. */}
+            {tab.key === 'visite' && (isOwner || isNutritionist)
+              && richiesteAperte.length > 0 && (
+              <View style={styles.tabPallino}>
+                <Text style={styles.tabPallinoTxt}>{richiesteAperte.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -634,9 +942,29 @@ export const NutritionistScreen: React.FC = () => {
         contentContainerStyle={styles.contentContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* ------------------------------------------------------------
+            20 ottobre 2026 — PRIMA DEL CANCELLO, NON DOPO
+            ------------------------------------------------------------
+            L'elenco delle richieste stava dentro renderAppointments,
+            che si raggiunge solo dopo aver scelto un allievo. Il
+            pallino diceva «1» e per sapere CHI aveva chiesto bisognava
+            prima selezionare la persona: cioè l'informazione che si
+            stava cercando. Una porta che si apre con la chiave che sta
+            dentro.
+            Queste schede non dipendono dall'allievo scelto, quindi non
+            devono stare dietro a quella scelta. */}
+        {activeTab === 'visite' && (isOwner || isNutritionist)
+          && renderRichiesteTitolare()}
+        {activeTab === 'visite' && isStudent && renderRichiestaAllievo()}
+        {activeTab === 'visite' && isStudent && renderControlloQuindicinale()}
+
         {!selectedStudentId ? (
           <Card>
-            <Text style={styles.emptyText}>Seleziona un allievo per visualizzare i dati.</Text>
+            <Text style={styles.emptyText}>
+              {activeTab === 'visite'
+                ? 'Scegli un allievo per vedere le sue visite e prenotarne una.'
+                : 'Seleziona un allievo per visualizzare i dati.'}
+            </Text>
           </Card>
         ) : activeTab === 'misure' ? (
           renderMeasurements()
@@ -647,6 +975,129 @@ export const NutritionistScreen: React.FC = () => {
         )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Modale «Chiedi una consulenza» — solo l'allievo.
+          Due domande e basta: quando puoi, e se vuoi dirmi qualcosa.
+          Niente salute, niente obiettivi da spuntare: quella roba si
+          dice in visita, davanti a chi la sa ascoltare. */}
+      <Modal visible={showRichiestaModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title="Chiedi una consulenza"
+              onClose={() => setShowRichiestaModal(false)}
+            />
+            <Text style={styles.richiestaTesto}>
+              Quando puoi venire? Scegli una o più fasce: servono a trovare un
+              orario senza doverci scrivere dieci volte.
+            </Text>
+            <View style={styles.fasceRiga}>
+              {FASCE.map((f) => {
+                const attiva = fasceScelte.includes(f.valore);
+                return (
+                  <TouchableOpacity
+                    key={f.valore}
+                    style={{
+                      ...styles.fasciaChip,
+                      ...(attiva ? styles.fasciaChipAttiva : {}),
+                    }}
+                    onPress={() => setFasceScelte((p) => (attiva
+                      ? p.filter((x) => x !== f.valore)
+                      : [...p, f.valore]))}
+                    accessibilityLabel={`${f.etichetta}, ${f.quando}`}
+                  >
+                    <Text style={{
+                      ...styles.fasciaTxt,
+                      ...(attiva ? { color: colors.accent } : {}),
+                    }}>{f.etichetta}</Text>
+                    <Text style={styles.fasciaOre}>{f.quando}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <InputField
+              label="Vuoi aggiungere una riga? (non obbligatorio)"
+              value={notaRichiesta}
+              onChangeText={(v) => setNotaRichiesta(v.slice(0, MAX_NOTA))}
+              placeholder="Es. vorrei capire come mangiare nei giorni di allenamento"
+              multiline
+            />
+            <Text style={styles.richiestaDettaglio}>
+              Qui non serve scrivere nulla di medico: quello che riguarda la tua
+              salute lo dirai in visita, al professionista.
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <Button
+                title="Annulla"
+                variant="outline"
+                onPress={() => setShowRichiestaModal(false)}
+                style={styles.modalButton}
+              />
+              <Button
+                title={inviandoRichiesta ? 'Invio…' : 'Invia la richiesta'}
+                onPress={inviaRichiesta}
+                loading={inviandoRichiesta}
+                style={styles.modalButton}
+              />
+            </View>
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Modale «Proponi un orario» — solo il nutrizionista.
+          Campo libero e non un calendario: la sua agenda non sta in
+          questa applicazione, e un selettore di orari qui mentirebbe
+          su quali posti sono liberi. */}
+      <Modal visible={!!richiestaDaProporre} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ScrollView style={styles.modalContent}>
+            <ModalHeader
+              title="Proponi un orario"
+              onClose={() => setRichiestaDaProporre(null)}
+            />
+            {!!richiestaDaProporre && (
+              <>
+                <Text style={styles.richiestaTesto}>
+                  {richiestaDaProporre.allievo} ha detto che può{' '}
+                  {descriviFasce(richiestaDaProporre.fasce)}.
+                  {richiestaDaProporre.nota
+                    ? ` «${richiestaDaProporre.nota}»`
+                    : ''}
+                </Text>
+                <InputField
+                  label="Quando puoi riceverlo"
+                  value={orarioProposto}
+                  onChangeText={(v) => setOrarioProposto(v.slice(0, MAX_ORARIO))}
+                  placeholder="Es. martedì 21, alle 18:30"
+                />
+                <Text style={styles.richiestaDettaglio}>
+                  Lo vede subito nella sua area. La visita diventa definitiva
+                  quando il titolare la conferma: fino ad allora resta una
+                  proposta, e nessuno si presenta per sbaglio.
+                </Text>
+                <View style={styles.modalButtons}>
+                  <Button
+                    title="Annulla"
+                    variant="outline"
+                    onPress={() => setRichiestaDaProporre(null)}
+                    style={styles.modalButton}
+                  />
+                  <Button
+                    title={proponendo ? 'Invio…' : 'Proponi'}
+                    onPress={inviaProposta}
+                    loading={proponendo}
+                    style={styles.modalButton}
+                  />
+                </View>
+              </>
+            )}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Modale Nuove Misure */}
       <Modal visible={showMeasureModal} animationType="slide" transparent>
@@ -749,7 +1200,12 @@ export const NutritionistScreen: React.FC = () => {
                       <TouchableOpacity
                         key={`start-${t}`}
                         style={[styles.timeChip, appointmentForm.startTime === t && styles.chipActive]}
-                        onPress={() => setAppointmentForm({ ...appointmentForm, startTime: t })}
+                        onPress={() => setAppointmentForm({
+                          ...appointmentForm,
+                          startTime: t,
+                          // la fine segue l'inizio, e resta modificabile
+                          endTime: fineProposta(t) || appointmentForm.endTime,
+                        })}
                       >
                         <Text style={[styles.chipText, appointmentForm.startTime === t && styles.chipTextActive]}>{t}</Text>
                       </TouchableOpacity>
@@ -888,6 +1344,141 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: spacing.md,
+  },
+  tabPallino: {
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  tabPallinoTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: colors.white,
+  },
+
+  // --- la richiesta di consulenza ---
+  richiestaTesta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  richiestaTitolo: {
+    flex: 1,
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  richiestaTesto: {
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+  richiestaDettaglio: {
+    fontSize: fontSize.sm,
+    color: colors.textLight,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  richiestaNota: {
+    fontSize: fontSize.sm,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  richiestaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+    marginTop: spacing.md,
+  },
+  richiestaBtnTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  richiestaRiga: {
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    paddingTop: spacing.md,
+    marginTop: spacing.md,
+  },
+  richiestaNome: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  richiestaAzioni: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  richiestaAzione: {
+    flex: 1,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.accent,
+  },
+  richiestaProposta: {
+    color: colors.success,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    marginTop: spacing.xs,
+  },
+  richiestaAzioneTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  richiestaAzioneGrigia: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  richiestaAzioneGrigiaTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  fasceRiga: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  fasciaChip: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceLight,
+  },
+  fasciaChipAttiva: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+  },
+  fasciaTxt: {
+    fontSize: fontSize.md,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  fasciaOre: {
+    fontSize: fontSize.xs,
+    color: colors.textLight,
+    marginTop: 2,
   },
   addButtonContainer: {
     marginBottom: spacing.md,

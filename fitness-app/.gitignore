@@ -8,3 +8,7 @@ sa-key.json
 functions/lib/
 firestore-debug.log
 ui-debug.log
+
+# Il sito generato per il dominio: si ricostruisce con
+# `node scripts/build-sito.js`, non si versiona.
+sito-dist/

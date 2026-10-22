@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { CondizioniAvvisi } from '../domain/avvisoTelefono';
+import { prendiIndirizzoPush } from './indirizzoPush';
 
 let Notifications: any = null;
 
@@ -74,6 +76,68 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * L'indirizzo a cui il server può bussare.
+ *
+ * 22 ottobre 2026. Fino a oggi, sul telefono, l'app chiedeva il
+ * PERMESSO di mandare notifiche e poi non registrava niente: nessun
+ * indirizzo, nessuno a cui mandarle. Il permesso c'era, la notifica
+ * non arrivava mai, e sembrava una scelta.
+ *
+ * Qui si chiede a Firebase un indirizzo per questo telefono e lo si
+ * scrive sulla scheda della persona. Da quel momento una funzione sul
+ * server può raggiungerlo anche con l'app chiusa.
+ *
+ * Tre ragioni per cui può non succedere, e nessuna è un guasto:
+ *  · su iPhone funziona SOLO con l'app installata dalla schermata
+ *    home; da Safari il sistema non lo permette;
+ *  · se la persona ha negato il permesso, non si insiste;
+ *  · se il browser non sa fare i push, si esce e basta.
+ * In tutti e tre i casi resta l'avviso dentro l'app, che c'è sempre.
+ */
+const registraIndirizzoWeb = async (userId: string): Promise<string | null> => {
+  if (!webNotificationsSupported()) return null;
+  if (getNotificationStatus() !== 'granted') return null;
+
+  const esito = await prendiIndirizzoPush();
+  if (!esito.token) return null;
+
+  await updateDoc(doc(db, 'users', userId), { pushToken: esito.token }).catch(() => {});
+  return esito.token;
+};
+
+/**
+ * Le condizioni vere di QUESTO telefono, lette adesso.
+ *
+ * Non si fida di niente di salvato: permesso, installazione e
+ * indirizzo si rileggono ogni volta. Uno stato ricordato da ieri è
+ * esattamente il modo in cui una schermata dice «tutto a posto»
+ * mentre non arriva niente.
+ */
+export const condizioniAvvisi = async (): Promise<CondizioniAvvisi> => {
+  const iOS = isIOSWeb();
+  const installata = !iOS || isStandalonePWA();
+  const supportato = webNotificationsSupported();
+
+  let indirizzo = false;
+  let motivo: string | undefined;
+
+  if (supportato && getNotificationStatus() === 'granted') {
+    const esito = await prendiIndirizzoPush();
+    indirizzo = !!esito.token;
+    motivo = esito.motivo;
+  }
+
+  return {
+    supportato,
+    permesso: getNotificationStatus(),
+    iOS,
+    installata,
+    indirizzo,
+    motivo,
+  };
+};
+
 export const registerPushToken = async (userId: string): Promise<string | null> => {
   if (isWeb) {
     if (webNotificationsSupported() && Notification.permission === 'default') {
@@ -81,7 +145,7 @@ export const registerPushToken = async (userId: string): Promise<string | null> 
         await requestNotificationPermissions();
       }
     }
-    return null;
+    return registraIndirizzoWeb(userId);
   }
   if (!Notifications) return null;
   try {

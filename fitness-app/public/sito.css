@@ -1,0 +1,290 @@
+/* ============================================================
+   ESSĒRE — lo stile del sito, in un posto solo.
+   Quattro pagine con quattro copie dello stesso CSS divergono
+   sempre: si cambia un colore su una e ci si accorge dopo un mese
+   che le altre tre sono rimaste indietro.
+   ============================================================ */
+
+:root {
+  --fondo: #0A0A0A;
+  --fondo-alto: #141414;
+  --bordo: #262626;
+  --testo: #F2F2F7;
+  --tenue: #9A9A9E;
+  --accento: #D40000;
+  --misura: 34rem;
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --corpo: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+
+body {
+  background: var(--fondo);
+  color: var(--testo);
+  font-family: var(--corpo);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.guscio { max-width: var(--misura); margin: 0 auto; padding: 0 16px; }
+
+/* ---------- testata e navigazione ---------- */
+header { border-bottom: 1px solid var(--bordo); padding: 22px 0 0; }
+
+/* Il marchio: il cerchio e la parola, uno accanto all'altra. Il
+   cerchio non si rimpicciolisce mai sotto i 30 px — sotto quella
+   misura il tratto di pennello diventa una macchia. */
+.testata-marchio { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.testata-marchio img { width: 34px; height: 34px; flex: 0 0 34px; }
+.marchio {
+  font-family: var(--display); font-size: 1.35rem; font-weight: 700;
+  letter-spacing: .22em; color: var(--testo); text-decoration: none; display: block;
+}
+.sottomarchio {
+  font-size: .68rem; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--tenue); margin-top: 4px;
+}
+nav { display: flex; gap: 18px; margin-top: 16px; overflow-x: auto; }
+nav::-webkit-scrollbar { display: none; }
+nav a {
+  color: var(--tenue); text-decoration: none; font-size: .84rem;
+  padding-bottom: 10px; border-bottom: 2px solid transparent; white-space: nowrap;
+}
+nav a:hover { color: var(--testo); }
+nav a[aria-current="page"] { color: var(--testo); border-bottom-color: var(--accento); }
+
+/* ---------- apertura ---------- */
+.apertura { padding: 52px 0 40px; }
+.occhiello {
+  font-size: .7rem; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accento); font-weight: 600; margin-bottom: 14px;
+}
+h1 {
+  font-family: var(--display);
+  font-size: clamp(2.3rem, 10.5vw, 3.5rem);
+  line-height: 1.03; font-weight: 600; letter-spacing: -.015em;
+  text-wrap: balance;
+}
+.tesi {
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 4.6vw, 1.45rem);
+  line-height: 1.35; margin-top: 22px; text-wrap: balance;
+}
+.attacco { color: var(--tenue); margin-top: 18px; }
+.attacco b { color: var(--testo); font-weight: 600; }
+
+/* ---------- sezioni ---------- */
+section { padding: 34px 0; border-top: 1px solid var(--bordo); }
+h2 {
+  font-family: var(--display); font-size: 1.55rem; font-weight: 600;
+  line-height: 1.15; letter-spacing: -.01em; margin-bottom: 16px; text-wrap: balance;
+}
+.intro { color: var(--tenue); margin-bottom: 20px; }
+section p + p { margin-top: 12px; }
+
+/* ---------- elenco puntato ---------- */
+.voci { display: flex; flex-direction: column; gap: 15px; }
+.voce { display: grid; grid-template-columns: 8px 1fr; gap: 14px; align-items: start; }
+.voce::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accento); margin-top: .62em;
+}
+.voce h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1px; }
+.voce p { color: var(--tenue); font-size: .94rem; line-height: 1.52; }
+
+/* ---------- riquadri ---------- */
+.riquadro {
+  background: var(--fondo-alto); border: 1px solid var(--bordo);
+  border-radius: 14px; padding: 18px;
+}
+.riquadro .capo {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 8px;
+}
+.riquadro h3 { font-family: var(--display); font-size: 1.1rem; font-weight: 600; }
+.riquadro p { color: var(--tenue); font-size: .94rem; line-height: 1.55; }
+.riquadro em { color: var(--testo); font-style: italic; }
+.pila { display: flex; flex-direction: column; gap: 14px; }
+.etichetta {
+  font-size: .66rem; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--tenue); border: 1px solid var(--bordo);
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+
+/* ---------- passi numerati ---------- */
+.passi { display: flex; flex-direction: column; }
+.passo {
+  display: grid; grid-template-columns: 62px 1fr; gap: 16px;
+  padding: 14px 0; border-bottom: 1px solid var(--bordo);
+}
+.passo:last-child { border-bottom: none; }
+.passo .n {
+  font-family: var(--display); font-size: .78rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accento); padding-top: 3px;
+}
+.passo .che { font-family: var(--display); font-size: 1.12rem; font-weight: 600; }
+.passo p { color: var(--tenue); font-size: .92rem; margin-top: 2px; }
+
+/* ---------- prezzi ---------- */
+.prezzo {
+  background: var(--fondo-alto); border: 1px solid var(--bordo);
+  border-radius: 16px; padding: 22px;
+}
+.cifra {
+  font-family: var(--display); font-size: 3rem; font-weight: 600;
+  line-height: 1; letter-spacing: -.02em;
+}
+.cifra span { font-size: 1rem; color: var(--tenue); font-weight: 400; letter-spacing: 0; }
+.rate { margin-top: 16px; border-top: 1px solid var(--bordo); padding-top: 14px; }
+/* La riga va a capo sugli schermi stretti: la voce a sinistra e il
+   valore a destra non ci stanno sempre affiancati, e senza questo è la
+   PAGINA intera a scorrere di lato — difetto che non si vede sul
+   portatile e che vede chiunque abbia un telefono piccolo. */
+.rata { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 7px 0; font-size: .94rem; }
+.rata > span:first-child { min-width: 0; }
+.rata span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rata.somma { border-top: 1px solid var(--bordo); margin-top: 6px; padding-top: 12px; font-weight: 600; }
+.rata .quando { color: var(--tenue); font-size: .84rem; display: block; font-weight: 400; }
+
+/* ---------- nota con barra ---------- */
+.nota { border-left: 2px solid var(--accento); padding: 2px 0 2px 16px; margin-top: 20px; }
+.nota h3 { font-size: .94rem; font-weight: 600; margin-bottom: 4px; }
+.nota p { color: var(--tenue); font-size: .92rem; line-height: 1.55; }
+
+/* ---------- perimetro ---------- */
+.perimetro p { color: var(--tenue); margin-bottom: 12px; font-size: .96rem; }
+.perimetro b { color: var(--testo); font-weight: 600; }
+
+/* ---------- chiamata all'azione ---------- */
+.chiamata { text-align: center; padding: 42px 0 36px; }
+.chiamata h2 { margin-bottom: 10px; }
+.chiamata p { color: var(--tenue); margin-bottom: 22px; }
+.bottone {
+  display: inline-block; background: var(--accento); color: #fff;
+  font-family: var(--corpo); font-size: 1rem; font-weight: 600;
+  text-decoration: none; padding: 15px 32px; border-radius: 999px;
+  transition: transform .15s ease, background .15s ease;
+}
+.bottone:hover { background: #E63333; transform: translateY(-1px); }
+.bottone:focus-visible { outline: 2px solid var(--testo); outline-offset: 3px; }
+.bottone.vuoto { background: transparent; border: 1px solid var(--bordo); color: var(--testo); }
+.bottone.vuoto:hover { background: var(--fondo-alto); }
+.posti { color: var(--tenue); font-size: .84rem; margin-top: 16px; }
+
+/* ---------- piede ---------- */
+footer {
+  border-top: 1px solid var(--bordo); padding: 24px 0 40px;
+  color: var(--tenue); font-size: .8rem; line-height: 1.6;
+}
+footer a { color: var(--tenue); }
+footer .disclaimer { margin-top: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+
+@media (min-width: 640px) {
+  body { font-size: 18px; }
+  .apertura { padding: 76px 0 52px; }
+  section { padding: 44px 0; }
+  .riquadro { padding: 22px; }
+}
+
+
+/* ---------- l'applicazione, sul sito ----------
+   Una sezione sola, col marchio grande. Non è una pagina di prodotto:
+   è il posto dove chi sta leggendo capisce che quello che misuriamo
+   non finisce in un quaderno. Tre righe, poi si torna a parlare di
+   movimento. */
+.app-blocco {
+  border: 1px solid var(--bordo);
+  border-radius: 14px;
+  padding: 28px 22px;
+  text-align: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(212, 0, 0, .10), transparent 60%),
+    var(--fondo-alto);
+}
+.app-blocco img { width: 92px; height: 92px; margin-bottom: 14px; }
+.app-blocco h3 {
+  font-family: var(--display); font-size: 1.5rem; font-weight: 700;
+  letter-spacing: .14em; margin-bottom: 6px;
+}
+.app-blocco .occhiello { margin-bottom: 0; }
+.app-blocco p { color: var(--tenue); margin-top: 10px; }
+.app-punti {
+  display: grid; gap: 10px; margin: 20px 0 6px; text-align: left;
+}
+.app-punti div {
+  border-top: 1px solid var(--bordo); padding-top: 10px;
+  font-size: .95rem; color: var(--tenue);
+}
+.app-punti b { color: var(--testo); font-weight: 600; }
+
+
+/* ---------- i marchi, grandi ----------
+   Tre marchi, tre posti: Mind Movement Lab apre la pagina del metodo
+   — è la casa; Francesco Busanca apre «Chi sono» — è la persona;
+   ESSĒRE sta nel riquadro dell'applicazione — è lo strumento.
+   Messi tutti e tre nello stesso punto non se ne ricorderebbe
+   nessuno. */
+.marchio-grande {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto 26px;
+  border-radius: 10px;
+}
+/* Il marchio dello studio è verticale: misurato in larghezza
+   mangerebbe tutta la prima schermata e spingerebbe il titolo sotto
+   la piega. Un marchio che copre la frase per cui si è arrivati non
+   sta aiutando nessuno. */
+.marchio-studio { max-width: 232px; }
+/* Quello personale è disteso: alla stessa altezza serve più larghezza. */
+.marchio-persona { max-width: 400px; }
+/* L'icona dell'applicazione è già un quadrato con i suoi angoli:
+   non va incorniciata una seconda volta. */
+.app-blocco img.icona { width: 104px; height: 104px; border-radius: 22px; }
+
+/* ---------- la foto di gara ----------
+   Sta nella pagina «Chi sono», sotto i titoli. È una foto verticale:
+   a tutta larghezza su un telefono occuperebbe uno schermo intero e
+   chi scorre perderebbe il filo prima di arrivare ai titoli. Tenuta
+   stretta resta una prova, non una gigantografia. */
+.foto-gara {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  margin: 22px auto 8px;
+  border-radius: 12px;
+  border: 1px solid var(--bordo);
+}
+.didascalia {
+  text-align: center;
+  color: var(--tenue);
+  font-size: .86rem;
+  margin-bottom: 20px;
+}
+
+/* ---------- il libro ----------
+   Copertina e testo affiancati dove c'è spazio, incolonnati sul
+   telefono. La copertina resta piccola: è un riferimento, non la
+   vetrina di una libreria — qui si vende il metodo, non il volume. */
+.libro {
+  display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+  margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--bordo);
+}
+.libro > div { flex: 1 1 260px; min-width: 0; }
+.libro h3 { font-family: var(--display); font-size: 1.08rem; font-weight: 600; margin-bottom: 6px; }
+.libro p { color: var(--tenue); font-size: .94rem; line-height: 1.6; }
+.copertina {
+  width: 100%; max-width: 190px; height: auto;
+  border-radius: 8px; border: 1px solid var(--bordo);
+  margin: 0 auto;
+}

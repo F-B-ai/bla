@@ -1,7 +1,9 @@
 import {
   APERTURA, ULTIMO_INIZIO, ULTIMO_INIZIO_ECCEZIONE, PASSO_MINUTI,
+  grigliaOrari, oraPiena,
   DURATA_STANDARD, inMinuti, inOra, slotLiberi, descriviSlot,
   regolaDellaGiornata, AVVISO_SOLA_LETTURA, ORARI_STUDIO_VERSION,
+  fineProposta, GRIGLIA_A,
 } from '../orariStudio';
 
 // ============================================================
@@ -203,5 +205,147 @@ describe('chi legge NON prenota', () => {
 describe('versione', () => {
   it('tracciata', () => {
     expect(ORARI_STUDIO_VERSION).toBe(1);
+  });
+});
+
+// ============================================================
+// LA GRIGLIA A UN QUARTO D'ORA
+// ------------------------------------------------------------
+// 3 ottobre 2026. Era mezz'ora: un allievo che poteva solo alle
+// 10:15 andava spostato alle 10:00 o alle 10:30, e spesso quello
+// spostamento era il motivo per cui non veniva.
+// ============================================================
+
+describe('la griglia degli orari', () => {
+  it('va di quindici minuti in quindici', () => {
+    expect(PASSO_MINUTI).toBe(15);
+    const g = grigliaOrari();
+    expect(g).toContain('10:15');
+    expect(g).toContain('10:45');
+    expect(g).toContain('18:15');
+  });
+
+  it('comincia e finisce dove deve', () => {
+    const g = grigliaOrari();
+    expect(g[0]).toBe('07:00');
+    expect(g[g.length - 1]).toBe('22:00');
+  });
+
+  it('nessun orario è ripetuto e sono in ordine', () => {
+    const g = grigliaOrari();
+    expect(new Set(g).size).toBe(g.length);
+    const m = g.map(inMinuti);
+    expect(m).toEqual([...m].sort((a, b) => a - b));
+  });
+
+  it('ogni orario è multiplo del passo', () => {
+    grigliaOrari().forEach((o) => expect(inMinuti(o) % PASSO_MINUTI).toBe(0));
+  });
+
+  // Servono a dare un appiglio all'occhio in una lista di 61 voci.
+  it('le ore piene si riconoscono', () => {
+    expect(oraPiena('10:00')).toBe(true);
+    expect(oraPiena('10:15')).toBe(false);
+    expect(oraPiena('10:30')).toBe(false);
+    expect(grigliaOrari().filter(oraPiena).length).toBe(16); // dalle 7 alle 22
+  });
+
+  it('si può chiedere un passo diverso senza toccare il resto', () => {
+    expect(grigliaOrari('09:00', '10:00', 30)).toEqual(['09:00', '09:30', '10:00']);
+  });
+});
+
+describe('gli orari non sono più scritti a mano da nessuna parte', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const schermate = [
+    ['screens', 'shared', 'calendar', 'AppointmentModal.tsx'],
+    ['screens', 'shared', 'ScheduleSessionScreen.tsx'],
+    ['screens', 'shared', 'NutritionistScreen.tsx'],
+  ];
+
+  // Erano quattro liste diverse in quattro file: cambiare il passo
+  // avrebbe voluto dire toccarne quattro e dimenticarne una — e
+  // quella sarebbe rimasta a mezz'ora per mesi.
+  it('tutte e tre le schermate usano la griglia del dominio', () => {
+    schermate.forEach((parti) => {
+      const src = fs.readFileSync(
+        path.join(__dirname, '..', '..', ...parti), 'utf8'
+      );
+      expect(src).toContain('grigliaOrari()');
+      expect(src).not.toMatch(/const TIME_SLOTS = \[/);
+    });
+  });
+});
+
+import fs from 'fs';
+import path from 'path';
+
+// ============================================================
+// 19 ottobre 2026 — LA FINE SEGUE L'INIZIO
+// ------------------------------------------------------------
+// Il titolare: «quando fisso l'ora di un appuntamento, automaticamente
+// mi dà la fine dopo un'ora. Se voglio cambiare la fine posso farlo
+// comunque.»
+//
+// La seconda frase conta quanto la prima: è una PROPOSTA, non una
+// regola. La seduta da novanta minuti esiste e deve restare possibile
+// con lo stesso numero di tocchi di prima.
+// ============================================================
+
+describe('la fine proposta', () => {
+  it('è un\'ora dopo l\'inizio', () => {
+    expect(fineProposta('09:00')).toBe('10:00');
+    expect(fineProposta('17:30')).toBe('18:30');
+    expect(fineProposta('10:15')).toBe('11:15');
+  });
+
+  it('usa la durata standard dello studio, non un 60 scritto a mano', () => {
+    expect(fineProposta('09:00')).toBe(inOra(inMinuti('09:00') + DURATA_STANDARD));
+  });
+
+  it('cade sempre dentro la griglia: un orario che non esiste non si corregge', () => {
+    // 21:30 + un'ora sarebbe 22:30, fuori dall'ultimo orario scegliibile
+    expect(fineProposta('21:30')).toBe(GRIGLIA_A);
+    expect(grigliaOrari()).toContain(fineProposta('21:30'));
+  });
+
+  it('e l\'ora proposta è sempre una di quelle selezionabili', () => {
+    const griglia = grigliaOrari();
+    griglia.forEach((ora) => expect(griglia).toContain(fineProposta(ora)));
+  });
+
+  it('un inizio che non è un orario non produce una fine inventata', () => {
+    expect(fineProposta('')).toBe('');
+    expect(fineProposta('mezzogiorno')).toBe('');
+    expect(fineProposta('99:99')).toBe('');
+  });
+
+  it('la durata si può cambiare: novanta minuti restano possibili', () => {
+    expect(fineProposta('09:00', 90)).toBe('10:30');
+  });
+});
+
+describe('le schermate la usano davvero', () => {
+  const leggi = (r: string): string =>
+    fs.readFileSync(path.join(__dirname, '..', '..', r), 'utf8');
+
+  it('l\'agenda propone la fine quando si sceglie l\'inizio', () => {
+    const s = leggi('screens/shared/CalendarScreen.tsx');
+    expect(s).toMatch(/const scegliInizio = \(ora: string\)/);
+    expect(s).toMatch(/fineProposta\(ora\)/);
+    expect(s).toMatch(/setFormStartTime=\{scegliInizio\}/);
+  });
+
+  it('e la fine resta un campo che si cambia', () => {
+    // se sparisse il selettore della fine, la proposta diventerebbe
+    // una regola — ed è esattamente quello che non è stato chiesto
+    const m = leggi('screens/shared/calendar/AppointmentModal.tsx');
+    expect(m).toMatch(/setFormEndTime\(t\)/);
+  });
+
+  it('anche la visita dal nutrizionista si comporta allo stesso modo', () => {
+    const n = leggi('screens/shared/NutritionistScreen.tsx');
+    expect(n).toMatch(/endTime: fineProposta\(t\)/);
   });
 });

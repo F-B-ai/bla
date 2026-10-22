@@ -14,13 +14,44 @@ const PRECACHE_URLS = [
   '/Ionicons.ttf'
 ];
 
-// Install: pre-cache shell, skip waiting immediately
+// ============================================================
+// IL RICAMBIO LO DECIDE CHI STA USANDO L'APP, NON IL DEPLOY
+// ------------------------------------------------------------
+// 23 settembre 2026, poco dopo una pubblicazione: schermo nero.
+//
+// Qui c'era `self.skipWaiting()` dentro l'install. Voleva dire:
+// appena la versione nuova è pronta, prende il comando subito —
+// anche di un'app che in quel momento è APERTA e sta girando con
+// la versione precedente. E l'activate, un istante dopo, cancella
+// le cache vecchie.
+//
+// Il risultato è una pagina viva a cui viene tolto il pavimento da
+// sotto: al primo file che le serve — un'icona, un font, un pezzo
+// caricato al momento — quel file non c'è più né in cache né sul
+// server, perché il deploy l'ha sostituito. Schermo nero.
+//
+// Il paradosso è che l'avviso «C'è una versione nuova, tocca qui
+// per aggiornare» esiste già, scritto e funzionante. Non faceva mai
+// in tempo a comparire: `skipWaiting()` scavalcava la domanda e
+// cambiava tutto prima che qualcuno potesse rispondere. Un'altra
+// porta che c'era e che nessuno riusciva ad aprire.
+//
+// ADESSO: la versione nuova si installa e ASPETTA. L'avviso
+// compare. Il ricambio avviene quando lo chiede la pagina — cioè
+// quando l'ha chiesto una persona, a lezione finita e non a metà.
+// ============================================================
+
+// Install: si prepara e basta. Nessun skipWaiting: aspetta il suo turno.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
+});
+
+// L'unico modo di passare avanti: che la pagina lo chieda, dopo che
+// l'ha chiesto una persona toccando l'avviso.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // Activate: clean old caches, claim clients immediately

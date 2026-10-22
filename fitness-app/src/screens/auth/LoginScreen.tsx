@@ -69,11 +69,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
       );
       setShowForgotPassword(false);
       setResetEmail('');
-    } catch {
-      crossAlert(
-        'Errore',
-        'Impossibile inviare l\'email di recupero. Verifica che l\'indirizzo sia corretto.'
-      );
+    } catch (err) {
+      // Diceva sempre «verifica che l'indirizzo sia corretto», anche
+      // quando l'indirizzo era giustissimo e il motivo era un altro:
+      // troppi tentativi, rete caduta, servizio fermo. Chi legge
+      // ricontrolla l'email dieci volte e non trova niente, perché
+      // non c'è niente da trovare.
+      const codice = err && typeof err === 'object' && 'code' in err
+        ? String((err as { code: unknown }).code) : '';
+      const messaggio =
+        codice === 'auth/user-not-found'
+          ? 'Con questo indirizzo non risulta nessun account. Controlla di aver '
+            + 'scritto la stessa email con cui ti sei iscritto, oppure chiedi allo studio.'
+        : codice === 'auth/invalid-email'
+          ? 'Questo indirizzo non è scritto bene: ricontrollalo.'
+        : codice === 'auth/too-many-requests'
+          ? 'Hai chiesto il link troppe volte di seguito. Aspetta qualche minuto '
+            + 'e riprova: l\'indirizzo non c\'entra.'
+        : codice === 'auth/network-request-failed'
+          ? 'Niente connessione. Riprova quando la linea torna: l\'indirizzo non c\'entra.'
+          : `Non è stato possibile inviare il link.${codice ? ` (${codice})` : ''} `
+            + 'Riprova fra poco; se continua, scrivi allo studio.';
+      crossAlert('Link non inviato', messaggio);
     } finally {
       setResetLoading(false);
     }

@@ -12,7 +12,8 @@ import {
   Timestamp,
   writeBatch,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { db, functions } from '../config/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { brand } from '../config/brand';
 import { AppNotification, NotificationType } from '../types';
 import { showLocalNotification, updateBadgeCount } from './pushNotificationService';
@@ -25,6 +26,27 @@ const NOTIFICATION_PREFIX = `APP ${brand.appName}\n\n`;
 
 const prefixBody = (body: string): string =>
   body.startsWith('APP ESS') ? body : NOTIFICATION_PREFIX + body;
+
+/**
+ * Fa squillare il telefono di chi ha appena ricevuto un avviso.
+ *
+ * Separata e con il suo `catch`: una notifica che non parte non deve
+ * far fallire quello che la persona stava facendo. L'avviso dentro
+ * l'app è già salvato quando questa parte — se il telefono non si
+ * raggiunge resta il pallino rosso, che è il minimo garantito.
+ *
+ * Non aspetta la risposta di proposito: chi ha appena chiesto una
+ * consulenza non deve guardare una rotella perché il telefono di
+ * qualcun altro è lento a rispondere.
+ */
+const faiSquillare = (avvisoId: string): void => {
+  try {
+    httpsCallable(functions, 'inviaAvvisoPush')({ avvisoId })
+      .catch(() => undefined);
+  } catch {
+    // niente: è un di più, non una condizione per andare avanti
+  }
+};
 
 export const createNotification = async (
   userId: string,
@@ -43,6 +65,7 @@ export const createNotification = async (
     read: false,
     createdAt: Timestamp.now(),
   });
+  faiSquillare(docRef.id);
   return docRef.id;
 };
 
@@ -167,6 +190,8 @@ export const getNotificationIcon = (type: NotificationType): string => {
       return 'megaphone';
     case 'badge_milestone':
       return 'trophy';
+    case 'nutrition_request':
+      return 'nutrition';
     default:
       return 'notifications';
   }
