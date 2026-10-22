@@ -143,22 +143,83 @@ describe('il pannello esiste e si raggiunge', () => {
 // guasto che non si può nominare è peggio.
 // ============================================================
 
+// ============================================================
+// 22 ottobre 2026, terza diagnosi — «Requiring unknown module 1192»
+// ------------------------------------------------------------
+// Il pannello ha finito il lavoro e ha detto il motivo vero. Non era
+// Firebase, non era iOS, non era il permesso: era il costruttore del
+// pacchetto.
+//
+// `firebase/messaging` veniva caricato con un `await import(...)`
+// dentro una funzione, e non era importato in modo statico da
+// NESSUNA parte del programma — quindi Metro non lo metteva nel
+// pacchetto, e al momento di usarlo quel modulo non c'era.
+//
+// Un import dinamico non è una promessa che il modulo esista: è una
+// richiesta di qualcosa che qualcun altro deve aver messo lì.
+//
+// Verificato sul pacchetto costruito: `applicationServerKey` — il
+// cuore dell'iscrizione — compariva ZERO volte in quello pubblicato,
+// e compare in quello nuovo.
+// ============================================================
+
+describe('il modulo delle notifiche finisce nel pacchetto', () => {
+  const leggi = (r: string): string =>
+    fs.readFileSync(path.join(__dirname, '..', '..', r), 'utf8');
+
+  it('l\'import è statico e in cima, dove il costruttore lo vede', () => {
+    const web = leggi('services/indirizzoPush.web.ts');
+    expect(web.split('\n')[0]).toMatch(/^import \{ getMessaging, getToken, isSupported \} from 'firebase\/messaging';/);
+  });
+
+  it('e non resta nessun import dinamico di firebase/messaging', () => {
+    const push = leggi('services/pushNotificationService.ts');
+    expect(push).not.toMatch(/import\('firebase\/messaging'\)/);
+    // si guarda il CODICE, non i commenti: qui sopra la parola
+    // «await import» compare proprio nella spiegazione del guasto
+    const web = leggi('services/indirizzoPush.web.ts')
+      .replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(web).not.toMatch(/import\(/);
+  });
+
+  // La libreria è fatta per i browser: dentro un pacchetto nativo
+  // all'avvio esploderebbe. Metro sceglie il file per piattaforma.
+  it('la versione nativa esiste e non tocca firebase/messaging', () => {
+    const nativo = leggi('services/indirizzoPush.ts');
+    expect(nativo).not.toMatch(/firebase\/messaging/);
+    expect(nativo).toMatch(/prendiIndirizzoPush/);
+  });
+
+  it('le due versioni hanno la stessa forma: chi le usa non deve sapere quale', () => {
+    const nativo = leggi('services/indirizzoPush.ts');
+    const web = leggi('services/indirizzoPush.web.ts');
+    expect(nativo).toMatch(/export const prendiIndirizzoPush = async \(\): Promise<EsitoIndirizzo>/);
+    expect(web).toMatch(/export const prendiIndirizzoPush = async \(\): Promise<EsitoIndirizzo>/);
+  });
+
+  it('e l\'iscrizione e la diagnosi passano dallo stesso pezzo', () => {
+    // due copie dello stesso lavoro divergono sempre, e a divergere
+    // sarebbe quella che dice se funziona
+    const push = leggi('services/pushNotificationService.ts');
+    expect((push.match(/prendiIndirizzoPush\(\)/g) || []).length).toBe(2);
+  });
+});
+
 describe('quando l\'iscrizione fallisce si dice PERCHÉ', () => {
   const leggi = (r: string): string =>
     fs.readFileSync(path.join(__dirname, '..', '..', r), 'utf8');
-  const push = leggi('services/pushNotificationService.ts');
+  const web = leggi('services/indirizzoPush.web.ts');
   const pannello = leggi('components/common/StatoNotifiche.tsx');
 
   it('ogni strada che non porta a un indirizzo lascia scritto il motivo', () => {
-    expect(push).toMatch(/motivo = 'questo browser non supporta/);
-    expect(push).toMatch(/motivo = 'manca la chiave/);
-    expect(push).toMatch(/motivo = 'service worker non disponibile'/);
-    expect(push).toMatch(/motivo = 'il sistema non ha restituito/);
+    expect(web).toMatch(/motivo: 'questo browser non supporta/);
+    expect(web).toMatch(/motivo: 'manca la chiave/);
+    expect(web).toMatch(/motivo: 'service worker non disponibile'/);
+    expect(web).toMatch(/motivo: 'il sistema non ha restituito/);
   });
 
   it('e l\'errore del sistema non si perde dentro il catch', () => {
-    const i = push.indexOf('} catch (err) {', push.indexOf('condizioniAvvisi'));
-    expect(push.slice(i, i + 220)).toMatch(/e\?\.code \|\| e\?\.message/);
+    expect(web).toMatch(/e\?\.code \|\| e\?\.message/);
   });
 
   it('il motivo arriva fino allo schermo, e si può copiare', () => {

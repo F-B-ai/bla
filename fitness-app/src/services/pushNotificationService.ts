@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { brand } from '../config/brand';
 import { CondizioniAvvisi } from '../domain/avvisoTelefono';
+import { prendiIndirizzoPush } from './indirizzoPush';
 
 let Notifications: any = null;
 
@@ -96,36 +96,14 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
  * In tutti e tre i casi resta l'avviso dentro l'app, che c'è sempre.
  */
 const registraIndirizzoWeb = async (userId: string): Promise<string | null> => {
-  try {
-    if (!webNotificationsSupported()) return null;
-    if (getNotificationStatus() !== 'granted') return null;
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return null;
+  if (!webNotificationsSupported()) return null;
+  if (getNotificationStatus() !== 'granted') return null;
 
-    const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
-    if (!(await isSupported())) return null;
+  const esito = await prendiIndirizzoPush();
+  if (!esito.token) return null;
 
-    const chiave = (brand as { vapidKey?: string }).vapidKey;
-    if (!chiave) return null;
-
-    // Si riusa il service worker che l'app ha già: due service worker
-    // sullo stesso sito litigano per chi mostra la notifica, e ne
-    // esce una doppia o nessuna.
-    const sw = (navigator as { serviceWorker?: { ready: Promise<unknown> } }).serviceWorker;
-    if (!sw) return null;
-    const registrazione = await sw.ready;
-    const token = await getToken(getMessaging(), {
-      vapidKey: chiave,
-      serviceWorkerRegistration: registrazione as never,
-    });
-    if (!token) return null;
-
-    await updateDoc(doc(db, 'users', userId), { pushToken: token }).catch(() => {});
-    return token;
-  } catch {
-    // Un indirizzo che non si riesce a prendere non deve rompere
-    // l'avvio dell'app: la notifica è un di più, entrare è il minimo.
-    return null;
-  }
+  await updateDoc(doc(db, 'users', userId), { pushToken: esito.token }).catch(() => {});
+  return esito.token;
 };
 
 /**
@@ -145,31 +123,9 @@ export const condizioniAvvisi = async (): Promise<CondizioniAvvisi> => {
   let motivo: string | undefined;
 
   if (supportato && getNotificationStatus() === 'granted') {
-    try {
-      const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
-      if (!(await isSupported())) {
-        motivo = 'questo browser non supporta i messaggi Firebase';
-      } else {
-        const chiave = (brand as { vapidKey?: string }).vapidKey;
-        const sw = (navigator as { serviceWorker?: { ready: Promise<unknown> } }).serviceWorker;
-        if (!chiave) {
-          motivo = 'manca la chiave dei certificati push';
-        } else if (!sw) {
-          motivo = 'service worker non disponibile';
-        } else {
-          const token = await getToken(getMessaging(), {
-            vapidKey: chiave,
-            serviceWorkerRegistration: (await sw.ready) as never,
-          });
-          indirizzo = !!token;
-          if (!token) motivo = 'il sistema non ha restituito nessun indirizzo';
-        }
-      }
-    } catch (err) {
-      indirizzo = false;
-      const e = err as { code?: string; message?: string };
-      motivo = e?.code || e?.message || String(err);
-    }
+    const esito = await prendiIndirizzoPush();
+    indirizzo = !!esito.token;
+    motivo = esito.motivo;
   }
 
   return {

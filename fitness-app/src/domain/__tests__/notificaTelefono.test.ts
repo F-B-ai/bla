@@ -40,17 +40,23 @@ describe('la chiave sta dove stanno le altre impostazioni', () => {
 describe('il telefono si iscrive', () => {
   const push = leggi('services/pushNotificationService.ts');
 
+  // Dal 22 ottobre 2026 il pezzo che parla con Firebase sta in un
+  // file per piattaforma: `indirizzoPush.web.ts` sul browser,
+  // `indirizzoPush.ts` sull'app nativa. Prima era un import dinamico
+  // dentro una funzione, e non finiva nel pacchetto.
+  const indirizzo = leggi('services/indirizzoPush.web.ts');
+
   it('chiede un indirizzo a Firebase e lo scrive sulla scheda della persona', () => {
-    expect(push).toMatch(/getToken\(getMessaging\(\)/);
-    expect(push).toMatch(/vapidKey: chiave/);
-    expect(push).toMatch(/updateDoc\(doc\(db, 'users', userId\), \{ pushToken: token \}\)/);
+    expect(indirizzo).toMatch(/getToken\(getMessaging\(\)/);
+    expect(indirizzo).toMatch(/vapidKey: chiave/);
+    expect(push).toMatch(/updateDoc\(doc\(db, 'users', userId\), \{ pushToken: esito\.token \}\)/);
   });
 
   it('riusa il service worker che l\'app ha già', () => {
     // due service worker sullo stesso sito litigano per chi mostra la
     // notifica: esce doppia, o non esce
-    expect(push).toMatch(/serviceWorkerRegistration: registrazione/);
-    expect(push).not.toMatch(/firebase-messaging-sw/);
+    expect(indirizzo).toMatch(/serviceWorkerRegistration: \(await sw\.ready\)/);
+    expect(indirizzo).not.toMatch(/firebase-messaging-sw/);
   });
 
   it('non si iscrive senza permesso, e non insiste', () => {
@@ -60,10 +66,12 @@ describe('il telefono si iscrive', () => {
   });
 
   it('e se non riesce non rompe l\'avvio: entrare viene prima', () => {
+    // l'errore si ferma dentro il pezzo che parla con Firebase e
+    // torna indietro come motivo, invece di propagarsi all'avvio
+    expect(indirizzo).toMatch(/catch \(err\)/);
+    expect(indirizzo).toMatch(/return \{ token: null, motivo:/);
     const i = push.indexOf('const registraIndirizzoWeb');
-    const blocco = push.slice(i, push.indexOf('export const registerPushToken'));
-    expect(blocco).toMatch(/catch \{/);
-    expect(blocco).toMatch(/return null;/);
+    expect(push.slice(i, i + 420)).toMatch(/if \(!esito\.token\) return null;/);
   });
 
   it('l\'iscrizione parte davvero: non è una funzione scritta e mai chiamata', () => {
