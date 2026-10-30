@@ -96,7 +96,6 @@ import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
 import { QRAccessScreen } from '../screens/owner/QRAccessScreen';
 import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
-import { RegistroScreen } from '../screens/owner/RegistroScreen';
 import { WorkoutHistoryScreen } from '../screens/shared/WorkoutHistoryScreen';
 import { GamificationScreen } from '../screens/student/GamificationScreen';
 import { BodyCompositionScreen } from '../screens/shared/BodyCompositionScreen';
@@ -309,14 +308,6 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'Team',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'people' : 'people-outline'} focused={focused} />,
-      }}
-    />
-    <OwnerTab.Screen
-      name="Registro"
-      component={RegistroScreen}
-      options={{
-        tabBarLabel: 'Registro',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'document-text' : 'document-text-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
