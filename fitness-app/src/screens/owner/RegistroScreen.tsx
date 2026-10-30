@@ -5,6 +5,9 @@ import {
 } from 'react-native';
 import { colors } from '../../config/theme';
 import { leggiRegistro } from '../../services/registroService';
+import { getCollaborators } from '../../services/authService';
+import { getTransactions } from '../../services/financialService';
+import { chiNonRegistra, RigaRicavo } from '../../domain/ricaviCollaboratore';
 import {
   VoceRegistro, descriviVoce, pesoVoce, filtraRegistro, daGuardare,
   riepilogoTutti, giorniDaUltimaVolta, RiepilogoPersona,
@@ -73,6 +76,7 @@ const RigaVoce: React.FC<{ v: VoceRegistro }> = ({ v }) => (
 
 export const RegistroScreen: React.FC = () => {
   const [voci, setVoci] = useState<VoceRegistro[]>([]);
+  const [fermi, setFermi] = useState<RigaRicavo[]>([]);
   const [caricando, setCaricando] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [vista, setVista] = useState<Vista>('persone');
@@ -80,7 +84,16 @@ export const RegistroScreen: React.FC = () => {
   const carica = useCallback(async () => {
     try {
       setErrore(null);
-      setVoci(await leggiRegistro(300));
+      const [righe, collaboratori, movimenti] = await Promise.all([
+        leggiRegistro(300),
+        getCollaborators().catch(() => []),
+        getTransactions().catch(() => []),
+      ]);
+      setVoci(righe);
+      // Chi ha allievi assegnati e non ha registrato un solo
+      // movimento. Non dice che non lavora: dice che nell'app non
+      // risulta — ed e' l'unica cosa che questi dati sostengono.
+      setFermi(chiNonRegistra(collaboratori, movimenti));
     } catch (e) {
       // Un elenco vuoto e un elenco non letto non sono la stessa
       // cosa, e confonderli qui sarebbe grave: direbbe «nessuno ha
@@ -150,6 +163,24 @@ export const RegistroScreen: React.FC = () => {
           </Text>
         )}
 
+        {!errore && vista === 'persone' && fermi.length > 0 && (
+          <View style={styles.fermi}>
+            <Text style={styles.fermiTitolo}>
+              Hanno allievi e non registrano niente
+            </Text>
+            {fermi.map((f) => (
+              <Text key={f.id} style={styles.fermiRiga}>
+                <Text style={styles.allarme}>{f.nome || 'Senza nome'}</Text>
+                {`  ·  ${f.allievi} ${f.allievi === 1 ? 'allievo' : 'allievi'} assegnati, nessun movimento`}
+              </Text>
+            ))}
+            <Text style={styles.fermiNota}>
+              Vuol dire che nell&apos;applicazione non risulta: non che non
+              abbia lavorato. Sono due cose diverse.
+            </Text>
+          </View>
+        )}
+
         {!errore && vista === 'persone' && persone.map((r) => (
           <RigaPersona key={r.chi} r={r} />
         ))}
@@ -192,6 +223,15 @@ const styles = StyleSheet.create({
     fontSize: 14, color: colors.textSecondary, lineHeight: 21,
     marginTop: 24, textAlign: 'center',
   },
+
+  fermi: {
+    backgroundColor: colors.surface, borderRadius: 12,
+    borderLeftWidth: 3, borderLeftColor: colors.error,
+    padding: 14, marginBottom: 14,
+  },
+  fermiTitolo: { fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: 8 },
+  fermiRiga: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 20, marginBottom: 3 },
+  fermiNota: { fontSize: 11.5, color: colors.textSecondary, lineHeight: 17, marginTop: 8 },
 
   scheda: {
     backgroundColor: colors.surface, borderRadius: 12,
