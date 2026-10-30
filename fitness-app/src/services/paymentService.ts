@@ -15,6 +15,7 @@ import { db } from '../config/firebase';
 import { messaggioPromemoria } from '../domain/patto';
 import { PaymentPlan, Installment, CollaboratorEarning, PaymentStatus } from '../types';
 import { scegliPiano, Scelta, TipoImpegnoPiano } from '../domain/piani';
+import { annota } from './registroService';
 
 const PAYMENTS_COLLECTION = 'paymentPlans';
 const EARNINGS_COLLECTION = 'collaboratorEarnings';
@@ -27,6 +28,12 @@ export const createPaymentPlan = async (
   const docRef = await addDoc(collection(db, PAYMENTS_COLLECTION), {
     ...plan,
     createdAt: Timestamp.now(),
+  });
+  annota({
+    azione: 'creato',
+    oggetto: 'pagamento',
+    oggettoId: docRef.id,
+    dettaglio: plan.totalAmount ? `${plan.totalAmount} euro` : undefined,
   });
   return docRef.id;
 };
@@ -54,6 +61,13 @@ export const markInstallmentPaid = async (
   );
   await updateDoc(doc(db, PAYMENTS_COLLECTION, planId), {
     installments: updated,
+  });
+  const rata = installments.find((i) => i.id === installmentId);
+  annota({
+    azione: 'modificato',
+    oggetto: 'pagamento',
+    oggettoId: planId,
+    dettaglio: `rata segnata come pagata${rata?.amount ? `, ${rata.amount} euro` : ''}`,
   });
 };
 
@@ -117,6 +131,7 @@ export const getUpcomingInstallments = async (
 
 export const deletePaymentPlan = async (planId: string): Promise<void> => {
   await deleteDoc(doc(db, PAYMENTS_COLLECTION, planId));
+  annota({ azione: 'eliminato', oggetto: 'pagamento', oggettoId: planId });
 };
 
 export const updatePaymentPlan = async (

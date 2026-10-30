@@ -368,8 +368,28 @@ service cloud.firestore {
             ['role', 'commissionPercentage', 'managerCommissionPercentage',
              'coachCommissionPercentage', 'managedPassword', 'person_id']
           )) ||
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['assignedStudents']) ||
+        // ------------------------------------------------------
+        // 30 ottobre 2026 — QUESTA RIGA NON AVEVA NESSUNA GUARDIA
+        // ------------------------------------------------------
+        // Era un ramo dell'OR senza controllo di ruolo e senza
+        // controllo d'identità: chiunque avesse un account —
+        // compreso un allievo — poteva riscrivere `assignedStudents`
+        // sulla scheda di CHIUNQUE. Nessuno ruba allievi così
+        // (l'assegnazione vera sta sulla scheda dell'allievo, e
+        // quella è di owner e manager), ma bastava per falsare il
+        // numero di allievi per collaboratore — cioè i conti con cui
+        // il titolare giudica chi lavora.
+        //
+        // Il caso legittimo è uno solo: l'allievo che si registra
+        // con un invito si aggiunge da solo all'elenco del suo
+        // coach. Quindi: lo staff può, e chiunque altro può toccare
+        // SOLO il proprio identificativo.
+        (request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['assignedStudents']) &&
+          (isStaff() ||
+            ('assignedStudents' in resource.data &&
+             request.resource.data.assignedStudents.removeAll([request.auth.uid])
+               == resource.data.assignedStudents.removeAll([request.auth.uid])))) ||
         // person_id del twin (M3, doc 02 §6.1): SET-ONCE — lo scrive
         // self o staff la prima volta, poi e' immutabile per tutti
         // tranne owner/manager (identita' stabile = base del twin)
@@ -378,7 +398,44 @@ service cloud.firestore {
           !('person_id' in resource.data) &&
           (request.auth.uid == userId || isStaff()))
       );
-      allow delete: if isStaff();
+      // ------------------------------------------------------------
+      // 30 ottobre 2026 — CANCELLARE UNA PERSONA ERA DI TUTTI
+      // ------------------------------------------------------------
+      // Qui c'era `isStaff()`: qualunque collaboratore poteva
+      // cancellare la scheda di chiunque — un allievo, un altro
+      // collaboratore, il titolare stesso — e non restava traccia da
+      // nessuna parte. Era esattamente il controllo che il titolare
+      // aveva chiesto di tenere per sé, scritto al contrario.
+      allow delete: if isOwner();
+    }
+
+    // ============================================================
+    // IL REGISTRO — chi ha fatto che cosa
+    // ------------------------------------------------------------
+    // Si scrive una volta e non si tocca più. `update` e `delete`
+    // sono falsi PER TUTTI, titolare compreso: un registro che il
+    // proprietario può correggere non dimostra niente davanti a
+    // nessuno, e il suo valore viene per intero dal fatto che non lo
+    // tocca neanche lui.
+    //
+    // Scrive chiunque sia autenticato, perché una riga la deve poter
+    // lasciare anche un allievo e anche un account appena declassato;
+    // legge solo il titolare, perché è un registro sulle persone e
+    // non un tabellone.
+    //
+    // `chi` è obbligatoriamente l'autore vero: senza questo vincolo
+    // chiunque potrebbe lasciare righe firmate da un altro, e il
+    // registro diventerebbe un modo per incastrare qualcuno invece
+    // che per sapere come sono andate le cose.
+    // ============================================================
+    match /registro/{voceId} {
+      allow read: if isOwner();
+      allow create: if isAuthenticated()
+        && request.resource.data.chi == request.auth.uid
+        && request.resource.data.keys().hasAll(
+             ['chi', 'chiNome', 'ruolo', 'azione', 'oggetto', 'quando']
+           );
+      allow update, delete: if false;
     }
 
     // ============================================================

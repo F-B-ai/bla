@@ -14,6 +14,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, storage, functions } from '../config/firebase';
 import { registraGuasto } from './guastiService';
+import { annota, impostaAutoreRegistro, dimenticaAutoreRegistro } from './registroService';
 import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
@@ -88,7 +89,20 @@ export const signIn = async (email: string, password: string): Promise<User> => 
     );
   }
 
-  return { ...userDoc.data(), id: userDoc.id } as User;
+  const profilo = { ...userDoc.data(), id: userDoc.id } as User;
+
+  // Da qui in poi il registro sa chi sta lavorando: il nome e il
+  // ruolo si prendono UNA volta, all'ingresso, e finiscono dentro
+  // ogni riga. Venti punti del programma annotano senza dover sapere
+  // come si recupera un profilo.
+  impostaAutoreRegistro(
+    profilo.id,
+    `${profilo.name || ''} ${profilo.surname || ''}`.trim(),
+    profilo.role
+  );
+  annota({ azione: 'entrato', oggetto: 'applicazione' });
+
+  return profilo;
 };
 
 export const registerOwner = async (
@@ -162,6 +176,7 @@ export const registerManager = async (
 };
 
 export const signOut = async (): Promise<void> => {
+  dimenticaAutoreRegistro();
   await firebaseSignOut(auth);
 };
 
@@ -570,14 +585,28 @@ export const getStudents = async (): Promise<Student[]> => {
 export const toggleUserActive = async (userId: string, isActive: boolean): Promise<void> => {
   const userRef = doc(db, 'users', userId);
   const userSnap = await getDoc(userRef);
+  const d = userSnap.exists() ? userSnap.data() : {};
   if (userSnap.exists()) {
     await updateDoc(userRef, { isActive });
   } else {
     await setDoc(userRef, { isActive }, { merge: true });
   }
+  annota({
+    azione: 'modificato',
+    oggetto: d.role === 'student' ? 'allievo' : 'collaboratore',
+    oggettoId: userId,
+    oggettoNome: `${d.name || ''} ${d.surname || ''}`.trim(),
+    dettaglio: isActive ? 'accesso riattivato' : 'accesso disattivato',
+  });
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
+  // IL NOME SI LEGGE PRIMA DI CANCELLARE. È l'unico momento in cui
+  // esiste ancora: dopo la riga del registro direbbe «ha eliminato
+  // allievo», senza dire quale, e non servirebbe a niente.
+  const prima = await getDoc(doc(db, 'users', userId)).catch(() => null);
+  const d = prima?.exists() ? prima.data() : {};
+
   // Eliminazione account Auth server-side (Cloud Function adminDeleteUser).
   // Se le Functions non sono ancora deployate (piano Spark), si elimina
   // comunque il profilo Firestore: l'account Auth orfano resta inutilizzabile
@@ -589,6 +618,14 @@ export const deleteUser = async (userId: string): Promise<void> => {
     // Auth deletion non disponibile — si procede con la pulizia Firestore
   }
   await deleteDoc(doc(db, 'users', userId));
+
+  annota({
+    azione: 'eliminato',
+    oggetto: d.role === 'student' ? 'allievo' : 'collaboratore',
+    oggettoId: userId,
+    oggettoNome: `${d.name || ''} ${d.surname || ''}`.trim(),
+    dettaglio: d.email ? String(d.email) : undefined,
+  });
 };
 
 export const removeStudentFromCollaborator = async (
