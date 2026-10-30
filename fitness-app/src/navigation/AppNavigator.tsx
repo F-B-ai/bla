@@ -312,6 +312,14 @@ const OwnerTabs = () => (
       }}
     />
     <OwnerTab.Screen
+      name="Registro"
+      component={RegistroScreen}
+      options={{
+        tabBarLabel: 'Registro',
+        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'document-text' : 'document-text-outline'} focused={focused} />,
+      }}
+    />
+    <OwnerTab.Screen
       name="Sessions"
       component={CalendarScreen}
       options={{
@@ -485,14 +493,6 @@ const OwnerTabs = () => (
       options={{
         tabBarLabel: 'Spazio',
         tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'server' : 'server-outline'} focused={focused} />,
-      }}
-    />
-    <OwnerTab.Screen
-      name="Registro"
-      component={RegistroScreen}
-      options={{
-        tabBarLabel: 'Registro',
-        tabBarIcon: ({ focused }) => <TabIcon name={focused ? 'document-text' : 'document-text-outline'} focused={focused} />,
       }}
     />
     <OwnerTab.Screen
