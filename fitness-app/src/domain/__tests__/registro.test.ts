@@ -194,3 +194,37 @@ describe('nessuno riscrive il passato', () => {
     expect(blocco).toMatch(/allow create: if isAuthenticated\(\)/);
   });
 });
+
+// ============================================================
+// 31 ottobre 2026, 01:15 — «SENZA NOME»
+// ------------------------------------------------------------
+// Il titolare apre il Registro per la prima volta e legge una riga
+// firmata «Senza nome». Era lui.
+//
+// L'autore lo impostava solo `signIn`. Ma chi ha già la sessione
+// aperta non passa mai di lì: riapre l'app e basta. Quindi ogni riga
+// di chi non si era appena autenticato nasceva senza nome — cioè
+// senza la cosa per cui il registro esiste.
+// ============================================================
+
+describe('il registro sa chi è anche a sessione già aperta', () => {
+  const auth = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'hooks', 'useAuth.ts'), 'utf8'
+  );
+
+  it("l'autore si imposta quando il profilo arriva, non solo al login", () => {
+    expect(auth).toMatch(/impostaAutoreRegistro\(/);
+    const i = auth.indexOf('impostaAutoreRegistro(');
+    // deve stare dentro il ramo che ha un profilo, non altrove
+    expect(auth.slice(i - 200, i)).toMatch(/if \(profile\)/);
+  });
+
+  it('e si dimentica quando la sessione cade', () => {
+    expect(auth).toMatch(/dimenticaAutoreRegistro\(\);/);
+  });
+
+  it('col nome e il cognome, non col solo identificativo', () => {
+    const i = auth.indexOf('impostaAutoreRegistro(');
+    expect(auth.slice(i, i + 220)).toMatch(/profile\.name.*profile\.surname/s);
+  });
+});

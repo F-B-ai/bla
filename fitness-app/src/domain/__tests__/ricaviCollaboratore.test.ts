@@ -21,10 +21,12 @@ import {
 const t = (collaboratorId: string, amount: number, type = 'income') =>
   ({ type, amount, collaboratorId });
 
+// `allievi` lo conta chi chiama, dalle schede degli allievi: vedi la
+// nota del 31 ottobre in ricaviCollaboratore.ts.
 const persone = [
-  { id: 'g', name: 'Giuseppe', surname: 'Esposito', assignedStudents: ['a1', 'a2', 'a3'] },
-  { id: 'a', name: 'Antonio', surname: 'Russo', assignedStudents: ['a4'] },
-  { id: 'n', name: 'Nuovo', surname: 'Arrivato', assignedStudents: [] },
+  { id: 'g', name: 'Giuseppe', surname: 'Esposito', allievi: 3 },
+  { id: 'a', name: 'Antonio', surname: 'Russo', allievi: 1 },
+  { id: 'n', name: 'Nuovo', surname: 'Arrivato', allievi: 0 },
 ];
 
 describe('si somma quello che è stato registrato, e basta', () => {
@@ -80,6 +82,26 @@ describe('chi ha allievi e non registra niente', () => {
   it("dal più grave: chi ha più allievi fermi viene per primo", () => {
     const r = chiNonRegistra(persone, []);
     expect(r.map((x) => x.id)).toEqual(['g', 'a']);
+  });
+});
+
+describe('il numero di allievi non viene dalla copia', () => {
+  // 31 ottobre 2026. Prima si leggeva `assignedStudents` sulla scheda
+  // del collaboratore: una copia che fino a ieri poteva riscrivere
+  // chiunque. Chi aveva la copia vuota e allievi veri spariva da
+  // questo elenco — e un'assenza qui si legge come un'assoluzione.
+  it('chi ha la copia vuota ma allievi veri compare lo stesso', () => {
+    const conCopiaVuota = [
+      { id: 'g', name: 'Giuseppe', surname: 'E.', allievi: 3, assignedStudents: [] },
+    ];
+    expect(chiNonRegistra(conCopiaVuota, []).map((x) => x.id)).toEqual(['g']);
+  });
+
+  it('e il campo della copia non viene nemmeno guardato', () => {
+    const conCopiaPiena = [
+      { id: 'x', name: 'X', surname: 'Y', allievi: 0, assignedStudents: ['a', 'b', 'c'] },
+    ];
+    expect(chiNonRegistra(conCopiaPiena, [])).toEqual([]);
   });
 });
 

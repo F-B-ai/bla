@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { colors } from '../../config/theme';
 import { leggiRegistro } from '../../services/registroService';
-import { getCollaborators } from '../../services/authService';
+import { getCollaborators, getStudents } from '../../services/authService';
+import { isStudentAssignedTo } from '../../utils/helpers';
 import { getTransactions } from '../../services/financialService';
 import { chiNonRegistra, RigaRicavo } from '../../domain/ricaviCollaboratore';
 import {
@@ -84,16 +85,29 @@ export const RegistroScreen: React.FC = () => {
   const carica = useCallback(async () => {
     try {
       setErrore(null);
-      const [righe, collaboratori, movimenti] = await Promise.all([
+      const [righe, collaboratori, movimenti, allievi] = await Promise.all([
         leggiRegistro(300),
         getCollaborators().catch(() => []),
         getTransactions().catch(() => []),
+        getStudents().catch(() => []),
       ]);
       setVoci(righe);
       // Chi ha allievi assegnati e non ha registrato un solo
       // movimento. Non dice che non lavora: dice che nell'app non
       // risulta — ed e' l'unica cosa che questi dati sostengono.
-      setFermi(chiNonRegistra(collaboratori, movimenti));
+      // Gli allievi si contano dalle schede degli allievi, non
+      // dall'elenco scritto sulla scheda del collaboratore: quella e'
+      // una copia, e una copia stantia qui si leggerebbe come
+      // un'assoluzione.
+      setFermi(chiNonRegistra(
+        collaboratori.map((c) => ({
+          id: c.id,
+          name: c.name,
+          surname: c.surname,
+          allievi: allievi.filter((a) => isStudentAssignedTo(a, c.id)).length,
+        })),
+        movimenti
+      ));
     } catch (e) {
       // Un elenco vuoto e un elenco non letto non sono la stessa
       // cosa, e confonderli qui sarebbe grave: direbbe «nessuno ha

@@ -66,11 +66,29 @@ export const etichettaRicavo = (r: Ricavo): string => {
   return `${Math.round(r.importo)} €`;
 };
 
+// ------------------------------------------------------------
+// 31 ottobre 2026, 01:15 — DA DOVE SI CONTANO GLI ALLIEVI
+// ------------------------------------------------------------
+// Prima qui si leggeva `assignedStudents`, l'elenco scritto sulla
+// scheda del collaboratore. È la copia, non l'originale:
+// l'assegnazione vera sta sulla scheda dell'allievo
+// (`assignedCollaboratorIds`), ed è quella che tutto il resto
+// dell'applicazione guarda. Fino a ieri quella copia la poteva
+// riscrivere chiunque fosse autenticato.
+//
+// Conseguenza: un collaboratore con la copia vuota e allievi veri
+// assegnati NON compariva fra chi non registra niente. Un'assenza
+// che si legge come un'assoluzione, ed è solo un campo stantio.
+//
+// Adesso il numero lo passa chi chiama, contandolo dagli allievi
+// veri con lo stesso criterio del resto dell'app.
+// ------------------------------------------------------------
 export interface PersonaConRicavo {
   id: string;
   name?: string;
   surname?: string;
-  assignedStudents?: string[];
+  /** quanti allievi ha davvero: contato dalle schede degli allievi */
+  allievi: number;
 }
 
 export interface RigaRicavo {
@@ -87,7 +105,7 @@ export const ricaviPerPersona = (
   id: p.id,
   nome: `${p.name || ''} ${p.surname ? `${p.surname.charAt(0)}.` : ''}`.trim(),
   ricavo: ricavoRegistrato(transazioni, p.id),
-  allievi: (p.assignedStudents || []).length,
+  allievi: p.allievi,
 }));
 
 /**

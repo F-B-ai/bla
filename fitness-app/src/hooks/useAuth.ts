@@ -4,6 +4,7 @@ import { attendiAlMassimo, SECONDI_PROFILO } from '../domain/avvio';
 import { auth } from '../config/firebase';
 import { User, UserRole } from '../types';
 import { getUserProfile, signIn, signOut } from '../services/authService';
+import { impostaAutoreRegistro, dimenticaAutoreRegistro } from '../services/registroService';
 
 interface AuthState {
   firebaseUser: FirebaseUser | null;
@@ -61,6 +62,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             SECONDI_PROFILO * 1000,
             'La copia locale dei dati non risponde (timeout lettura profilo).'
           );
+          // IL REGISTRO DEVE SAPERE CHI È.
+          //
+          // 31 ottobre 2026, 01:15. Il titolare apre il Registro e
+          // legge «Senza nome». Era lui. L'autore lo impostava solo
+          // `signIn` — ma chi ha già la sessione aperta non passa mai
+          // di lì: riapre l'app e basta. Quindi ogni riga di chi non
+          // si era appena autenticato nasceva senza nome, cioè senza
+          // la cosa per cui il registro esiste.
+          if (profile) {
+            impostaAutoreRegistro(
+              profile.id,
+              `${profile.name || ''} ${profile.surname || ''}`.trim(),
+              profile.role
+            );
+          }
           setState({
             firebaseUser: fbUser,
             userProfile: profile,
@@ -81,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
+        dimenticaAutoreRegistro();
         setState({
           firebaseUser: null,
           userProfile: null,
