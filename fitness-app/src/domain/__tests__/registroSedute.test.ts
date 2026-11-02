@@ -100,3 +100,53 @@ describe('annotare non rallenta e non rompe il lavoro', () => {
     expect(blocco).not.toMatch(/await annotaSeduta/);
   });
 });
+
+// ============================================================
+// 2 novembre 2026 — ANCHE LE SCHEDE
+// ------------------------------------------------------------
+// «Devi dirmi tutto quello che avviene nell'app.» Contati: quaranta
+// servizi scrivono, tre annotavano. programService — dodici
+// scritture, le schede e le programmazioni — non annotava niente.
+//
+// Era l'ultima delle tre mansioni del foglio del 23 settembre che il
+// Registro non vedeva: gli appuntamenti sì (punto 1.1), la chat non
+// esiste (punto 1.3), le schede no (punto 1.2).
+// ============================================================
+
+describe('le schede lasciano una riga', () => {
+  const schede = leggi('services/programService.ts');
+
+  it('quando si crea un piano di allenamento', () => {
+    const i = schede.indexOf('export const createWorkoutPlan');
+    expect(schede.slice(i, schede.indexOf('export const getStudentWorkoutPlans')))
+      .toMatch(/annotaScheda\('creato'/);
+  });
+
+  it('quando si crea un programma di seduta', () => {
+    const i = schede.indexOf('export const createProgram');
+    expect(schede.slice(i, i + 600)).toMatch(/annotaScheda\('creato'/);
+  });
+
+  it('quando si modifica', () => {
+    const i = schede.indexOf('export const updateWorkoutPlan');
+    expect(schede.slice(i, i + 900)).toMatch(/annotaScheda\('modificato'/);
+  });
+
+  it('quando si cancella, piano o programma', () => {
+    const a = schede.indexOf('export const deleteWorkoutPlan');
+    expect(schede.slice(a, a + 600)).toMatch(/annotaScheda\('eliminato'/);
+    const b = schede.indexOf('export const deleteProgram');
+    expect(schede.slice(b, b + 600)).toMatch(/annotaScheda\('eliminato'/);
+  });
+
+  it("e sulle cancellazioni l'allievo si legge PRIMA", () => {
+    const a = schede.indexOf('export const deleteWorkoutPlan');
+    const blocco = schede.slice(a, a + 600);
+    expect(blocco.indexOf('allievoDellaScheda')).toBeLessThan(blocco.indexOf('deleteDoc'));
+  });
+
+  it('e annotare non blocca il salvataggio della scheda', () => {
+    expect(schede).toMatch(/const annotaScheda = \([\s\S]{0,400}\): void => \{/);
+    expect(schede).not.toMatch(/await annotaScheda/);
+  });
+});
