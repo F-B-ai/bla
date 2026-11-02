@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { colors } from '../../config/theme';
 import { leggiRegistro } from '../../services/registroService';
-import { getCollaborators, getStudents } from '../../services/authService';
+import { getCollaborators, getManagers, getStudents } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 import { getTransactions } from '../../services/financialService';
 import { chiNonRegistra, RigaRicavo } from '../../domain/ricaviCollaboratore';
@@ -85,9 +85,10 @@ export const RegistroScreen: React.FC = () => {
   const carica = useCallback(async () => {
     try {
       setErrore(null);
-      const [righe, collaboratori, movimenti, allievi] = await Promise.all([
+      const [righe, collaboratori, manager, movimenti, allievi] = await Promise.all([
         leggiRegistro(300),
         getCollaborators().catch(() => []),
+        getManagers().catch(() => []),
         getTransactions().catch(() => []),
         getStudents().catch(() => []),
       ]);
@@ -99,8 +100,16 @@ export const RegistroScreen: React.FC = () => {
       // dall'elenco scritto sulla scheda del collaboratore: quella e'
       // una copia, e una copia stantia qui si leggerebbe come
       // un'assoluzione.
+      // 2 novembre 2026 — I MANAGER MANCAVANO.
+      // Qui si leggevano solo i collaboratori, e `getCollaborators`
+      // filtra su `role == 'collaborator'`. Un manager con ventuno
+      // allievi e zero movimenti era invisibile PER COSTRUZIONE: non
+      // compariva, e non comparire in questo elenco si legge come
+      // «su di lui non c'e' niente da dire».
+      //
+      // Chi segue allievi va guardato, qualunque etichetta abbia.
       setFermi(chiNonRegistra(
-        collaboratori.map((c) => ({
+        [...collaboratori, ...manager].map((c) => ({
           id: c.id,
           name: c.name,
           surname: c.surname,

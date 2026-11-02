@@ -156,3 +156,48 @@ describe('la cifra inventata non è più da nessuna parte', () => {
     });
   });
 });
+
+// ============================================================
+// 2 novembre 2026 — I MANAGER MANCAVANO
+// ------------------------------------------------------------
+// Il titolare apre il pannello e non vede Giuseppe, che ha ventuno
+// allievi assegnati e nessun movimento registrato. Vede solo Antonio,
+// che ne ha otto.
+//
+// Il motivo non era nei dati: la schermata leggeva solo
+// `getCollaborators()`, che filtra su `role == 'collaborator'`.
+// Giuseppe è un MANAGER. Era invisibile per costruzione.
+//
+// E non comparire in quell'elenco si legge come «su di lui non c'è
+// niente da dire»: la terza volta in questa storia che uno strumento
+// esiste e non arriva dove serve.
+// ============================================================
+
+describe('chi segue allievi si guarda, qualunque etichetta abbia', () => {
+  const leggiSchermata = (): string =>
+    fs.readFileSync(
+      path.join(__dirname, '..', '..', 'screens', 'owner', 'RegistroScreen.tsx'),
+      'utf8'
+    );
+
+  it('la schermata legge anche i manager, non solo i collaboratori', () => {
+    const s = leggiSchermata();
+    expect(s).toMatch(/getManagers/);
+    expect(s).toMatch(/\[\.\.\.collaboratori, \.\.\.manager\]/);
+  });
+
+  it('e un manager con allievi e zero movimenti compare', () => {
+    const manager = [{ id: 'g', name: 'Giuseppe', surname: 'Calabrese', allievi: 21 }];
+    const r = chiNonRegistra(manager, []);
+    expect(r).toHaveLength(1);
+    expect(r[0].allievi).toBe(21);
+  });
+
+  it('ordinati dal più grave: ventuno allievi fermi vengono prima di otto', () => {
+    const tutti = [
+      { id: 'a', name: 'Antonio', surname: 'C', allievi: 8 },
+      { id: 'g', name: 'Giuseppe', surname: 'Calabrese', allievi: 21 },
+    ];
+    expect(chiNonRegistra(tutti, []).map((x) => x.id)).toEqual(['g', 'a']);
+  });
+});
