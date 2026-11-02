@@ -576,18 +576,26 @@ service cloud.firestore {
     }
 
     // Collaborator earnings
+    // 9 novembre 2026, scelta A del titolare: i guadagni degli ALTRI
+    // non li vede nessuno tranne lui. Prima li leggevano owner e
+    // manager; adesso un manager (Giuseppe) vede solo i PROPRI, come
+    // un collaboratore. La creazione resta allo staff — un coach
+    // registra il proprio guadagno — ma correggere e cancellare sono
+    // del titolare.
     match /collaboratorEarnings/{earningId} {
-      allow read: if isOwnerOrManager() || resource.data.collaboratorId == request.auth.uid;
+      allow read: if isOwner() || resource.data.collaboratorId == request.auth.uid;
       allow create: if isStaff();
-      allow update: if isOwnerOrManager();
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
 
-    // Financial transactions
+    // Financial transactions — il registro commerciale dello studio.
+    // 9 novembre 2026, scelta A: incassi e movimenti sono del solo
+    // titolare. Il manager non li legge e non li scrive più.
     match /financialTransactions/{transactionId} {
-      allow read: if isOwnerOrManager();
-      allow create: if isOwnerOrManager();
-      allow update: if isOwnerOrManager();
+      allow read: if isOwner();
+      allow create: if isOwner();
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
 

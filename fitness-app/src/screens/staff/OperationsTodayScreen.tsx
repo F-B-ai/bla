@@ -50,7 +50,13 @@ export const OperationsTodayScreen: React.FC = () => {
   const { user, isOwner, isManager } = useAuth();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const canSeeMoney = isOwner || isManager;
+  // 9 novembre 2026. Il titolare, scelta A: «Nessuno — manager,
+  // nutrizionisti, collaboratori — deve vedere niente dei dati
+  // commerciali. Solo io». Prima era `isOwner || isManager`: il
+  // manager vedeva incassi, rate e la Coda del mattino di tutto lo
+  // studio. E un manager è Giuseppe. Adesso i soldi e la salute
+  // commerciale sono del solo titolare.
+  const canSeeMoney = isOwner;
 
   const [refreshing, setRefreshing] = useState(false);
   const [attention, setAttention] = useState<AttentionItem[]>([]);

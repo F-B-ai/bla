@@ -184,10 +184,14 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
   ],
   manager: [
     {
-      title: 'Gestione',
+      title: 'Il mio lavoro',
+      // 9 novembre 2026, scelta A del titolare: «Nessuno nei manager,
+      // nei nutrizionisti, nei collaboratori deve vedere niente. Solo
+      // io». Un manager è Giuseppe. Via «Dashboard completa» (i ricavi
+      // di tutta la sua squadra) e «Analytics» (le analisi dello
+      // studio): sono le attività commerciali che il titolare tiene
+      // per sé. Resta «I tuoi ricavi» — i SUOI, cioè i suoi conteggi.
       rows: [
-        { icon: 'speedometer-outline', title: 'Dashboard completa', route: 'DashboardCompleta' },
-        { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
         { icon: 'wallet-outline', title: 'I tuoi ricavi', route: 'Guadagni' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
       ],

@@ -40,10 +40,11 @@ describe('la coda del mattino non arriva a chi non vede i soldi', () => {
     expect(schermata).toMatch(/\{canSeeMoney && brainRows\.length > 0 &&/);
   });
 
-  // canSeeMoney = isOwner || isManager. Oggi la coda resta a owner e
-  // manager. Se il titolare deciderà di chiuderla anche ai manager,
-  // qui diventerà isOwner — e questo test lo ricorda.
-  it('il permesso è canSeeMoney (owner o manager), non isStaff', () => {
-    expect(schermata).toMatch(/const canSeeMoney = isOwner \|\| isManager;/);
+  // 9 novembre 2026, scelta A del titolare: la coda — e tutta la parte
+  // commerciale di questa schermata — è del SOLO titolare. Né manager
+  // né nutrizionisti. `canSeeMoney` è isOwner, non più isOwner||isManager.
+  it('il permesso è isOwner soltanto: nessun manager, nessun nutrizionista', () => {
+    expect(schermata).toMatch(/const canSeeMoney = isOwner;/);
+    expect(schermata).not.toMatch(/const canSeeMoney = isOwner \|\| isManager;/);
   });
 });
