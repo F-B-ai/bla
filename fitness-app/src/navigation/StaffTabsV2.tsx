@@ -199,9 +199,15 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
   collaborator: [
     {
       title: 'Il mio lavoro',
+      // 9 novembre 2026. Il titolare: «loro devono eseguire solamente,
+      // segnare la lezione e vedere i loro conteggi e i loro allievi.
+      // Le mie analisi no». «Analytics» mostra i ricavi di tutto lo
+      // studio: i soldi il database glieli negava già (sono di owner e
+      // manager), ma la VOCE restava nel menu e tentava la lettura.
+      // Un collaboratore vede i SUOI guadagni, non le analisi dello
+      // studio. Tolta.
       rows: [
         { icon: 'wallet-outline', title: 'I miei guadagni', route: 'Guadagni' },
-        { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
         { icon: 'hardware-chip-outline', title: 'Impostazioni AI', route: 'ImpostazioniAI' },
       ],
