@@ -22,9 +22,17 @@ service cloud.firestore {
       return isAttivo() && getUserRole() == 'owner';
     }
 
-    function isOwnerOrManager() {
-      return isAttivo() && getUserRole() in ['owner', 'manager'];
-    }
+    // 9 novembre 2026 — SCELTA A DEL TITOLARE
+    // «I manager non devono avere nessun potere.» Il manager diventa
+    // un esecutore come il collaboratore: tiene i poteri operativi
+    // (che passano da isStaff() — segnare sedute, leggere i propri
+    // allievi) e perde TUTTI quelli amministrativi, che prima passavano
+    // da isOwner() e adesso sono del solo titolare.
+    //
+    // La funzione è stata TOLTA di proposito, non svuotata: così se un
+    // giorno qualcuno riscrive una regola «isOwner()» per
+    // abitudine, la pubblicazione fallisce invece di ridare in silenzio
+    // un potere al manager. Il fallimento rumoroso è la guardia.
 
     function isStaff() {
       return isAttivo() && getUserRole() in ['owner', 'manager', 'collaborator'];
@@ -184,7 +192,7 @@ service cloud.firestore {
     // Log costi/uso AI: scrive SOLO il gateway (Admin SDK).
     // L'owner/manager li legge per il cruscotto costi.
     match /aiUsage/{docId} {
-      allow read: if isOwnerOrManager();
+      allow read: if isOwner();
       allow write: if false;
     }
 
@@ -286,7 +294,7 @@ service cloud.firestore {
         isStaff() || resource.data.studentId == request.auth.uid
       );
       allow create, update: if isStaff();
-      allow delete: if isOwnerOrManager()
+      allow delete: if isOwner()
         && resource.data.tipoSoggetto == 'interessato';
     }
 
@@ -362,7 +370,7 @@ service cloud.firestore {
       );
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
-        isOwnerOrManager() ||
+        isOwner() ||
         (request.auth.uid == userId &&
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(
             ['role', 'commissionPercentage', 'managerCommissionPercentage',
@@ -468,7 +476,7 @@ service cloud.firestore {
         request.resource.data.isUsed == true
       );
 
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     // Conteggio dei tentativi di validazione: lo scrive e lo legge
@@ -572,7 +580,7 @@ service cloud.firestore {
       allow read: if isStaff() || resource.data.studentId == request.auth.uid;
       allow create: if isStaff();
       allow update: if isAuthenticated();
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     // Collaborator earnings
@@ -604,7 +612,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     // Chat messages
@@ -612,7 +620,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated();
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     // Chat typing indicators
@@ -636,7 +644,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isStaff();
       allow update: if isStaff();
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     // Diary entries - dati personali sensibili
@@ -747,7 +755,7 @@ service cloud.firestore {
     match /comunicazioni/{comunicazioneId} {
       allow read: if isAuthenticated();
       allow create, update: if isStaff();
-      allow delete: if isOwnerOrManager();
+      allow delete: if isOwner();
     }
 
     match /notifications/{notificationId} {
@@ -766,17 +774,17 @@ service cloud.firestore {
     // KPI targets
     match /kpiTargets/{targetId} {
       allow read: if isAuthenticated();
-      allow create: if isOwnerOrManager();
-      allow update: if isOwnerOrManager();
+      allow create: if isOwner();
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
 
     // Daily tasks
     match /dailyTasks/{taskId} {
-      allow read: if isOwnerOrManager();
-      allow create: if isOwnerOrManager();
-      allow update: if isOwnerOrManager();
-      allow delete: if isOwnerOrManager();
+      allow read: if isOwner();
+      allow create: if isOwner();
+      allow update: if isOwner();
+      allow delete: if isOwner();
     }
 
     // Custom workout templates
@@ -789,9 +797,9 @@ service cloud.firestore {
 
     // Credential change requests
     match /credentialRequests/{requestId} {
-      allow read: if isOwnerOrManager() || resource.data.userId == request.auth.uid;
+      allow read: if isOwner() || resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated();
-      allow update: if isOwnerOrManager();
+      allow update: if isOwner();
       allow delete: if isOwner();
     }
 
