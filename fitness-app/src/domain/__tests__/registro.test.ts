@@ -228,3 +228,52 @@ describe('il registro sa chi è anche a sessione già aperta', () => {
     expect(auth.slice(i, i + 220)).toMatch(/profile\.name.*profile\.surname/s);
   });
 });
+
+// ============================================================
+// 2 novembre 2026 — «DAMMI LA SICUREZZA CHE SCRIVE TUTTO»
+// ------------------------------------------------------------
+// La persona, l'allievo, quando e a che ora. Sono andato a provarlo
+// invece di rispondere a memoria, e l'ora c'era ma l'ANNO no: la
+// riga diceva «2 nov, 14:37».
+//
+// Fra otto mesi, o davanti a qualcuno che chiede quando, quella riga
+// non vale niente — non si distingue dal 2 novembre dell'anno prima.
+// Un registro senza anno non è una prova: è un appunto.
+// ============================================================
+
+describe('la riga dice la persona, l\'allievo, il giorno e l\'ora', () => {
+  const schermata = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'owner', 'RegistroScreen.tsx'), 'utf8'
+  );
+
+  it('la data porta anche l\'anno', () => {
+    const i = schermata.indexOf('const quando =');
+    const blocco = schermata.slice(i, i + 300);
+    expect(blocco).toMatch(/year: 'numeric'/);
+    expect(blocco).toMatch(/hour: '2-digit'/);
+    expect(blocco).toMatch(/minute: '2-digit'/);
+  });
+
+  it('e si formatta con toLocaleString, non con la sola data', () => {
+    const i = schermata.indexOf('const quando =');
+    expect(schermata.slice(i, i + 200)).toMatch(/toLocaleString\('it-IT'/);
+  });
+
+  it('la riga mostra anche il ruolo di chi ha agito', () => {
+    expect(schermata).toMatch(/v\.ruolo \? ` · \$\{v\.ruolo\}`/);
+  });
+
+  it('e il testo porta persona e allievo dentro la stessa frase', () => {
+    const v: VoceRegistro = {
+      chi: 'g', chiNome: 'Giuseppe Calabrese', ruolo: 'manager',
+      azione: 'modificato', oggetto: 'lezione',
+      oggettoId: 's1', oggettoNome: 'Mario Milo',
+      quando: new Date('2026-11-02T14:37:00'),
+      dettaglio: 'segnata come svolta',
+    };
+    const riga = descriviVoce(v);
+    expect(riga).toContain('Giuseppe Calabrese');
+    expect(riga).toContain('Mario Milo');
+    expect(riga).toContain('lezione');
+  });
+});

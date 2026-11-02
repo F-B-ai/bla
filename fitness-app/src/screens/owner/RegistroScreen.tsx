@@ -31,8 +31,16 @@ import {
 
 type Vista = 'persone' | 'guardare' | 'tutto';
 
-const quando = (d: Date): string => d.toLocaleDateString('it-IT', {
-  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+// 2 novembre 2026. «Dammi la sicurezza che il registro scrive tutto:
+// la persona, l'allievo, quando e a che ora.»
+//
+// Sono andato a provarlo invece di risponderlo: l'ora c'era, l'ANNO
+// no. Veniva fuori «2 nov, 14:37». Fra otto mesi, o davanti a
+// qualcuno che chiede quando, quella riga non vale niente: non si
+// distingue dal 2 novembre dell'anno prima.
+const quando = (d: Date): string => d.toLocaleString('it-IT', {
+  day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit',
 });
 
 const RigaPersona: React.FC<{ r: RiepilogoPersona }> = ({ r }) => {
@@ -69,7 +77,9 @@ const RigaVoce: React.FC<{ v: VoceRegistro }> = ({ v }) => (
     <View style={styles.voceCorpo}>
       <Text style={styles.voceTesto}>{descriviVoce(v)}</Text>
       <Text style={styles.voceSotto}>
-        {quando(v.quando)}{v.dettaglio ? ` · ${v.dettaglio}` : ''}
+        {quando(v.quando)}
+        {v.ruolo ? ` · ${v.ruolo}` : ''}
+        {v.dettaglio ? ` · ${v.dettaglio}` : ''}
       </Text>
     </View>
   </View>
