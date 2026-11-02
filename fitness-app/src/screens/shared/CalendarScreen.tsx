@@ -70,8 +70,7 @@ import {
 } from '../../domain/piani';
 import { valutaAnnullamento } from '../../domain/annullamento';
 import {
-  Mancanza, mancanza, descriviMancanze, titoloMancanze,
-} from '../../domain/caricamentoAgenda';
+  Mancanza, mancanza, descriviMancanze, titoloMancanze, vaSegnalataMancanzaOspiti } from '../../domain/caricamentoAgenda';
 import {
   permessiAgenda, spiegaNienteAnnullo, spiegaNienteEliminazione,
 } from '../../domain/permessiAgenda';
@@ -319,7 +318,12 @@ export const CalendarScreen: React.FC = () => {
         // Se dicono di no, arriva un errore e si vede. Un permesso si
         // fa rispettare dove conta, non nascondendo la domanda.
         getOspitiConfermati().catch((e) => {
-          mancanti.push(mancanza('ospiti', e));
+          // Un collaboratore NON può leggere gli ospiti, ed è giusto:
+          // sono contatti del titolare. Per lui il permission-denied
+          // è lo stato normale, non un guasto — e un allarme su una
+          // cosa che funziona fa smettere di fidarsi degli allarmi
+          // veri. Si segnala SOLO a chi avrebbe il diritto: il titolare.
+          if (vaSegnalataMancanzaOspiti(e, isOwner)) mancanti.push(mancanza('ospiti', e));
           return { ospiti: [], troncato: false, letti: 0, confermate: 0 };
         }),
       ]);

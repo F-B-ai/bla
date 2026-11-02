@@ -89,3 +89,57 @@ describe('versione', () => {
     expect(CARICAMENTO_AGENDA_VERSION).toBe(1);
   });
 });
+
+// ============================================================
+// 9 novembre 2026 — L'ALLARME CHE SPAVENTAVA CHI NON DOVEVA
+// ------------------------------------------------------------
+// Un collaboratore (non Giuseppe, non Antonio) apre il calendario e
+// vede un allarme rosso: «Non sono riuscito a leggere le consulenze
+// con persone non ancora in anagrafica · permission-denied».
+//
+// Non era un guasto. Gli ospiti sono contatti del titolare, e un
+// collaboratore non deve leggerli: il database fa il suo lavoro. Ma
+// lo schermo chiedeva comunque e trasformava un «no» previsto in un
+// allarme — su una cosa che funziona.
+// ============================================================
+
+import { vaSegnalataMancanzaOspiti, ERRORE_PERMESSO } from '../caricamentoAgenda';
+
+describe('un permesso negato sugli ospiti non è sempre un guasto', () => {
+  const permessoNegato = { code: ERRORE_PERMESSO, message: 'Missing or insufficient permissions.' };
+
+  it('a un collaboratore il permesso negato NON si segnala: è lo stato normale', () => {
+    expect(vaSegnalataMancanzaOspiti(permessoNegato, false)).toBe(false);
+  });
+
+  // È il caso per cui la lettura si tenta sempre: se il ruolo del
+  // titolare non si legge bene, gli ospiti non devono sparire muti.
+  it('al titolare il permesso negato SI segnala: per lui è un guasto vero', () => {
+    expect(vaSegnalataMancanzaOspiti(permessoNegato, true)).toBe(true);
+  });
+
+  it('qualunque altro errore si segnala sempre, a chiunque', () => {
+    const rete = { code: 'unavailable', message: 'network error' };
+    expect(vaSegnalataMancanzaOspiti(rete, false)).toBe(true);
+    expect(vaSegnalataMancanzaOspiti(rete, true)).toBe(true);
+    expect(vaSegnalataMancanzaOspiti(new Error('boom'), false)).toBe(true);
+  });
+});
+
+describe('la schermata applica la regola, non la reinventa', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const cal = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'shared', 'CalendarScreen.tsx'), 'utf8'
+  );
+
+  it('il calendario filtra il fallimento ospiti con la funzione del dominio', () => {
+    expect(cal).toMatch(/if \(vaSegnalataMancanzaOspiti\(e, isOwner\)\) mancanti\.push/);
+  });
+
+  // La lettura si TENTA ancora per tutti: è questo che protegge il
+  // titolare dal guasto silenzioso. Si filtra l'avviso, non la domanda.
+  it('la lettura degli ospiti si chiede comunque, non si salta per ruolo', () => {
+    expect(cal).toMatch(/getOspitiConfermati\(\)\.catch/);
+  });
+});

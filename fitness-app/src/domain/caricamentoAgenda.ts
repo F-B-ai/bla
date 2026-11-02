@@ -62,6 +62,43 @@ export const mancanza = (pezzo: PezzoAgenda, errore: unknown): Mancanza => ({
   motivo: motivoLeggibile(errore) || undefined,
 });
 
+// ------------------------------------------------------------
+// 9 novembre 2026 — UN «PERMESSO NEGATO» NON È SEMPRE UN GUASTO
+// ------------------------------------------------------------
+// Un collaboratore apre il calendario e vede un allarme rosso: «Non
+// sono riuscito a leggere le consulenze con persone non ancora in
+// anagrafica · permission-denied».
+//
+// Non era un guasto. Gli ospiti sono contatti del titolare
+// (`bookingRequests: if isOwner()`), e un collaboratore NON deve
+// leggerli: il database sta facendo il suo lavoro. Ma lo schermo
+// chiedeva comunque — scelta mia, per non far sparire gli ospiti in
+// silenzio al TITOLARE il giorno che il suo ruolo non si legge bene —
+// e per il collaboratore quel «no» previsto diventava un allarme su
+// una cosa che funziona.
+//
+// Un allarme rosso su qualcosa che va bene è il modo più sicuro di
+// far smettere la gente di dare retta agli allarmi veri.
+export const ERRORE_PERMESSO = 'permission-denied';
+
+/**
+ * Il fallimento di lettura degli ospiti si segnala SOLO a chi avrebbe
+ * il diritto di leggerli — il titolare. A un collaboratore il permesso
+ * negato è lo stato normale, e si tace.
+ *
+ * Qualunque ALTRO errore (rete, timeout, server) si segnala sempre, a
+ * chiunque: quello è un guasto vero per tutti, titolare compreso.
+ */
+export const vaSegnalataMancanzaOspiti = (
+  errore: unknown,
+  puoLeggereOspiti: boolean
+): boolean => {
+  const codice = String((errore as { code?: string })?.code || '').trim();
+  const permessoNegato = codice === ERRORE_PERMESSO;
+  if (permessoNegato && !puoLeggereOspiti) return false;
+  return true;
+};
+
 const elenco = (nomi: string[]): string =>
   nomi.length === 1
     ? nomi[0]
