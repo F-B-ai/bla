@@ -752,9 +752,14 @@ service cloud.firestore {
     // La scrive lo staff, la legge chi è dentro. Si cancella solo dal
     // titolare: una comunicazione tolta dalla bacheca sparisce per
     // tutti, e non è una decisione da collaboratore.
+    // 5 novembre 2026, scelta A: un avviso a tutto lo studio lo manda
+    // solo il titolare. Prima create/update erano isStaff(): un
+    // collaboratore o un manager poteva mandare una comunicazione a
+    // tutti, e senza lasciare traccia. Adesso lo manda l'owner, e il
+    // Registro lo scrive (vedi comunicazioneService).
     match /comunicazioni/{comunicazioneId} {
       allow read: if isAuthenticated();
-      allow create, update: if isStaff();
+      allow create, update: if isOwner();
       allow delete: if isOwner();
     }
 

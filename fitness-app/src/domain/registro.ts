@@ -50,6 +50,7 @@ export type OggettoRegistro =
   | 'scheda'
   | 'consulenza'
   | 'contenuto'
+  | 'avviso'
   | 'applicazione';
 
 export interface VoceRegistro {
@@ -89,6 +90,7 @@ const ETICHETTE_OGGETTO: Record<OggettoRegistro, string> = {
   scheda: 'scheda',
   consulenza: 'consulenza',
   contenuto: 'contenuto',
+  avviso: 'avviso',
   applicazione: "nell'applicazione",
 };
 
