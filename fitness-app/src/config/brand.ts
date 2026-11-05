@@ -37,6 +37,17 @@ export const brand = {
     measurementId: 'G-QLVE494VJR',
   },
 
+  // --- La chiave per le notifiche che arrivano a telefono chiuso ---
+  // È la chiave PUBBLICA dei certificati push web (VAPID), generata
+  // dalla console Firebase il 22 ottobre 2026. È pubblica per
+  // costruzione: viaggia dentro il programma che gira sul telefono di
+  // chiunque apra l'app, esattamente come apiKey qui sopra. La metà
+  // segreta resta su Firebase e non esce di lì.
+  //
+  // Senza questa, il telefono non si iscrive e il server non sa dove
+  // bussare: la notifica non arriva e nessuno se ne accorge.
+  vapidKey: 'BFRwVMrLKhEpO2Zixak3JarDTOsgbcxqsmWksX9QJ4VC-Bni7sDIUPt3EDKJ0RtcYGFnmpZQF441zDvt0gkE89A',
+
   // --- URL pubblico dell'istanza (per QR, condivisioni, ecc.) ---
   appUrl: 'https://essere-3fe6f.web.app',
 

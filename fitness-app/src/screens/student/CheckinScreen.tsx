@@ -84,7 +84,10 @@ export const CheckinScreen: React.FC = () => {
       : user.email || 'Utente';
 
     try {
-      const result = await registerCheckin(user.id, displayName, method);
+      // Il ruolo viaggia col check-in: dal 12 ottobre 2026 l'ingresso lo
+      // registra anche chi lavora qui, e il registro deve poter
+      // distinguere un allievo da un collaboratore.
+      const result = await registerCheckin(user.id, displayName, method, user.role);
       if (result.success) {
         setState('success');
       } else if (result.alreadyCheckedIn) {

@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
+import { StatoNotifiche } from '../../components/common/StatoNotifiche';
 import { Button } from '../../components/common/Button';
 import { InputField } from '../../components/common/InputField';
 import { crossAlert } from '../../utils/alert';
@@ -525,6 +526,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ targetUserId, targ
           <Text style={styles.avatarHint}>Tocca per cambiare la foto</Text>
         </View>
       </Card>
+
+      {/* Le notifiche sul telefono, e perché non arrivano.
+          Sta in alto, subito sotto la foto: quando una notifica non
+          arriva questa è la prima cosa da guardare, e una cosa da
+          guardare per prima non si mette in fondo.
+          Solo sul proprio profilo: lo stato è di QUESTO telefono, e
+          mostrarlo mentre si guarda la scheda di un altro direbbe una
+          cosa falsa su di lui. */}
+      {!isEditingOther && !!profileUser.id && (
+        <StatoNotifiche userId={profileUser.id} />
+      )}
 
       {/* Info utente */}
       <Card variant="elevated">

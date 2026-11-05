@@ -685,8 +685,19 @@ ${PROCEDURA.map((p) => `
               </View>
             </View>
 
+            {/* L'etichetta diceva «è già stata pagata», e copriva un caso
+                solo. Quando la valutazione è COMPRESA nel percorso — come
+                nel percorso a distanza — non è stata pagata a parte: è
+                dentro. Chi cercava quel caso non riconosceva questo
+                interruttore e lasciava la valutazione nel conto. Una
+                parola sbagliata rende invisibile una funzione che c'è. */}
             <View style={s.switchRiga}>
-              <Text style={s.corpo}>La valutazione è già stata pagata</Text>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={s.corpo}>La valutazione non si paga a parte</Text>
+                <Text style={s.switchNota}>
+                  Già pagata prima, oppure compresa nel percorso
+                </Text>
+              </View>
               <Switch
                 value={valutazionePagata}
                 onValueChange={setValutazionePagata}
@@ -697,6 +708,11 @@ ${PROCEDURA.map((p) => `
 
           <View style={[s.card, { borderColor: colors.accent }]}>
             <Text style={s.cardTitle}>Il conto</Text>
+            <Text style={s.muted}>
+              Questo documento porta anche LE MISURE che hai raccolto e che cosa
+              dicono messe insieme: è quello da leggere insieme all'allievo,
+              in studio o in videochiamata.
+            </Text>
             {piano.righe.map((r, i) => (
               <View key={i} style={s.riga}>
                 <View style={{ flex: 1 }}>
@@ -954,6 +970,9 @@ const s = StyleSheet.create({
   prioritaTitolo: { color: colors.text, fontSize: fontSize.md, fontWeight: '700', flex: 1 },
   tag: { borderWidth: 1, borderRadius: borderRadius.round, paddingHorizontal: 8, paddingVertical: 1 },
   tagTxt: { fontSize: fontSize.xs, fontWeight: '700' },
+  switchNota: {
+    color: colors.textLight, fontSize: fontSize.xs, marginTop: 2, lineHeight: 15,
+  },
   switchRiga: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     marginTop: spacing.sm,

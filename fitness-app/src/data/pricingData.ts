@@ -4,6 +4,11 @@
 // (conoscenza prezzi). Un solo punto di verità.
 // ============================================================
 
+import {
+  QUOTE_GRUPPO, euroIt, incassoGruppoDi,
+  PREZZO_AFFIANCAMENTO, AFFIANCAMENTO_MIN_MESE, AFFIANCAMENTO_MAX_MESE,
+} from '../domain/listino';
+
 export interface PricingTier {
   id: string;
   title: string;
@@ -11,7 +16,7 @@ export interface PricingTier {
   registrationFee: number;
   durationMonths: number;
   icon: string;
-  category: 'gym' | 'premium' | 'personal' | 'postural';
+  category: 'gym' | 'premium' | 'personal' | 'postural' | 'gruppo' | 'affiancamento';
   features: string[];
   highlight?: string;
   highlightColor?: string;
@@ -118,6 +123,65 @@ export const TIERS: PricingTier[] = [
       'Conducibile anche dagli istruttori dello studio, col programma unico',
     ],
   },
+  // ----------------------------------------------------------
+  // IL PERSONAL DI GRUPPO — deciso l'8 ottobre 2026
+  // ----------------------------------------------------------
+  // I prezzi non sono scritti qui: vengono da domain/listino.ts, che
+  // è lo stesso posto da cui li prende l'agenda. Il 12 settembre un
+  // prezzo scritto due volte ha fatto dire all'assistente una cifra
+  // e creare al pulsante un'altra: non si ripete.
+  //
+  // La quota a testa scende e l'ora rende di più: in due 40 €, in tre
+  // 45, in quattro 46 — più di una seduta individuale col direttore
+  // tecnico. È questo che rende il gruppo una cosa sensata e non uno
+  // sconto travestito.
+  ...[2, 3, 4].map((n) => ({
+    id: `gruppo_${n}`,
+    title: n === 2 ? 'Personal in coppia' : `Personal di gruppo — ${n} persone`,
+    amount: QUOTE_GRUPPO[n],
+    registrationFee: 0,
+    durationMonths: 1,
+    icon: n === 2 ? '👥' : '👨‍👩‍👧',
+    category: 'gruppo' as const,
+    priceLabel: `€${euroIt(QUOTE_GRUPPO[n])}`,
+    priceNote: `a persona, a seduta · ${euroIt(incassoGruppoDi(n) as number)} € la seduta`,
+    courseType: n === 2 ? 'Personal in coppia' : `Personal di gruppo ${n}`,
+    features: [
+      `Si allenano ${n === 2 ? 'in due' : `in ${n}`}, nello stesso orario`,
+      'Programma individuale per ciascuno, non una lezione collettiva',
+      `Ogni partecipante paga la sua quota: ${euroIt(QUOTE_GRUPPO[n])} € a seduta`,
+      'In agenda si crea un appuntamento per ciascuno, così ognuno ha la sua storia',
+    ],
+  })),
+
+  // ----------------------------------------------------------
+  // L'AFFIANCAMENTO — deciso l'8 ottobre 2026
+  // ----------------------------------------------------------
+  // Da quattro a sei lezioni al mese. Il minimo conta più del prezzo:
+  // sotto le quattro è una lezione ogni tanto, e una lezione ogni
+  // tanto non cambia niente in chi la riceve.
+  ...Array.from(
+    { length: AFFIANCAMENTO_MAX_MESE - AFFIANCAMENTO_MIN_MESE + 1 },
+    (_, i) => AFFIANCAMENTO_MIN_MESE + i
+  ).map((n) => ({
+    id: `affiancamento_${n}`,
+    title: `Affiancamento — ${n} lezioni al mese`,
+    amount: n * PREZZO_AFFIANCAMENTO,
+    registrationFee: 0,
+    durationMonths: 1,
+    icon: '🤝',
+    category: 'affiancamento' as const,
+    priceLabel: `€${euroIt(n * PREZZO_AFFIANCAMENTO)}/mese`,
+    priceNote: `${n} lezioni · ${PREZZO_AFFIANCAMENTO} € a lezione`,
+    courseType: `Affiancamento ${n} lezioni al mese`,
+    features: [
+      `${n} lezioni al mese, ${PREZZO_AFFIANCAMENTO} € a lezione`,
+      'Condotto da un istruttore, da un manager o dal direttore tecnico',
+      'Si allena da solo e viene seguito: non è una seduta di personal',
+      `Il minimo è ${AFFIANCAMENTO_MIN_MESE} lezioni al mese — sotto, non cambia niente`,
+    ],
+  })),
+
   {
     // Sostituisce l'«Analisi Posturale Singola» a €49: un esame isolato
     // senza lettura né protocollo svaluta il lavoro che lo circonda.
@@ -171,6 +235,16 @@ export const PRICING_NOTES = [
   // che lo stava dicendo agli allievi.
   'La valutazione Mind Movement™ è compresa nei piani annuali PREMIUM. '
   + 'Con gli altri piani si acquista a parte, a €150.',
+  `Personal di gruppo: in coppia €${euroIt(QUOTE_GRUPPO[2])} a persona a seduta, `
+  + `in tre €${euroIt(QUOTE_GRUPPO[3])}, in quattro €${euroIt(QUOTE_GRUPPO[4])}. `
+  + 'Ognuno ha il suo programma e paga la sua quota: non è una lezione collettiva, '
+  + 'è personal condotto in contemporanea. Per gruppi di cinque la quota la stabilisce '
+  + 'il direttore tecnico caso per caso.',
+  `Affiancamento: da ${AFFIANCAMENTO_MIN_MESE} a ${AFFIANCAMENTO_MAX_MESE} lezioni al `
+  + `mese, €${PREZZO_AFFIANCAMENTO} a lezione (${AFFIANCAMENTO_MIN_MESE} lezioni = `
+  + `€${euroIt(AFFIANCAMENTO_MIN_MESE * PREZZO_AFFIANCAMENTO)} al mese). Lo conduce un `
+  + 'istruttore, un manager o il direttore tecnico, e il prezzo non cambia con chi lo '
+  + `conduce. Sotto le ${AFFIANCAMENTO_MIN_MESE} lezioni al mese non si attiva.`,
   'Quota di iscrizione palestra: €35 una tantum (solo piani Mensile/Trimestrale/Semestrale).',
   "Bonus pagamento annuale in un'unica soluzione: 1 mese in regalo + T-shirt Mind Movement Lab.",
   'Pagamento semestrale dei piani annuali tramite contratto: possibile ma senza bonus.',

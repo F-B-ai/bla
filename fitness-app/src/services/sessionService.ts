@@ -7,6 +7,7 @@ import {
   updateDoc,
   getDocs,
   deleteDoc,
+  getDoc,
   query,
   where,
   limit,
@@ -16,6 +17,9 @@ import {
 import { db } from '../config/firebase';
 import { TrainingSession, SessionStatus } from '../types';
 import { ORE_LIMITE } from '../domain/annullamento';
+import { senzaIndefiniti } from '../domain/salvataggio';
+import { annota } from './registroService';
+import { AzioneRegistro } from '../domain/registro';
 
 const SESSIONS_COLLECTION = 'sessions';
 // Il numero era scritto qui, e di nuovo in nutritionistService, e di
@@ -23,14 +27,58 @@ const SESSIONS_COLLECTION = 'sessions';
 // in domain/annullamento.ts insieme alla regola che lo usa.
 const CANCELLATION_HOURS_LIMIT = ORE_LIMITE;
 
+// ============================================================
+// LE SEDUTE FINISCONO NEL REGISTRO
+// ------------------------------------------------------------
+// 2 novembre 2026. Il titolare: «il registro, mi devi dire tutto
+// quello che avverrà». Sono andato a leggere i punti dove si annota
+// e ho trovato il buco: erano sei, e nessuno riguardava le sedute.
+//
+// Avevo scritto al titolare che se qualcuno avesse inserito quaranta
+// appuntamenti in una sera, il Registro ne avrebbe tenuto traccia.
+// Non era vero: questo file non annotava niente. Sarebbe andato a
+// una conversazione difficile contando su uno strumento che non
+// esisteva.
+//
+// Il nome dell'allievo si risolve qui dentro e in modo asincrono,
+// perché la riga deve restare leggibile anche quando quella scheda
+// non ci sarà più — e perché chi fissa un appuntamento non deve
+// aspettare una lettura in più per vederlo salvato.
+// ============================================================
+const annotaSeduta = (
+  azione: AzioneRegistro,
+  sessionId: string,
+  studentId: string,
+  dettaglio?: string
+): void => {
+  void (async () => {
+    let nome = '';
+    try {
+      const snap = await getDoc(doc(db, 'users', studentId));
+      if (snap.exists()) {
+        const d = snap.data() as { name?: string; surname?: string };
+        nome = `${d.name || ''} ${d.surname || ''}`.trim();
+      }
+    } catch {
+      // senza nome la riga vale meno, ma esiste: meglio di niente
+    }
+    annota({ azione, oggetto: 'lezione', oggettoId: sessionId, oggettoNome: nome, dettaglio });
+  })();
+};
+
 export const createSession = async (
   session: Omit<TrainingSession, 'id'>
 ): Promise<string> => {
-  const docRef = await addDoc(collection(db, SESSIONS_COLLECTION), {
+  // `senzaIndefiniti`: un campo lasciato in bianco non si scrive. Senza
+  // questo, una seduta creata senza costo — cioè quasi tutte quelle
+  // dentro un pacchetto — faceva fallire l'intero salvataggio.
+  const docRef = await addDoc(collection(db, SESSIONS_COLLECTION), senzaIndefiniti({
     ...session,
     date: Timestamp.fromDate(session.date),
     createdAt: Timestamp.now(),
-  });
+  }));
+  annotaSeduta('creato', docRef.id, session.studentId,
+    `${session.date.toLocaleDateString('it-IT')} ${session.startTime || ''}`.trim());
   return docRef.id;
 };
 
@@ -50,6 +98,11 @@ export const cancelSession = async (
   };
 
   await updateDoc(doc(db, SESSIONS_COLLECTION, sessionId), updateData);
+
+  const snap = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId)).catch(() => null);
+  const sid = snap?.exists() ? String((snap.data() as { studentId?: string }).studentId || '') : '';
+  annotaSeduta('modificato', sessionId, sid,
+    isLate ? 'disdetta tardiva (conta come svolta)' : 'disdetta');
 
   return { success: true, isLate };
 };
@@ -111,7 +164,16 @@ export const updateSessionStatus = async (
   const updateData: Record<string, unknown> = { status };
   if (notes !== undefined) updateData.notes = notes;
   if (status === 'completed') updateData.isCountedAsCompleted = true;
+
+  // Si legge PRIMA di scrivere: serve l'allievo per la riga del
+  // registro, e dopo l'aggiornamento costerebbe una lettura uguale.
+  const prima = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId)).catch(() => null);
+  const sid = prima?.exists() ? String((prima.data() as { studentId?: string }).studentId || '') : '';
+
   await updateDoc(doc(db, SESSIONS_COLLECTION, sessionId), updateData);
+
+  annotaSeduta('modificato', sessionId, sid,
+    status === 'completed' ? 'segnata come svolta' : `stato: ${status}`);
 };
 
 export const getCompletedSessionsCount = async (
@@ -125,15 +187,29 @@ export const updateSession = async (
   sessionId: string,
   updates: Partial<Omit<TrainingSession, 'id'>>
 ): Promise<void> => {
-  const data: Record<string, unknown> = { ...updates };
+  const data: Record<string, unknown> = senzaIndefiniti({ ...updates });
   if (updates.date) {
     data.date = Timestamp.fromDate(updates.date);
   }
+  const prima = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId)).catch(() => null);
+  const sid = prima?.exists() ? String((prima.data() as { studentId?: string }).studentId || '') : '';
+
   await updateDoc(doc(db, SESSIONS_COLLECTION, sessionId), data);
+
+  annotaSeduta('modificato', sessionId, sid,
+    updates.date ? `spostata al ${updates.date.toLocaleDateString('it-IT')}` : 'modificata');
 };
 
 export const deleteSession = async (sessionId: string): Promise<void> => {
+  // Il nome si legge PRIMA di cancellare: dopo non esiste piu'.
+  const prima = await getDoc(doc(db, SESSIONS_COLLECTION, sessionId)).catch(() => null);
+  const d = prima?.exists() ? (prima.data() as { studentId?: string; date?: { toDate?: () => Date } }) : null;
+  const sid = String(d?.studentId || '');
+
   await deleteDoc(doc(db, SESSIONS_COLLECTION, sessionId));
+
+  annotaSeduta('eliminato', sessionId, sid,
+    d?.date?.toDate ? d.date.toDate().toLocaleDateString('it-IT') : undefined);
 };
 
 /**

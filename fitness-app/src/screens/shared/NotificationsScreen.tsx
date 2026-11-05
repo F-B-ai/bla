@@ -235,7 +235,10 @@ const allegatoDi = (n: { data?: Record<string, string> }): string | null =>
         )}
       </View>
 
-      {isStaff && (
+      {/* 5 novembre 2026, scelta A: un avviso a tutto lo studio è
+          un atto del titolare. Prima lo poteva mandare anche un
+          collaboratore o un manager, a tutti. Adesso solo l'owner. */}
+      {isOwner && (
         <TouchableOpacity
           style={styles.sendAlertBtn}
           onPress={() => setShowSendModal(true)}

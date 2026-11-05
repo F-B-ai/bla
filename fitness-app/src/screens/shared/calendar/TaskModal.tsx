@@ -7,13 +7,12 @@ import { TaskPriority, DailyTask } from '../../../types';
 import { InputField } from '../../../components/common/InputField';
 import { ModalHeader } from '../../../components/common/ModalHeader';
 import { Button } from '../../../components/common/Button';
+import { grigliaOrari } from '../../../domain/orariStudio';
 
-const TIME_SLOTS = [
-  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-  '19:00', '19:30', '20:00', '20:30', '21:00',
-];
+// Gli orari vengono dal dominio, come per gli appuntamenti: passo di
+// 15 minuti. Questa lista era scritta a mano e ferma alla mezz'ora —
+// un task delle 9 e un quarto non si poteva mettere.
+const TIME_SLOTS = grigliaOrari();
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
   low: colors.info,
@@ -47,6 +46,15 @@ export interface TaskModalProps {
   savingTask: boolean;
   onSave: () => void;
   onClose: () => void;
+  /**
+   * Eliminare il task da qui dentro.
+   *
+   * Nella giornata si toccava la riga e si finiva su questa
+   * schermata, dove di eliminare non c'era traccia: si chiudeva, e il
+   * task era ancora lì. Questo è il posto dove chi vuole liberarsene
+   * arriva per primo, e il pulsante deve stare qui.
+   */
+  onDelete?: () => void;
 }
 
 export const TaskModal: React.FC<TaskModalProps> = ({
@@ -67,6 +75,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   savingTask,
   onSave,
   onClose,
+  onDelete,
 }) => {
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -217,6 +226,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 loading={savingTask}
               />
             </View>
+
+            {!!editingTask && !!onDelete && (
+              <TouchableOpacity
+                style={styles.eliminaBtn}
+                onPress={onDelete}
+                disabled={savingTask}
+                accessibilityLabel="Elimina questo task"
+              >
+                <Text style={styles.eliminaTxt}>Elimina questo task</Text>
+              </TouchableOpacity>
+            )}
+
             <View style={{ height: 60 }} />
           </ScrollView>
         </View>
@@ -320,5 +341,22 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   modalButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  // Largo quanto lo schermo e alto 48: chi vuole eliminare un task lo
+  // trova senza cercarlo. Sotto i pulsanti di salvataggio, perché
+  // distruggere non si fa per sbaglio mentre si salva.
+  eliminaBtn: {
+    marginTop: spacing.md,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  eliminaTxt: {
+    fontSize: fontSize.lg,
+    fontWeight: '700',
+    color: colors.error,
+  },
   modalButton: { flex: 1 },
 });

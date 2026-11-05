@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback, useContext, createContext } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { attendiAlMassimo, SECONDI_PROFILO } from '../domain/avvio';
 import { auth } from '../config/firebase';
 import { User, UserRole } from '../types';
 import { getUserProfile, signIn, signOut } from '../services/authService';
+import { impostaAutoreRegistro, dimenticaAutoreRegistro } from '../services/registroService';
 
 interface AuthState {
   firebaseUser: FirebaseUser | null;
@@ -22,6 +24,7 @@ interface AuthContextValue {
   isManager: boolean;
   isCollaborator: boolean;
   isStudent: boolean;
+  isNutritionist: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -45,7 +48,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         try {
-          const profile = await getUserProfile(fbUser.uid);
+          // La lettura del profilo NON può restare appesa.
+          //
+          // 12 ottobre 2026: l'app si fermava su «Caricamento…» senza
+          // fine. Firestore tiene una copia locale sul telefono
+          // (IndexedDB) e, quando quella si incarta — succede sulle app
+          // installate dalla schermata home, e quando la stessa app è
+          // aperta in due posti — la lettura non riesce e non
+          // fallisce: resta lì. Un `catch` non serve contro una cosa
+          // che non finisce mai; serve una sveglia.
+          const profile = await attendiAlMassimo(
+            getUserProfile(fbUser.uid),
+            SECONDI_PROFILO * 1000,
+            'La copia locale dei dati non risponde (timeout lettura profilo).'
+          );
+          // IL REGISTRO DEVE SAPERE CHI È.
+          //
+          // 31 ottobre 2026, 01:15. Il titolare apre il Registro e
+          // legge «Senza nome». Era lui. L'autore lo impostava solo
+          // `signIn` — ma chi ha già la sessione aperta non passa mai
+          // di lì: riapre l'app e basta. Quindi ogni riga di chi non
+          // si era appena autenticato nasceva senza nome, cioè senza
+          // la cosa per cui il registro esiste.
+          if (profile) {
+            impostaAutoreRegistro(
+              profile.id,
+              `${profile.name || ''} ${profile.surname || ''}`.trim(),
+              profile.role
+            );
+          }
           setState({
             firebaseUser: fbUser,
             userProfile: profile,
@@ -58,10 +89,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             firebaseUser: fbUser,
             userProfile: null,
             loading: false,
-            error: 'Errore nel caricamento del profilo',
+            // Il motivo vero, non una frase generica: è quello che
+            // compare in fondo alla schermata di blocco, ed è l'unica
+            // cosa che dice se riprovare, riparare o uscire.
+            error: (err as { message?: string })?.message
+              || 'Errore nel caricamento del profilo',
           });
         }
       } else {
+        dimenticaAutoreRegistro();
         setState({
           firebaseUser: null,
           userProfile: null,
@@ -114,6 +150,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isManager: state.userProfile?.role === 'manager',
     isCollaborator: state.userProfile?.role === 'collaborator',
     isStudent: state.userProfile?.role === 'student',
+    // Il nutrizionista non è un ruolo a sé: è un collaboratore con il
+    // tipo 'nutritionist'. Chiederlo come ruolo non avrebbe mai dato
+    // vero, e il permesso sarebbe stato muto invece che negato.
+    isNutritionist: state.userProfile?.role === 'collaborator'
+      && (state.userProfile as { collaboratorType?: string })?.collaboratorType === 'nutritionist',
     login,
     logout,
     refreshProfile,

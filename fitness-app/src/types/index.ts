@@ -556,7 +556,8 @@ export type NotificationType =
   | 'new_content'
   | 'workout_renewal'
   | 'custom_alert'
-  | 'badge_milestone';
+  | 'badge_milestone'
+  | 'nutrition_request';
 
 export interface AppNotification {
   id: string;

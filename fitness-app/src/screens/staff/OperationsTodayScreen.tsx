@@ -50,7 +50,13 @@ export const OperationsTodayScreen: React.FC = () => {
   const { user, isOwner, isManager } = useAuth();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const canSeeMoney = isOwner || isManager;
+  // 9 novembre 2026. Il titolare, scelta A: «Nessuno — manager,
+  // nutrizionisti, collaboratori — deve vedere niente dei dati
+  // commerciali. Solo io». Prima era `isOwner || isManager`: il
+  // manager vedeva incassi, rate e la Coda del mattino di tutto lo
+  // studio. E un manager è Giuseppe. Adesso i soldi e la salute
+  // commerciale sono del solo titolare.
+  const canSeeMoney = isOwner;
 
   const [refreshing, setRefreshing] = useState(false);
   const [attention, setAttention] = useState<AttentionItem[]>([]);
@@ -69,8 +75,23 @@ export const OperationsTodayScreen: React.FC = () => {
     const today = new Date();
 
     // Brain: coda del mattino (non blocca il resto della dashboard)
-    getBrainQueue().then(setBrainRows).catch(() => setBrainRows([]));
-    getBrainStatus().then(setBrainStatus).catch(() => {});
+    //
+    // 9 novembre 2026. Il titolare, indicando questa schermata: «non
+    // deve assolutamente vedere nemmeno questo». La coda del mattino
+    // legge i twins di TUTTI gli allievi — churn, rate scadute,
+    // abbandoni: è l'intera salute commerciale dello studio su una
+    // pagina. Non la deve vedere chi non vede i soldi.
+    //
+    // Non la si nasconde soltanto: non la si CHIEDE nemmeno. Così
+    // l'app di un collaboratore non manda proprio la domanda, e non
+    // c'è niente da filtrare dopo.
+    if (canSeeMoney) {
+      getBrainQueue().then(setBrainRows).catch(() => setBrainRows([]));
+      getBrainStatus().then(setBrainStatus).catch(() => {});
+    } else {
+      setBrainRows([]);
+      setBrainStatus(null);
+    }
 
     const [checksR, checkinsR, sessionsR, studentsR, plansR, txR] = await Promise.allSettled([
       getAllTodayChecks(),
@@ -230,7 +251,7 @@ export const OperationsTodayScreen: React.FC = () => {
         </View>
 
         {/* 🧠 Brain — la coda del mattino (pattern, non solo l'oggi) */}
-        {brainRows.length > 0 && (
+        {canSeeMoney && brainRows.length > 0 && (
           <>
             <View style={styles.brainHeader}>
               <Text style={styles.sectionTitle}>🧠 Coda del mattino</Text>

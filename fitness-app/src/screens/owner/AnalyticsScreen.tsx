@@ -17,6 +17,7 @@ import { getAllKPIIndicators, saveKPIIndicators, KPIIndicator } from '../../serv
 import { crossAlert } from '../../utils/alert';
 import { useAuth } from '../../hooks/useAuth';
 import { Collaborator, Manager, FinancialTransaction } from '../../types';
+import { ricavoRegistrato, chiNonRegistra } from '../../domain/ricaviCollaboratore';
 
 type Period = 'month' | 'quarter' | 'year';
 
@@ -99,13 +100,12 @@ export const AnalyticsScreen: React.FC = () => {
 
   const getCoachRevenueData = (): BarData[] =>
     coaches.map((collab) => {
-      const coachIncome = transactions
-        .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
-        .reduce((sum, t) => sum + t.amount, 0);
+      // niente stime: una barra vuota è un'informazione
+      const r = ricavoRegistrato(transactions, collab.id);
       return {
         label: `${collab.name} ${collab.surname?.charAt(0) || ''}.`,
-        value: coachIncome > 0 ? coachIncome : collab.assignedStudents.length * 150,
-        color: colors.collaboratorBadge,
+        value: r.importo,
+        color: r.movimenti === 0 ? colors.border : colors.collaboratorBadge,
       };
     });
 
@@ -114,12 +114,12 @@ export const AnalyticsScreen: React.FC = () => {
       const managedCollabs = collaborators.filter((c) =>
         mgr.assignedCollaborators.includes(c.id)
       );
-      const teamRevenue = managedCollabs.reduce((sum, collab) => {
-        const coachIncome = transactions
-          .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
-          .reduce((s, t) => s + t.amount, 0);
-        return sum + (coachIncome > 0 ? coachIncome : collab.assignedStudents.length * 150);
-      }, 0);
+      // il totale di squadra non si tappa: se tre coach su cinque non
+      // hanno registrato niente, deve risultare piu' basso
+      const teamRevenue = managedCollabs.reduce(
+        (sum, collab) => sum + ricavoRegistrato(transactions, collab.id).importo,
+        0
+      );
       return {
         label: `${mgr.name} ${mgr.surname?.charAt(0) || ''}.`,
         value: teamRevenue,

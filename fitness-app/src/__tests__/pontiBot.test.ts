@@ -22,11 +22,28 @@ const cal = fs.readFileSync(
   path.join(radice, 'functions', 'src', 'cal.ts'), 'utf8'
 );
 
-const rewrites = firebase.hosting.rewrites as Array<{
-  source: string;
-  function?: { functionId: string };
-  destination?: string;
-}>;
+// ------------------------------------------------------------
+// DUE SPAZI DI PUBBLICAZIONE, NON UNO
+// ------------------------------------------------------------
+// Dal 15 ottobre 2026 il progetto pubblica due cose: l'applicazione
+// (sito «essere-3fe6f») e il sito pubblico di mindmovementlab.it
+// (sito «mindmovementlab»). In firebase.json `hosting` è quindi un
+// elenco, e queste regole riguardano SOLO l'applicazione: prenderne
+// un'altra significherebbe controllare le intestazioni del sito
+// vetrina credendo di controllare quelle dell'app.
+const hostingApp = (() => {
+  const h = (firebase as { hosting: unknown }).hosting;
+  const elenco = Array.isArray(h) ? h : [h];
+  const app = (elenco as Array<{ site?: string; public?: string }>)
+    .find((x) => x.site === 'essere-3fe6f' || x.public === 'dist');
+  if (!app) throw new Error('firebase.json: manca lo spazio dell\'applicazione');
+  return app as {
+    rewrites: Array<{ source: string; function?: { functionId: string }; destination?: string }>;
+    headers: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+  };
+})();
+
+const rewrites = hostingApp.rewrites;
 
 const indice = (s: string) => rewrites.findIndex((r) => r.source === s);
 
@@ -123,5 +140,48 @@ describe('la regola della giornata non è scritta qui', () => {
       path.join(radice, 'functions', 'copy-domain.js'), 'utf8'
     );
     expect(copia).toContain('orariStudio.ts');
+  });
+});
+
+// ============================================================
+// I DUE SPAZI DI PUBBLICAZIONE — 15 ottobre 2026
+// ------------------------------------------------------------
+// Il dominio mindmovementlab.it è stato comprato, e il sito non
+// poteva andare sullo spazio dell'applicazione: lì la radice «/» è
+// l'app, e chi digitasse il dominio troverebbe una schermata di
+// accesso invece del sito.
+//
+// Da qui in poi i due spazi non devono mescolarsi: è il genere di
+// errore che non dà nessun segnale — tutto «funziona», solo che
+// mostra la cosa sbagliata a chi arriva.
+// ============================================================
+
+describe('l\'applicazione e il sito pubblico restano separati', () => {
+  const spazi = (() => {
+    const h = (firebase as { hosting: unknown }).hosting;
+    return (Array.isArray(h) ? h : [h]) as Array<{ site?: string; public?: string }>;
+  })();
+
+  it('sono due, e ciascuno ha il suo nome', () => {
+    expect(spazi).toHaveLength(2);
+    expect(spazi.map((s) => s.site).sort())
+      .toEqual(['essere-3fe6f', 'mindmovementlab']);
+  });
+
+  it('pubblicano cartelle diverse', () => {
+    const app = spazi.find((s) => s.site === 'essere-3fe6f');
+    const sito = spazi.find((s) => s.site === 'mindmovementlab');
+    expect(app?.public).toBe('dist');
+    expect(sito?.public).toBe('sito-dist');
+  });
+
+  it('il sito pubblico NON ha il catch-all dell\'applicazione', () => {
+    // Se ce l'avesse, qualunque indirizzo sbagliato del sito
+    // restituirebbe l'applicazione: il visitatore che sbaglia a
+    // digitare una pagina finirebbe sulla schermata di accesso.
+    const sito = spazi.find((s) => s.site === 'mindmovementlab') as {
+      rewrites?: Array<{ source: string }>;
+    };
+    expect(sito.rewrites).toBeUndefined();
   });
 });

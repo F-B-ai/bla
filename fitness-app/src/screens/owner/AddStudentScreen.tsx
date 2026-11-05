@@ -24,7 +24,7 @@ interface Props {
 }
 
 export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
-  const { user: currentUser, isOwner } = useAuth();
+  const { user: currentUser, isOwner, isNutritionist } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -51,16 +51,33 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
       setCollaborators(collabs);
       setManagers(mgrs);
       setOwner(ownerData);
-      // Manager/collaboratore: pre-seleziona se stesso come coach assegnato
+      // ------------------------------------------------------------
+      // 22 ottobre 2026 — CHI CONDUCE NON È CHI HA SCRITTO IL NOME
+      // ------------------------------------------------------------
+      // Manager e coach si pre-assegnano l'allievo: giusto, sono loro
+      // che lo alleneranno. Il nutrizionista no: lui registra una
+      // persona che segue sul piano alimentare, e metterlo come coach
+      // vorrebbe dire scrivere che lo allena lui — con tutto quello
+      // che ci sta attaccato dietro, a cominciare dalla percentuale
+      // sulle sedute. L'allievo nuovo va al titolare, che è dove
+      // deve stare.
       if (currentUser && !isOwner) {
-        setSelectedCoachIds((prev) => (prev.length === 0 ? [currentUser.id] : prev));
+        const daAssegnare = isNutritionist
+          ? (ownerData?.id || currentUser.id)
+          : currentUser.id;
+        setSelectedCoachIds((prev) => (prev.length === 0 ? [daAssegnare] : prev));
         const meMgr = mgrs.find((m) => m.id === currentUser.id);
         if (meMgr) {
           setSelectedManagerId(meMgr.id);
           setManagerCommission(String(meMgr.commissionPercentage ?? 10));
         }
+        // La percentuale del coach si porta dietro chi conduce. Se
+        // l'allievo va al titolare non c'è nessuna percentuale da
+        // riconoscere: lasciarci quella del nutrizionista vorrebbe
+        // dire scrivere un debito che non esiste, e scoprirlo a fine
+        // mese guardando i conti.
         const meCollab = collabs.find((c) => c.id === currentUser.id);
-        if (meCollab) {
+        if (meCollab && !isNutritionist) {
           setCoachCommission(String(meCollab.commissionPercentage ?? 60));
         }
       }
@@ -167,12 +184,17 @@ export const AddStudentScreen: React.FC<Props> = ({ onBack }) => {
             placeholder="Numero di telefono"
           />
 
-          {/* Per manager/coach: l'allievo viene assegnato automaticamente a loro */}
+          {/* Chi conduce non è chi ha scritto il nome: il
+              nutrizionista registra, il titolare segue. */}
           {!isOwner && (
             <View style={styles.autoAssignNote}>
               <Ionicons name="information-circle" size={18} color={colors.accent} />
               <Text style={styles.autoAssignText}>
-                L'allievo verrà assegnato automaticamente a te.
+                {isNutritionist
+                  ? 'L\'allievo viene registrato e assegnato al titolare dello '
+                    + 'studio. Tu lo vedrai fra le persone che segui dal lato '
+                    + 'nutrizionale.'
+                  : 'L\'allievo verrà assegnato automaticamente a te.'}
               </Text>
             </View>
           )}

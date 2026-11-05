@@ -113,6 +113,13 @@ jobs:
         run: npm run build:web
         working-directory: fitness-app
 
+      # Il sito pubblico (mindmovementlab.it) si genera dalle stesse
+      # pagine di public/: una copia sola da modificare, due spazi di
+      # pubblicazione. Vedi scripts/build-sito.js.
+      - name: Genera il sito pubblico
+        run: node scripts/build-sito.js
+        working-directory: fitness-app
+
       - name: Write service account key
         env:
           FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -128,7 +135,9 @@ jobs:
             console.log('SA ok:', sa.client_email);
           "
 
-      - name: Deploy hosting
+      # Due spazi: l'applicazione (essere-3fe6f) e il sito pubblico
+      # (mindmovementlab). `--only hosting` li pubblica entrambi.
+      - name: Deploy hosting (applicazione + sito)
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/firebase_sa.json
         run: npx firebase-tools deploy --only hosting --project essere-3fe6f --non-interactive

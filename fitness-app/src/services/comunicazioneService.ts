@@ -9,6 +9,7 @@ import {
   COMUNICAZIONE_VERSION,
 } from '../domain/comunicazione';
 import { createNotification } from './notificationService';
+import { annota } from './registroService';
 
 // ============================================================
 // MANDARE UNA COSA A TUTTI
@@ -100,6 +101,17 @@ export const inviaComunicazione = async (
 
   const creata = await addDoc(collection(db, COMUNICAZIONI), documento);
 
+  // Nel Registro: chi ha mandato l'avviso, a quanti, quando. Un avviso
+  // a tutto lo studio è un atto che deve lasciare una traccia. La prova
+  // si segna come tale, così non si confonde con un avviso vero.
+  annota({
+    azione: 'creato',
+    oggetto: 'avviso',
+    oggettoId: creata.id,
+    oggettoNome: dati.titolo.trim(),
+    dettaglio: `${dati.prova ? 'prova · ' : ''}a ${dati.destinatariIds.length} ${dati.destinatariIds.length === 1 ? 'persona' : 'persone'}`,
+  });
+
   // La campanella, una per persona. Si contano i fallimenti invece di
   // lasciarli cadere: `allSettled`, non `all`.
   const esiti = await Promise.allSettled(
@@ -186,4 +198,5 @@ export const cancellaComunicazione = async (
     }
   }
   await deleteDoc(doc(db, COMUNICAZIONI, id));
+  annota({ azione: 'eliminato', oggetto: 'avviso', oggettoId: id });
 };

@@ -13,6 +13,8 @@ import { doc, getDoc, setDoc, collection, getDocs, query, where, Timestamp, upda
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, storage, functions } from '../config/firebase';
+import { registraGuasto } from './guastiService';
+import { annota, impostaAutoreRegistro, dimenticaAutoreRegistro } from './registroService';
 import { User, UserRole, Collaborator, Student, Manager, Owner, CollaboratorType } from '../types';
 
 /**
@@ -87,7 +89,20 @@ export const signIn = async (email: string, password: string): Promise<User> => 
     );
   }
 
-  return { ...userDoc.data(), id: userDoc.id } as User;
+  const profilo = { ...userDoc.data(), id: userDoc.id } as User;
+
+  // Da qui in poi il registro sa chi sta lavorando: il nome e il
+  // ruolo si prendono UNA volta, all'ingresso, e finiscono dentro
+  // ogni riga. Venti punti del programma annotano senza dover sapere
+  // come si recupera un profilo.
+  impostaAutoreRegistro(
+    profilo.id,
+    `${profilo.name || ''} ${profilo.surname || ''}`.trim(),
+    profilo.role
+  );
+  annota({ azione: 'entrato', oggetto: 'applicazione' });
+
+  return profilo;
 };
 
 export const registerOwner = async (
@@ -135,7 +150,7 @@ export const registerManager = async (
   specializations: string[] = []
 ): Promise<Manager> => {
   const uid = await createUserWithRestApi(email, password);
-  await sendPasswordSetupEmail(email);
+  ultimoInvito = await sendPasswordSetupEmail(email);
 
   const managerData: Omit<Manager, 'id'> = {
     email,
@@ -161,6 +176,7 @@ export const registerManager = async (
 };
 
 export const signOut = async (): Promise<void> => {
+  dimenticaAutoreRegistro();
   await firebaseSignOut(auth);
 };
 
@@ -172,13 +188,52 @@ export const resetPassword = async (email: string): Promise<void> => {
 // password" all'email reale dell'allievo/collaboratore. La password
 // temporanea scelta alla creazione NON viene mai salvata (bonifica V1):
 // il canale credenziali è il link, che arriva alla persona e non allo staff.
-const sendPasswordSetupEmail = async (email: string): Promise<void> => {
+/**
+ * L'esito dell'invio del link «imposta la tua password».
+ *
+ * 2 ottobre 2026. Qui c'era un catch VUOTO, con scritto accanto «lo
+ * staff può reinviare il link dal profilo». Ma per reinviarlo deve
+ * SAPERE che non è partito — e nessuno glielo diceva: l'account si
+ * creava, la schermata diceva che era andato tutto bene, e la persona
+ * non riceveva niente. Lo si scopriva giorni dopo, quando quella
+ * persona provava a entrare e non poteva.
+ *
+ * L'errore però non si può far risalire e basta: a quel punto
+ * l'account su Firebase è GIÀ creato, e far fallire la registrazione
+ * lascerebbe una persona a metà — autenticazione sì, scheda no. Si
+ * restituisce l'esito: l'account si crea comunque, e il fallimento si
+ * vede.
+ */
+export interface EsitoInvito {
+  inviata: boolean;
+  motivo: string;
+}
+
+const sendPasswordSetupEmail = async (email: string): Promise<EsitoInvito> => {
   try {
     await sendPasswordResetEmail(auth, email);
-  } catch {
-    // Email non raggiungibile: lo staff può reinviare il link dal profilo
+    return { inviata: true, motivo: '' };
+  } catch (err) {
+    const motivo = err && typeof err === 'object' && 'code' in err
+      ? String((err as { code: unknown }).code)
+      : 'sconosciuto';
+    registraGuasto({
+      errore: err,
+      schermata: 'Invio link imposta-password',
+    }).catch(() => {});
+    return {
+      inviata: false,
+      motivo: `Il link per impostare la password NON è partito (${motivo}). `
+        + 'L\'account è stato creato lo stesso: reinvia il link dal profilo '
+        + 'della persona, oppure controlla che l\'indirizzo sia giusto.',
+    };
   }
 };
+
+/** L'ultimo invito che non è partito, per dirlo a chi ha creato l'account. */
+let ultimoInvito: EsitoInvito = { inviata: true, motivo: '' };
+
+export const esitoUltimoInvito = (): EsitoInvito => ultimoInvito;
 
 export const getCurrentUser = (): Promise<FirebaseUser | null> => {
   return new Promise((resolve) => {
@@ -210,7 +265,7 @@ export const registerCollaborator = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
-  await sendPasswordSetupEmail(email);
+  ultimoInvito = await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -244,7 +299,7 @@ export const registerNutritionist = async (
   specializations: string[]
 ): Promise<Collaborator> => {
   const uid = await createUserWithRestApi(email, password);
-  await sendPasswordSetupEmail(email);
+  ultimoInvito = await sendPasswordSetupEmail(email);
 
   const collaboratorData: Omit<Collaborator, 'id'> = {
     email,
@@ -282,7 +337,7 @@ export const registerStudent = async (
   coachCommissionPercentage?: number
 ): Promise<Student> => {
   const uid = await createUserWithRestApi(email, password);
-  await sendPasswordSetupEmail(email);
+  ultimoInvito = await sendPasswordSetupEmail(email);
   const coachIds = Array.isArray(assignedCollaboratorIds) ? assignedCollaboratorIds : [assignedCollaboratorIds];
 
   const studentData: Omit<Student, 'id'> = {
@@ -530,14 +585,28 @@ export const getStudents = async (): Promise<Student[]> => {
 export const toggleUserActive = async (userId: string, isActive: boolean): Promise<void> => {
   const userRef = doc(db, 'users', userId);
   const userSnap = await getDoc(userRef);
+  const d = userSnap.exists() ? userSnap.data() : {};
   if (userSnap.exists()) {
     await updateDoc(userRef, { isActive });
   } else {
     await setDoc(userRef, { isActive }, { merge: true });
   }
+  annota({
+    azione: 'modificato',
+    oggetto: d.role === 'student' ? 'allievo' : 'collaboratore',
+    oggettoId: userId,
+    oggettoNome: `${d.name || ''} ${d.surname || ''}`.trim(),
+    dettaglio: isActive ? 'accesso riattivato' : 'accesso disattivato',
+  });
 };
 
 export const deleteUser = async (userId: string): Promise<void> => {
+  // IL NOME SI LEGGE PRIMA DI CANCELLARE. È l'unico momento in cui
+  // esiste ancora: dopo la riga del registro direbbe «ha eliminato
+  // allievo», senza dire quale, e non servirebbe a niente.
+  const prima = await getDoc(doc(db, 'users', userId)).catch(() => null);
+  const d = prima?.exists() ? prima.data() : {};
+
   // Eliminazione account Auth server-side (Cloud Function adminDeleteUser).
   // Se le Functions non sono ancora deployate (piano Spark), si elimina
   // comunque il profilo Firestore: l'account Auth orfano resta inutilizzabile
@@ -549,6 +618,14 @@ export const deleteUser = async (userId: string): Promise<void> => {
     // Auth deletion non disponibile — si procede con la pulizia Firestore
   }
   await deleteDoc(doc(db, 'users', userId));
+
+  annota({
+    azione: 'eliminato',
+    oggetto: d.role === 'student' ? 'allievo' : 'collaboratore',
+    oggettoId: userId,
+    oggettoNome: `${d.name || ''} ${d.surname || ''}`.trim(),
+    dettaglio: d.email ? String(d.email) : undefined,
+  });
 };
 
 export const removeStudentFromCollaborator = async (
