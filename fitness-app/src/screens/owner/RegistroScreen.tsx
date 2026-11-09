@@ -11,7 +11,7 @@ import { getTransactions } from '../../services/financialService';
 import { chiNonRegistra, RigaRicavo } from '../../domain/ricaviCollaboratore';
 import {
   VoceRegistro, descriviVoce, pesoVoce, filtraRegistro, daGuardare,
-  riepilogoTutti, giorniDaUltimaVolta, RiepilogoPersona,
+  riepilogoPersona, giorniDaUltimaVolta, RiepilogoPersona,
 } from '../../domain/registro';
 
 // ============================================================
@@ -88,6 +88,9 @@ const RigaVoce: React.FC<{ v: VoceRegistro }> = ({ v }) => (
 export const RegistroScreen: React.FC = () => {
   const [voci, setVoci] = useState<VoceRegistro[]>([]);
   const [fermi, setFermi] = useState<RigaRicavo[]>([]);
+  // Chi lavora per te: i collaboratori e i manager. «Le persone» mostra
+  // solo loro — non chiunque lasci una riga nel registro.
+  const [staff, setStaff] = useState<Array<{ id: string; nome: string }>>([]);
   const [caricando, setCaricando] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [vista, setVista] = useState<Vista>('persone');
@@ -103,6 +106,13 @@ export const RegistroScreen: React.FC = () => {
         getStudents().catch(() => []),
       ]);
       setVoci(righe);
+      // L'elenco di chi monitori: collaboratori + manager, con nome e
+      // cognome fissati adesso (servono anche a chi non ha ancora
+      // lasciato una riga — comparirà lo stesso, come «mai vista»).
+      setStaff([...collaboratori, ...manager].map((c) => ({
+        id: c.id,
+        nome: `${c.name || ''} ${c.surname || ''}`.trim(),
+      })));
       // Chi ha allievi assegnati e non ha registrato un solo
       // movimento. Non dice che non lavora: dice che nell'app non
       // risulta — ed e' l'unica cosa che questi dati sostengono.
@@ -140,7 +150,18 @@ export const RegistroScreen: React.FC = () => {
 
   useEffect(() => { void carica(); }, [carica]);
 
-  const persone = riepilogoTutti(voci);
+  // «Le persone» = solo i tuoi collaboratori e manager, non chiunque
+  // compaia nel registro. Prima si elencava ogni `chi` che avesse
+  // lasciato una riga — te compreso, e ogni allievo che fa login (una
+  // riga «entrato»), e i conti di prova. Qui si vede solo chi lavora
+  // per te, e si vedono TUTTI: anche quello che non si è mai fatto
+  // vedere, che è proprio la cosa da sapere.
+  const persone = staff
+    .map((s) => {
+      const r = riepilogoPersona(voci, s.id);
+      return { ...r, nome: r.nome || s.nome };
+    })
+    .sort((a, b) => b.totale - a.totale);
   const elenco = vista === 'guardare' ? daGuardare(voci) : filtraRegistro(voci);
 
   return (

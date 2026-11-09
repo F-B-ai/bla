@@ -277,3 +277,39 @@ describe('la riga dice la persona, l\'allievo, il giorno e l\'ora', () => {
     expect(riga).toContain('lezione');
   });
 });
+
+// ============================================================
+// 9 novembre 2026 — «VOGLIO VEDERE SOLO I MIEI COLLABORATORI»
+// ------------------------------------------------------------
+// «Le persone» chiamava `riepilogoTutti(voci)`: elencava CHIUNQUE
+// avesse lasciato una riga nel registro. Il titolare compreso, ogni
+// allievo che fa login (una riga «entrato»), e i conti di prova.
+// Il titolare non vuole monitorare sé stesso né i suoi allievi: vuole
+// vedere chi lavora per lui — i collaboratori e i manager.
+//
+// Il filtro è per RUOLO, non per nome: inchiodare tre nomi nel codice
+// si rompe al primo collaboratore nuovo o al primo che se ne va.
+// ============================================================
+
+describe('«Le persone» mostra solo i collaboratori e i manager', () => {
+  const schermata = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'screens', 'owner', 'RegistroScreen.tsx'), 'utf8'
+  );
+
+  it('non elenca più chiunque compaia nel registro', () => {
+    // `riepilogoTutti` tirava dentro il titolare e ogni allievo: non
+    // deve più reggere la lista delle persone.
+    expect(schermata).not.toMatch(/riepilogoTutti/);
+  });
+
+  it('costruisce la lista dai collaboratori e dai manager', () => {
+    expect(schermata).toMatch(/getCollaborators/);
+    expect(schermata).toMatch(/getManagers/);
+    expect(schermata).toMatch(/\[\s*\.\.\.collaboratori,\s*\.\.\.manager\s*\]/);
+  });
+
+  it('e per ciascuno legge il suo riepilogo, anche a zero attività', () => {
+    expect(schermata).toMatch(/staff\s*\n?\s*\.map/);
+    expect(schermata).toMatch(/riepilogoPersona\(voci/);
+  });
+});
