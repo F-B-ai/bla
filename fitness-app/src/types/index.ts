@@ -395,6 +395,10 @@ export interface PosturalAssessment {
   aiRecommendations?: string[];
   aiExerciseProgram?: string[];
   comparisonNotes?: string;
+  /** scheletro schematico ricostruito dalle foto (domain/posture3d.ts) */
+  modello3d?: import('../domain/posture3d').Modello3D;
+  /** quali segmenti le misure hanno segnato, al momento della valutazione */
+  modello3dTinte?: import('../domain/posture3d').Tinte;
 }
 
 export interface PosturalFinding {

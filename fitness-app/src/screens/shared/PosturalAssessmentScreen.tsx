@@ -33,6 +33,10 @@ import {
 } from '../../services/posturalService';
 import { analyzePostureWithAI, comparePostureWithAI, AIPosturalAnalysis, AIPosturalComparison, ensureAIApiKey } from '../../services/aiService';
 import { measurePostureFromPhotos } from '../../services/postureMeasure';
+import { costruisciModelloDalleFoto } from '../../services/modello3dService';
+import { getStudentMeasurements } from '../../services/nutritionistService';
+import { Modello3DView } from '../../components/postura/Modello3DView';
+import { Modello3D, Tinte, modelloValido } from '../../domain/posture3d';
 import { useAuth } from '../../hooks/useAuth';
 import {
   classificaErrore, messaggioCaricamento, perIlRegistro,
@@ -101,6 +105,12 @@ export const PosturalAssessmentScreen: React.FC = () => {
   // AI
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AIPosturalAnalysis | null>(null);
+
+  // Modello 3D: lo scheletro ricostruito da frontale + profilo. Si
+  // costruisce sul dispositivo, senza AI e senza chiave: vale anche
+  // per chi non usa l'analisi AI.
+  const [modello3d, setModello3d] = useState<{ modello: Modello3D; tinte: Tinte } | null>(null);
+  const [costruendo3d, setCostruendo3d] = useState(false);
 
   // Save
   const [saving, setSaving] = useState(false);
@@ -287,6 +297,54 @@ export const PosturalAssessmentScreen: React.FC = () => {
   };
 
   // -----------------------------------------------------------------------
+  // Modello 3D
+  // -----------------------------------------------------------------------
+  // Un modello costruito su foto che non ci sono più è una bugia: se
+  // cambia una foto, il modello si butta e si rifà.
+  useEffect(() => {
+    setModello3d(null);
+  }, [frontImage, sideLeftImage, sideRightImage, backImage]);
+
+  const handleModello3D = async () => {
+    if (!frontImage && !backImage) {
+      crossAlert('Modello 3D', 'Serve la foto frontale (o la posteriore). Con il profilo diventa tridimensionale.');
+      return;
+    }
+    setCostruendo3d(true);
+    try {
+      // La statura sta nelle misure corporee, non in anagrafica: si
+      // prende l'ultima scritta. Se non c'è, il modello usa una media
+      // e lo dichiara — non è un motivo per fermarsi.
+      let staturaCm: number | undefined;
+      if (selectedStudentId) {
+        try {
+          const misure = await getStudentMeasurements(selectedStudentId);
+          staturaCm = misure.find((m) => typeof m.height === 'number' && m.height > 0)?.height;
+        } catch {
+          staturaCm = undefined;
+        }
+      }
+      const r = await costruisciModelloDalleFoto(
+        {
+          frontale: frontImage,
+          laterale: sideLeftImage || sideRightImage,
+          posteriore: backImage,
+        },
+        staturaCm
+      );
+      if (!r.esito.ok) {
+        crossAlert('Modello 3D', r.esito.motivo);
+        return;
+      }
+      setModello3d({ modello: r.esito.modello, tinte: r.tinte });
+    } catch (err: unknown) {
+      crossAlert('Modello 3D', err instanceof Error ? err.message : 'Non sono riuscito a costruire il modello.');
+    } finally {
+      setCostruendo3d(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
   // Findings
   // -----------------------------------------------------------------------
   const addFinding = () => {
@@ -402,6 +460,9 @@ export const PosturalAssessmentScreen: React.FC = () => {
         aiAnalysis: aiSummaryText,
         aiRecommendations: aiResult?.recommendations || [],
         aiExerciseProgram: aiResult?.exerciseProgram || [],
+        // Il modello 3D viaggia con la valutazione: sono pochi numeri
+        // (19 punti), non una foto. Solo se è stato costruito.
+        ...(modello3d ? { modello3d: modello3d.modello, modello3dTinte: modello3d.tinte } : {}),
       });
 
       const msg = messaggioCaricamento(esiti);
@@ -423,6 +484,7 @@ export const PosturalAssessmentScreen: React.FC = () => {
         setFindings([]);
         setOverallNotes('');
         setAiResult(null);
+        setModello3d(null);
       }
     } catch (err) {
       crossAlert('Errore', `Impossibile salvare: ${err instanceof Error ? err.message : 'Errore sconosciuto'}`);
@@ -684,6 +746,23 @@ export const PosturalAssessmentScreen: React.FC = () => {
         <Card variant="outlined">
           <Text style={styles.aiLoadingText}>L'AI sta analizzando le immagini... Potrebbe richiedere fino a 30 secondi.</Text>
         </Card>
+      )}
+
+      {/* Modello 3D: frontale + profilo, costruito sul dispositivo */}
+      <Button
+        title={costruendo3d ? 'Costruisco il modello...' : modello3d ? 'Ricostruisci modello 3D' : 'Modello 3D dalle foto'}
+        onPress={handleModello3D}
+        variant="outline"
+        style={{ marginTop: spacing.sm }}
+        loading={costruendo3d}
+        disabled={(!frontImage && !backImage) || costruendo3d}
+      />
+      {modello3d && (
+        <Modello3DView
+          modello={modello3d.modello}
+          tinte={modello3d.tinte}
+          nomeFile="modello-posturale"
+        />
       )}
 
       <Button
@@ -1130,6 +1209,15 @@ export const PosturalAssessmentScreen: React.FC = () => {
                       ))}
                     </Card>
                   </>
+                ) : null}
+
+                {/* Modello 3D salvato con la valutazione */}
+                {modelloValido(detailAssessment.modello3d) ? (
+                  <Modello3DView
+                    modello={detailAssessment.modello3d}
+                    tinte={detailAssessment.modello3dTinte}
+                    nomeFile="modello-posturale"
+                  />
                 ) : null}
 
                 {/* Analisi AI */}
