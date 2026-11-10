@@ -85,6 +85,13 @@ export interface PostureFinding {
   severity: PostureSeverity;
   /** lato/verso interessato, quando ha senso (es. "spalla sinistra più alta") */
   direction?: string;
+  /**
+   * Di quanto oscilla questo numero rileggendo la STESSA foto più
+   * volte (±, stessa unità del valore). È la ripetibilità della
+   * lettura: non dice quanto il numero è vicino al vero, dice quanto
+   * è stabile. Assente se la foto è stata letta una volta sola.
+   */
+  tolerance?: number;
 }
 
 export interface PostureMetrics {
@@ -345,4 +352,157 @@ export const computePostureMetrics = (lm: Landmark[], view: PostureView): Postur
     };
   }
   return view === 'laterale' ? computeSagittal(lm) : computeCoronal(lm, view);
+};
+
+// ============================================================
+// 10 novembre 2026 — LEGGERE PIÙ VOLTE, E DIRE DI QUANTO SI OSCILLA
+// ------------------------------------------------------------
+// Il titolare: «Devi creare qualcosa di altissima precisione,
+// altrimenti tutto perde valore.»
+//
+// La precisione non si dichiara: si misura. Ho preso una foto vera e
+// l'ho fatta rileggere sedici volte spostandola di pochi pixel. I
+// punti non cadono mai nello stesso posto: tremano. Col modello
+// leggero il punto tipico si sposta di ~5 pixel, e una volta su
+// sedici un punto è saltato di 94. Un numero letto una volta sola,
+// quindi, porta con sé un'incertezza che nessuno vedeva.
+//
+// Due rimedi, tutti e due qui:
+//  1. si legge la foto PIÙ VOLTE e si tiene la MEDIANA di ogni punto
+//     (la mediana ignora il punto che salta; la media no);
+//  2. accanto a ogni misura si scrive di quanto ha oscillato (±).
+//
+// E una conseguenza che vale più dei due rimedi: fra un «prima» e un
+// «dopo» una differenza conta SOLO se è più grande dell'oscillazione.
+// Sotto quel margine non è un miglioramento: è rumore.
+// ============================================================
+
+export const mediana = (a: number[]): number => {
+  if (!a.length) return NaN;
+  const s = [...a].sort((x, y) => x - y);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Dispersione robusta (stima della deviazione standard dalla MAD). */
+export const dispersione = (a: number[]): number => {
+  if (a.length < 2) return 0;
+  const m = mediana(a);
+  return 1.4826 * mediana(a.map((x) => Math.abs(x - m)));
+};
+
+/**
+ * Fonde più letture della stessa foto in uno scheletro solo: per
+ * ogni punto, la mediana di x, di y e della visibilità.
+ */
+export const fondiLetture = (letture: Landmark[][]): Landmark[] | null => {
+  const buone = (letture || []).filter((l) => l && l.length >= 33);
+  if (!buone.length) return null;
+  return buone[0].map((_, i) => ({
+    x: mediana(buone.map((l) => l[i].x)),
+    y: mediana(buone.map((l) => l[i].y)),
+    visibility: mediana(buone.map((l) => l[i].visibility ?? 1)),
+  }));
+};
+
+/** Sotto questo numero di letture l'oscillazione non si stima. */
+export const LETTURE_MINIME = 3;
+
+/**
+ * Misura da più letture GIÀ RADDRIZZATE della stessa foto. Il valore
+ * è quello dello scheletro mediano; `tolerance` è di quanto la stessa
+ * misura ha oscillato da una lettura all'altra.
+ */
+export const misuraRipetuta = (letture: Landmark[][], view: PostureView): PostureMetrics => {
+  const fuso = fondiLetture(letture);
+  if (!fuso) return computePostureMetrics([], view);
+  const base = computePostureMetrics(fuso, view);
+  const buone = letture.filter((l) => l && l.length >= 33);
+  if (base.quality !== 'ok' || buone.length < LETTURE_MINIME) return base;
+
+  const singole = buone.map((l) => computePostureMetrics(l, view));
+  const conMargine = (f: PostureFinding): PostureFinding => {
+    const valori = singole
+      .map((m) => m.findings.find((x) => x.key === f.key))
+      .map((x) => (x ? x.value_deg ?? x.value_pct : undefined))
+      .filter((x): x is number => typeof x === 'number');
+    if (valori.length < LETTURE_MINIME) return f;
+    return { ...f, tolerance: round1(dispersione(valori)) };
+  };
+  const findings = base.findings.map(conMargine);
+  return {
+    ...base,
+    findings,
+    notable: base.notable.map((n) => findings.find((f) => f.key === n.key) || n),
+    quality_notes: [...base.quality_notes, `Foto letta ${buone.length} volte: accanto a ogni misura c'è di quanto ha oscillato.`],
+  };
+};
+
+// Sotto questi valori non si parla di cambiamento, qualunque sia la
+// ripetibilità della lettura: fra due foto diverse la persona non si
+// rimette mai identica, e questo margine lo copre.
+export const MARGINE_MINIMO_GRADI = 2;
+export const MARGINE_MINIMO_PERCENTO = 3;
+
+export interface Cambiamento {
+  key: string;
+  label: string;
+  view: PostureView;
+  prima: number;
+  dopo: number;
+  /** dopo − prima: negativo = la deviazione si è ridotta */
+  delta: number;
+  /** quanto deve valere |delta| per contare */
+  margine: number;
+  unita: '°' | '%';
+  esito: 'ridotta' | 'aumentata' | 'entro il margine';
+}
+
+/**
+ * Confronta la stessa misura fra due valutazioni. Tutte le misure
+ * sono DEVIAZIONI (0 = allineato): «ridotta» è il verso buono.
+ * Ritorna null se le due non sono la stessa misura o manca un valore.
+ */
+export const cambiamento = (
+  prima: PostureFinding | undefined,
+  dopo: PostureFinding | undefined,
+  view: PostureView = 'frontale'
+): Cambiamento | null => {
+  if (!prima || !dopo || prima.key !== dopo.key) return null;
+  const inGradi = prima.value_deg != null && dopo.value_deg != null;
+  const a = inGradi ? prima.value_deg : prima.value_pct;
+  const b = inGradi ? dopo.value_deg : dopo.value_pct;
+  if (typeof a !== 'number' || typeof b !== 'number') return null;
+  const t = Math.hypot(prima.tolerance || 0, dopo.tolerance || 0);
+  const margine = round1(Math.max(inGradi ? MARGINE_MINIMO_GRADI : MARGINE_MINIMO_PERCENTO, 2 * t));
+  const delta = round1(b - a);
+  return {
+    key: dopo.key,
+    label: dopo.label,
+    view,
+    prima: a,
+    dopo: b,
+    delta,
+    margine,
+    unita: inGradi ? '°' : '%',
+    esito: Math.abs(delta) <= margine ? 'entro il margine' : delta < 0 ? 'ridotta' : 'aumentata',
+  };
+};
+
+/** Tutte le misure in comune fra due valutazioni, vista per vista. */
+export const cambiamenti = (
+  prima: PostureMetrics[] | null | undefined,
+  dopo: PostureMetrics[] | null | undefined
+): Cambiamento[] => {
+  const out: Cambiamento[] = [];
+  for (const d of dopo || []) {
+    if (!d || d.quality !== 'ok') continue;
+    const p = (prima || []).find((x) => x && x.view === d.view && x.quality === 'ok');
+    if (!p) continue;
+    for (const f of d.findings) {
+      const c = cambiamento(p.findings.find((x) => x.key === f.key), f, d.view);
+      if (c) out.push(c);
+    }
+  }
+  return out;
 };

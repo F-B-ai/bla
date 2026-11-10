@@ -16,10 +16,12 @@
 // ============================================================
 
 import {
-  Modello3D, Punto3, Tinte, OSSA, GIUNTI, puntoScena, RAGGIO_TESTA,
+  Modello3D, Punto3, Tinte, OSSA, GIUNTI, puntoScena, RAGGIO_TESTA, ExtraScena,
 } from './posture3d';
 
-type Materia = 'neutro' | 'lieve' | 'moderato' | 'piombo' | 'base';
+type Materia =
+  | 'neutro' | 'lieve' | 'moderato' | 'piombo' | 'base'
+  | 'prima' | 'linea' | 'lineaOsservare';
 
 /** Colori dei materiali, in rosso/verde/blu da 0 a 1. */
 const COLORE: Record<Materia, [number, number, number]> = {
@@ -28,7 +30,13 @@ const COLORE: Record<Materia, [number, number, number]> = {
   moderato: [1.0, 0.27, 0.23],
   piombo: [0.39, 0.82, 1.0],
   base: [0.16, 0.16, 0.17],
+  prima: [0.55, 0.56, 0.6],
+  linea: [0.2, 0.78, 0.35],
+  lineaOsservare: [1.0, 0.62, 0.04],
 };
+
+// Il modello di PRIMA è semitrasparente: si deve vedere attraverso.
+const OPACITA: Partial<Record<Materia, number>> = { prima: 0.45 };
 
 const NOME_MATERIA: Record<Materia, string> = {
   neutro: 'Neutro',
@@ -36,12 +44,16 @@ const NOME_MATERIA: Record<Materia, string> = {
   moderato: 'Moderato',
   piombo: 'FiloAPiombo',
   base: 'Base',
+  prima: 'Prima',
+  linea: 'Linee',
+  lineaOsservare: 'LineeDaOsservare',
 };
 
 // Spessori in metri: è un manichino, non un'anatomia.
 const R_OSSO = 0.017;
 const R_GIUNTO = 0.028;
 const R_PIOMBO = 0.004;
+const R_LINEA = 0.006;
 const R_BASE = 0.3;
 
 export interface Maglia {
@@ -153,11 +165,12 @@ export const aggiungiDisco = (m: Maglia, c: Punto3, r: number, lati = 28): void 
  * le misure hanno segnato prendono il colore della loro gravità.
  */
 export const maglieDelModello = (
-  modello: Modello3D, tinte: Tinte = {}
+  modello: Modello3D, tinte: Tinte = {}, extra: ExtraScena = {}
 ): Record<Materia, Maglia> => {
   const out: Record<Materia, Maglia> = {
     neutro: magliaVuota(), lieve: magliaVuota(), moderato: magliaVuota(),
     piombo: magliaVuota(), base: magliaVuota(),
+    prima: magliaVuota(), linea: magliaVuota(), lineaOsservare: magliaVuota(),
   };
   const materiaDi = (s: string | undefined): Materia =>
     s === 'moderato' ? 'moderato' : s === 'lieve' ? 'lieve' : 'neutro';
@@ -183,6 +196,32 @@ export const maglieDelModello = (
     RAGGIO_TESTA * modello.statura_m,
     10, 16
   );
+
+  // Il modello di PRIMA, nello stesso punto: stesse caviglie, stesso
+  // filo a piombo. In AR si gira intorno alla differenza.
+  if (extra.prima) {
+    const p0 = extra.prima;
+    for (const o of OSSA) {
+      const a = sopra(puntoScena(p0, o.da));
+      const b = sopra(puntoScena(p0, o.a));
+      aggiungiCilindro(out.prima, a, b, R_OSSO);
+      aggiungiSfera(out.prima, a, R_OSSO, 4, 8);
+      aggiungiSfera(out.prima, b, R_OSSO, 4, 8);
+    }
+    aggiungiSfera(out.prima, puntoScena(p0, 'testa'), RAGGIO_TESTA * p0.statura_m, 10, 16);
+  }
+
+  for (const l of extra.linee || []) {
+    const m = l.daOsservare ? out.lineaOsservare : out.linea;
+    for (const ramo of l.rami) {
+      for (let i = 1; i < ramo.length; i++) {
+        const a = sopra(ramo[i - 1]);
+        const b = sopra(ramo[i]);
+        aggiungiCilindro(m, a, b, R_LINEA, 6);
+        aggiungiSfera(m, b, R_LINEA, 3, 6);
+      }
+    }
+  }
 
   // Il filo a piombo dal centro delle caviglie, e la base su cui sta.
   aggiungiCilindro(out.piombo, [0, 0.003, 0], [0, modello.statura_m * 1.03, 0], R_PIOMBO, 6);
@@ -219,11 +258,15 @@ const estensione = (punti: number[]): string => {
   return `[(${min.map(n4).join(', ')}), (${max.map(n4).join(', ')})]`;
 };
 
-const MATERIE: Materia[] = ['neutro', 'lieve', 'moderato', 'piombo', 'base'];
+const MATERIE: Materia[] = [
+  'neutro', 'lieve', 'moderato', 'piombo', 'base', 'prima', 'linea', 'lineaOsservare',
+];
 
 /** Il modello come testo USD. */
-export const creaUsda = (modello: Modello3D, tinte: Tinte = {}): string => {
-  const maglie = maglieDelModello(modello, tinte);
+export const creaUsda = (
+  modello: Modello3D, tinte: Tinte = {}, extra: ExtraScena = {}
+): string => {
+  const maglie = maglieDelModello(modello, tinte, extra);
   const usate = MATERIE.filter((k) => maglie[k].facce.length > 0);
 
   const materiali = usate.map((k) => {
@@ -237,7 +280,8 @@ export const creaUsda = (modello: Modello3D, tinte: Tinte = {}): string => {
             {
                 uniform token info:id = "UsdPreviewSurface"
                 color3f inputs:diffuseColor = (${n4(c[0])}, ${n4(c[1])}, ${n4(c[2])})
-                float inputs:metallic = 0
+                float inputs:metallic = 0${OPACITA[k] !== undefined ? `
+                float inputs:opacity = ${n4(OPACITA[k] as number)}` : ''}
                 float inputs:roughness = 0.55
                 token outputs:surface
             }
@@ -403,5 +447,7 @@ export const impacchettaUsdz = (
 };
 
 /** Il file .usdz del modello, pronto da aprire in realtà aumentata. */
-export const creaUsdz = (modello: Modello3D, tinte: Tinte = {}): Uint8Array =>
-  impacchettaUsdz([{ nome: 'modello.usda', dati: inByte(creaUsda(modello, tinte)) }]);
+export const creaUsdz = (
+  modello: Modello3D, tinte: Tinte = {}, extra: ExtraScena = {}
+): Uint8Array =>
+  impacchettaUsdz([{ nome: 'modello.usda', dati: inByte(creaUsda(modello, tinte, extra)) }]);

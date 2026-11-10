@@ -30,7 +30,9 @@
 import { Landmark } from './gait';
 import { raddrizza, PostureMetrics, PostureSeverity } from './posture';
 
-export const MODELLO_3D_VERSIONE = 1;
+// v2: frontale+posteriore fuse, un profilo per lato, lati verificati
+// dalla geometria.
+export const MODELLO_3D_VERSIONE = 2;
 
 /** Metri. X verso la SINISTRA del soggetto, Y in alto, Z in AVANTI. */
 export type Punto3 = [number, number, number];
@@ -87,7 +89,11 @@ export interface VistaPosa {
 export interface IngressoModello {
   frontale?: VistaPosa | null;
   posteriore?: VistaPosa | null;
+  /** profilo senza lato dichiarato: lo si capisce dalla foto */
   laterale?: VistaPosa | null;
+  /** la foto messa nel riquadro «Laterale SX» / «Laterale DX» */
+  lateraleSx?: VistaPosa | null;
+  lateraleDx?: VistaPosa | null;
   /** statura in centimetri, se in anagrafica */
   staturaCm?: number | null;
 }
@@ -98,10 +104,18 @@ export interface Modello3D {
   /** false = statura non nota: scala calcolata su una statura media */
   staturaDichiarata: boolean;
   /** da dove viene la terza dimensione */
-  profondita: 'profilo' | 'assente';
-  /** quale foto ha dato larghezza e altezza */
-  base: 'frontale' | 'posteriore';
+  profondita: 'due profili' | 'profilo' | 'assente';
+  /** quali foto hanno dato larghezza e altezza */
+  base: 'frontale' | 'posteriore' | 'frontale+posteriore';
   punti: Record<NomePunto, Punto3>;
+  /**
+   * Quando ci sono sia la frontale sia la posteriore: di quanto, in
+   * centimetri, le due foto mettono lo stesso punto in posti diversi
+   * (mediana sui punti cardine). È un numero ONESTO sulla precisione:
+   * dentro c'è l'errore di lettura e il fatto che la persona, fra una
+   * foto e l'altra, non si rimette mai identica.
+   */
+  scartoViste_cm?: number;
   /** limiti di QUESTO modello, da mostrare a chi lo guarda */
   note: string[];
 }
@@ -113,35 +127,100 @@ export type EsitoModello =
 const completa = (v: VistaPosa | null | undefined): v is VistaPosa =>
   !!v && Array.isArray(v.landmarks) && v.landmarks.length >= 33;
 
-/** Quale lato si vede nella foto di profilo: l'altro è coperto. */
-const latoVisibile = (lm: Landmark[]): 'Sx' | 'Dx' => {
-  const sx = vis(lm[7]) + vis(lm[11]) + vis(lm[23]) + vis(lm[27]);
-  const dx = vis(lm[8]) + vis(lm[12]) + vis(lm[24]) + vis(lm[28]);
-  return sx >= dx ? 'Sx' : 'Dx';
-};
-
 const latoDi = (nome: NomePunto): 'Sx' | 'Dx' | null =>
   nome.endsWith('Sx') ? 'Sx' : nome.endsWith('Dx') ? 'Dx' : null;
 
-/** Lo stesso punto, sul lato che nel profilo si vede. */
+/** Lo stesso punto, su un lato dato. */
 const sulLato = (nome: NomePunto, lato: 'Sx' | 'Dx'): NomePunto =>
   (latoDi(nome) ? nome.slice(0, -2) + lato : nome) as NomePunto;
 
+/** Scambia destra e sinistra in tutti i 33 punti. */
+const scambiaLati = (lm: Landmark[]): Landmark[] => {
+  const out = lm.slice();
+  const coppie: Array<[number, number]> = [[1, 4], [2, 5], [3, 6], [7, 8], [9, 10]];
+  for (let i = 11; i < 33; i += 2) coppie.push([i, i + 1]);
+  for (const [a, b] of coppie) { out[a] = lm[b]; out[b] = lm[a]; }
+  return out;
+};
+
+// ------------------------------------------------------------
+// LARGHEZZA E ALTEZZA — dalla frontale, dalla posteriore, o da tutte e due
+// ------------------------------------------------------------
+
+type Piano =
+  | { ok: true; xy: Record<NomePunto, [number, number]>; bacinoSu: number; scambiati: boolean }
+  | { ok: false; motivo: string };
+
 /**
- * Da che parte guarda la persona nella foto di profilo: +1 se il
- * davanti è verso destra nell'immagine, -1 se verso sinistra, 0 se
- * non si capisce. Il naso sta davanti all'orecchio; in mancanza, la
- * punta del piede sta davanti al tallone.
+ * Una foto di fronte o di spalle → x (verso la sinistra del soggetto)
+ * e y (in alto) di ogni punto, in metri, ancorati alle caviglie.
  */
-const versoDelProfilo = (lm: Landmark[], lato: 'Sx' | 'Dx'): number => {
+const piano = (vista: VistaPosa, tipo: 'frontale' | 'posteriore', H: number): Piano => {
+  let f = raddrizza(vista.landmarks, vista.larghezza, vista.altezza);
+
+  const cardini = [f[11], f[12], f[23], f[24], f[27], f[28]];
+  if (!cardini.every((p) => vis(p) >= MIN_VIS)) {
+    return {
+      ok: false,
+      motivo: 'non si leggono bene spalle, bacino e caviglie: corpo intero, in piedi, buona luce, indumenti aderenti.',
+    };
+  }
+
+  // Di fronte la sinistra del soggetto è a DESTRA nella foto; di
+  // spalle è a sinistra. Il motore a volte, soprattutto di spalle,
+  // etichetta i lati al contrario: lo si vede dalla geometria, e si
+  // rimettono a posto. Senza questo controllo, fondere frontale e
+  // posteriore farebbe la media fra una persona e il suo specchio.
+  const sinistraADestra = f[11].x > f[12].x;
+  const scambiati = tipo === 'frontale' ? !sinistraADestra : sinistraADestra;
+  if (scambiati) f = scambiaLati(f);
+
+  const cavX = (f[27].x + f[28].x) / 2;
+  const cavY = (f[27].y + f[28].y) / 2;
+  const spY = (f[11].y + f[12].y) / 2;
+  const tratto = cavY - spY;
+  if (!(tratto > 0.05)) {
+    return { ok: false, motivo: 'la persona non risulta in piedi e intera: non si può mettere in scala.' };
+  }
+  // In piedi, il bacino sta a circa due terzi della salita fra caviglie
+  // e spalle. Seduti o accovacciati no: e mettere in scala una persona
+  // seduta come se fosse in piedi darebbe un modello che sembra vero e
+  // non lo è.
+  const bacinoSu = (cavY - (f[23].y + f[24].y) / 2) / tratto;
+  if (bacinoSu < 0.45 || bacinoSu > 0.8) {
+    return { ok: false, motivo: 'la persona non risulta in piedi: il modello si costruisce solo da in piedi, corpo intero.' };
+  }
+
+  const k = ((QUOTA_SPALLA - QUOTA_CAVIGLIA) * H) / tratto;
+  const segno = tipo === 'frontale' ? 1 : -1;
+  const xy = {} as Record<NomePunto, [number, number]>;
+  for (const nome of NOMI_PUNTI) {
+    const p = f[INDICE[nome]];
+    xy[nome] = [segno * (p.x - cavX) * k, (cavY - p.y) * k + QUOTA_CAVIGLIA * H];
+  }
+  return { ok: true, xy, bacinoSu, scambiati };
+};
+
+// ------------------------------------------------------------
+// PROFONDITÀ — da uno o due profili
+// ------------------------------------------------------------
+
+/**
+ * Da che parte guarda la persona nel profilo: +1 se il davanti è
+ * verso destra nell'immagine, -1 se verso sinistra, 0 se non si
+ * capisce. Il naso sta davanti all'orecchio; in mancanza, la punta
+ * del piede sta davanti al tallone.
+ */
+const versoDelProfilo = (lm: Landmark[]): number => {
   const naso = lm[0];
-  const orecchio = lm[lato === 'Sx' ? 7 : 8];
+  const orecchio = vis(lm[7]) >= vis(lm[8]) ? lm[7] : lm[8];
   if (vis(naso) >= MIN_VIS && vis(orecchio) >= MIN_VIS) {
     const d = naso.x - orecchio.x;
     if (Math.abs(d) > 1e-4) return Math.sign(d);
   }
-  const punta = lm[lato === 'Sx' ? 31 : 32];
-  const tallone = lm[lato === 'Sx' ? 29 : 30];
+  const sx = vis(lm[31]) + vis(lm[29]) >= vis(lm[32]) + vis(lm[30]);
+  const punta = lm[sx ? 31 : 32];
+  const tallone = lm[sx ? 29 : 30];
   if (vis(punta) >= MIN_VIS && vis(tallone) >= MIN_VIS) {
     const d = punta.x - tallone.x;
     if (Math.abs(d) > 1e-4) return Math.sign(d);
@@ -149,38 +228,65 @@ const versoDelProfilo = (lm: Landmark[], lato: 'Sx' | 'Dx'): number => {
   return 0;
 };
 
+type Profilo =
+  | { ok: true; lato: 'Sx' | 'Dx'; z: (nome: NomePunto) => number; bacinoSu: number }
+  | { ok: false; motivo: string };
+
+/**
+ * Una foto di profilo → la profondità (z, in avanti) di ogni punto.
+ *
+ * QUALE LATO SI VEDE lo dice la geometria, non un'etichetta: chi è
+ * fotografato dal suo lato SINISTRO guarda verso la sinistra
+ * dell'immagine, chi dal destro verso destra.
+ */
+const profilo = (vista: VistaPosa, H: number): Profilo => {
+  const s = raddrizza(vista.landmarks, vista.larghezza, vista.altezza);
+  const verso = versoDelProfilo(s);
+  if (verso === 0) return { ok: false, motivo: 'non si capisce da che parte guarda la persona' };
+  const lato: 'Sx' | 'Dx' = verso < 0 ? 'Sx' : 'Dx';
+
+  // I punti si leggono dal lato che il motore vede meglio (di profilo
+  // i due lati si sovrappongono, e uno è coperto).
+  const vSx = vis(s[11]) + vis(s[23]) + vis(s[27]);
+  const vDx = vis(s[12]) + vis(s[24]) + vis(s[28]);
+  const letto: 'Sx' | 'Dx' = vSx === vDx ? lato : vSx > vDx ? 'Sx' : 'Dx';
+  const sp = s[INDICE[sulLato('spallaSx', letto)]];
+  const an = s[INDICE[sulLato('ancaSx', letto)]];
+  const cav = s[INDICE[sulLato('cavigliaSx', letto)]];
+  const tratto = cav.y - sp.y;
+  if (![sp, an, cav].every((p) => vis(p) >= MIN_VIS) || !(tratto > 0.05)) {
+    return { ok: false, motivo: 'non si leggono bene spalla, anca e caviglia' };
+  }
+  const k = ((QUOTA_SPALLA - QUOTA_CAVIGLIA) * H) / tratto;
+  return {
+    ok: true,
+    lato,
+    z: (nome) => verso * (s[INDICE[sulLato(nome, letto)]].x - cav.x) * k,
+    bacinoSu: (cav.y - an.y) / tratto,
+  };
+};
+
+const NOME_LATO = { Sx: 'sinistro', Dx: 'destro' } as const;
+
 /**
  * Fonde le foto in un modello nello spazio.
  *
- * Larghezza e altezza vengono dalla frontale (o dalla posteriore,
- * specchiata). La profondità viene dal profilo. Le due foto non sono
- * scattate dalla stessa distanza, quindi ognuna si porta in metri
- * con la STESSA misura del corpo — la quota caviglia→spalla — e si
- * ancora nello stesso punto: le caviglie.
+ * Larghezza e altezza vengono dalla frontale e dalla posteriore (se
+ * ci sono tutte e due se ne fa la media, e lo scarto fra le due dice
+ * quanto fidarsi). La profondità viene dai profili: con due, ogni
+ * lato ha la sua. Le foto non sono scattate dalla stessa distanza,
+ * quindi ognuna si porta in metri con la STESSA misura del corpo — la
+ * quota caviglia→spalla — e si ancora nello stesso punto: le caviglie.
  */
 export const costruisciModello3D = (ingresso: IngressoModello): EsitoModello => {
-  const base: 'frontale' | 'posteriore' | null =
-    completa(ingresso.frontale) ? 'frontale'
-      : completa(ingresso.posteriore) ? 'posteriore' : null;
-  if (!base) {
+  if (!completa(ingresso.frontale) && !completa(ingresso.posteriore)) {
     return {
       ok: false,
       motivo: 'Serve la foto frontale (o la posteriore): è quella che dà larghezza e altezza.',
     };
   }
-  const vistaBase = (base === 'frontale' ? ingresso.frontale : ingresso.posteriore) as VistaPosa;
-  const f = raddrizza(vistaBase.landmarks, vistaBase.larghezza, vistaBase.altezza);
-
-  const cardini = [f[11], f[12], f[23], f[24], f[27], f[28]];
-  if (!cardini.every((p) => vis(p) >= MIN_VIS)) {
-    return {
-      ok: false,
-      motivo: 'Nella foto non si leggono bene spalle, bacino e caviglie: corpo intero, in piedi, buona luce, indumenti aderenti.',
-    };
-  }
 
   const note: string[] = [];
-
   const staturaValida = typeof ingresso.staturaCm === 'number'
     && ingresso.staturaCm >= 120 && ingresso.staturaCm <= 230;
   const staturaCm = staturaValida ? (ingresso.staturaCm as number) : STATURA_PREDEFINITA_CM;
@@ -190,81 +296,101 @@ export const costruisciModello3D = (ingresso: IngressoModello): EsitoModello => 
       `Statura non in anagrafica: il modello è in scala su ${STATURA_PREDEFINITA_CM} cm. Le proporzioni sono quelle della foto, i centimetri no.`
     );
   }
-  const quota = (QUOTA_SPALLA - QUOTA_CAVIGLIA) * H; // metri fra caviglia e spalla
 
-  // --- larghezza e altezza: dalla foto di base ---
-  const cavX = (f[27].x + f[28].x) / 2;
-  const cavY = (f[27].y + f[28].y) / 2;
-  const spY = (f[11].y + f[12].y) / 2;
-  const trattoF = cavY - spY;
-  if (!(trattoF > 0.05)) {
-    return {
-      ok: false,
-      motivo: 'La persona non risulta in piedi e intera nella foto: non si può mettere in scala.',
-    };
+  // --- larghezza e altezza ---
+  const pf = completa(ingresso.frontale) ? piano(ingresso.frontale, 'frontale', H) : null;
+  const pp = completa(ingresso.posteriore) ? piano(ingresso.posteriore, 'posteriore', H) : null;
+  const buoni = [pf, pp].filter((p): p is Extract<Piano, { ok: true }> => !!p && p.ok);
+  if (!buoni.length) {
+    const primo = (pf || pp) as Extract<Piano, { ok: false }>;
+    return { ok: false, motivo: `Nella foto ${primo.motivo}` };
   }
-  // In piedi, il bacino sta a circa due terzi della salita fra caviglie
-  // e spalle. Seduti o accovacciati no: e mettere in scala una persona
-  // seduta come se fosse in piedi darebbe un modello che sembra vero e
-  // non lo è.
-  const bacinoSu = (cavY - (f[23].y + f[24].y) / 2) / trattoF;
-  if (bacinoSu < 0.45 || bacinoSu > 0.8) {
-    return {
-      ok: false,
-      motivo: 'La persona non risulta in piedi nella foto: il modello si costruisce solo da in piedi, corpo intero.',
-    };
-  }
-  const kF = quota / trattoF;
-  // Di fronte, la sinistra del soggetto è a destra nella foto; di
-  // spalle è il contrario.
-  const segno = base === 'frontale' ? 1 : -1;
+  let base: Modello3D['base'];
+  if (pf && pf.ok && pp && pp.ok) base = 'frontale+posteriore';
+  else if (pf && pf.ok) base = 'frontale';
+  else base = 'posteriore';
 
-  // --- profondità: dal profilo, se c'è e si legge ---
+  if (pf && !pf.ok && pp && pp.ok) note.push(`La frontale non è stata usata: ${pf.motivo}`);
+  if (pp && !pp.ok && pf && pf.ok) note.push(`La posteriore non è stata usata: ${pp.motivo}`);
+  if (pf && pf.ok && pf.scambiati) {
+    note.push('Nella frontale destra e sinistra risultavano scambiate e sono state rimesse a posto: controlla che nel riquadro «Frontale» ci sia davvero la foto di fronte.');
+  }
+  if (pp && pp.ok && pp.scambiati) {
+    note.push('Nella posteriore il motore aveva scambiato destra e sinistra: rimesse a posto dalla geometria.');
+  }
+
+  const xy = {} as Record<NomePunto, [number, number]>;
+  for (const nome of NOMI_PUNTI) {
+    xy[nome] = [
+      buoni.reduce((s, b) => s + b.xy[nome][0], 0) / buoni.length,
+      buoni.reduce((s, b) => s + b.xy[nome][1], 0) / buoni.length,
+    ];
+  }
+
+  let scartoViste_cm: number | undefined;
+  if (buoni.length === 2) {
+    const cardini: NomePunto[] = [
+      'spallaSx', 'spallaDx', 'ancaSx', 'ancaDx', 'ginocchioSx', 'ginocchioDx',
+    ];
+    const scarti = cardini
+      .map((n) => Math.hypot(buoni[0].xy[n][0] - buoni[1].xy[n][0], buoni[0].xy[n][1] - buoni[1].xy[n][1]))
+      .sort((a, b) => a - b);
+    scartoViste_cm = Math.round(((scarti[2] + scarti[3]) / 2) * 1000) / 10;
+    note.push(`Frontale e posteriore mettono gli stessi punti a ${String(scartoViste_cm).replace('.', ',')} cm di distanza (mediana): è il margine di questo modello su larghezze e altezze.`);
+  }
+
+  // --- profondità ---
+  const candidati: Array<{ vista: VistaPosa; riquadro: 'Sx' | 'Dx' | null }> = [];
+  if (completa(ingresso.lateraleSx)) candidati.push({ vista: ingresso.lateraleSx, riquadro: 'Sx' });
+  if (completa(ingresso.lateraleDx)) candidati.push({ vista: ingresso.lateraleDx, riquadro: 'Dx' });
+  if (completa(ingresso.laterale)) candidati.push({ vista: ingresso.laterale, riquadro: null });
+
+  const riferimento = buoni.reduce((s, b) => s + b.bacinoSu, 0) / buoni.length;
+  const perLato: Record<'Sx' | 'Dx', Array<(n: NomePunto) => number>> = { Sx: [], Dx: [] };
+  for (const c of candidati) {
+    const pr = profilo(c.vista, H);
+    const quale = c.riquadro ? `nel riquadro «Laterale ${c.riquadro.toUpperCase()}»` : 'di profilo';
+    if (!pr.ok) {
+      note.push(`La foto ${quale} non è stata usata: ${pr.motivo}.`);
+      continue;
+    }
+    if (c.riquadro && c.riquadro !== pr.lato) {
+      note.push(`La foto ${quale} mostra il lato ${NOME_LATO[pr.lato]}: è stata usata come lato ${NOME_LATO[pr.lato]}.`);
+    }
+    // Le foto raccontano la stessa persona? Il bacino deve stare alla
+    // stessa frazione fra caviglia e spalla in tutte.
+    if (Math.abs(riferimento - pr.bacinoSu) > 0.08) {
+      note.push(`La foto ${quale} non combacia bene con la frontale (distanza o altezza del telefono diverse): la profondità è solo indicativa.`);
+    }
+    perLato[pr.lato].push(pr.z);
+  }
+
+  const media = (fz: Array<(n: NomePunto) => number>, n: NomePunto): number =>
+    fz.reduce((s, z) => s + z(n), 0) / fz.length;
+  const tutti = [...perLato.Sx, ...perLato.Dx];
+
   let profondita: Modello3D['profondita'] = 'assente';
   let zDi: (nome: NomePunto) => number = () => 0;
-
-  if (completa(ingresso.laterale)) {
-    const s = raddrizza(
-      ingresso.laterale.landmarks, ingresso.laterale.larghezza, ingresso.laterale.altezza
-    );
-    const lato = latoVisibile(s);
-    const sp = s[INDICE[sulLato('spallaSx', lato)]];
-    const an = s[INDICE[sulLato('ancaSx', lato)]];
-    const cav = s[INDICE[sulLato('cavigliaSx', lato)]];
-    const verso = versoDelProfilo(s, lato);
-    const trattoS = cav.y - sp.y;
-
-    if (![sp, an, cav].every((p) => vis(p) >= MIN_VIS) || !(trattoS > 0.05)) {
-      note.push('La foto di profilo non si legge bene (spalla, anca, caviglia): il modello è piatto, senza profondità.');
-    } else if (verso === 0) {
-      note.push('Dal profilo non si capisce da che parte guarda la persona: il modello è piatto, senza profondità.');
-    } else {
-      const kS = quota / trattoS;
-      profondita = 'profilo';
-      zDi = (nome) => {
-        const p = s[INDICE[sulLato(nome, lato)]];
-        return verso * (p.x - cav.x) * kS;
-      };
-      note.push('La profondità viene da un solo profilo: è uguale per i due lati. Le rotazioni (una spalla o un\'anca più avanti dell\'altra) qui non si vedono.');
-
-      // Le due foto raccontano la stessa persona? Il bacino deve stare
-      // alla stessa frazione fra caviglia e spalla in entrambe.
-      const ancaF = (cavY - (f[23].y + f[24].y) / 2) / trattoF;
-      const ancaS = (cav.y - an.y) / trattoS;
-      if (Math.abs(ancaF - ancaS) > 0.08) {
-        note.push('Frontale e profilo non combaciano bene (distanza o altezza del telefono diverse): la profondità è solo indicativa.');
-      }
-    }
-  } else {
+  if (perLato.Sx.length && perLato.Dx.length) {
+    profondita = 'due profili';
+    zDi = (nome) => {
+      const l = latoDi(nome);
+      return l ? media(perLato[l], nome) : media(tutti, nome);
+    };
+    note.push('Ogni lato ha la sua profondità, dal suo profilo. Fra una foto e l\'altra la persona si rigira: differenze di 1–2 cm fra i due lati sono normali e non vanno lette come rotazioni.');
+  } else if (tutti.length) {
+    profondita = 'profilo';
+    zDi = (nome) => media(tutti, nome);
+    note.push('La profondità viene da un solo profilo: è uguale per i due lati. Le rotazioni (una spalla o un\'anca più avanti dell\'altra) qui non si vedono.');
+  } else if (!candidati.length) {
     note.push('Manca la foto di profilo: il modello è piatto. Con frontale + profilo diventa tridimensionale.');
+  } else {
+    note.push('Nessuna foto di profilo era leggibile: il modello è piatto, senza profondità.');
   }
 
   const punti = {} as Record<NomePunto, Punto3>;
   for (const nome of NOMI_PUNTI) {
-    const p = f[INDICE[nome]];
-    const x = segno * (p.x - cavX) * kF;
-    const y = Math.max(0, (cavY - p.y) * kF + QUOTA_CAVIGLIA * H);
-    punti[nome] = [mm(x), mm(y), mm(zDi(nome))];
+    punti[nome] = [mm(xy[nome][0]), mm(Math.max(0, xy[nome][1])), mm(zDi(nome))];
   }
 
   return {
@@ -276,6 +402,7 @@ export const costruisciModello3D = (ingresso: IngressoModello): EsitoModello => 
       profondita,
       base,
       punti,
+      ...(scartoViste_cm !== undefined ? { scartoViste_cm } : {}),
       note,
     },
   };
@@ -396,8 +523,24 @@ export const proietta = (p: Punto3, v: Vista3D): { x: number; y: number; z: numb
   return { x: x1, y: y2, z: z2 };
 };
 
+/** Una linea da disegnare sopra il modello (i rami sono già nello spazio). */
+export interface LineaScena {
+  id: string;
+  rami: Punto3[][];
+  daOsservare: boolean;
+}
+
+/** Quello che si può aggiungere alla scena oltre al modello. */
+export interface ExtraScena {
+  /** il modello di una valutazione precedente, disegnato in ombra */
+  prima?: Modello3D | null;
+  /** linee tracciate sul modello (lineeMiofasciali.ts) */
+  linee?: LineaScena[];
+}
+
 export interface TrattoScena {
-  tipo: 'osso' | 'giunto' | 'testa' | 'piombo';
+  /** 'ombra' = un segmento (o la testa) del modello di PRIMA */
+  tipo: 'osso' | 'giunto' | 'testa' | 'piombo' | 'ombra' | 'linea';
   id: string;
   x1: number; y1: number;
   /** solo per ossa e filo a piombo */
@@ -414,8 +557,45 @@ export interface TrattoScena {
  * ordine: dal più lontano al più vicino. Chi disegna deve solo
  * trasformare i metri in pixel.
  */
-export const scena = (m: Modello3D, v: Vista3D, tinte: Tinte = {}): TrattoScena[] => {
+export const scena = (
+  m: Modello3D, v: Vista3D, tinte: Tinte = {}, extra: ExtraScena = {}
+): TrattoScena[] => {
   const out: TrattoScena[] = [];
+
+  // Il «prima» sta sempre dietro: è il termine di paragone, non deve
+  // coprire quello che si guarda adesso.
+  if (extra.prima) {
+    const p0 = extra.prima;
+    for (const o of OSSA) {
+      const a = proietta(puntoScena(p0, o.da), v);
+      const b = proietta(puntoScena(p0, o.a), v);
+      out.push({
+        tipo: 'ombra', id: `prima-${o.id}`,
+        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+        z: (a.z + b.z) / 2 - 100, severita: 'normale',
+      });
+    }
+    const t0 = proietta(puntoScena(p0, 'testa'), v);
+    out.push({
+      tipo: 'ombra', id: 'prima-testa',
+      x1: t0.x, y1: t0.y, raggio: RAGGIO_TESTA * p0.statura_m,
+      z: t0.z - 100, severita: 'normale',
+    });
+  }
+
+  for (const l of extra.linee || []) {
+    l.rami.forEach((ramo, r) => {
+      for (let i = 1; i < ramo.length; i++) {
+        const a = proietta(ramo[i - 1], v);
+        const b = proietta(ramo[i], v);
+        out.push({
+          tipo: 'linea', id: `${l.id}-${r}-${i}`,
+          x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+          z: (a.z + b.z) / 2 + 0.002, severita: l.daOsservare ? 'lieve' : 'normale',
+        });
+      }
+    });
+  }
 
   // Il filo a piombo: la verticale che sale dal centro delle caviglie.
   const giu = proietta([0, 0, 0], v);

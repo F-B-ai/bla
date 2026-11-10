@@ -11,6 +11,9 @@ import {
   magliaVuota, aggiungiSfera, aggiungiCilindro, maglieDelModello, Maglia,
 } from '../modelloAR';
 import { computePostureMetrics, raddrizza, PostureMetrics } from '../posture';
+import {
+  leggiLinee, tracciaLinea, lunghezzaLinea, IDS_LINEE, AVVERTENZA_LINEE,
+} from '../lineeMiofasciali';
 
 // ============================================================
 // 10 novembre 2026 — IL MODELLO 3D
@@ -64,14 +67,19 @@ const fotoFrontale = (
   return { landmarks: lm, larghezza: largo, altezza: alto };
 };
 
-/** Fotografa di profilo. verso=+1: guarda verso destra nell'immagine. */
+/**
+ * Fotografa di profilo, con la geometria vera: chi è ripreso dal suo
+ * lato SINISTRO guarda verso la sinistra dell'immagine, chi dal
+ * destro verso destra. Il lato lontano è coperto.
+ */
 const fotoProfilo = (
   p: Record<NomePunto, Punto3>, largo: number, alto: number, pxPerMetro: number,
-  verso: 1 | -1, latoVisibile: 'Sx' | 'Dx' = 'Sx'
+  lato: 'Sx' | 'Dx'
 ): VistaPosa => {
+  const verso = lato === 'Sx' ? -1 : 1;
   const lm = vuoti();
   for (const n of NOMI_PUNTI) {
-    const coperto = (n.endsWith('Sx') || n.endsWith('Dx')) && !n.endsWith(latoVisibile);
+    const coperto = (n.endsWith('Sx') || n.endsWith('Dx')) && !n.endsWith(lato);
     lm[INDICE[n]] = {
       x: (largo / 2 + verso * p[n][2] * pxPerMetro) / largo,
       y: (alto * 0.9 - p[n][1] * pxPerMetro) / alto,
@@ -84,8 +92,8 @@ const fotoProfilo = (
 const costruisci = (extra: Partial<Parameters<typeof costruisciModello3D>[0]> = {}): Modello3D => {
   const p = persona();
   const r = costruisciModello3D({
-    frontale: fotoFrontale(p, 750, 1000, 480),   // 3:4
-    laterale: fotoProfilo(p, 1080, 1920, 900, 1), // 9:16, altra distanza
+    frontale: fotoFrontale(p, 750, 1000, 480),    // 3:4
+    laterale: fotoProfilo(p, 1080, 1920, 900, 'Dx'), // 9:16, altra distanza
     staturaCm: 180,
     ...extra,
   });
@@ -104,20 +112,16 @@ describe('fusione di frontale e profilo', () => {
     }
     expect(m.profondita).toBe('profilo');
     expect(m.staturaDichiarata).toBe(true);
+    expect(m.versione).toBe(2);
   });
 
-  it('il davanti resta davanti anche se nel profilo guarda a sinistra', () => {
+  it('il davanti resta davanti da qualunque lato sia preso il profilo', () => {
     const p = persona();
-    const m = costruisci({ laterale: fotoProfilo(p, 1080, 1920, 900, -1) });
-    expect(m.punti.naso[2]).toBeGreaterThan(0.1);      // il naso è avanti
-    expect(m.punti.talloneSx[2]).toBeLessThan(0);       // il tallone dietro
-  });
-
-  it('funziona uguale col profilo destro', () => {
-    const p = persona();
-    const m = costruisci({ laterale: fotoProfilo(p, 1080, 1920, 900, 1, 'Dx') });
-    expect(m.punti.naso[2]).toBeCloseTo(0.16, 2);
-    expect(m.profondita).toBe('profilo');
+    for (const lato of ['Sx', 'Dx'] as const) {
+      const m = costruisci({ laterale: fotoProfilo(p, 1080, 1920, 900, lato) });
+      expect(m.punti.naso[2]).toBeCloseTo(0.16, 2);   // il naso è avanti
+      expect(m.punti.talloneSx[2]).toBeLessThan(0);   // il tallone dietro
+    }
   });
 
   it('la sinistra del soggetto resta a sinistra anche dalla foto di spalle', () => {
@@ -145,6 +149,114 @@ describe('fusione di frontale e profilo', () => {
   });
 });
 
+// ============================================================
+// QUATTRO FOTO — «lo scheletro deve prendere 4 o anche più angolazioni»
+// ============================================================
+
+/** Scambia destra e sinistra, come fa il motore quando sbaglia lato. */
+const etichetteScambiate = (v: VistaPosa): VistaPosa => {
+  const lm = v.landmarks.slice();
+  const coppie: Array<[number, number]> = [[7, 8]];
+  for (let i = 11; i < 33; i += 2) coppie.push([i, i + 1]);
+  for (const [a, b] of coppie) { lm[a] = v.landmarks[b]; lm[b] = v.landmarks[a]; }
+  return { ...v, landmarks: lm };
+};
+
+describe('quattro foto: frontale, posteriore e i due profili', () => {
+  /** Persona con la spalla DESTRA 4 cm più avanti della sinistra. */
+  const ruotata = (): Record<NomePunto, Punto3> => {
+    const p = persona();
+    p.spallaDx = [p.spallaDx[0], p.spallaDx[1], 0.04];
+    return p;
+  };
+  const quattro = (p = ruotata(), extra: Partial<Parameters<typeof costruisciModello3D>[0]> = {}): Modello3D => {
+    const r = costruisciModello3D({
+      frontale: fotoFrontale(p, 750, 1000, 480),
+      posteriore: fotoFrontale(p, 750, 1000, 430, -1),
+      lateraleSx: fotoProfilo(p, 1080, 1920, 900, 'Sx'),
+      lateraleDx: fotoProfilo(p, 1080, 1920, 860, 'Dx'),
+      staturaCm: 180,
+      ...extra,
+    });
+    if (!r.ok) throw new Error(r.motivo);
+    return r.modello;
+  };
+
+  it('con due profili ogni lato ha la SUA profondità: la rotazione si vede', () => {
+    const m = quattro();
+    expect(m.profondita).toBe('due profili');
+    expect(m.punti.spallaDx[2]).toBeCloseTo(0.04, 2);
+    expect(m.punti.spallaSx[2]).toBeCloseTo(0, 2);
+  });
+
+  it('con un profilo solo la stessa rotazione NON si vede, e lo dichiara', () => {
+    const p = ruotata();
+    const m = quattro(p, { lateraleDx: null });
+    expect(m.profondita).toBe('profilo');
+    expect(m.punti.spallaDx[2]).toBe(m.punti.spallaSx[2]);
+    expect(m.note.join(' ')).toMatch(/uguale per i due lati/);
+  });
+
+  it('frontale e posteriore si fondono, e lo scarto fra le due è dichiarato', () => {
+    const m = quattro();
+    expect(m.base).toBe('frontale+posteriore');
+    expect(m.scartoViste_cm).toBeDefined();
+    expect(m.scartoViste_cm!).toBeLessThan(0.3); // stessa persona, stessa posa
+    expect(m.note.join(' ')).toMatch(/Frontale e posteriore mettono gli stessi punti/);
+    // e i punti restano quelli veri
+    const vero = ruotata();
+    expect(m.punti.spallaSx[0]).toBeCloseTo(vero.spallaSx[0], 2);
+    expect(m.punti.ancaDx[1]).toBeCloseTo(vero.ancaDx[1], 2);
+  });
+
+  it('se la persona si è mossa fra le due foto, lo scarto lo dice', () => {
+    const p = ruotata();
+    const mossa = ruotata();
+    for (const n of ['spallaSx', 'spallaDx', 'ancaSx', 'ancaDx', 'ginocchioSx', 'ginocchioDx'] as NomePunto[]) {
+      mossa[n] = [mossa[n][0] + 0.03, mossa[n][1], mossa[n][2]]; // 3 cm di lato
+    }
+    const m = quattro(p, { posteriore: fotoFrontale(mossa, 750, 1000, 430, -1) });
+    expect(m.scartoViste_cm!).toBeGreaterThan(2.5);
+    expect(m.scartoViste_cm!).toBeLessThan(3.5);
+  });
+
+  it('il motore che scambia destra e sinistra di spalle NON rovina la fusione', () => {
+    const p = ruotata();
+    const m = quattro(p, {
+      posteriore: etichetteScambiate(fotoFrontale(p, 750, 1000, 430, -1)),
+    });
+    expect(m.punti.spallaSx[0]).toBeGreaterThan(0.15); // non la media con lo specchio
+    expect(m.punti.spallaSx[1]).toBeGreaterThan(m.punti.spallaDx[1]);
+    expect(m.note.join(' ')).toMatch(/aveva scambiato destra e sinistra/);
+  });
+
+  it('una foto messa nel riquadro sbagliato viene usata per il lato che mostra', () => {
+    const p = ruotata();
+    const m = quattro(p, {
+      lateraleSx: fotoProfilo(p, 1080, 1920, 860, 'Dx'),
+      lateraleDx: fotoProfilo(p, 1080, 1920, 900, 'Sx'),
+    });
+    expect(m.profondita).toBe('due profili');
+    expect(m.punti.spallaDx[2]).toBeCloseTo(0.04, 2);
+    expect(m.note.join(' ')).toMatch(/«Laterale SX» mostra il lato destro/);
+  });
+
+  it('due profili dello stesso lato non fingono di essere due lati', () => {
+    const p = ruotata();
+    const m = quattro(p, { lateraleSx: fotoProfilo(p, 1080, 1920, 900, 'Dx') });
+    expect(m.profondita).toBe('profilo');
+  });
+
+  it('una frontale illeggibile non blocca: si usa la posteriore e lo si dice', () => {
+    const p = ruotata();
+    const rotta = fotoFrontale(p, 750, 1000, 480);
+    rotta.landmarks[27] = { ...rotta.landmarks[27], visibility: 0.1 };
+    const m = quattro(p, { frontale: rotta });
+    expect(m.base).toBe('posteriore');
+    expect(m.note.join(' ')).toMatch(/La frontale non è stata usata/);
+  });
+});
+
 describe('i limiti, detti e non nascosti', () => {
   it('senza profilo il modello è PIATTO e lo dichiara', () => {
     const m = costruisci({ laterale: null });
@@ -155,14 +267,14 @@ describe('i limiti, detti e non nascosti', () => {
 
   it('un profilo illeggibile non inventa la profondità', () => {
     const p = persona();
-    const profilo = fotoProfilo(p, 1080, 1920, 900, 1);
-    profilo.landmarks = profilo.landmarks.map((l) => ({ ...l, visibility: 0.1 }));
-    const m = costruisci({ laterale: profilo });
+    const prof = fotoProfilo(p, 1080, 1920, 900, 'Dx');
+    prof.landmarks = prof.landmarks.map((l) => ({ ...l, visibility: 0.1 }));
+    const m = costruisci({ laterale: prof });
     expect(m.profondita).toBe('assente');
-    expect(m.note.join(' ')).toMatch(/non si legge bene/);
+    expect(m.note.join(' ')).toMatch(/non è stata usata/);
   });
 
-  it('con il profilo dice che i due lati hanno la stessa profondità', () => {
+  it('con un profilo dice che i due lati hanno la stessa profondità', () => {
     expect(costruisci().note.join(' ')).toMatch(/uguale per i due lati/);
   });
 
@@ -179,7 +291,7 @@ describe('i limiti, detti e non nascosti', () => {
   });
 
   it('senza frontale né posteriore non costruisce niente, e dice perché', () => {
-    const r = costruisciModello3D({ laterale: fotoProfilo(persona(), 1080, 1920, 900, 1) });
+    const r = costruisciModello3D({ laterale: fotoProfilo(persona(), 1080, 1920, 900, 'Dx') });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.motivo).toMatch(/frontale/);
   });
@@ -205,10 +317,10 @@ describe('i limiti, detti e non nascosti', () => {
     const storta = persona();
     storta.ancaSx = [0.1, 1.2, 0.01]; // bacino 25 cm più su: non è la stessa posa
     storta.ancaDx = [-0.1, 1.2, 0.01];
-    const m = costruisci({ laterale: fotoProfilo(storta, 1080, 1920, 900, 1) });
-    expect(m.note.join(' ')).toMatch(/non combaciano/);
-    expect(costruisci({ laterale: fotoProfilo(p, 1080, 1920, 900, 1) }).note.join(' '))
-      .not.toMatch(/non combaciano/);
+    const m = costruisci({ laterale: fotoProfilo(storta, 1080, 1920, 900, 'Dx') });
+    expect(m.note.join(' ')).toMatch(/non combacia/);
+    expect(costruisci({ laterale: fotoProfilo(p, 1080, 1920, 900, 'Dx') }).note.join(' '))
+      .not.toMatch(/non combacia/);
   });
 });
 
@@ -325,14 +437,14 @@ describe('il modello salvato si riconosce', () => {
 describe('il modello concorda con le misure', () => {
   it('testa in avanti: stesso angolo dalla foto e dal modello', () => {
     const p = persona();
-    const profilo = fotoProfilo(p, 1080, 1920, 900, 1);
+    const profilo = fotoProfilo(p, 1080, 1920, 900, 'Dx');
     const misura = computePostureMetrics(
       raddrizza(profilo.landmarks, profilo.larghezza, profilo.altezza), 'laterale'
     ).findings.find((f) => f.key === 'forward_head')!;
 
     const m = costruisci();
-    const or = m.punti.orecchioSx;
-    const sp = m.punti.spallaSx;
+    const or = m.punti.orecchioDx;
+    const sp = m.punti.spallaDx;
     const dalModello = (Math.atan2(Math.abs(or[2] - sp[2]), or[1] - sp[1]) * 180) / Math.PI;
     expect(misura.value_deg!).toBeCloseTo(dalModello, 0);
   });
@@ -484,6 +596,165 @@ describe('il file .usdz', () => {
 });
 
 // ============================================================
+// PRIMA E DOPO, NELLO STESSO SPAZIO
+// ============================================================
+
+describe('confronto prima/dopo nel disegno e in AR', () => {
+  const adesso = (): Modello3D => costruisci();
+  const prima = (): Modello3D => {
+    const p = persona();
+    p.naso = [0, 1.66, 0.26]; // prima la testa era 10 cm più avanti
+    p.orecchioSx = [0.075, 1.67, 0.16];
+    p.orecchioDx = [-0.075, 1.67, 0.16];
+    const r = costruisciModello3D({
+      frontale: fotoFrontale(p, 750, 1000, 480),
+      laterale: fotoProfilo(p, 1080, 1920, 900, 'Dx'),
+      staturaCm: 180,
+    });
+    if (!r.ok) throw new Error(r.motivo);
+    return r.modello;
+  };
+
+  it('il modello di prima entra nella scena come ombra, e sta DIETRO', () => {
+    const s = scena(adesso(), VISTE.profiloDx, {}, { prima: prima() });
+    const ombre = s.filter((t) => t.tipo === 'ombra');
+    expect(ombre).toHaveLength(OSSA.length + 1); // i segmenti e la testa
+    const ultimaOmbra = Math.max(...ombre.map((o) => s.indexOf(o)));
+    const primoVero = Math.min(...s.filter((t) => t.tipo === 'osso').map((o) => s.indexOf(o)));
+    expect(ultimaOmbra).toBeLessThan(primoVero);
+  });
+
+  it('di profilo la testa di prima si vede più avanti di quella di adesso', () => {
+    const s = scena(adesso(), VISTE.profiloDx, {}, { prima: prima() });
+    const tPrima = s.find((t) => t.id === 'prima-testa')!;
+    const tAdesso = s.find((t) => t.id === 'testa')!;
+    expect(tPrima.x1 - tAdesso.x1).toBeCloseTo(0.1, 2);
+  });
+
+  it('senza un prima la scena è quella di sempre', () => {
+    expect(scena(adesso(), VISTE.fronte).some((t) => t.tipo === 'ombra')).toBe(false);
+  });
+
+  it('nel file AR il prima è un oggetto a parte, semitrasparente', () => {
+    const senza = creaUsda(adesso());
+    expect(senza).not.toMatch(/def Mesh "Prima"/);
+    const con = creaUsda(adesso(), {}, { prima: prima() });
+    expect(con).toMatch(/def Mesh "Prima"/);
+    expect(con).toMatch(/inputs:opacity = 0\.45/);
+    expect(con).not.toMatch(/NaN|Infinity|undefined/);
+  });
+});
+
+// ============================================================
+// LE LINEE MIOFASCIALI — dove guardare, non che cosa è «alterato»
+// ============================================================
+
+describe('linee miofasciali sul modello', () => {
+  const vista = (view: 'frontale' | 'laterale', findings: PostureMetrics['findings']): PostureMetrics => ({
+    version: 4, view, findings, notable: [], quality: 'ok', quality_notes: [],
+  });
+
+  /** Persona perfettamente simmetrica. */
+  const simmetrica = (): Modello3D => {
+    const p = persona();
+    p.spallaSx = [0.2, SP, 0]; p.spallaDx = [-0.2, SP, 0];
+    const r = costruisciModello3D({ frontale: fotoFrontale(p, 750, 1000, 480), staturaCm: 180 });
+    if (!r.ok) throw new Error(r.motivo);
+    return r.modello;
+  };
+
+  it('persona simmetrica e nessuna misura fuori asse: tutte nella norma', () => {
+    const l = leggiLinee(simmetrica(), []);
+    expect(l).toHaveLength(IDS_LINEE.length);
+    for (const x of l) { expect(x.stato).toBe('nella norma'); expect(x.perche).toHaveLength(0); }
+  });
+
+  it('le due laterali di una persona simmetrica sono lunghe uguali', () => {
+    const m = simmetrica();
+    expect(lunghezzaLinea(m, 'lateraleSx')).toBeCloseTo(lunghezzaLinea(m, 'lateraleDx'), 3);
+  });
+
+  it('una spalla più bassa accorcia la laterale di quel lato, e lo dice in centimetri', () => {
+    const p = persona();
+    p.spallaSx = [0.2, SP, 0];
+    p.spallaDx = [-0.2, SP - 0.04, 0]; // spalla destra 4 cm più bassa
+    const r = costruisciModello3D({ frontale: fotoFrontale(p, 750, 1000, 480), staturaCm: 180 });
+    if (!r.ok) throw new Error(r.motivo);
+    const l = leggiLinee(r.modello, []);
+    const dx = l.find((x) => x.id === 'lateraleDx')!;
+    const sx = l.find((x) => x.id === 'lateraleSx')!;
+    expect(dx.lunghezza_cm).toBeLessThan(sx.lunghezza_cm);
+    expect(dx.stato).toBe('da osservare');
+    expect(dx.perche[0]).toMatch(/più corta dell'altra di \d+(,\d)? cm/);
+    expect(sx.perche[0]).toMatch(/più lunga/);
+  });
+
+  it('sotto il centimetro la differenza non si segnala: è rumore di lettura', () => {
+    const p = persona();
+    p.spallaSx = [0.2, SP, 0];
+    p.spallaDx = [-0.2, SP - 0.004, 0]; // 4 millimetri
+    const r = costruisciModello3D({ frontale: fotoFrontale(p, 750, 1000, 480), staturaCm: 180 });
+    if (!r.ok) throw new Error(r.motivo);
+    for (const x of leggiLinee(r.modello, [])) expect(x.stato).toBe('nella norma');
+  });
+
+  it('una misura sul piano di profilo segnala posteriore e anteriore, e cita la misura', () => {
+    const l = leggiLinee(simmetrica(), [vista('laterale', [
+      { key: 'forward_head', label: 'Testa in avanti (orecchio vs spalla)', value_deg: 21.5, severity: 'moderato', direction: 'capo anteposto' },
+    ])]);
+    for (const id of ['posteriore', 'anteriore'] as const) {
+      const x = l.find((y) => y.id === id)!;
+      expect(x.stato).toBe('da osservare');
+      expect(x.perche.join(' ')).toMatch(/Testa in avanti.*21,5°/);
+    }
+    expect(l.find((y) => y.id === 'lateraleSx')!.stato).toBe('nella norma');
+  });
+
+  it('una misura nella norma non segnala niente', () => {
+    const l = leggiLinee(simmetrica(), [vista('frontale', [
+      { key: 'shoulder_tilt', label: 'Inclinazione delle spalle', value_deg: 0.8, severity: 'normale' },
+    ])]);
+    for (const x of l) expect(x.stato).toBe('nella norma');
+  });
+
+  it('non conclude mai sul tessuto: niente «accorciata», «retratta», «in tensione»', () => {
+    const p = persona();
+    p.spallaDx = [-0.2, SP - 0.05, 0];
+    const r = costruisciModello3D({ frontale: fotoFrontale(p, 750, 1000, 480), staturaCm: 180 });
+    if (!r.ok) throw new Error(r.motivo);
+    const tutto = JSON.stringify(leggiLinee(r.modello, [vista('laterale', [
+      { key: 'forward_head', label: 'Testa in avanti', value_deg: 25, severity: 'moderato' },
+    ])]));
+    expect(tutto).not.toMatch(/accorciat|retratt|in tensione|rigid|contrattur|patolog|diagnos/i);
+    expect(AVVERTENZA_LINEE).toMatch(/non misura il tessuto/);
+  });
+
+  it('il tracciato si scosta dallo scheletro senza cambiare altezza', () => {
+    const m = simmetrica();
+    const rami = tracciaLinea(m, 'lateraleSx');
+    expect(rami).toHaveLength(1);
+    expect(rami[0][0][0]).toBeCloseTo(m.punti.cavigliaSx[0] + 0.045, 3);
+    expect(rami[0][0][1]).toBeCloseTo(m.punti.cavigliaSx[1], 3);
+    expect(tracciaLinea(m, 'posteriore')).toHaveLength(2); // un ramo per gamba
+  });
+
+  it('le linee entrano nella scena e nel file AR col loro stato', () => {
+    const m = simmetrica();
+    const linee = [
+      { id: 'lateraleSx', rami: tracciaLinea(m, 'lateraleSx'), daOsservare: true },
+      { id: 'lateraleDx', rami: tracciaLinea(m, 'lateraleDx'), daOsservare: false },
+    ];
+    const s = scena(m, VISTE.fronte, {}, { linee });
+    const tratti = s.filter((t) => t.tipo === 'linea');
+    expect(tratti).toHaveLength(8); // 4 segmenti per linea
+    expect(tratti.filter((t) => t.severita === 'lieve')).toHaveLength(4);
+    const usda = creaUsda(m, {}, { linee });
+    expect(usda).toMatch(/def Mesh "Linee"/);
+    expect(usda).toMatch(/def Mesh "LineeDaOsservare"/);
+  });
+});
+
+// ============================================================
 // IL CABLAGGIO — una funzione che esiste e non si raggiunge non esiste
 // ============================================================
 
@@ -505,7 +776,7 @@ describe('il modello 3D è collegato allo schermo', () => {
 
   it('il servizio raddrizza le foto prima di fonderle: lo fa il dominio', () => {
     const d = leggi('domain', 'posture3d.ts');
-    expect(d).toMatch(/raddrizza\(vistaBase\.landmarks, vistaBase\.larghezza, vistaBase\.altezza\)/);
+    expect(d).toMatch(/raddrizza\(vista\.landmarks, vista\.larghezza, vista\.altezza\)/);
   });
 
   it('chi guarda il modello legge sempre i suoi limiti', () => {

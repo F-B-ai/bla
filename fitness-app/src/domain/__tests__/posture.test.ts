@@ -316,3 +316,124 @@ describe('le foto non sono quadrate: prima si raddrizza, poi si misura', () => {
     });
   });
 });
+
+// ============================================================
+// 10 novembre 2026 — LEGGERE PIÙ VOLTE, E DIRE DI QUANTO SI OSCILLA
+// ============================================================
+
+import {
+  mediana, dispersione, fondiLetture, misuraRipetuta, cambiamento, cambiamenti,
+  MARGINE_MINIMO_GRADI, PostureMetrics,
+} from '../posture';
+
+describe('letture ripetute della stessa foto', () => {
+  /** Frontale isotropa con spalle inclinate di `gradi`. */
+  const spalle = (gradi: number): Landmark[] => {
+    const lm = base();
+    const [l, r] = tiltedPair(0.5, 0.3, 0.1, gradi, true);
+    lm[LM.L_SHOULDER] = l; lm[LM.R_SHOULDER] = r;
+    set(lm, LM.L_HIP, 0.44, 0.6); set(lm, LM.R_HIP, 0.56, 0.6);
+    set(lm, LM.L_ANKLE, 0.44, 0.95); set(lm, LM.R_ANKLE, 0.56, 0.95);
+    set(lm, LM.NOSE, 0.5, 0.18);
+    return lm;
+  };
+
+  it('mediana e dispersione fanno il loro mestiere', () => {
+    expect(mediana([3, 1, 2])).toBe(2);
+    expect(mediana([4, 1, 2, 3])).toBe(2.5);
+    expect(dispersione([5, 5, 5, 5])).toBe(0);
+    expect(dispersione([1])).toBe(0);
+    expect(dispersione([1, 2, 3, 4, 5])).toBeCloseTo(1.4826, 3);
+  });
+
+  it('un punto che SALTA in una lettura non sposta lo scheletro fuso', () => {
+    const letture = [spalle(4), spalle(4), spalle(4), spalle(4), spalle(4)];
+    letture[2] = letture[2].slice();
+    letture[2][LM.L_SHOULDER] = { x: 0.9, y: 0.9, visibility: 0.9 }; // salto enorme
+    const fuso = fondiLetture(letture)!;
+    expect(fuso[LM.L_SHOULDER].x).toBeCloseTo(spalle(4)[LM.L_SHOULDER].x, 6);
+    const m = misuraRipetuta(letture, 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').value_deg!).toBeCloseTo(4, 0);
+  });
+
+  it('letture identiche: oscillazione zero, e lo scrive', () => {
+    const m = misuraRipetuta([spalle(4), spalle(4), spalle(4)], 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').tolerance).toBe(0);
+    expect(m.quality_notes.join(' ')).toMatch(/letta 3 volte/);
+  });
+
+  it('letture che tremano: il valore è al centro e l\'oscillazione è dichiarata', () => {
+    const m = misuraRipetuta([spalle(3), spalle(3.5), spalle(4), spalle(4.5), spalle(5)], 'frontale');
+    const f = find(m.findings, 'shoulder_tilt');
+    expect(f.value_deg!).toBeCloseTo(4, 0);
+    expect(f.tolerance!).toBeGreaterThan(0.4);
+    expect(f.tolerance!).toBeLessThan(1.2);
+  });
+
+  it('con meno di tre letture non finge di conoscere l\'oscillazione', () => {
+    const m = misuraRipetuta([spalle(4), spalle(4.4)], 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').tolerance).toBeUndefined();
+  });
+
+  it('nessuna lettura buona: insufficiente, senza rompersi', () => {
+    expect(misuraRipetuta([], 'frontale').quality).toBe('insufficiente');
+    expect(fondiLetture([])).toBeNull();
+  });
+
+  it('i rilievi notevoli portano la stessa oscillazione dell\'elenco', () => {
+    const m = misuraRipetuta([spalle(5), spalle(5.4), spalle(5.8), spalle(6.2)], 'frontale');
+    const n = m.notable.find((x) => x.key === 'shoulder_tilt')!;
+    expect(n.tolerance).toBe(find(m.findings, 'shoulder_tilt').tolerance);
+  });
+});
+
+describe('un cambiamento conta solo se supera il margine', () => {
+  const f = (v: number, tol?: number): PostureFinding => ({
+    key: 'forward_head', label: 'Testa in avanti', value_deg: v, severity: 'lieve', tolerance: tol,
+  });
+
+  it('una differenza grande è una riduzione vera', () => {
+    const c = cambiamento(f(30, 0.8), f(18, 0.6), 'laterale')!;
+    expect(c.delta).toBe(-12);
+    expect(c.esito).toBe('ridotta');
+    expect(c.unita).toBe('°');
+  });
+
+  it('sotto i due gradi non è un miglioramento: è rumore', () => {
+    const c = cambiamento(f(14, 0.2), f(12.5, 0.2))!;
+    expect(c.margine).toBe(MARGINE_MINIMO_GRADI);
+    expect(c.esito).toBe('entro il margine');
+  });
+
+  it('letture che oscillano molto alzano il margine', () => {
+    const c = cambiamento(f(20, 2), f(16, 2))!; // 4° di differenza, ma ±2 e ±2
+    expect(c.margine).toBeGreaterThan(5);
+    expect(c.esito).toBe('entro il margine');
+  });
+
+  it('un aumento oltre il margine si chiama aumento', () => {
+    expect(cambiamento(f(10, 0.3), f(16, 0.3))!.esito).toBe('aumentata');
+  });
+
+  it('le percentuali hanno il loro margine minimo', () => {
+    const p = (v: number): PostureFinding => ({ key: 'sagittal_plumb', label: 'Filo', value_pct: v, severity: 'lieve' });
+    expect(cambiamento(p(10), p(8))!.esito).toBe('entro il margine');
+    expect(cambiamento(p(16), p(9))!.esito).toBe('ridotta');
+    expect(cambiamento(p(16), p(9))!.unita).toBe('%');
+  });
+
+  it('misure diverse o mancanti non si confrontano', () => {
+    expect(cambiamento(f(10), { ...f(8), key: 'shoulder_tilt' })).toBeNull();
+    expect(cambiamento(undefined, f(8))).toBeNull();
+  });
+
+  it('confronta vista per vista, e salta quelle non leggibili', () => {
+    const vista = (view: 'frontale' | 'laterale', v: number, quality: 'ok' | 'insufficiente' = 'ok'): PostureMetrics => ({
+      version: 4, view, findings: [f(v, 0.5)], notable: [], quality, quality_notes: [],
+    });
+    const c = cambiamenti([vista('laterale', 30), vista('frontale', 9)], [vista('laterale', 18), vista('frontale', 9, 'insufficiente')]);
+    expect(c).toHaveLength(1);
+    expect(c[0].view).toBe('laterale');
+    expect(cambiamenti(null, [vista('laterale', 18)])).toHaveLength(0);
+  });
+});
