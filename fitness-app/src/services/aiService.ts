@@ -736,6 +736,7 @@ IMPORTANTE:
 - Sii incoraggiante ma onesto. Se c'è un miglioramento evidente, dillo chiaramente e con entusiasmo.
 - Considera anche i cambiamenti estetici e di composizione corporea (tono, definizione, dimagrimento), non solo gli aspetti clinici.
 - Puoi basarti su FOTO (se disponibili) e/o su DATI TESTUALI delle valutazioni precedenti (findings, severità, note AI).
+- NUMERI NON CONFRONTABILI A CAVALLO DEL 10/11/2026: fino a quella data gli angoli in gradi e le percentuali riportati nelle analisi erano calcolati senza correggere il formato della foto. Su foto verticali le deviazioni dalla verticale (testa in avanti, tronco, filo a piombo) risultavano SOVRASTIMATE e le inclinazioni di spalle e bacino SOTTOSTIMATE. Se una valutazione è precedente a quella data e l'altra successiva, NON confrontare i numeri fra loro e NON presentare la differenza numerica come miglioramento o peggioramento: basati sulle foto e sulle osservazioni, e scrivi chiaramente che i numeri delle due date non sono confrontabili. Due valutazioni entrambe precedenti, o entrambe successive, si confrontano normalmente.
 - ATTENZIONE: Se la valutazione "PRIMA" ha pochi o nessun finding registrato, NON significa che il paziente stava meglio. Significa che la valutazione era meno approfondita. In quel caso, NON interpretare nuovi findings come peggioramento — piuttosto valuta lo stato attuale in modo positivo e nota che i dati precedenti erano incompleti.
 
 RISPONDI SEMPRE in formato JSON valido:

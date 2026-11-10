@@ -21,7 +21,48 @@
 
 import { Landmark, LM } from './gait';
 
-export const POSTURE_METRICS_VERSION = 3;
+// v4 (10 novembre 2026) — le coordinate vanno RADDRIZZATE prima di
+// misurare: vedi `raddrizza` qui sotto.
+export const POSTURE_METRICS_VERSION = 4;
+
+// ============================================================
+// 10 novembre 2026 — GLI ANGOLI NON ERANO «REALI»
+// ------------------------------------------------------------
+// MediaPipe restituisce x in frazioni della LARGHEZZA della foto e y
+// in frazioni dell'ALTEZZA. Sono due righelli diversi. Su una foto
+// quadrata coincidono; su una foto verticale da telefono (3:4, 9:16)
+// no — e fino a v3 gli angoli si calcolavano su quei numeri così
+// com'erano.
+//
+// Effetto, su una foto 3:4:
+//   • ogni deviazione dalla VERTICALE (testa in avanti, tronco, filo
+//     a piombo) usciva GONFIATA: 45° veri si leggevano 53°;
+//   • ogni inclinazione dall'ORIZZONTALE (spalle, bacino) usciva
+//     SCHIACCIATA: 4° veri si leggevano 3°.
+//
+// Il confronto prima/dopo fra due foto con lo stesso formato resta
+// valido nel verso (entrambe storte allo stesso modo). I numeri
+// assoluti no, e nemmeno le soglie lieve/moderato.
+//
+// Il rimedio è uno solo e sta a monte: portare x nello stesso
+// righello di y (frazioni dell'altezza) PRIMA di qualunque formula.
+// ============================================================
+
+/**
+ * Porta i landmark su un righello unico: x e y entrambe in frazioni
+ * dell'ALTEZZA della foto. Da chiamare sempre prima di misurare.
+ * Con dimensioni mancanti o assurde restituisce i punti invariati:
+ * meglio la misura di prima che una divisione per zero.
+ */
+export const raddrizza = (
+  lm: Landmark[],
+  larghezza: number,
+  altezza: number
+): Landmark[] => {
+  if (!(larghezza > 0) || !(altezza > 0)) return lm;
+  const k = larghezza / altezza;
+  return lm.map((p) => ({ ...p, x: p.x * k }));
+};
 
 // Orecchie: indici MediaPipe non presenti nel sottoinsieme LM di gait,
 // ma servono per la testa-in-avanti sulla vista laterale.

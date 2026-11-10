@@ -278,6 +278,29 @@ export const extractLandmarksFromImage = async (
   uri: string,
   onStatus?: (s: GaitStatus) => void
 ): Promise<{ x: number; y: number; visibility?: number }[] | null> => {
+  const posa = await leggiPosa(uri, onStatus);
+  return posa ? posa.landmarks : null;
+};
+
+/** I landmark di una foto INSIEME alle sue dimensioni. */
+export interface PosaFoto {
+  /** 33 punti, x in frazioni della larghezza e y dell'altezza */
+  landmarks: { x: number; y: number; visibility?: number }[];
+  /** dimensioni della tela su cui si è misurato, in pixel */
+  larghezza: number;
+  altezza: number;
+}
+
+/**
+ * Come `extractLandmarksFromImage`, ma restituisce anche larghezza e
+ * altezza della foto. Servono SEMPRE: x e y dei landmark sono su due
+ * righelli diversi, e senza le dimensioni nessun angolo è vero
+ * (vedi `raddrizza` in domain/posture.ts).
+ */
+export const leggiPosa = async (
+  uri: string,
+  onStatus?: (s: GaitStatus) => void
+): Promise<PosaFoto | null> => {
   const landmarker = await getImageLandmarker(onStatus);
   onStatus?.('analyzing');
   const doc = (globalThis as any).document;
@@ -306,7 +329,11 @@ export const extractLandmarksFromImage = async (
   const res = landmarker.detect(canvas);
   const lm = res?.landmarks?.[0];
   if (!lm || lm.length < 33) return null;
-  return lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility }));
+  return {
+    landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
+    larghezza: canvas.width,
+    altezza: canvas.height,
+  };
 };
 
 // ------------------------------------------------------------

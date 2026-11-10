@@ -215,3 +215,104 @@ describe('vista laterale — piano sagittale', () => {
     expect(find(m.findings, 'forward_head').value_deg).toBeCloseTo(15, 0);
   });
 });
+
+// ============================================================
+// 10 novembre 2026 — GLI ANGOLI NON ERANO «REALI»
+// ------------------------------------------------------------
+// MediaPipe dà x in frazioni della LARGHEZZA e y in frazioni
+// dell'ALTEZZA: due righelli diversi. Su una foto verticale da
+// telefono gli angoli calcolati su quei numeri uscivano storti, e la
+// scheda li chiamava «angoli reali».
+//
+// Qui costruisco la persona in PIXEL, con un angolo che decido io,
+// la metto in una foto 3:4 e chiedo l'angolo. Senza raddrizzare esce
+// sbagliato (lo dimostro); raddrizzando esce giusto.
+// ============================================================
+
+import { raddrizza } from '../posture';
+
+describe('le foto non sono quadrate: prima si raddrizza, poi si misura', () => {
+  const W = 750;
+  const H = 1000; // 3:4, il formato di un telefono in verticale
+
+  /** Profilo con la testa avanti di un angolo NOTO, in pixel veri. */
+  const profilo = (gradiVeri: number): Landmark[] => {
+    const lm = base();
+    const spalla = { x: 375, y: 300 };
+    const su = 120; // l'orecchio è 120 px sopra la spalla
+    const avanti = su * Math.tan((gradiVeri * Math.PI) / 180);
+    const px = (x: number, y: number) => ({ x: x / W, y: y / H });
+    set(lm, 7, px(spalla.x + avanti, spalla.y - su).x, px(0, spalla.y - su).y);
+    set(lm, LM.L_SHOULDER, px(spalla.x, 0).x, px(0, spalla.y).y);
+    set(lm, LM.L_HIP, px(spalla.x, 0).x, px(0, 600).y);
+    set(lm, LM.L_ANKLE, px(spalla.x, 0).x, px(0, 950).y);
+    // lato destro coperto
+    [8, LM.R_SHOULDER, LM.R_HIP, LM.R_ANKLE].forEach((i) => set(lm, i, 0.5, 0.5, 0.1));
+    return lm;
+  };
+
+  /** Spalle inclinate di un angolo NOTO, in pixel veri. */
+  const frontale = (gradiVeri: number): Landmark[] => {
+    const lm = base();
+    const mezza = 110;
+    const dy = mezza * Math.tan((gradiVeri * Math.PI) / 180);
+    set(lm, LM.L_SHOULDER, (375 + mezza) / W, (300 - dy) / H);
+    set(lm, LM.R_SHOULDER, (375 - mezza) / W, (300 + dy) / H);
+    set(lm, LM.L_HIP, (375 + 60) / W, 600 / H);
+    set(lm, LM.R_HIP, (375 - 60) / W, 600 / H);
+    set(lm, LM.L_ANKLE, (375 + 60) / W, 950 / H);
+    set(lm, LM.R_ANKLE, (375 - 60) / W, 950 / H);
+    set(lm, LM.NOSE, 375 / W, 180 / H);
+    return lm;
+  };
+
+  it('SENZA raddrizzare, la testa in avanti esce gonfiata (il difetto)', () => {
+    const storto = find(computePostureMetrics(profilo(45), 'laterale').findings, 'forward_head');
+    expect(storto.value_deg!).toBeGreaterThan(52); // 45° veri letti ~53°
+  });
+
+  it('raddrizzando, la testa in avanti è quella vera', () => {
+    for (const veri of [10, 20, 30, 45]) {
+      const f = find(
+        computePostureMetrics(raddrizza(profilo(veri), W, H), 'laterale').findings,
+        'forward_head'
+      );
+      expect(f.value_deg!).toBeCloseTo(veri, 0);
+    }
+  });
+
+  it('SENZA raddrizzare, le spalle escono schiacciate (il difetto)', () => {
+    const storto = find(computePostureMetrics(frontale(4), 'frontale').findings, 'shoulder_tilt');
+    expect(storto.value_deg!).toBeLessThan(3.2); // 4° veri letti ~3°
+  });
+
+  it('raddrizzando, l\'inclinazione delle spalle è quella vera', () => {
+    for (const veri of [2, 4, 6]) {
+      const f = find(
+        computePostureMetrics(raddrizza(frontale(veri), W, H), 'frontale').findings,
+        'shoulder_tilt'
+      );
+      expect(f.value_deg!).toBeCloseTo(veri, 0);
+    }
+  });
+
+  it('su una foto quadrata raddrizzare non cambia niente', () => {
+    const lm = profilo(20);
+    expect(raddrizza(lm, 800, 800)).toEqual(lm);
+  });
+
+  it('con dimensioni mancanti restituisce i punti com\'erano, senza rompersi', () => {
+    const lm = profilo(20);
+    expect(raddrizza(lm, 0, 1000)).toBe(lm);
+    expect(raddrizza(lm, 750, NaN)).toBe(lm);
+  });
+
+  it('non tocca la visibilità né la y', () => {
+    const r = raddrizza(profilo(20), W, H);
+    const o = profilo(20);
+    r.forEach((p, i) => {
+      expect(p.y).toBe(o[i].y);
+      expect(p.visibility).toBe(o[i].visibility);
+    });
+  });
+});

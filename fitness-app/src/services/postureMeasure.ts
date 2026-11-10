@@ -9,8 +9,8 @@
 // ============================================================
 
 import { Platform } from 'react-native';
-import { extractLandmarksFromImage } from './gaitService';
-import { computePostureMetrics, PostureMetrics, PostureView } from '../domain/posture';
+import { leggiPosa } from './gaitService';
+import { computePostureMetrics, raddrizza, PostureMetrics, PostureView } from '../domain/posture';
 
 export interface PosturePhotoSet {
   frontale?: string | null;
@@ -39,8 +39,8 @@ export const measurePostureFromPhotos = async (
   for (const [view, uri] of views) {
     if (!uri) continue;
     try {
-      const lm = await extractLandmarksFromImage(uri);
-      if (!lm) {
+      const posa = await leggiPosa(uri);
+      if (!posa) {
         out.push({
           version: 0,
           view,
@@ -51,7 +51,13 @@ export const measurePostureFromPhotos = async (
         });
         continue;
       }
-      out.push(computePostureMetrics(lm, view));
+      // x e y dei landmark sono su due righelli diversi (larghezza e
+      // altezza della foto): si raddrizzano PRIMA di misurare, o su
+      // una foto verticale ogni angolo esce storto.
+      out.push(computePostureMetrics(
+        raddrizza(posa.landmarks, posa.larghezza, posa.altezza),
+        view
+      ));
     } catch (e) {
       out.push({
         version: 0,
