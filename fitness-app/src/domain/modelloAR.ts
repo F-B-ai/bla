@@ -17,6 +17,7 @@
 
 import {
   Modello3D, Punto3, Tinte, OSSA, GIUNTI, puntoScena, RAGGIO_TESTA, ExtraScena,
+  allaStatura,
 } from './posture3d';
 
 type Materia =
@@ -200,7 +201,7 @@ export const maglieDelModello = (
   // Il modello di PRIMA, nello stesso punto: stesse caviglie, stesso
   // filo a piombo. In AR si gira intorno alla differenza.
   if (extra.prima) {
-    const p0 = extra.prima;
+    const p0 = allaStatura(extra.prima, modello.statura_m);
     for (const o of OSSA) {
       const a = sopra(puntoScena(p0, o.da));
       const b = sopra(puntoScena(p0, o.a));

@@ -9,8 +9,8 @@
 // ============================================================
 
 import { Platform } from 'react-native';
-import { leggiPosa } from './gaitService';
-import { computePostureMetrics, raddrizza, PostureMetrics, PostureView } from '../domain/posture';
+import { leggiPosaRipetuta } from './gaitService';
+import { misuraRipetuta, raddrizza, PostureMetrics, PostureView } from '../domain/posture';
 
 export interface PosturePhotoSet {
   frontale?: string | null;
@@ -39,7 +39,9 @@ export const measurePostureFromPhotos = async (
   for (const [view, uri] of views) {
     if (!uri) continue;
     try {
-      const posa = await leggiPosa(uri);
+      // Ogni foto si legge più volte: la misura è quella dello
+      // scheletro mediano, con accanto di quanto ha oscillato.
+      const posa = await leggiPosaRipetuta(uri);
       if (!posa) {
         out.push({
           version: 0,
@@ -54,8 +56,8 @@ export const measurePostureFromPhotos = async (
       // x e y dei landmark sono su due righelli diversi (larghezza e
       // altezza della foto): si raddrizzano PRIMA di misurare, o su
       // una foto verticale ogni angolo esce storto.
-      out.push(computePostureMetrics(
-        raddrizza(posa.landmarks, posa.larghezza, posa.altezza),
+      out.push(misuraRipetuta(
+        posa.letture.map((l) => raddrizza(l, posa.larghezza, posa.altezza)),
         view
       ));
     } catch (e) {

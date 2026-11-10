@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Landmark } from '../gait';
 import {
-  costruisciModello3D, proietta, scena, tinteDalleMisure, puntoScena, modelloValido,
+  costruisciModello3D, proietta, scena, tinteDalleMisure, puntoScena, modelloValido, allaStatura,
   NOMI_PUNTI, NomePunto, Punto3, VistaPosa, VISTE, OSSA, GIUNTI,
   QUOTA_CAVIGLIA, QUOTA_SPALLA, STATURA_PREDEFINITA_CM, Modello3D,
 } from '../posture3d';
@@ -631,6 +631,25 @@ describe('confronto prima/dopo nel disegno e in AR', () => {
     expect(tPrima.x1 - tAdesso.x1).toBeCloseTo(0.1, 2);
   });
 
+  it('un prima salvato con un\'altra statura viene portato alla stessa scala', () => {
+    const p = persona();
+    const r = costruisciModello3D({
+      frontale: fotoFrontale(p, 750, 1000, 480),
+      laterale: fotoProfilo(p, 1080, 1920, 900, 'Dx'),
+      staturaCm: undefined, // allora la statura mancava: 170 di ripiego
+    });
+    if (!r.ok) throw new Error(r.motivo);
+    expect(r.modello.statura_m).toBe(1.7);
+    // stessa persona, stessa posa: sovrapposti devono coincidere
+    const s2 = scena(adesso(), VISTE.fronte, {}, { prima: r.modello });
+    const ombra = s2.find((t) => t.id === 'prima-spalle')!;
+    const vero = s2.find((t) => t.id === 'spalle')!;
+    expect(ombra.y1).toBeCloseTo(vero.y1, 2);
+    expect(ombra.x1).toBeCloseTo(vero.x1, 2);
+    expect(allaStatura(r.modello, 1.8).statura_m).toBe(1.8);
+    expect(allaStatura(r.modello, 1.7)).toBe(r.modello); // niente da fare
+  });
+
   it('senza un prima la scena è quella di sempre', () => {
     expect(scena(adesso(), VISTE.fronte).some((t) => t.tipo === 'ombra')).toBe(false);
   });
@@ -765,7 +784,8 @@ describe('il modello 3D è collegato allo schermo', () => {
   it('la schermata della valutazione posturale lo costruisce e lo mostra', () => {
     const s = leggi('screens', 'shared', 'PosturalAssessmentScreen.tsx');
     expect(s).toMatch(/costruisciModelloDalleFoto\(/);
-    expect(s).toMatch(/<Modello3DView/);
+    expect(s).toMatch(/<RisultatoPostura3D/);
+    expect(leggi('components', 'postura', 'RisultatoPostura3D.tsx')).toMatch(/<Modello3DView/);
   });
 
   it('e lo salva insieme alla valutazione', () => {
@@ -787,6 +807,45 @@ describe('il modello 3D è collegato allo schermo', () => {
 
   it('le foto si misurano raddrizzate, non sui numeri grezzi', () => {
     const s = leggi('services', 'postureMeasure.ts');
-    expect(s).toMatch(/raddrizza\(posa\.landmarks, posa\.larghezza, posa\.altezza\)/);
+    expect(s).toMatch(/leggiPosaRipetuta\(/);
+    expect(s).toMatch(/raddrizza\(l, posa\.larghezza, posa\.altezza\)/);
+    expect(s).toMatch(/misuraRipetuta\(/);
+  });
+
+  it('la schermata manda TUTTE e quattro le foto, non una laterale a scelta', () => {
+    const s = leggi('screens', 'shared', 'PosturalAssessmentScreen.tsx');
+    const i = s.indexOf('await costruisciModelloDalleFoto(');
+    const blocco = s.slice(i, i + 400);
+    expect(blocco).toMatch(/lateraleSx: sideLeftImage/);
+    expect(blocco).toMatch(/lateraleDx: sideRightImage/);
+    expect(blocco).toMatch(/posteriore: backImage/);
+  });
+
+  it('con la valutazione si salvano misure, inquadrature e linee', () => {
+    const s = leggi('screens', 'shared', 'PosturalAssessmentScreen.tsx');
+    const i = s.indexOf('await createAssessment({');
+    const blocco = s.slice(i, i + 1600);
+    expect(blocco).toMatch(/misure3d/);
+    expect(blocco).toMatch(/inquadrature3d/);
+    expect(blocco).toMatch(/linee3d/);
+    // Firestore rifiuta gli undefined: devono passare per JSON
+    expect(blocco).toMatch(/JSON\.parse\(JSON\.stringify\(/);
+  });
+
+  it('chi guarda le misure legge sempre che cosa vuol dire il ±', () => {
+    const c = leggi('components', 'postura', 'RisultatoPostura3D.tsx');
+    expect(c).toMatch(/non quanto è vicina al vero/);
+    expect(c).toMatch(/AVVERTENZA_LINEE/);
+    expect(c).toMatch(/confrontaInquadrature\(/);
+    expect(c).toMatch(/entro il margine/);
+  });
+
+  it('per le foto lavora il motore accurato, col ripiego dichiarato', () => {
+    const g = leggi('services', 'gaitService.ts');
+    expect(g).toMatch(/pose_landmarker_heavy\.task/);
+    expect(g).toMatch(/motore: 'standard'/);
+    // niente rotazioni né specchi fra le variazioni di lettura
+    const i = g.indexOf('const VARIAZIONI');
+    expect(g.slice(i, i + 500)).not.toMatch(/rot|mirror|specchio:/i);
   });
 });

@@ -523,6 +523,23 @@ export const proietta = (p: Punto3, v: Vista3D): { x: number; y: number; z: numb
   return { x: x1, y: y2, z: z2 };
 };
 
+/**
+ * Lo stesso modello portato a un'altra statura. Serve a sovrapporre
+ * un «prima» e un «dopo»: se nel frattempo è cambiata la statura in
+ * anagrafica (o prima mancava), i due modelli avrebbero scale diverse
+ * e la differenza che si vedrebbe sarebbe di righello, non di postura.
+ */
+export const allaStatura = (m: Modello3D, statura_m: number): Modello3D => {
+  if (!(m.statura_m > 0) || !(statura_m > 0) || m.statura_m === statura_m) return m;
+  const k = statura_m / m.statura_m;
+  const punti = {} as Record<NomePunto, Punto3>;
+  for (const n of NOMI_PUNTI) {
+    const p = m.punti[n];
+    punti[n] = [p[0] * k, p[1] * k, p[2] * k];
+  }
+  return { ...m, statura_m, punti };
+};
+
 /** Una linea da disegnare sopra il modello (i rami sono già nello spazio). */
 export interface LineaScena {
   id: string;
@@ -565,7 +582,7 @@ export const scena = (
   // Il «prima» sta sempre dietro: è il termine di paragone, non deve
   // coprire quello che si guarda adesso.
   if (extra.prima) {
-    const p0 = extra.prima;
+    const p0 = allaStatura(extra.prima, m.statura_m);
     for (const o of OSSA) {
       const a = proietta(puntoScena(p0, o.da), v);
       const b = proietta(puntoScena(p0, o.a), v);

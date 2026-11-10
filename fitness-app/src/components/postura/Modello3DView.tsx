@@ -5,8 +5,9 @@ import {
 import Svg, { Line, Circle, Ellipse } from 'react-native-svg';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import {
-  Modello3D, Tinte, Vista3D, VISTE, scena, TrattoScena,
+  Modello3D, Tinte, Vista3D, VISTE, scena, TrattoScena, LineaScena,
 } from '../../domain/posture3d';
+import { LetturaLinea, tracciaLinea, AVVERTENZA_LINEE } from '../../domain/lineeMiofasciali';
 import { creaUsdz } from '../../domain/modelloAR';
 import { supportoAR, apriUsdz } from '../../utils/realtaAumentata';
 import { crossAlert } from '../../utils/alert';
@@ -28,6 +29,12 @@ interface Props {
   tinte?: Tinte;
   /** nome del file AR, senza estensione */
   nomeFile?: string;
+  /** il modello di una valutazione precedente: si disegna in ombra, dietro */
+  prima?: Modello3D | null;
+  /** quando è stato preso il «prima», da scrivere in legenda */
+  primaQuando?: string;
+  /** le linee lette su questo modello (lineeMiofasciali.ts) */
+  linee?: LetturaLinea[];
 }
 
 const ALTEZZA = 380;
@@ -43,8 +50,12 @@ const PULSANTI: Array<{ chiave: keyof typeof VISTE; etichetta: string }> = [
   { chiave: 'profiloDx', etichetta: 'Profilo dx' },
 ];
 
-export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => {
+export const Modello3DView: React.FC<Props> = ({
+  modello, tinte, nomeFile, prima, primaQuando, linee,
+}) => {
   const [larghezza, setLarghezza] = useState(320);
+  const [mostraLinee, setMostraLinee] = useState(false);
+  const [mostraPrima, setMostraPrima] = useState(true);
   const [vista, setVista] = useState<Vista3D>({ imbardata: 30, beccheggio: 8 });
   const partenza = useRef(vista);
   const corrente = useRef(vista);
@@ -72,12 +83,32 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
   const X = (m: number): number => cx + m * scala;
   const Y = (m: number): number => suolo - m * scala;
 
-  const tratti = useMemo(() => scena(modello, vista, tinte || {}), [modello, vista, tinte]);
+  // Quello che si aggiunge al modello: il «prima» e le linee, se
+  // richiesti. Lo stesso `extra` va al disegno E al file AR: in AR si
+  // vede esattamente quello che si vede qui.
+  const extra = useMemo(() => {
+    const tracciate: LineaScena[] = mostraLinee
+      ? (linee || []).map((l) => ({
+        id: l.id,
+        rami: tracciaLinea(modello, l.id),
+        daOsservare: l.stato === 'da osservare',
+      }))
+      : [];
+    return { prima: mostraPrima ? prima || null : null, linee: tracciate };
+  }, [modello, prima, linee, mostraLinee, mostraPrima]);
+
+  const tratti = useMemo(
+    () => scena(modello, vista, tinte || {}, extra),
+    [modello, vista, tinte, extra]
+  );
 
   const ar = supportoAR();
   const apriAR = (): void => {
     try {
-      const fatto = apriUsdz(creaUsdz(modello, tinte || {}), `${nomeFile || 'modello-posturale'}.usdz`);
+      const fatto = apriUsdz(
+        creaUsdz(modello, tinte || {}, extra),
+        `${nomeFile || 'modello-posturale'}.usdz`
+      );
       if (fatto === 'scarica') {
         crossAlert(
           'Modello scaricato',
@@ -98,7 +129,9 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
         <Text style={styles.titolo}>Modello 3D</Text>
         <View style={[styles.targhetta, modello.profondita === 'assente' && styles.targhettaPiatta]}>
           <Text style={styles.targhettaTesto}>
-            {modello.profondita === 'profilo' ? 'frontale + profilo' : 'piatto · manca il profilo'}
+            {modello.profondita === 'due profili' ? 'due profili: un lato per foto'
+              : modello.profondita === 'profilo' ? 'un profilo'
+                : 'piatto · manca il profilo'}
           </Text>
         </View>
       </View>
@@ -120,6 +153,31 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
                   key={t.id}
                   x1={X(t.x1)} y1={Y(t.y1)} x2={X(t.x2 as number)} y2={Y(t.y2 as number)}
                   stroke={colors.info} strokeWidth={1.5} strokeDasharray="5 5"
+                />
+              );
+            }
+            if (t.tipo === 'ombra') {
+              return t.raggio !== undefined ? (
+                <Circle
+                  key={t.id}
+                  cx={X(t.x1)} cy={Y(t.y1)} r={t.raggio * scala}
+                  fill="none" stroke={colors.textLight} strokeWidth={3}
+                />
+              ) : (
+                <Line
+                  key={t.id}
+                  x1={X(t.x1)} y1={Y(t.y1)} x2={X(t.x2 as number)} y2={Y(t.y2 as number)}
+                  stroke={colors.textLight} strokeWidth={5} strokeLinecap="round"
+                />
+              );
+            }
+            if (t.tipo === 'linea') {
+              return (
+                <Line
+                  key={t.id}
+                  x1={X(t.x1)} y1={Y(t.y1)} x2={X(t.x2 as number)} y2={Y(t.y2 as number)}
+                  stroke={t.severita === 'lieve' ? colors.warning : colors.success}
+                  strokeWidth={2} strokeDasharray="2 4" strokeLinecap="round"
                 />
               );
             }
@@ -165,7 +223,50 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
         ))}
       </View>
 
+      {(prima || (linee && linee.length > 0)) && (
+        <View style={styles.viste}>
+          {prima ? (
+            <TouchableOpacity
+              style={[styles.vistaBottone, mostraPrima && styles.interruttoreAcceso]}
+              onPress={() => setMostraPrima((x) => !x)}
+            >
+              <Text style={styles.vistaTesto}>
+                {mostraPrima ? 'Prima: visibile' : 'Prima: nascosto'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {linee && linee.length > 0 ? (
+            <TouchableOpacity
+              style={[styles.vistaBottone, mostraLinee && styles.interruttoreAcceso]}
+              onPress={() => setMostraLinee((x) => !x)}
+            >
+              <Text style={styles.vistaTesto}>
+                {mostraLinee ? 'Linee miofasciali: visibili' : 'Linee miofasciali'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
       <View style={styles.legenda}>
+        {prima && mostraPrima ? (
+          <View style={styles.voce}>
+            <View style={[styles.pallino, { backgroundColor: colors.textLight }]} />
+            <Text style={styles.voceTesto}>prima{primaQuando ? ` (${primaQuando})` : ''}</Text>
+          </View>
+        ) : null}
+        {mostraLinee ? (
+          <>
+            <View style={styles.voce}>
+              <View style={[styles.pallino, { backgroundColor: colors.success }]} />
+              <Text style={styles.voceTesto}>linea nella norma</Text>
+            </View>
+            <View style={styles.voce}>
+              <View style={[styles.pallino, { backgroundColor: colors.warning }]} />
+              <Text style={styles.voceTesto}>linea da osservare</Text>
+            </View>
+          </>
+        ) : null}
         <View style={styles.voce}>
           <View style={[styles.pallino, { backgroundColor: colors.text }]} />
           <Text style={styles.voceTesto}>nella norma</Text>
@@ -191,7 +292,7 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
           </Text>
           <Text style={styles.bottoneARSotto}>
             {ar === 'ar'
-              ? `In piedi nella stanza, alto ${Math.round(modello.statura_m * 100)} cm`
+              ? `In piedi nella stanza, alto ${Math.round(modello.statura_m * 100)} cm${extra.prima ? ' · con il prima sovrapposto' : ''}${extra.linee.length ? ' · con le linee' : ''}`
               : 'Si apre in realtà aumentata su iPhone e iPad'}
           </Text>
         </TouchableOpacity>
@@ -205,6 +306,12 @@ export const Modello3DView: React.FC<Props> = ({ modello, tinte, nomeFile }) => 
         {modello.note.map((n, i) => (
           <Text key={i} style={styles.limitiTesto}>· {n}</Text>
         ))}
+        {mostraLinee ? <Text style={styles.limitiTesto}>· {AVVERTENZA_LINEE}</Text> : null}
+        {prima && mostraPrima ? (
+          <Text style={styles.limitiTesto}>
+            · Prima e adesso sono sovrapposti sulle caviglie e portati alla stessa statura: si confrontano le forme, non i centimetri.
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -243,6 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm, backgroundColor: colors.surfaceLight,
   },
   vistaTesto: { fontSize: fontSize.xs, color: colors.text, fontWeight: '600' },
+  interruttoreAcceso: { borderWidth: 1, borderColor: colors.primary },
 
   legenda: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.sm },
   voce: { flexDirection: 'row', alignItems: 'center', gap: 6 },
