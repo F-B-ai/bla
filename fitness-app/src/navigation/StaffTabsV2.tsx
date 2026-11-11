@@ -48,6 +48,7 @@ import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
 import { RegistroScreen } from '../screens/owner/RegistroScreen';
 import { RapportoMattinoScreen } from '../screens/owner/RapportoMattinoScreen';
+import { ControlloAccessiScreen } from '../screens/owner/ControlloAccessiScreen';
 import { ComunicazioniScreen } from '../screens/owner/ComunicazioniScreen';
 import { EarningsScreen } from '../screens/collaborator/EarningsScreen';
 
@@ -174,6 +175,7 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
         { icon: 'card-outline', title: 'Piani di pagamento', route: 'Pagamenti' },
         { icon: 'people-circle-outline', title: 'Team', route: 'Team' },
         { icon: 'document-text-outline', title: 'Registro attività', route: 'Registro' },
+        { icon: 'key-outline', title: 'Controllo accessi', route: 'ControlloAccessi' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
         { icon: 'server-outline', title: 'Spazio di archiviazione', route: 'Spazio' },
         { icon: 'hardware-chip-outline', title: 'Impostazioni AI', route: 'ImpostazioniAI' },
@@ -297,6 +299,7 @@ const buildNavigators = (role: StaffRole) => {
           <StudioStack.Screen name="Team" component={ManageUsersScreen} options={inner('Team')} />
           <StudioStack.Screen name="Registro" component={RegistroScreen} options={inner('Registro attività')} />
           <StudioStack.Screen name="RapportoMattino" component={RapportoMattinoScreen} options={inner('Rapporto del mattino')} />
+          <StudioStack.Screen name="ControlloAccessi" component={ControlloAccessiScreen} options={inner('Controllo accessi')} />
           <StudioStack.Screen name="Spazio" component={StorageManagementScreen} options={inner('Spazio di archiviazione')} />
           <StudioStack.Screen name="Comunicazioni" component={ComunicazioniScreen} options={inner('Comunicazioni')} />
           <StudioStack.Screen name="ImpostazioniAI" component={AISettingsScreen} options={inner('Impostazioni AI')} />

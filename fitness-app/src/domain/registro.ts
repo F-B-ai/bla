@@ -40,7 +40,10 @@ export type AzioneRegistro =
   | 'modificato'
   | 'eliminato'
   | 'assegnato'
-  | 'esportato';
+  | 'esportato'
+  // 11 novembre 2026: chi ha provato a fare una cosa che non gli
+  // spetta, e il server l'ha respinto. Lo scrive solo il server.
+  | 'tentato';
 
 export type OggettoRegistro =
   | 'allievo'
@@ -51,6 +54,9 @@ export type OggettoRegistro =
   | 'consulenza'
   | 'contenuto'
   | 'avviso'
+  // 11 novembre 2026: email, password, ruolo, creazione e
+  // cancellazione di un accesso. Lo scrive solo il server.
+  | 'accesso'
   | 'applicazione';
 
 export interface VoceRegistro {
@@ -80,6 +86,7 @@ const ETICHETTE_AZIONE: Record<AzioneRegistro, string> = {
   eliminato: 'ha eliminato',
   assegnato: 'ha assegnato',
   esportato: 'ha esportato',
+  tentato: 'ha tentato di modificare',
 };
 
 const ETICHETTE_OGGETTO: Record<OggettoRegistro, string> = {
@@ -91,6 +98,7 @@ const ETICHETTE_OGGETTO: Record<OggettoRegistro, string> = {
   consulenza: 'consulenza',
   contenuto: 'contenuto',
   avviso: 'avviso',
+  accesso: "l'accesso di",
   applicazione: "nell'applicazione",
 };
 
@@ -127,6 +135,10 @@ export const descriviVoce = (v: VoceRegistro): string => {
  * riga non viene più letto dopo la prima settimana.
  */
 export const pesoVoce = (v: VoceRegistro): Peso => {
+  // Un tentativo respinto e qualunque cambio di accesso (email,
+  // password, ruolo) si guardano per primi: sono le chiavi di casa.
+  if (v.azione === 'tentato') return 'alta';
+  if (v.oggetto === 'accesso') return 'alta';
   if (v.azione === 'eliminato') return 'alta';
   if (v.oggetto === 'pagamento') return 'alta';
   if (v.azione === 'assegnato' || v.azione === 'esportato') return 'media';
@@ -190,7 +202,7 @@ export const riepilogoPersona = (
   const sue = voci.filter((v) => v.chi === chi);
   const perAzione = {
     entrato: 0, creato: 0, modificato: 0,
-    eliminato: 0, assegnato: 0, esportato: 0,
+    eliminato: 0, assegnato: 0, esportato: 0, tentato: 0,
   } as Record<AzioneRegistro, number>;
 
   let ultima: Date | null = null;

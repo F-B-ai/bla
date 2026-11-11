@@ -62,6 +62,11 @@ const RigaPersona: React.FC<{ r: RiepilogoPersona }> = ({ r }) => {
         <Text style={r.perAzione.eliminato > 0 ? styles.allarme : undefined}>
           {r.perAzione.eliminato} eliminazioni
         </Text>
+        {r.perAzione.tentato > 0 ? (
+          <Text style={styles.allarme}>
+            {' · '}{r.perAzione.tentato} {r.perAzione.tentato === 1 ? 'tentativo respinto' : 'tentativi respinti'}
+          </Text>
+        ) : null}
       </Text>
     </View>
   );

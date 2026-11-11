@@ -1,9 +1,11 @@
 import * as admin from "firebase-admin";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {soloTitolareTracciato, tracciaAccesso} from "./traccia";
 
 export {aiMessages} from "./ai";
 export {nightlyBrain, brainRun} from "./brain";
 export {rapportoMattino} from "./rapporto";
+export {controlloAccessi} from "./accessi";
 export {calIngest, calKeyRotate, calLiberi} from "./cal";
 export {validaInvito} from "./inviti";
 export {inviaAvvisoPush} from "./avvisi";
@@ -31,12 +33,9 @@ function comeHttpsError(err: unknown, contesto: string): HttpsError {
   return new HttpsError("internal", `${contesto}: ${motivo}`);
 }
 
-async function verifyOwner(callerUid: string): Promise<void> {
-  const userDoc = await db.collection("users").doc(callerUid).get();
-  if (!userDoc.exists || userDoc.data()?.role !== "owner") {
-    throw new HttpsError("permission-denied", "Solo il titolare può eseguire questa operazione.");
-  }
-}
+// Il controllo «solo il titolare» sta in ./traccia.ts
+// (`soloTitolareTracciato`): oltre a respingere, scrive nel Registro
+// chi ha provato.
 
 // 11 novembre 2026 — QUI C'ERA `verifyOwnerOrManager`.
 //
@@ -74,9 +73,8 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId, newEmail} = request.data;
+  await soloTitolareTracciato(request.auth.uid, "cambiare l'email di accesso", targetUserId);
   if (!targetUserId || !newEmail) {
     throw new HttpsError("invalid-argument", "targetUserId e newEmail sono obbligatori.");
   }
@@ -150,6 +148,12 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
     );
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: `email di accesso cambiata da «${emailPrecedente}» a «${newEmail}»`,
+  });
   return {success: true};
 });
 
@@ -157,9 +161,8 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId, newPassword} = request.data;
+  await soloTitolareTracciato(request.auth.uid, "cambiare la password", targetUserId);
   if (!targetUserId || !newPassword) {
     throw new HttpsError("invalid-argument", "targetUserId e newPassword sono obbligatori.");
   }
@@ -190,6 +193,13 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
     );
   }
 
+  // La password non si scrive mai: né qui né altrove.
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: "password cambiata",
+  });
   return {success: true};
 });
 
@@ -204,9 +214,8 @@ export const adminStatoAccesso = onCall({region: "europe-west1"}, async (request
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId} = request.data;
+  await soloTitolareTracciato(request.auth.uid, "leggere lo stato di un accesso", targetUserId);
   if (!targetUserId) {
     throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
   }
@@ -244,9 +253,8 @@ export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId, email, password} = request.data;
+  await soloTitolareTracciato(request.auth.uid, "creare un accesso", targetUserId);
   if (!targetUserId || !email || !password) {
     throw new HttpsError(
       "invalid-argument",
@@ -341,6 +349,12 @@ export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request)
     avvisi.push("la scheda mostra ancora l'email vecchia");
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "creato",
+    bersaglio: targetUserId,
+    dettaglio: `accesso creato con l'email «${String(email).trim()}»`,
+  });
   return {success: true, avvisi};
 });
 
@@ -348,9 +362,8 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId} = request.data;
+  await soloTitolareTracciato(request.auth.uid, "eliminare un accesso", targetUserId);
   if (!targetUserId) {
     throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
   }
@@ -368,6 +381,12 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
     }
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "eliminato",
+    bersaglio: targetUserId,
+    dettaglio: "accesso eliminato",
+  });
   return {success: true};
 });
 
@@ -375,9 +394,8 @@ export const setUserClaims = onCall({region: "europe-west1"}, async (request) =>
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
   const {targetUserId, role} = request.data;
+  await soloTitolareTracciato(request.auth.uid, `cambiare il ruolo in «${role}»`, targetUserId);
   if (!targetUserId || !role) {
     throw new HttpsError("invalid-argument", "targetUserId e role sono obbligatori.");
   }
@@ -398,6 +416,12 @@ export const setUserClaims = onCall({region: "europe-west1"}, async (request) =>
   } catch (err) {
     throw comeHttpsError(err, "Non sono riuscito ad assegnare il ruolo");
   }
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: `ruolo nel token: «${role}»`,
+  });
   return {success: true};
 });
 
@@ -405,7 +429,7 @@ export const migrateUserClaims = onCall({region: "europe-west1"}, async (request
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
+  await soloTitolareTracciato(request.auth.uid, "riallineare i ruoli di tutti");
 
   let usersSnapshot;
   try {
@@ -435,7 +459,7 @@ export const cleanManagedPasswords = onCall({region: "europe-west1"}, async (req
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
+  await soloTitolareTracciato(request.auth.uid, "ripulire le password salvate");
 
   let cleaned = 0;
   try {

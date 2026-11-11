@@ -75,3 +75,14 @@ Secondo modulo, costruito sopra il rapporto. **Non ancora pubblicato** alla data
 - **Schermo:** in cima al Rapporto del mattino, prima dei numeri.
 
 Per i dati di movimento e salute vedi `movement-intelligence.md`.
+
+## Accessi: traccia e controllo (11 novembre 2026)
+
+Dopo il buco sulle funzioni amministrative (un manager poteva cambiare email e password di chiunque, dal 2 settembre all'11 novembre 2026).
+
+- **Cancello tracciato** (`functions/src/traccia.ts` → `soloTitolareTracciato`): tutte e otto le funzioni che toccano gli accessi lasciano passare solo il titolare. Chi viene respinto lascia una riga nel Registro, azione `tentato`, con che cosa stava provando a fare e su chi.
+- **Traccia delle modifiche:** cambio email (da quale a quale), cambio password, creazione, cancellazione e cambio di ruolo lasciano una riga nel Registro, oggetto `accesso`, scritta dal server. **Nessuna password viene mai scritta.**
+- **Controllo accessi** (funzione `controlloAccessi`, schermata Studio → Controllo accessi): per ogni account, email di accesso, email in scheda, creazione, ultimo ingresso, ultima attività e da quando valgono le sessioni. Segnala: accessi senza scheda, email di accesso diversa da quella della scheda, schede disattivate con accesso abilitato, sessioni chiuse negli ultimi 30 giorni, più di un titolare. Legge e basta.
+- Le regole di sicurezza non cambiano: il Registro si aggiunge e non si modifica, e lo legge solo il titolare.
+
+**Limite:** quello che è successo prima dell'11 novembre non è nel Registro. Le date di Firebase (creazione, ultimo ingresso, sessioni chiuse) dicono *quando*, non *chi*. Il *chi* per quel periodo sta solo nei log delle funzioni nella console Firebase.
