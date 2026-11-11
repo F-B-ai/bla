@@ -384,7 +384,7 @@ export const nightlyBrain = onSchedule(
   }
 );
 
-// Trigger manuale (solo owner/manager): per test e per il pulsante
+// Trigger manuale (solo titolare): per test e per il pulsante
 // "ricalcola ora" — stessa identica esecuzione della notte.
 export const brainRun = onRequest(
   {region: "europe-west1", timeoutSeconds: 300, memory: "256MiB", cors: true,
@@ -400,8 +400,11 @@ export const brainRun = onRequest(
       const uid = (await admin.auth().verifyIdToken(idToken)).uid;
       const user = await db().collection("users").doc(uid).get();
       const role = user.data()?.role;
-      if (role !== "owner" && role !== "manager") {
-        res.status(403).json({error: "Solo titolare o manager"});
+      // Solo il titolare: il manager non ha poteri amministrativi
+      // (decisione del 9 novembre 2026), e ricalcolare a mano fa
+      // partire anche le chiamate AI a pagamento.
+      if (role !== "owner") {
+        res.status(403).json({error: "Solo il titolare"});
         return;
       }
     } catch {

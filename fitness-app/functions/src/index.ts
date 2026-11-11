@@ -38,13 +38,12 @@ async function verifyOwner(callerUid: string): Promise<void> {
   }
 }
 
-async function verifyOwnerOrManager(callerUid: string): Promise<void> {
-  const userDoc = await db.collection("users").doc(callerUid).get();
-  const role = userDoc.data()?.role;
-  if (!userDoc.exists || (role !== "owner" && role !== "manager")) {
-    throw new HttpsError("permission-denied", "Non hai i permessi per questa operazione.");
-  }
-}
+// 11 novembre 2026 — QUI C'ERA `verifyOwnerOrManager`.
+//
+// Dal 9 novembre 2026 il manager non ha poteri amministrativi
+// (decisione del titolare): le funzioni che gestiscono gli accessi
+// sono riservate al titolare e chiamano `verifyOwner`. La funzione
+// di prima non esiste più apposta: perché non torni in uso.
 
 /**
  * Perché tutto sta dentro un try.
@@ -75,7 +74,7 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
+  await verifyOwner(request.auth.uid);
 
   const {targetUserId, newEmail} = request.data;
   if (!targetUserId || !newEmail) {
@@ -158,7 +157,7 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
+  await verifyOwner(request.auth.uid);
 
   const {targetUserId, newPassword} = request.data;
   if (!targetUserId || !newPassword) {
@@ -205,7 +204,7 @@ export const adminStatoAccesso = onCall({region: "europe-west1"}, async (request
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
+  await verifyOwner(request.auth.uid);
 
   const {targetUserId} = request.data;
   if (!targetUserId) {
@@ -245,7 +244,7 @@ export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
+  await verifyOwner(request.auth.uid);
 
   const {targetUserId, email, password} = request.data;
   if (!targetUserId || !email || !password) {
