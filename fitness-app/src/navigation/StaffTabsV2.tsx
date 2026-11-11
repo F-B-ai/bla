@@ -47,6 +47,7 @@ import { PricingScreen } from '../screens/owner/PricingScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
 import { RegistroScreen } from '../screens/owner/RegistroScreen';
+import { RapportoMattinoScreen } from '../screens/owner/RapportoMattinoScreen';
 import { ComunicazioniScreen } from '../screens/owner/ComunicazioniScreen';
 import { EarningsScreen } from '../screens/collaborator/EarningsScreen';
 
@@ -165,6 +166,7 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
     {
       title: 'Gestione',
       rows: [
+        { icon: 'sunny-outline', title: 'Rapporto del mattino', route: 'RapportoMattino' },
         { icon: 'speedometer-outline', title: 'Dashboard completa', route: 'DashboardCompleta' },
         { icon: 'cash-outline', title: 'Finanza', route: 'Finanza' },
         { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
@@ -294,6 +296,7 @@ const buildNavigators = (role: StaffRole) => {
           <StudioStack.Screen name="Pagamenti" component={PaymentPlanScreen} options={inner('Piani di pagamento')} />
           <StudioStack.Screen name="Team" component={ManageUsersScreen} options={inner('Team')} />
           <StudioStack.Screen name="Registro" component={RegistroScreen} options={inner('Registro attività')} />
+          <StudioStack.Screen name="RapportoMattino" component={RapportoMattinoScreen} options={inner('Rapporto del mattino')} />
           <StudioStack.Screen name="Spazio" component={StorageManagementScreen} options={inner('Spazio di archiviazione')} />
           <StudioStack.Screen name="Comunicazioni" component={ComunicazioniScreen} options={inner('Comunicazioni')} />
           <StudioStack.Screen name="ImpostazioniAI" component={AISettingsScreen} options={inner('Impostazioni AI')} />

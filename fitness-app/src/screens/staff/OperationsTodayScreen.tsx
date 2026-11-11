@@ -138,7 +138,10 @@ export const OperationsTodayScreen: React.FC = () => {
         for (const inst of p.installments || []) {
           if (!inst.dueDate) continue;
           const due = inst.dueDate?.toDate ? inst.dueDate.toDate() : new Date(inst.dueDate);
-          if (isInstallmentOverdue(due, !!inst.isPaid)) {
+          // `isPaid` non è mai esistito: una rata pagata porta
+          // `status: 'paid'`. Leggendo il campo sbagliato ogni rata con
+          // la data passata compariva come scaduta, anche se pagata.
+          if (isInstallmentOverdue(due, inst.status === 'paid')) {
             const days = -daysUntilDue(due);
             items.push({
               key: `pay_${p.id}_${inst.number || due.getTime()}`,

@@ -15,6 +15,8 @@ import {
   BRAIN_FORMULAS_VERSION,
   AcwrResult,
 } from "./domain/brain";
+import {rataPagata} from "./domain/rapportoMattino";
+import {generaRapportoMattino} from "./rapporto";
 
 // ============================================================
 // ESSĒRE BRAIN — Tappa 1: il motore notturno (doc 02 §4.3)
@@ -149,7 +151,13 @@ export const runBrain = async (apiKey?: string): Promise<BrainRunSummary> => {
     const d = doc.data();
     const installments = (d.installments || []) as Array<Record<string, unknown>>;
     const hasOverdue = installments.some((i) => {
-      if (i.isPaid) return false;
+      // 11 novembre 2026 — qui si leggeva `i.isPaid`, un campo che
+      // l'applicazione non ha MAI scritto: una rata pagata porta
+      // `status: 'paid'`. Quindi ogni rata con la data passata
+      // risultava scaduta anche se pagata — e finiva nel rischio di
+      // abbandono, nella coda del mattino e nelle bozze di sollecito
+      // che l'AI preparava per chi aveva già pagato.
+      if (rataPagata(i as {status?: string})) return false;
       const due = (i.dueDate as admin.firestore.Timestamp)?.toDate?.();
       return due ? due.getTime() < now.getTime() - MS_DAY : false;
     });
@@ -354,8 +362,25 @@ export const nightlyBrain = onSchedule(
     secrets: [ANTHROPIC_API_KEY],
   },
   async () => {
-    const s = await runBrain(ANTHROPIC_API_KEY.value());
-    console.log("Brain notturno:", JSON.stringify(s));
+    // Due lavori nella stessa notte, ognuno per conto suo: se uno
+    // cade l'altro si fa lo stesso. L'errore del primo non si perde:
+    // si rilancia in fondo, così la notte risulta fallita nei log.
+    let erroreBrain: unknown = null;
+    try {
+      const s = await runBrain(ANTHROPIC_API_KEY.value());
+      console.log("Brain notturno:", JSON.stringify(s));
+    } catch (e) {
+      erroreBrain = e;
+      console.error("Brain notturno FALLITO:", e);
+    }
+    try {
+      const r = await generaRapportoMattino(new Date(), "notturno");
+      console.log("Rapporto del mattino:", r.giorno,
+        JSON.stringify({letti: r.letti, avvisi: r.avvisi.length}));
+    } catch (e) {
+      console.error("Rapporto del mattino FALLITO:", e);
+    }
+    if (erroreBrain) throw erroreBrain;
   }
 );
 
