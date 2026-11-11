@@ -28,6 +28,8 @@ export interface AccountIn {
   ultimaAttivita?: string | null;
   /** da questo momento valgono solo le sessioni aperte dopo */
   sessioniValideDal?: string | null;
+  /** il ruolo scritto nel token: le regole dei FILE si fidano di questo */
+  ruoloToken?: string;
 }
 
 /** Una scheda dell'anagrafica. */
@@ -151,6 +153,17 @@ export const analizzaAccessi = (
       segnalazioni.push({
         gravita: staff ? 'alta' : 'media',
         testo: `L'email con cui entra («${a.email}») non è quella della scheda («${scheda.email}»).`,
+      });
+    }
+
+    // Il ruolo nel token decide i permessi sui file (foto, documenti).
+    // Se non è quello della scheda, una persona declassata può tenere
+    // poteri che non ha più.
+    if (scheda && a.ruoloToken && a.ruoloToken !== ruolo) {
+      const potente = STAFF.has(a.ruoloToken);
+      segnalazioni.push({
+        gravita: potente ? 'alta' : 'media',
+        testo: `Il ruolo scritto nel suo accesso («${NOME_RUOLO[a.ruoloToken] || a.ruoloToken}») non è quello della scheda («${NOME_RUOLO[ruolo] || ruolo || 'nessuno'}»): i permessi sui file seguono l'accesso. Allinea i ruoli da Team.`,
       });
     }
 

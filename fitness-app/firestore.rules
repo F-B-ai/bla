@@ -18,6 +18,20 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive != false;
     }
 
+    // Il nome con cui una persona firma il Registro: nome e cognome
+    // della sua scheda, come li compone l'app (vedi useAuth).
+    function nomeRegistro() {
+      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let n = u.get('name', '');
+      let c = u.get('surname', '');
+      return ((n is string ? n : '') + ' ' + (c is string ? c : '')).trim();
+    }
+
+    // Un campo facoltativo: se c'è, è un testo di lunghezza limitata.
+    function testoBreve(d, campo, massimo) {
+      return !(campo in d) || (d[campo] is string && d[campo].size() <= massimo);
+    }
+
     function isOwner() {
       return isAttivo() && getUserRole() == 'owner';
     }
@@ -368,7 +382,29 @@ service cloud.firestore {
         isStaff() ||
         resource.data.role in ['owner', 'manager', 'collaborator']
       );
-      allow create: if isAuthenticated();
+      // ------------------------------------------------------------
+      // 11 novembre 2026 — CHIUNQUE POTEVA DIVENTARE TITOLARE
+      // ------------------------------------------------------------
+      // Qui c'era `allow create: if isAuthenticated();` senza nessun
+      // limite sul ruolo. Chiunque si creasse un account (la
+      // registrazione è aperta: serve agli allievi con l'invito)
+      // poteva scriversi la propria scheda con `role: 'owner'` — e
+      // da quel momento ogni regola che chiede `isOwner()` lo
+      // trattava da titolare: movimenti economici, Registro, tutto.
+      //
+      // Le schede le creano tre sole strade, e nessun'altra:
+      //  · il titolare: qualunque persona, qualunque ruolo;
+      //  · lo staff: solo allievi (il nutrizionista che aggiunge un
+      //    allievo, il coach che lo registra);
+      //  · chi si registra da solo, con l'invito: solo la PROPRIA
+      //    scheda, e solo come allievo.
+      // Il primo titolare di un'installazione nuova si crea dalla
+      // console Firebase, non dall'applicazione.
+      allow create: if isAuthenticated() && (
+        isOwner() ||
+        (isStaff() && request.resource.data.role in ['student', 'academy_student']) ||
+        (request.auth.uid == userId && request.resource.data.role == 'student')
+      );
       allow update: if isAuthenticated() && (
         isOwner() ||
         (request.auth.uid == userId &&
@@ -436,13 +472,38 @@ service cloud.firestore {
     // registro diventerebbe un modo per incastrare qualcuno invece
     // che per sapere come sono andate le cose.
     // ============================================================
+    // 11 novembre 2026 — UNA RIGA DICE IL VERO SU CHI, COSA E QUANDO
+    // Prima bastava che `chi` fosse il proprio identificativo: il
+    // resto lo decideva chi scriveva. Si poteva datare una riga nel
+    // 2099 (e seppellire le vere sotto), firmarla col nome del
+    // titolare, o fingere una riga del server.
+    //  · `quando` è l'ora del server, non quella del telefono;
+    //  · nome e ruolo sono quelli della propria scheda (o vuoti);
+    //  · azioni e oggetti sono quelli dell'app: «tentato» e
+    //    «accesso» li scrive SOLO il server, e qui sono esclusi;
+    //  · nessun campo in più e nessun testo smisurato.
     match /registro/{voceId} {
       allow read: if isOwner();
       allow create: if isAuthenticated()
         && request.resource.data.chi == request.auth.uid
         && request.resource.data.keys().hasAll(
              ['chi', 'chiNome', 'ruolo', 'azione', 'oggetto', 'quando']
-           );
+           )
+        && request.resource.data.keys().hasOnly(
+             ['chi', 'chiNome', 'ruolo', 'azione', 'oggetto', 'oggettoId',
+              'oggettoNome', 'quando', 'dettaglio']
+           )
+        && request.resource.data.quando == request.time
+        && request.resource.data.azione in
+             ['entrato', 'creato', 'modificato', 'eliminato', 'assegnato', 'esportato']
+        && request.resource.data.oggetto in
+             ['allievo', 'collaboratore', 'lezione', 'pagamento', 'scheda',
+              'consulenza', 'contenuto', 'avviso', 'applicazione']
+        && request.resource.data.ruolo in ['', getUserRole()]
+        && request.resource.data.chiNome in ['', nomeRegistro()]
+        && testoBreve(request.resource.data, 'oggettoId', 200)
+        && testoBreve(request.resource.data, 'oggettoNome', 200)
+        && testoBreve(request.resource.data, 'dettaglio', 500);
       allow update, delete: if false;
     }
 

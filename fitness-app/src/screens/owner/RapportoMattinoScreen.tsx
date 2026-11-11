@@ -6,7 +6,7 @@ import {
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { formatCurrency } from '../../utils/helpers';
 import {
-  RapportoMattino, Somma, RigaRata, StatoLezioni,
+  RapportoMattino, Somma, RigaRata, StatoLezioni, giornoRoma,
 } from '../../domain/rapportoMattino';
 import { leggiRapportoMattino, spiegaErroreRapporto } from '../../services/rapportoMattinoService';
 import { RapportoCompleto, LivelloEvidenza } from '../../domain/evidenze';
@@ -145,6 +145,15 @@ export const RapportoMattinoScreen: React.FC = () => {
 
       {r ? (
         <>
+          {r.giorno !== giornoRoma(new Date()) ? (
+            <View style={styles.avvisi}>
+              <Text style={styles.avvisiTitolo}>Non è il rapporto di oggi</Text>
+              <Text style={styles.avvisiTesto}>
+                Questo è il rapporto del {giorno(r.giorno)}: quello di stanotte non è stato scritto.
+                Tocca «Ricalcola adesso» per averlo aggiornato.
+              </Text>
+            </View>
+          ) : null}
           {r.avvisi.length > 0 ? (
             <View style={styles.avvisi}>
               <Text style={styles.avvisiTitolo}>Dati da sistemare</Text>

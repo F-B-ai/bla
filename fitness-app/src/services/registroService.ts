@@ -1,5 +1,5 @@
 import {
-  collection, addDoc, getDocs, query, orderBy, limit as fbLimit, Timestamp,
+  collection, addDoc, getDocs, query, orderBy, limit as fbLimit, serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { senzaIndefiniti } from '../domain/salvataggio';
@@ -28,6 +28,7 @@ const daDoc = (d: { id: string; data: () => Record<string, unknown> }): VoceRegi
     oggettoNome: String(x.oggettoNome || ''),
     quando: aData(x.quando),
     dettaglio: x.dettaglio ? String(x.dettaglio) : undefined,
+    tentativo: x.tentativo ? String(x.tentativo) : undefined,
   };
 };
 
@@ -80,19 +81,31 @@ export const annota = (a: Annotazione): void => {
   const chi = autore?.id || auth.currentUser?.uid || '';
   if (!chi) return;
 
-  void addDoc(collection(db, REGISTRO), senzaIndefiniti({
+  const riga = (nome: string, ruolo: string) => senzaIndefiniti({
     chi,
-    chiNome: autore?.nome || '',
-    ruolo: autore?.ruolo || '',
+    chiNome: nome,
+    ruolo,
     azione: a.azione,
     oggetto: a.oggetto,
-    oggettoId: a.oggettoId || '',
-    oggettoNome: (a.oggettoNome || '').trim(),
-    quando: Timestamp.now(),
-    dettaglio: (a.dettaglio || '').trim() || undefined,
-  })).catch((err) => {
-    console.error('Registro: riga non scritta', a.azione, a.oggetto, err);
+    oggettoId: (a.oggettoId || '').slice(0, 200),
+    oggettoNome: (a.oggettoNome || '').trim().slice(0, 200),
+    // L'ora la mette il server: le regole accettano solo quella
+    // (11 novembre 2026), così nessuna riga può essere retrodatata.
+    quando: serverTimestamp(),
+    dettaglio: (a.dettaglio || '').trim().slice(0, 500) || undefined,
   });
+
+  // Le regole vogliono che nome e ruolo siano quelli della scheda. Se
+  // nel frattempo la scheda è cambiata (il titolare ha corretto il
+  // nome, o il ruolo), quello in memoria non combacia più e la riga
+  // verrebbe respinta: allora si riscrive senza nome né ruolo. Il
+  // «chi» resta, e da lì il titolare risale alla persona. Meglio una
+  // riga senza nome che nessuna riga.
+  void addDoc(collection(db, REGISTRO), riga(autore?.nome || '', autore?.ruolo || ''))
+    .catch(() => addDoc(collection(db, REGISTRO), riga('', '')))
+    .catch((err) => {
+      console.error('Registro: riga non scritta', a.azione, a.oggetto, err);
+    });
 };
 
 /**

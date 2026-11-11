@@ -75,7 +75,7 @@ describe('il registro non si riscrive', () => {
   const blocco = (): string => {
     const i = senzaCommenti.indexOf('match /registro/{voceId}');
     expect(i).toBeGreaterThan(-1);
-    return senzaCommenti.slice(i, i + 900);
+    return senzaCommenti.slice(i, senzaCommenti.indexOf('\n    }', i));
   };
 
   it('update e delete sono falsi per tutti, titolare compreso', () => {
@@ -139,5 +139,72 @@ describe('le righe si scrivono davvero: non è una funzione mai chiamata', () =>
     // niente await verso l'esterno, e l'errore si ferma dentro
     expect(s).toMatch(/export const annota = \(a: Annotazione\): void =>/);
     expect(s).toMatch(/\.catch\(\(err\)/);
+  });
+});
+
+// ============================================================
+// 11 novembre 2026 — CHIUNQUE POTEVA DIVENTARE TITOLARE
+// ------------------------------------------------------------
+// La creazione di una scheda non aveva limiti sul ruolo: chi si
+// creava un account poteva scriversi titolare. Questi test fissano la
+// chiusura. Le prove complete (ogni strada legittima e ogni attacco)
+// girano sull'emulatore; qui si controlla che il testo non torni
+// indietro.
+// ============================================================
+
+describe('nessuno si crea titolare da solo', () => {
+  const blocco = (): string => {
+    const u = senzaCommenti.indexOf('match /users/{userId}');
+    const i = senzaCommenti.indexOf('allow create', u);
+    return senzaCommenti.slice(i, senzaCommenti.indexOf('allow update', i));
+  };
+
+  it('la creazione non è più aperta a chiunque', () => {
+    expect(blocco()).not.toMatch(/allow create: if isAuthenticated\(\);/);
+  });
+
+  it('tre strade sole: titolare, staff solo per allievi, sé stessi solo come allievo', () => {
+    const b = blocco().replace(/\s+/g, ' ');
+    expect(b).toMatch(/isOwner\(\) \|\|/);
+    expect(b).toMatch(/\(isStaff\(\) && request\.resource\.data\.role in \['student', 'academy_student'\]\)/);
+    expect(b).toMatch(/\(request\.auth\.uid == userId && request\.resource\.data\.role == 'student'\)/);
+    expect(b).not.toMatch(/'owner'|'manager'|'collaborator'/);
+  });
+});
+
+describe('una riga del Registro dice il vero', () => {
+  const blocco = (): string => {
+    const i = senzaCommenti.indexOf('match /registro/{voceId}');
+    return senzaCommenti.slice(i, senzaCommenti.indexOf('\n    }', i)).replace(/\s+/g, ' ');
+  };
+
+  it('l\'ora è quella del server', () => {
+    expect(blocco()).toMatch(/request\.resource\.data\.quando == request\.time/);
+  });
+
+  it('nome e ruolo sono quelli della scheda, o vuoti', () => {
+    expect(blocco()).toMatch(/request\.resource\.data\.ruolo in \['', getUserRole\(\)\]/);
+    expect(blocco()).toMatch(/request\.resource\.data\.chiNome in \['', nomeRegistro\(\)\]/);
+  });
+
+  it('«tentato» e «accesso» non li scrive l\'applicazione', () => {
+    const b = blocco();
+    const azioni = b.slice(b.indexOf('azione in'), b.indexOf('oggetto in'));
+    const oggetti = b.slice(b.indexOf('oggetto in'), b.indexOf('ruolo in'));
+    expect(azioni).not.toMatch(/'tentato'/);
+    expect(oggetti).not.toMatch(/'accesso'/);
+    expect(b).toMatch(/keys\(\)\.hasOnly\(/);
+    expect(b).not.toMatch(/'origine'|'tentativo'/);
+  });
+
+  it('i testi hanno una lunghezza massima', () => {
+    expect(blocco()).toMatch(/testoBreve\(request\.resource\.data, 'dettaglio', 500\)/);
+  });
+
+  it('l\'app scrive l\'ora del server, e se nome o ruolo non combaciano riscrive la riga senza', () => {
+    const s = fs.readFileSync(path.join(__dirname, '..', 'services', 'registroService.ts'), 'utf8');
+    expect(s).toMatch(/quando: serverTimestamp\(\)/);
+    expect(s).not.toMatch(/Timestamp\.now\(\)/);
+    expect(s).toMatch(/\.catch\(\(\) => addDoc\(collection\(db, REGISTRO\), riga\('', ''\)\)\)/);
   });
 });

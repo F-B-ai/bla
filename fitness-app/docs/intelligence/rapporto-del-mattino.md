@@ -86,3 +86,17 @@ Dopo il buco sulle funzioni amministrative (un manager poteva cambiare email e p
 - Le regole di sicurezza non cambiano: il Registro si aggiunge e non si modifica, e lo legge solo il titolare.
 
 **Limite:** quello che è successo prima dell'11 novembre non è nel Registro. Le date di Firebase (creazione, ultimo ingresso, sessioni chiuse) dicono *quando*, non *chi*. Il *chi* per quel periodo sta solo nei log delle funzioni nella console Firebase.
+
+## Revisione dell'11 novembre 2026, sera
+
+Revisione completa con una seconda verifica indipendente. Trovato e corretto:
+
+- **Chiunque poteva diventare titolare** (regole di `users`, presente da prima di questo lavoro). La creazione di una scheda era aperta a qualunque account, senza limiti sul ruolo: bastava registrarsi e scriversi `role: 'owner'` per leggere movimenti economici, Registro e tutto il resto. Ora le schede le crea il titolare (qualunque ruolo), lo staff (solo allievi) o chi si registra con l'invito (solo la propria, solo come allievo). **Il primo titolare di un'installazione nuova si crea dalla console Firebase.**
+- **Registro falsificabile.** Un utente poteva retrodatare righe, firmarle col nome del titolare o fingerle del server. Ora l'ora è quella del server, nome e ruolo devono essere quelli della scheda, «tentato» e «accesso» li scrive solo il server, i testi hanno una lunghezza massima. Se nome o ruolo in memoria non combaciano più con la scheda, l'app riscrive la riga senza nome né ruolo invece di perderla.
+- **Funzioni:** una richiesta vuota faceva cadere la funzione prima del cancello, senza traccia; i testi mandati da chi chiama entravano nel Registro senza filtro; i tentativi ripetuti potevano allagare il Registro (ora una riga per ora, per persona e per tipo); i rifiuti sul rapporto e sul ricalcolo del motore non erano scritti; alcune operazioni riuscite non lasciavano riga; il cancello non guardava se la scheda del titolare era attiva.
+- **Controllo accessi:** ora confronta anche il ruolo scritto nell'accesso (che decide i permessi sui file) con quello della scheda.
+- **Rapporto:** la percentuale scritta sull'allievo vale solo se maggiore di zero e solo per i piani dei suoi coach; il rapporto gira prima del motore, con più tempo; lo schermo avverte se il rapporto non è di oggi.
+
+**Da sapere dopo la pubblicazione:** chi ha l'app aperta da prima scrive il Registro con l'ora del telefono, che ora viene rifiutata: quelle righe si perdono finché non ricarica l'app.
+
+Prove sull'emulatore: regole 49/49 (e le stesse prove sulle regole di prima mostrano i buchi), funzioni 42/42, rapporto 34/34.

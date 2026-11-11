@@ -11,6 +11,7 @@ import {
   RataIn,
 } from "./domain/rapportoMattino";
 import {conEvidenze, RapportoCompleto} from "./domain/evidenze";
+import {soloTitolareTracciato} from "./traccia";
 
 // ============================================================
 // IL RAPPORTO DEL MATTINO — lettura dei dati e consegna al titolare
@@ -167,13 +168,6 @@ export const generaRapportoMattino = async (
   return rapporto;
 };
 
-async function soloTitolare(uid: string): Promise<void> {
-  const utente = await db().collection("users").doc(uid).get();
-  if (!utente.exists || utente.data()?.role !== "owner") {
-    throw new HttpsError(
-      "permission-denied", "Il rapporto del mattino è riservato al titolare.");
-  }
-}
 
 /**
  * La porta del titolare. Senza argomenti restituisce l'ultimo rapporto
@@ -186,7 +180,10 @@ export const rapportoMattino = onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Devi essere autenticato.");
     }
-    await soloTitolare(request.auth.uid);
+    // Chi non è il titolare viene respinto e il tentativo resta
+    // scritto nel Registro.
+    await soloTitolareTracciato(
+      request.auth.uid, "leggere il rapporto del mattino", undefined, "pagamento");
 
     try {
       if (request.data?.aggiorna === true) {

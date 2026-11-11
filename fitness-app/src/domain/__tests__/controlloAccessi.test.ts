@@ -154,3 +154,26 @@ describe('robustezza', () => {
     expect(JSON.parse(JSON.stringify(c))).toEqual(c);
   });
 });
+
+describe('il ruolo scritto nell\'accesso', () => {
+  it('se nell\'accesso c\'è un ruolo di staff diverso dalla scheda: grave', () => {
+    const a = accounts();
+    a[3] = { ...a[3], ruoloToken: 'manager' }; // allieva con il token da manager
+    const r = riga('s1', a);
+    expect(r.segnalazioni[0].gravita).toBe('alta');
+    expect(r.segnalazioni[0].testo).toMatch(/«manager».*«allievo».*Allinea i ruoli/);
+  });
+
+  it('declassato ma con il token da titolare: grave', () => {
+    const a = accounts();
+    a[1] = { ...a[1], ruoloToken: 'owner' };
+    expect(riga('gius', a).segnalazioni[0]).toEqual(expect.objectContaining({ gravita: 'alta' }));
+  });
+
+  it('token uguale alla scheda, o assente: niente da dire', () => {
+    const a = accounts();
+    a[1] = { ...a[1], ruoloToken: 'manager' };
+    expect(riga('gius', a).segnalazioni).toEqual([]);
+    expect(riga('anto').segnalazioni).toEqual([]);
+  });
+});

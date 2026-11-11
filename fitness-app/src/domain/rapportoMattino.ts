@@ -481,9 +481,16 @@ export const costruisciRapporto = (dati: DatiRapporto): RapportoMattino => {
     for (const x of sue) {
       aggiungi(r, x.importo);
       const allievo = x.piano.studentId ? persone.get(x.piano.studentId) : undefined;
-      const pct = percentualeValida(allievo?.coachCommissionPercentage)
-        ? allievo!.coachCommissionPercentage
-        : base?.commissionPercentage;
+      // La percentuale scritta sull'allievo vale solo se è maggiore di
+      // zero (l'app scrive 0 quando il campo è lasciato vuoto) e solo
+      // se il piano è di uno dei suoi coach: non si applica la quota
+      // decisa per un collaboratore ai soldi di un altro.
+      const propria = allievo
+        && typeof allievo.coachCommissionPercentage === 'number'
+        && allievo.coachCommissionPercentage > 0
+        && percentualeValida(allievo.coachCommissionPercentage)
+        && coachDi(allievo).includes(id);
+      const pct = propria ? allievo!.coachCommissionPercentage : base?.commissionPercentage;
       if (!percentualeValida(pct)) { senzaPercentuale += 1; continue; }
       usate.add(pct);
       quota += calculateCollaboratorEarnings(x.importo, pct).collaboratorShare;
@@ -546,7 +553,7 @@ export const costruisciRapporto = (dati: DatiRapporto): RapportoMattino => {
         mese,
         mesePrecedente: `dal ${inItaliano(inizioMeseScorso)} al ${inItaliano(fineMeseScorso)}`,
       },
-      rate: { ...rate, fonte: 'Piani di pagamento: rate segnate come pagate, per data di pagamento.' },
+      rate: { ...rate, fonte: 'Piani di pagamento: rate segnate come pagate, per il giorno in cui sono state segnate.' },
       movimenti: { ...mov, fonte: 'Sezione economica: movimenti in entrata, per data del movimento.' },
       uscite: { ...uscite, fonte: 'Sezione economica: movimenti in uscita, per data del movimento.' },
       nota: NOTA_INCASSI,
@@ -562,7 +569,7 @@ export const costruisciRapporto = (dati: DatiRapporto): RapportoMattino => {
     },
     lezioni: {
       periodo: `sedute svolte dal ${inItaliano(daLezioni)} al ${inItaliano(oggi)}`,
-      fonte: 'Sedute segnate come svolte o conteggiate, incrociate con piani di pagamento e movimenti in entrata dell\'allievo.',
+      fonte: 'Sedute segnate come svolte, o conteggiate perché annullate tardi, incrociate con piani di pagamento e movimenti in entrata dell\'allievo.',
       righe: righeLezioni,
       nota: NOTA_LEZIONI,
     },

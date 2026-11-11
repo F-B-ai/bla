@@ -434,7 +434,10 @@ describe('il rapporto gira dentro il motore notturno che c\'è già', () => {
     const i = brain.indexOf('export const nightlyBrain = onSchedule(');
     const blocco = brain.slice(i, brain.indexOf('// Trigger manuale'));
     expect((blocco.match(/try \{/g) || []).length).toBe(2);
-    expect(blocco).toMatch(/if \(erroreBrain\) throw erroreBrain;/);
+    expect(blocco).toMatch(/if \(errore\) throw errore;/);
+    // il rapporto va prima del motore: è veloce e non dipende dall'AI
+    expect(blocco.indexOf('generaRapportoMattino(')).toBeLessThan(blocco.indexOf('runBrain('));
+    expect(blocco).toMatch(/timeoutSeconds: 540/);
   });
 
   it('la logica è quella del dominio, copiata nelle funzioni a ogni build', () => {
@@ -449,11 +452,10 @@ describe('il rapporto è del titolare e di nessun altro', () => {
   it('la funzione controlla sul server che chi chiama sia il titolare', () => {
     const i = funzione.indexOf('export const rapportoMattino = onCall(');
     const blocco = funzione.slice(i);
-    expect(blocco).toMatch(/await soloTitolare\(request\.auth\.uid\);/);
+    expect(blocco).toMatch(/await soloTitolareTracciato\(\s*request\.auth\.uid, "leggere il rapporto del mattino"/);
     // il controllo viene PRIMA di qualunque lettura o calcolo
-    expect(blocco.indexOf('soloTitolare(')).toBeLessThan(blocco.indexOf('generaRapportoMattino('));
-    expect(blocco.indexOf('soloTitolare(')).toBeLessThan(blocco.indexOf('.collection('));
-    expect(funzione).toMatch(/role !== "owner"/);
+    expect(blocco.indexOf('soloTitolareTracciato(')).toBeLessThan(blocco.indexOf('generaRapportoMattino('));
+    expect(blocco.indexOf('soloTitolareTracciato(')).toBeLessThan(blocco.indexOf('.collection('));
     expect(funzione).not.toMatch(/"manager"|"collaborator"/);
   });
 
@@ -524,5 +526,40 @@ describe('una rata pagata non risulta più scaduta', () => {
 
   it('e il campo vero è quello che l\'applicazione scrive', () => {
     expect(leggi('src', 'services', 'paymentService.ts')).toMatch(/status: 'paid' as PaymentStatus/);
+  });
+});
+
+// ============================================================
+// 11 novembre 2026 — LE PERCENTUALI, DOPO LA REVISIONE
+// ============================================================
+
+describe('la percentuale dell\'allievo vale solo quando è davvero sua', () => {
+  const conPiano = (studente: Partial<PersonaIn>, collaboratorId: string) => {
+    const p = persone().filter((x) => x.id !== 's9').concat([{ id: 's9', role: 'student', name: 'Zeno', surname: 'Prova', ...studente }]);
+    const pi: PianoIn[] = [{ id: 'pz', studentId: 's9', collaboratorId, installments: [
+      { amount: 100, status: 'paid', paidDate: g('2026-11-09') } ] }];
+    return rapporto({ persone: p, piani: pi, movimenti: [], sedute: [] }).collaboratori.righe.find((x) => x.id === collaboratorId)!;
+  };
+
+  it('zero sull\'allievo vuol dire «non impostata»: si usa quella del collaboratore', () => {
+    // l'app scrive 0 quando il campo è lasciato vuoto
+    const r = conPiano({ assignedCollaboratorIds: ['gius'], coachCommissionPercentage: 0 }, 'gius');
+    expect(r.quotaCollaboratore).toBe(50);
+    expect(r.notaQuota).toBe('Percentuale applicata: 50%.');
+  });
+
+  it('la percentuale dell\'allievo non si applica al piano di un altro collaboratore', () => {
+    const r = conPiano({ assignedCollaboratorIds: ['gius'], coachCommissionPercentage: 80 }, 'anto');
+    expect(r.quotaCollaboratore).toBe(60); // quella di Antonio, non l'80% deciso per Giuseppe
+  });
+
+  it('se è sua e maggiore di zero, si usa la sua', () => {
+    expect(conPiano({ assignedCollaboratorIds: ['anto'], coachCommissionPercentage: 80 }, 'anto').quotaCollaboratore).toBe(80);
+  });
+
+  it('le fonti dicono il vero: data in cui la rata è stata segnata, sedute anche annullate tardi', () => {
+    const r = rapporto();
+    expect(r.incassi.rate.fonte).toMatch(/per il giorno in cui sono state segnate/);
+    expect(r.lezioni.fonte).toMatch(/annullate tardi/);
   });
 });

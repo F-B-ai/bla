@@ -74,6 +74,9 @@ export interface VoceRegistro {
   oggettoNome: string;
   quando: Date;
   dettaglio?: string;
+  /** solo per i tentativi respinti (scritti dal server): che cosa si
+   *  stava provando a fare, es. «cambiare la password» */
+  tentativo?: string;
 }
 
 /** Quanto una riga merita di essere guardata. */
@@ -86,7 +89,7 @@ const ETICHETTE_AZIONE: Record<AzioneRegistro, string> = {
   eliminato: 'ha eliminato',
   assegnato: 'ha assegnato',
   esportato: 'ha esportato',
-  tentato: 'ha tentato di modificare',
+  tentato: 'ha tentato di',
 };
 
 const ETICHETTE_OGGETTO: Record<OggettoRegistro, string> = {
@@ -121,6 +124,20 @@ export const descriviVoce = (v: VoceRegistro): string => {
   if (v.azione === 'entrato') return `${chi} è entrato`;
 
   const cosa = (v.oggettoNome || '').trim();
+
+  // «Giuseppe Rossi ha tentato di cambiare la password: Maria Bianchi»
+  if (v.azione === 'tentato') {
+    const fare = (v.tentativo || '').trim() || "fare un'operazione riservata al titolare";
+    return `${chi} ha tentato di ${fare}${cosa ? `: ${cosa}` : ''}`.replace(/\s+/g, ' ').trim();
+  }
+
+  // «l'accesso di» senza un nome dopo resterebbe una frase monca: senza
+  // nome (la persona non ha una scheda, o l'operazione era su tutti)
+  // si dice «un accesso».
+  if (v.oggetto === 'accesso' && !cosa) {
+    return `${chi} ${nomeAzione(v.azione)} un accesso`.replace(/\s+/g, ' ').trim();
+  }
+
   const tipo = nomeOggetto(v.oggetto);
   const coda = cosa ? `${tipo} ${cosa}` : tipo;
   return `${chi} ${nomeAzione(v.azione)} ${coda}`.replace(/\s+/g, ' ').trim();

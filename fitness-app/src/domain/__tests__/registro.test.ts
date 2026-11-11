@@ -175,13 +175,13 @@ describe('nessuno riscrive il passato', () => {
   it('e nelle regole il registro si scrive una volta sola', () => {
     const i = regole.indexOf('match /registro/{voceId}');
     expect(i).toBeGreaterThan(-1);
-    const blocco = regole.slice(i, i + 1400);
+    const blocco = regole.slice(i, regole.indexOf('\n    }', i));
     expect(blocco).toMatch(/allow update, delete: if false;/);
   });
 
   it('lo legge solo il titolare', () => {
     const i = regole.indexOf('match /registro/{voceId}');
-    const blocco = regole.slice(i, i + 1400);
+    const blocco = regole.slice(i, regole.indexOf('\n    }', i));
     expect(blocco).toMatch(/allow read: if isOwner\(\);/);
   });
 
@@ -190,7 +190,7 @@ describe('nessuno riscrive il passato', () => {
   // che qualcuno ha appena declassato.
   it('ma chiunque sia dentro può lasciare una riga', () => {
     const i = regole.indexOf('match /registro/{voceId}');
-    const blocco = regole.slice(i, i + 1400);
+    const blocco = regole.slice(i, regole.indexOf('\n    }', i));
     expect(blocco).toMatch(/allow create: if isAuthenticated\(\)/);
   });
 });
@@ -311,5 +311,50 @@ describe('«Le persone» mostra solo i collaboratori e i manager', () => {
   it('e per ciascuno legge il suo riepilogo, anche a zero attività', () => {
     expect(schermata).toMatch(/staff\s*\n?\s*\.map/);
     expect(schermata).toMatch(/riepilogoPersona\(voci/);
+  });
+});
+
+// ============================================================
+// 11 novembre 2026 — TENTATIVI E ACCESSI: FRASI INTERE
+// ============================================================
+
+describe('le righe degli accessi si leggono senza buchi', () => {
+  const base = { chi: 'g', chiNome: 'Giuseppe Manager', ruolo: 'manager', oggettoId: '', quando: new Date() };
+
+  it('un tentativo dice che cosa si provava a fare, e su chi', () => {
+    expect(descriviVoce({ ...base, azione: 'tentato', oggetto: 'accesso', oggettoNome: 'Francesco Titolare', tentativo: 'cambiare la password' }))
+      .toBe('Giuseppe Manager ha tentato di cambiare la password: Francesco Titolare');
+  });
+
+  it('un tentativo senza bersaglio non lascia la frase a metà', () => {
+    expect(descriviVoce({ ...base, azione: 'tentato', oggetto: 'pagamento', oggettoNome: '', tentativo: 'leggere il rapporto del mattino' }))
+      .toBe('Giuseppe Manager ha tentato di leggere il rapporto del mattino');
+  });
+
+  it('un tentativo senza descrizione dice comunque una cosa vera', () => {
+    expect(descriviVoce({ ...base, azione: 'tentato', oggetto: 'accesso', oggettoNome: '' }))
+      .toBe("Giuseppe Manager ha tentato di fare un'operazione riservata al titolare");
+  });
+
+  it('una modifica di accesso senza nome dice «un accesso»', () => {
+    expect(descriviVoce({ ...base, chiNome: 'Francesco Titolare', azione: 'modificato', oggetto: 'accesso', oggettoNome: '' }))
+      .toBe('Francesco Titolare ha modificato un accesso');
+  });
+
+  it('con il nome, la frase è quella di sempre', () => {
+    expect(descriviVoce({ ...base, chiNome: 'Francesco Titolare', azione: 'creato', oggetto: 'accesso', oggettoNome: 'Maria Bianchi' }))
+      .toBe("Francesco Titolare ha creato l'accesso di Maria Bianchi");
+  });
+
+  it('nessuna frase degli accessi finisce con una parola sospesa', () => {
+    for (const azione of ['creato', 'modificato', 'eliminato', 'tentato'] as const) {
+      const f = descriviVoce({ ...base, azione, oggetto: 'accesso', oggettoNome: '' });
+      expect(f).not.toMatch(/\b(di|il|la|l'accesso di)$/);
+    }
+  });
+
+  it('tentativi e accessi si guardano per primi', () => {
+    expect(pesoVoce({ ...base, azione: 'tentato', oggetto: 'pagamento', oggettoNome: '' })).toBe('alta');
+    expect(pesoVoce({ ...base, azione: 'modificato', oggetto: 'accesso', oggettoNome: '' })).toBe('alta');
   });
 });

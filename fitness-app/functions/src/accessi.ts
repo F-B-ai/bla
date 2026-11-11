@@ -38,6 +38,7 @@ const tuttiGliAccount = async (): Promise<AccountIn[]> => {
         ultimoIngresso: iso(u.metadata.lastSignInTime),
         ultimaAttivita: iso(u.metadata.lastRefreshTime),
         sessioniValideDal: iso(u.tokensValidAfterTime),
+        ruoloToken: typeof u.customClaims?.role === "string" ? u.customClaims.role : undefined,
       });
     }
     pagina = r.pageToken;
