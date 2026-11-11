@@ -63,3 +63,15 @@ Sezioni: 1) incassi registrati; 2) rate scadute, bonifici da confermare, rate in
 
 - Pubblicare: un commit con `[deploy] [deploy-functions]` nella prima riga. Solo su approvazione del titolare.
 - Tornare indietro: `git revert` del commit del rapporto e nuovo rilascio delle funzioni. I documenti in `rapportiMattino` restano dove sono e non li legge nessuno; i dati dello studio non vengono mai modificati dal rapporto, quindi non c'è niente da ripristinare.
+
+## Executive: le evidenze del giorno
+
+Secondo modulo, costruito sopra il rapporto. **Non ancora pubblicato** alla data di questo documento.
+
+- **Logica:** `src/domain/evidenze.ts`. Legge il rapporto e ne ricava le righe che meritano una decisione, in tre livelli: da fare, da guardare, da sapere. Sono regole scritte, senza AI.
+- **Regole:** bonifici dichiarati da confermare; sedute non scalate dal percorso; percentuali mancanti; rate scadute; lezioni senza un percorso registrato; collaboratori con allievi e nessuna seduta registrata nel mese; differenza fra rate e movimenti del mese; dati incompleti.
+- **Ogni evidenza** porta i numeri che la motivano, la sezione del rapporto da cui viene e una proposta. Le proposte non sono azioni: non parte niente da solo.
+- **Traccia:** le evidenze si salvano dentro il foglio del giorno (`rapportiMattino/{giorno}`), quindi resta scritto che cosa era stato segnalato in ogni data.
+- **Schermo:** in cima al Rapporto del mattino, prima dei numeri.
+
+Per i dati di movimento e salute vedi `movement-intelligence.md`.

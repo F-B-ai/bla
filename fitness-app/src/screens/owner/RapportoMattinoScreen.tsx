@@ -9,6 +9,7 @@ import {
   RapportoMattino, Somma, RigaRata, StatoLezioni,
 } from '../../domain/rapportoMattino';
 import { leggiRapportoMattino, spiegaErroreRapporto } from '../../services/rapportoMattinoService';
+import { RapportoCompleto, LivelloEvidenza } from '../../domain/evidenze';
 
 // ============================================================
 // IL RAPPORTO DEL MATTINO, DA LEGGERE
@@ -47,6 +48,12 @@ const COLORE_STATO: Record<StatoLezioni, string> = {
   'non ancora dovuto': colors.textSecondary,
 };
 
+const COLORE_LIVELLO: Record<LivelloEvidenza, string> = {
+  'da fare': colors.error,
+  'da guardare': colors.warning,
+  'da sapere': colors.info,
+};
+
 const Fonte: React.FC<{ periodo: string; fonte: string }> = ({ periodo, fonte }) => (
   <View style={styles.fonte}>
     <Text style={styles.fonteTesto}>Periodo: {periodo}</Text>
@@ -78,7 +85,7 @@ const RataRiga: React.FC<{ r: RigaRata; colore: string }> = ({ r, colore }) => (
 );
 
 export const RapportoMattinoScreen: React.FC = () => {
-  const [rapporto, setRapporto] = useState<RapportoMattino | null>(null);
+  const [rapporto, setRapporto] = useState<RapportoCompleto | null>(null);
   const [caricando, setCaricando] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
 
@@ -144,6 +151,27 @@ export const RapportoMattinoScreen: React.FC = () => {
               {r.avvisi.map((a, i) => <Text key={i} style={styles.avvisiTesto}>· {a}</Text>)}
             </View>
           ) : null}
+
+          {/* in evidenza: che cosa merita una decisione oggi */}
+          <View style={styles.blocco}>
+            <Text style={styles.sezione}>In evidenza oggi</Text>
+            {r.evidenze.length === 0 ? (
+              <Text style={styles.vuoto}>
+                Niente che richieda una decisione: i numeri sono qui sotto.
+              </Text>
+            ) : r.evidenze.map((e) => (
+              <View key={e.chiave} style={styles.voce}>
+                <Text style={[styles.stato, { color: COLORE_LIVELLO[e.livello] }]}>{e.livello}</Text>
+                <Text style={styles.voceNome}>{e.titolo}</Text>
+                <Text style={styles.voceSotto}>{e.perche}</Text>
+                <Text style={styles.proposta}>Proposta: {e.proposta}</Text>
+              </View>
+            ))}
+            <Text style={styles.nota}>
+              Sono regole scritte, non intelligenza artificiale: ogni riga cita i numeri
+              del rapporto. Le proposte non partono da sole: decidi tu.
+            </Text>
+          </View>
 
           {/* 1 — incassi */}
           <View style={styles.blocco}>
@@ -299,6 +327,7 @@ const styles = StyleSheet.create({
   voceSotto: { fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 17, marginTop: 2 },
   stato: { fontSize: fontSize.sm, fontWeight: '700' },
   vuoto: { fontSize: fontSize.md, color: colors.textSecondary, marginTop: 4 },
+  proposta: { fontSize: fontSize.sm, color: colors.text, lineHeight: 17, marginTop: 4 },
 
   fonte: { marginTop: spacing.lg, gap: 2 },
   fonteTesto: { fontSize: fontSize.xs, color: colors.textLight, lineHeight: 15, marginTop: 2 },

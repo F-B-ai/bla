@@ -4,13 +4,13 @@ import {
   costruisciRapporto,
   giornoRoma,
   spostaGiorno,
-  RapportoMattino,
   PianoIn,
   MovimentoIn,
   SedutaIn,
   PersonaIn,
   RataIn,
 } from "./domain/rapportoMattino";
+import {conEvidenze, RapportoCompleto} from "./domain/evidenze";
 
 // ============================================================
 // IL RAPPORTO DEL MATTINO — lettura dei dati e consegna al titolare
@@ -153,9 +153,12 @@ const pulito = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 export const generaRapportoMattino = async (
   adesso: Date = new Date(),
   origine: "notturno" | "manuale" = "notturno"
-): Promise<RapportoMattino> => {
+): Promise<RapportoCompleto> => {
   const dati = await leggiDatiRapporto(adesso);
-  const rapporto = costruisciRapporto({adesso, ...dati});
+  // Prima i numeri, poi l'Executive che ne tira fuori le evidenze.
+  // Si salvano insieme: il foglio di ogni giorno conserva anche che
+  // cosa era stato segnalato quel giorno.
+  const rapporto = conEvidenze(costruisciRapporto({adesso, ...dati}));
   await db().collection(COLLEZIONE_RAPPORTI).doc(rapporto.giorno).set({
     ...pulito(rapporto),
     origine,

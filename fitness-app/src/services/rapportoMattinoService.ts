@@ -1,6 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../config/firebase';
 import { RapportoMattino } from '../domain/rapportoMattino';
+import { RapportoCompleto, conEvidenze } from '../domain/evidenze';
 
 // ============================================================
 // RAPPORTO DEL MATTINO — la porta del titolare
@@ -33,8 +34,11 @@ export const spiegaErroreRapporto = (err: unknown): string => {
  * L'ultimo rapporto scritto dal motore notturno. Con `aggiorna` lo
  * fa ricalcolare adesso sugli ultimi dati.
  */
-export const leggiRapportoMattino = async (aggiorna = false): Promise<RapportoMattino> => {
+export const leggiRapportoMattino = async (aggiorna = false): Promise<RapportoCompleto> => {
   const fn = httpsCallable(functions, 'rapportoMattino');
   const r = await fn(aggiorna ? { aggiorna: true } : {});
-  return r.data as RapportoMattino;
+  const dati = r.data as RapportoMattino & Partial<RapportoCompleto>;
+  // Un foglio scritto prima che esistessero le evidenze non le porta:
+  // si ricavano qui, con la stessa identica funzione del server.
+  return Array.isArray(dati.evidenze) ? (dati as RapportoCompleto) : conEvidenze(dati);
 };
