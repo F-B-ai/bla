@@ -69,6 +69,8 @@ export interface RigaAccesso {
    * vale «no», e il pulsante non compare.
    */
   senzaScheda?: boolean;
+  /** il ruolo scritto nel token dell'accesso, così com'è ('' se non c'è) */
+  ruoloAccesso?: string;
   staff: boolean;
   segnalazioni: Segnalazione[];
 }
@@ -209,6 +211,7 @@ export const analizzaAccessi = (
     righe.push({
       uid: a.uid,
       senzaScheda: !scheda,
+      ruoloAccesso: a.ruoloToken || '',
       nome: nome || (scheda ? 'Senza nome' : 'Non in anagrafica'),
       ruolo: NOME_RUOLO[ruolo] || (ruolo ? ruolo : 'nessuno'),
       emailAccesso: a.email || '',
@@ -267,4 +270,35 @@ export const analizzaAccessi = (
     },
     generali,
   };
+};
+
+// ============================================================
+// 13 novembre 2026 — «ELIMINA TUTTI I SENZA SCHEDA»
+// ------------------------------------------------------------
+// Quali accessi il pulsante unico può eliminare in blocco: quelli
+// senza scheda in anagrafica, TRANNE chi nel proprio accesso porta
+// ancora un ruolo da staff. Un accesso così è con ogni probabilità una
+// persona vera a cui è stata persa la scheda (un manager, un coach):
+// non si toglie in blocco, lo si guarda uno per uno.
+// ============================================================
+
+const RUOLI_PROTETTI = new Set(['owner', 'manager', 'collaborator', 'nutritionist', 'admin']);
+
+export interface SceltaInBlocco {
+  daEliminare: RigaAccesso[];
+  /** senza scheda, ma con un ruolo da staff nell'accesso: esclusi */
+  protetti: RigaAccesso[];
+}
+
+export const sceltaEliminaInBlocco = (righe: RigaAccesso[] | null | undefined): SceltaInBlocco => {
+  const daEliminare: RigaAccesso[] = [];
+  const protetti: RigaAccesso[] = [];
+  for (const r of righe || []) {
+    if (!r || r.senzaScheda !== true || !r.uid) continue;
+    // Senza il ruolo dell'accesso (fotografia di un server più vecchio)
+    // non si può sapere se è staff: per prudenza resta fuori dal blocco.
+    if (typeof r.ruoloAccesso !== 'string' || RUOLI_PROTETTI.has(r.ruoloAccesso.toLowerCase())) protetti.push(r);
+    else daEliminare.push(r);
+  }
+  return { daEliminare, protetti };
 };

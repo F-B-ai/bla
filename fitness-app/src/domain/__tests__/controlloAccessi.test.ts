@@ -1,4 +1,4 @@
-import { analizzaAccessi, AccountIn, SchedaIn } from '../controlloAccessi';
+import { analizzaAccessi, sceltaEliminaInBlocco, AccountIn, SchedaIn } from '../controlloAccessi';
 
 // ============================================================
 // 11 novembre 2026 — IL CONTROLLO ACCESSI
@@ -193,5 +193,51 @@ describe('il ruolo scritto nell\'accesso', () => {
     a[1] = { ...a[1], ruoloToken: 'manager' };
     expect(riga('gius', a).segnalazioni).toEqual([]);
     expect(riga('anto').segnalazioni).toEqual([]);
+  });
+});
+
+describe('elimina tutti i senza scheda', () => {
+  const conOrfani = () => accounts().concat([
+    { uid: 'prova1', email: 'enzo@essere.it', creato: giorniFa(100) },
+    { uid: 'prova2', email: 'napoli@essere.it', creato: giorniFa(90), ruoloToken: 'student' },
+    { uid: 'persa', email: 'coach@studio.it', creato: giorniFa(80), ruoloToken: 'manager' },
+  ]);
+
+  it('prende solo gli accessi senza scheda', () => {
+    const { daEliminare } = sceltaEliminaInBlocco(analizza(conOrfani()).righe);
+    expect(daEliminare.map((r) => r.uid).sort()).toEqual(['prova1', 'prova2']);
+  });
+
+  it('non tocca mai titolare, manager, collaboratori e allievi con scheda', () => {
+    const { daEliminare } = sceltaEliminaInBlocco(analizza(conOrfani()).righe);
+    for (const uid of ['tit', 'gius', 'anto', 's1']) expect(daEliminare.some((r) => r.uid === uid)).toBe(false);
+  });
+
+  it('senza scheda ma con un ruolo da staff nell\'accesso: escluso e messo da parte', () => {
+    const { daEliminare, protetti } = sceltaEliminaInBlocco(analizza(conOrfani()).righe);
+    expect(protetti.map((r) => r.uid)).toEqual(['persa']);
+    expect(daEliminare.some((r) => r.uid === 'persa')).toBe(false);
+  });
+
+  it('il ruolo protetto vale anche scritto in maiuscolo', () => {
+    const a = accounts().concat([{ uid: 'x', email: 'x@x.it', ruoloToken: 'OWNER' }]);
+    expect(sceltaEliminaInBlocco(analizza(a).righe).protetti.map((r) => r.uid)).toEqual(['x']);
+  });
+
+  it('una fotografia di un server vecchio, senza il segno: non elimina niente', () => {
+    const righe = analizza(conOrfani()).righe.map(({ senzaScheda, ...r }) => r);
+    expect(sceltaEliminaInBlocco(righe as never).daEliminare).toEqual([]);
+  });
+
+  it('senza il ruolo dell\'accesso non si sa se è staff: escluso per prudenza', () => {
+    const righe = analizza(conOrfani()).righe.map(({ ruoloAccesso, ...r }) => r);
+    const { daEliminare, protetti } = sceltaEliminaInBlocco(righe as never);
+    expect(daEliminare).toEqual([]);
+    expect(protetti.map((r) => r.uid).sort()).toEqual(['persa', 'prova1', 'prova2']);
+  });
+
+  it('elenchi vuoti o rotti non fanno cadere niente', () => {
+    expect(sceltaEliminaInBlocco(null)).toEqual({ daEliminare: [], protetti: [] });
+    expect(sceltaEliminaInBlocco([null as never, {} as never])).toEqual({ daEliminare: [], protetti: [] });
   });
 });

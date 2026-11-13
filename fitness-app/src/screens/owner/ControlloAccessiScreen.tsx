@@ -4,7 +4,7 @@ import {
   ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
-import { ControlloAccessi, Gravita, RigaAccesso } from '../../domain/controlloAccessi';
+import { ControlloAccessi, Gravita, RigaAccesso, sceltaEliminaInBlocco } from '../../domain/controlloAccessi';
 import { VoceRegistro, descriviVoce, filtraRegistro } from '../../domain/registro';
 import {
   leggiControlloAccessi, spiegaErroreControllo, eliminaAccessoSenzaScheda,
@@ -84,6 +84,7 @@ export const ControlloAccessiScreen: React.FC = () => {
   const [errore, setErrore] = useState<string | null>(null);
   const [tutti, setTutti] = useState(false);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [blocco, setBlocco] = useState<string | null>(null);
 
   const carica = useCallback(async () => {
     setCaricando(true);
@@ -100,6 +101,7 @@ export const ControlloAccessiScreen: React.FC = () => {
   useEffect(() => { void carica(); }, [carica]);
 
   const elimina = useCallback((r: RigaAccesso) => {
+    if (blocco !== null) return; // è in corso l'eliminazione in blocco
     const email = r.emailAccesso || 'senza email';
     crossAlert(
       'Elimina accesso',
@@ -125,7 +127,53 @@ export const ControlloAccessiScreen: React.FC = () => {
         },
       ],
     );
-  }, [carica]);
+  }, [carica, blocco]);
+
+  const scelta = sceltaEliminaInBlocco(dati?.righe);
+
+  const eliminaTutti = useCallback(() => {
+    const { daEliminare, protetti } = sceltaEliminaInBlocco(dati?.righe);
+    if (daEliminare.length === 0) return;
+    const elenco = daEliminare.map((r) => `· ${r.emailAccesso || 'senza email'}`).join('\n');
+    const esclusi = protetti.length > 0
+      ? `\n\nNe lascio fuori ${protetti.length}: hanno ancora un ruolo da staff nell'accesso, guardali uno per uno.`
+      : '';
+    crossAlert(
+      'Elimina tutti i senza scheda',
+      `Elimino ${daEliminare.length} accessi che non hanno nessuna scheda in anagrafica:\n${elenco}${esclusi}\n\nLe persone con scheda (allievi, coach, manager, titolare) non vengono toccate. L'operazione non si annulla e ogni eliminazione resta scritta nel Registro.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: `Elimina ${daEliminare.length}`,
+          style: 'destructive',
+          onPress: async () => {
+            const nonRiusciti: string[] = [];
+            let fatti = 0;
+            // Uno alla volta: ogni eliminazione ricontrolla la scheda e
+            // scrive la sua riga nel Registro.
+            for (let i = 0; i < daEliminare.length; i++) {
+              const r = daEliminare[i];
+              setBlocco(`Elimino ${i + 1} di ${daEliminare.length}…`);
+              try {
+                await eliminaAccessoSenzaScheda(r.uid);
+                fatti++;
+              } catch (err: unknown) {
+                const e = err as { message?: string } | undefined;
+                nonRiusciti.push(`· ${r.emailAccesso || r.uid}: ${e?.message || 'non riuscito'}`);
+              }
+            }
+            setBlocco(null);
+            crossAlert(
+              nonRiusciti.length ? 'Fatto in parte' : 'Fatto',
+              `Eliminati ${fatti} accessi su ${daEliminare.length}.` +
+                (nonRiusciti.length ? `\n\nNon eliminati:\n${nonRiusciti.join('\n')}` : ''),
+            );
+            await carica();
+          },
+        },
+      ],
+    );
+  }, [dati, carica]);
 
   const righe = dati ? dati.righe.filter((r) => tutti || r.staff || r.segnalazioni.some((s) => s.gravita === 'alta')) : [];
   const generali = dati?.generali || [];
@@ -162,6 +210,18 @@ export const ControlloAccessiScreen: React.FC = () => {
             <Text style={styles.sezione}>Da guardare</Text>
             {generali.length === 0 && conProblemi.length === 0 ? (
               <Text style={styles.dato}>Niente che non torni fra accessi e anagrafica.</Text>
+            ) : null}
+            {scelta.daEliminare.length > 0 ? (
+              <TouchableOpacity
+                style={[styles.elimina, styles.eliminaTutti]}
+                onPress={eliminaTutti}
+                disabled={blocco !== null || eliminando !== null}
+                accessibilityRole="button"
+              >
+                <Text style={styles.eliminaTuttiTesto}>
+                  {blocco || `Elimina tutti i senza scheda (${scelta.daEliminare.length})`}
+                </Text>
+              </TouchableOpacity>
             ) : null}
             {generali.map((s, i) => (
               <Text key={`g${i}`} style={[styles.segnalazione, { color: COLORE[s.gravita] }]}>· {s.testo}</Text>
@@ -259,6 +319,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.round, borderWidth: 1, borderColor: colors.error,
   },
   eliminaTesto: { fontSize: fontSize.sm, color: colors.error, fontWeight: '600' },
+  eliminaTutti: { marginTop: spacing.md, backgroundColor: colors.error, paddingVertical: 8, paddingHorizontal: spacing.lg },
+  eliminaTuttiTesto: { fontSize: fontSize.md, color: colors.white, fontWeight: '700' },
   erroreTitolo: { fontSize: fontSize.xl, fontWeight: '600', color: colors.error, marginBottom: 6 },
   fondo: { height: 40 },
 });
