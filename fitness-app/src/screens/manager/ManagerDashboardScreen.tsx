@@ -24,6 +24,7 @@ import { getAllAppointments } from '../../services/nutritionistService';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationPrompt } from '../../components/common/NotificationPrompt';
 import { InstallPrompt } from '../../components/common/InstallPrompt';
+import { ricavoRegistrato, chiNonRegistra } from '../../domain/ricaviCollaboratore';
 
 export const ManagerDashboardScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -144,13 +145,13 @@ export const ManagerDashboardScreen: React.FC = () => {
       const coachIncome = transactions
         .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
         .reduce((sum, t) => sum + t.amount, 0);
-      const estimatedRevenue = coachIncome > 0
-        ? coachIncome
-        : collab.assignedStudents.length * 150;
+      // la cifra inventata arrivava anche qui: nemmeno chi doveva
+      // controllare i coach poteva accorgersi di chi non segnava
+      const r = ricavoRegistrato(transactions, collab.id);
       return {
         label: `${collab.name} ${collab.surname?.charAt(0) || ''}.`,
-        value: estimatedRevenue,
-        color: colors.collaboratorBadge,
+        value: r.importo,
+        color: r.movimenti === 0 ? colors.border : colors.collaboratorBadge,
       };
     });
   };
@@ -306,7 +307,7 @@ export const ManagerDashboardScreen: React.FC = () => {
           },
           {
             label: 'Ricavi generati',
-            value: coachIncome > 0 ? coachIncome : collab.assignedStudents.length * 150,
+            value: ricavoRegistrato(transactions, collab.id).importo,
             unit: '€',
             color: colors.success,
             trend: coachIncome > 0 ? 'up' as const : 'stable' as const,

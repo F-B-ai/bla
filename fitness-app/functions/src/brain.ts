@@ -15,6 +15,9 @@ import {
   BRAIN_FORMULAS_VERSION,
   AcwrResult,
 } from "./domain/brain";
+import {rataPagata} from "./domain/rapportoMattino";
+import {generaRapportoMattino} from "./rapporto";
+import {tracciaAccesso} from "./traccia";
 
 // ============================================================
 // ESSĒRE BRAIN — Tappa 1: il motore notturno (doc 02 §4.3)
@@ -149,7 +152,13 @@ export const runBrain = async (apiKey?: string): Promise<BrainRunSummary> => {
     const d = doc.data();
     const installments = (d.installments || []) as Array<Record<string, unknown>>;
     const hasOverdue = installments.some((i) => {
-      if (i.isPaid) return false;
+      // 11 novembre 2026 — qui si leggeva `i.isPaid`, un campo che
+      // l'applicazione non ha MAI scritto: una rata pagata porta
+      // `status: 'paid'`. Quindi ogni rata con la data passata
+      // risultava scaduta anche se pagata — e finiva nel rischio di
+      // abbandono, nella coda del mattino e nelle bozze di sollecito
+      // che l'AI preparava per chi aveva già pagato.
+      if (rataPagata(i as {status?: string})) return false;
       const due = (i.dueDate as admin.firestore.Timestamp)?.toDate?.();
       return due ? due.getTime() < now.getTime() - MS_DAY : false;
     });
@@ -350,16 +359,38 @@ export const nightlyBrain = onSchedule(
     timeZone: "Europe/Rome",
     region: "europe-west1",
     memory: "256MiB",
-    timeoutSeconds: 300,
+    // Più largo di prima (era 300): ora nella stessa notte girano due
+    // lavori, e il motore fa anche chiamate all'AI.
+    timeoutSeconds: 540,
     secrets: [ANTHROPIC_API_KEY],
   },
   async () => {
-    const s = await runBrain(ANTHROPIC_API_KEY.value());
-    console.log("Brain notturno:", JSON.stringify(s));
+    // Due lavori nella stessa notte, ognuno per conto suo: se uno
+    // cade l'altro si fa lo stesso. Il rapporto va PRIMA: è veloce e
+    // non dipende dall'AI, così un motore lento non lo lascia indietro.
+    // Gli errori non si perdono: si rilanciano in fondo, così la notte
+    // risulta fallita nei log.
+    let errore: unknown = null;
+    try {
+      const r = await generaRapportoMattino(new Date(), "notturno");
+      console.log("Rapporto del mattino:", r.giorno,
+        JSON.stringify({letti: r.letti, avvisi: r.avvisi.length}));
+    } catch (e) {
+      errore = e;
+      console.error("Rapporto del mattino FALLITO:", e);
+    }
+    try {
+      const s = await runBrain(ANTHROPIC_API_KEY.value());
+      console.log("Brain notturno:", JSON.stringify(s));
+    } catch (e) {
+      errore = errore || e;
+      console.error("Brain notturno FALLITO:", e);
+    }
+    if (errore) throw errore;
   }
 );
 
-// Trigger manuale (solo owner/manager): per test e per il pulsante
+// Trigger manuale (solo titolare): per test e per il pulsante
 // "ricalcola ora" — stessa identica esecuzione della notte.
 export const brainRun = onRequest(
   {region: "europe-west1", timeoutSeconds: 300, memory: "256MiB", cors: true,
@@ -375,8 +406,18 @@ export const brainRun = onRequest(
       const uid = (await admin.auth().verifyIdToken(idToken)).uid;
       const user = await db().collection("users").doc(uid).get();
       const role = user.data()?.role;
-      if (role !== "owner" && role !== "manager") {
-        res.status(403).json({error: "Solo titolare o manager"});
+      if (role !== "owner" || user.data()?.isActive === false) {
+        await tracciaAccesso({
+          chi: uid,
+          azione: "tentato",
+          oggetto: "applicazione",
+          tentativo: "ricalcolare il motore notturno",
+          dettaglio: "ricalcolare il motore notturno: respinto, solo il titolare può farlo",
+        });
+        // Solo il titolare, con la scheda attiva: il manager non ha
+        // poteri amministrativi (decisione del 9 novembre 2026), e
+        // ricalcolare a mano fa partire anche le chiamate AI a pagamento.
+        res.status(403).json({error: "Solo il titolare"});
         return;
       }
     } catch {

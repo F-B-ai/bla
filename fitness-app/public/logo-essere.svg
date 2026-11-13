@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Il marchio ESSĒRE: l'ensō, il cerchio tracciato in un solo gesto, con
+  l'apertura in alto a destra — non si chiude mai del tutto. Dentro,
+  l'onda del movimento.
+
+  È lo stesso disegno dell'applicazione (src/components/common/EnsōLogo.tsx),
+  portato qui in un file solo perché tutte le pagine lo usano: due copie
+  dello stesso logo divergono sempre, e ci si accorge dopo mesi.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="ESSĒRE">
+  <defs>
+    <linearGradient id="ensoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF1A1A"/>
+      <stop offset="50%" stop-color="#D40000"/>
+      <stop offset="100%" stop-color="#8B0000"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F2F2F7" stop-opacity="0.1"/>
+      <stop offset="30%" stop-color="#F2F2F7" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#F2F2F7" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#F2F2F7" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- il cerchio, tratto di pennello -->
+  <path d="M 95 22 C 120 28, 142 52, 144 80 C 146 108, 130 136, 100 144 C 70 152, 36 140, 22 114 C 8 88, 14 54, 36 34 C 52 20, 74 18, 88 22"
+        stroke="url(#ensoGrad)" stroke-width="12" stroke-linecap="round" fill="none" opacity="0.95"/>
+
+  <!-- le sovrapposizioni che danno la texture del pennello -->
+  <path d="M 93 24 C 118 30, 138 50, 141 78 C 144 106, 128 134, 100 141"
+        stroke="#D40000" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <path d="M 100 141 C 70 148, 38 138, 24 112 C 10 86, 16 56, 38 36 C 54 22, 76 20, 90 24"
+        stroke="#FF1A1A" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.3"/>
+
+  <!-- l'onda: il movimento dentro il cerchio -->
+  <path d="M 42 82 C 55 72, 68 72, 80 80 C 92 88, 105 88, 118 78"
+        stroke="url(#waveGrad)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M 116 79 C 120 76, 124 74, 126 74"
+        stroke="#F2F2F7" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.5"/>
+</svg>

@@ -173,3 +173,72 @@ export const messaggioGuasto = (g: Guasto): string => {
   const s = spiegaGuasto(g);
   return `${s.titolo}. ${s.testo}`;
 };
+
+// ============================================================
+// «MI HA RICHIESTO CHIAVE SCADUTA»
+// ------------------------------------------------------------
+// Il titolare, il 23 settembre 2026, dentro la valutazione della
+// composizione corporea.
+//
+// Non era vero. La chiave non c'entrava niente.
+//
+// Quello che è successo: la chiamata passa dal gateway, che ha la
+// chiave sul server. Quando il gateway fallisce in un modo non
+// previsto — le quattro foto sono un carico grosso — il codice
+// scivola SENZA DIRLO sul vecchio ramo diretto, che usa una chiave
+// client rimasta lì dai tempi in cui il gateway non esisteva.
+// Quella chiave è vecchia, Anthropic la rifiuta, e l'utente legge
+// «Chiave AI non valida o scaduta. Aggiornala in Impostazioni AI».
+//
+// Quindi gli si chiede di aggiornare una chiave che non serve, per
+// risolvere un problema che sta da un'altra parte. È il cartello
+// davanti alla porta murata, di nuovo: un messaggio che manda la
+// persona a fare una cosa che non sistema niente.
+//
+// La regola qui sotto: se il gateway ha fallito, la verità è il
+// guasto del gateway. Il ramo vecchio è solo l'ultimo tentativo,
+// e quando fallisce anche lui non ha il diritto di raccontare
+// un'altra storia.
+// ============================================================
+
+/** Perché il gateway non ha risposto bene. */
+export interface MotivoGateway {
+  /** lo stato HTTP, 0 se non si è nemmeno raggiunto */
+  stato: number;
+  /** il pezzo di risposta utile, se c'era */
+  dettaglio?: string;
+}
+
+/**
+ * Che cosa dire quando ha fallito prima il gateway e poi anche il
+ * tentativo diretto.
+ *
+ * `motivo` è il guasto del gateway, `staleKey` dice se il
+ * tentativo diretto è morto su un 401 (cioè sulla chiave vecchia).
+ */
+export const messaggioDopoGateway = (
+  motivo: MotivoGateway | null,
+  staleKey: boolean
+): string => {
+  if (!motivo) {
+    // Il gateway non è stato nemmeno provato: allora sì, la chiave
+    // è davvero l'unica cosa in ballo.
+    return staleKey
+      ? 'Chiave AI non valida o scaduta. Aggiornala in Impostazioni AI.'
+      : 'Il servizio AI non ha risposto. Riprova fra poco.';
+  }
+
+  const g = leggiGuastoGateway(motivo.stato, motivo.dettaglio || '');
+  const base = g ? messaggioGuasto(g) : 'Il servizio AI non ha risposto.';
+  const stato = motivo.stato > 0 ? ` (errore ${motivo.stato})` : '';
+
+  // Il numero dell'errore si scrive sempre: è l'unica cosa che
+  // permette di capire che cosa è successo davvero, e costa niente.
+  if (!staleKey) return `${base}${stato}`;
+
+  // Qui è il punto. Il tentativo diretto è morto sulla chiave
+  // vecchia, ma NON è quello il problema — e mandarlo a cambiarla
+  // gli fa perdere tempo su una porta murata.
+  return `${base}${stato} Non è la chiave: quella sta sul server e non si tocca. `
+    + 'Se è appena successo con le foto, riprova con foto più leggere.';
+};

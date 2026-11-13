@@ -10,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { crossAlert } from '../../utils/alert';
+import { grigliaOrari } from '../../domain/orariStudio';
 import { colors, spacing, fontSize, borderRadius, shadows } from '../../config/theme';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -28,12 +29,9 @@ import {
 import { getStudents, getCollaborators } from '../../services/authService';
 import { isStudentAssignedTo } from '../../utils/helpers';
 
-const TIME_SLOTS = [
-  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
-  '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-  '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30',
-  '19:00', '19:30', '20:00', '20:30', '21:00',
-];
+// Gli orari vengono dal dominio: unica lista per tutta l'applicazione,
+// passo di 15 minuti. Vedi domain/orariStudio.ts.
+const TIME_SLOTS = grigliaOrari();
 
 export const ScheduleSessionScreen: React.FC = () => {
   const { user, isOwner, isManager, isCollaborator } = useAuth();

@@ -16,10 +16,61 @@ import { TrainingProgram, WorkoutPlan, Exercise, ExerciseCategory } from '../typ
 import { allDefaultExercises, DefaultExercise } from '../data/defaultExercises';
 import { GruppoMuscolare } from '../domain/muscoli';
 import { fondiConCanone } from '../domain/filmEsercizio';
+import { annota } from './registroService';
+import { AzioneRegistro } from '../domain/registro';
 
 const PROGRAMS_COLLECTION = 'trainingPrograms';
 const PLANS_COLLECTION = 'workoutPlans';
 const EXERCISES_COLLECTION = 'exerciseLibrary';
+
+// ============================================================
+// LE SCHEDE FINISCONO NEL REGISTRO — punto 1.2 del 23 settembre
+// ------------------------------------------------------------
+// 2 novembre 2026. «Devi dirmi tutto quello che avviene nell'app.»
+// Ho contato: quaranta servizi scrivono, tre annotavano. Questo —
+// dodici scritture, le schede e le programmazioni — non annotava
+// niente.
+//
+// È l'unica delle tre mansioni del foglio firmato che il Registro
+// ancora non vedeva. Gli appuntamenti sì, la chat non esiste, le
+// schede no.
+//
+// Come per le sedute: il nome dell'allievo si risolve qui dentro e
+// in modo asincrono, perché la riga deve restare leggibile anche
+// quando quella scheda non ci sarà più.
+// ============================================================
+const annotaScheda = (
+  azione: AzioneRegistro,
+  schedaId: string,
+  studentId: string,
+  dettaglio?: string
+): void => {
+  void (async () => {
+    let nome = '';
+    try {
+      if (studentId) {
+        const snap = await getDoc(doc(db, 'users', studentId));
+        if (snap.exists()) {
+          const d = snap.data() as { name?: string; surname?: string };
+          nome = `${d.name || ''} ${d.surname || ''}`.trim();
+        }
+      }
+    } catch {
+      // senza nome la riga vale meno, ma esiste
+    }
+    annota({ azione, oggetto: 'scheda', oggettoId: schedaId, oggettoNome: nome, dettaglio });
+  })();
+};
+
+/** Legge lo studentId di una scheda prima che sparisca. */
+const allievoDellaScheda = async (
+  collezione: string,
+  id: string
+): Promise<string> => {
+  const snap = await getDoc(doc(db, collezione, id)).catch(() => null);
+  if (!snap?.exists()) return '';
+  return String((snap.data() as { studentId?: string }).studentId || '');
+};
 
 // --- Programmi sessione singola ---
 
@@ -30,6 +81,8 @@ export const createProgram = async (
     ...program,
     createdAt: Timestamp.now(),
   });
+  annotaScheda('creato', docRef.id,
+    String((program as { studentId?: string }).studentId || ''), 'programma di seduta');
   return docRef.id;
 };
 
@@ -94,6 +147,7 @@ export const createWorkoutPlan = async (
     endDate: Timestamp.fromDate(endDate),
     createdAt: Timestamp.now(),
   });
+  annotaScheda('creato', docRef.id, plan.studentId || '', 'piano di allenamento');
   return docRef.id;
 };
 
@@ -175,7 +229,11 @@ export const getExercise = async (exerciseId: string): Promise<Exercise | null> 
 };
 
 export const deleteWorkoutPlan = async (planId: string): Promise<void> => {
+  // Si legge PRIMA: dopo la cancellazione l'allievo non è più
+  // ricavabile, e la riga direbbe «ha eliminato scheda» e basta.
+  const sid = await allievoDellaScheda(PLANS_COLLECTION, planId);
   await deleteDoc(doc(db, PLANS_COLLECTION, planId));
+  annotaScheda('eliminato', planId, sid, 'piano di allenamento');
 };
 
 export const updateWorkoutPlan = async (
@@ -191,11 +249,15 @@ export const updateWorkoutPlan = async (
     const ed = data.endDate instanceof Date ? data.endDate : new Date(data.endDate as any);
     update.endDate = Timestamp.fromDate(ed);
   }
+  const sid = await allievoDellaScheda(PLANS_COLLECTION, planId);
   await updateDoc(doc(db, PLANS_COLLECTION, planId), update);
+  annotaScheda('modificato', planId, sid, 'piano di allenamento');
 };
 
 export const deleteProgram = async (programId: string): Promise<void> => {
+  const sid = await allievoDellaScheda(PROGRAMS_COLLECTION, programId);
   await deleteDoc(doc(db, PROGRAMS_COLLECTION, programId));
+  annotaScheda('eliminato', programId, sid, 'programma di seduta');
 };
 
 // --- Template personalizzati ---

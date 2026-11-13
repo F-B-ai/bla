@@ -1,10 +1,14 @@
 import * as admin from "firebase-admin";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {soloTitolareTracciato, tracciaAccesso} from "./traccia";
 
 export {aiMessages} from "./ai";
 export {nightlyBrain, brainRun} from "./brain";
+export {rapportoMattino} from "./rapporto";
+export {controlloAccessi} from "./accessi";
 export {calIngest, calKeyRotate, calLiberi} from "./cal";
 export {validaInvito} from "./inviti";
+export {inviaAvvisoPush} from "./avvisi";
 
 admin.initializeApp();
 
@@ -29,20 +33,18 @@ function comeHttpsError(err: unknown, contesto: string): HttpsError {
   return new HttpsError("internal", `${contesto}: ${motivo}`);
 }
 
-async function verifyOwner(callerUid: string): Promise<void> {
-  const userDoc = await db.collection("users").doc(callerUid).get();
-  if (!userDoc.exists || userDoc.data()?.role !== "owner") {
-    throw new HttpsError("permission-denied", "Solo il titolare può eseguire questa operazione.");
-  }
-}
+const RUOLI_VALIDI = ["owner", "manager", "collaborator", "student", "academy_student"];
 
-async function verifyOwnerOrManager(callerUid: string): Promise<void> {
-  const userDoc = await db.collection("users").doc(callerUid).get();
-  const role = userDoc.data()?.role;
-  if (!userDoc.exists || (role !== "owner" && role !== "manager")) {
-    throw new HttpsError("permission-denied", "Non hai i permessi per questa operazione.");
-  }
-}
+// Il controllo «solo il titolare» sta in ./traccia.ts
+// (`soloTitolareTracciato`): oltre a respingere, scrive nel Registro
+// chi ha provato.
+
+// 11 novembre 2026 — QUI C'ERA `verifyOwnerOrManager`.
+//
+// Dal 9 novembre 2026 il manager non ha poteri amministrativi
+// (decisione del titolare): le funzioni che gestiscono gli accessi
+// sono riservate al titolare e chiamano `verifyOwner`. La funzione
+// di prima non esiste più apposta: perché non torni in uso.
 
 /**
  * Perché tutto sta dentro un try.
@@ -73,9 +75,8 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
-
-  const {targetUserId, newEmail} = request.data;
+  const {targetUserId, newEmail} = request.data ?? {};
+  await soloTitolareTracciato(request.auth.uid, "cambiare l'email di accesso", targetUserId);
   if (!targetUserId || !newEmail) {
     throw new HttpsError("invalid-argument", "targetUserId e newEmail sono obbligatori.");
   }
@@ -137,6 +138,15 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
       ripristinata = false;
     }
     const codice = (err as {code?: string})?.code || String(err);
+    if (!ripristinata) {
+      await tracciaAccesso({
+        chi: request.auth.uid,
+        azione: "modificato",
+        bersaglio: targetUserId,
+        dettaglio: `email di accesso cambiata da «${emailPrecedente}» a «${newEmail}», ` +
+          "ma la scheda NON è stata aggiornata e il ritorno indietro è fallito",
+      });
+    }
     throw new HttpsError(
       "internal",
       ripristinata ?
@@ -149,6 +159,12 @@ export const adminChangeEmail = onCall({region: "europe-west1"}, async (request)
     );
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: `email di accesso cambiata da «${emailPrecedente}» a «${newEmail}»`,
+  });
   return {success: true};
 });
 
@@ -156,9 +172,8 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
-
-  const {targetUserId, newPassword} = request.data;
+  const {targetUserId, newPassword} = request.data ?? {};
+  await soloTitolareTracciato(request.auth.uid, "cambiare la password", targetUserId);
   if (!targetUserId || !newPassword) {
     throw new HttpsError("invalid-argument", "targetUserId e newPassword sono obbligatori.");
   }
@@ -189,6 +204,13 @@ export const adminChangePassword = onCall({region: "europe-west1"}, async (reque
     );
   }
 
+  // La password non si scrive mai: né qui né altrove.
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: "password cambiata",
+  });
   return {success: true};
 });
 
@@ -203,9 +225,8 @@ export const adminStatoAccesso = onCall({region: "europe-west1"}, async (request
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
-
-  const {targetUserId} = request.data;
+  const {targetUserId} = request.data ?? {};
+  await soloTitolareTracciato(request.auth.uid, "leggere lo stato di un accesso", targetUserId);
   if (!targetUserId) {
     throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
   }
@@ -243,9 +264,8 @@ export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request)
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwnerOrManager(request.auth.uid);
-
-  const {targetUserId, email, password} = request.data;
+  const {targetUserId, email, password} = request.data ?? {};
+  await soloTitolareTracciato(request.auth.uid, "creare un accesso", targetUserId);
   if (!targetUserId || !email || !password) {
     throw new HttpsError(
       "invalid-argument",
@@ -340,6 +360,12 @@ export const adminCreaAccesso = onCall({region: "europe-west1"}, async (request)
     avvisi.push("la scheda mostra ancora l'email vecchia");
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "creato",
+    bersaglio: targetUserId,
+    dettaglio: `accesso creato con l'email «${String(email).trim()}»`,
+  });
   return {success: true, avvisi};
 });
 
@@ -347,17 +373,28 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
-  const {targetUserId} = request.data;
+  const {targetUserId} = request.data ?? {};
+  await soloTitolareTracciato(request.auth.uid, "eliminare un accesso", targetUserId);
   if (!targetUserId) {
     throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
   }
 
+  // L'email si legge PRIMA di eliminare: dopo non esiste più, e per un
+  // accesso senza scheda è l'unica cosa che dice nel Registro quale
+  // accesso è stato tolto.
+  let email = "";
+  try {
+    email = (await authAdmin.getUser(targetUserId)).email || "";
+  } catch {
+    // nessun accesso: lo dice già il ramo qui sotto
+  }
+
+  let cera = true;
   try {
     await authAdmin.deleteUser(targetUserId);
   } catch (e: unknown) {
     const err = e as {code?: string};
+    if (err.code === "auth/user-not-found") cera = false;
     // Chi non ha mai completato la registrazione non ha un accesso da
     // cancellare: non è un errore, è già come dovrebbe essere.
     if (err.code !== "auth/user-not-found") {
@@ -367,6 +404,14 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
     }
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "eliminato",
+    bersaglio: targetUserId,
+    dettaglio: cera ?
+      (email ? `accesso eliminato (${email})` : "accesso eliminato") :
+      "nessun accesso da eliminare (la persona non era mai entrata)",
+  });
   return {success: true};
 });
 
@@ -374,15 +419,17 @@ export const setUserClaims = onCall({region: "europe-west1"}, async (request) =>
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
-
-  const {targetUserId, role} = request.data;
+  const {targetUserId, role} = request.data ?? {};
+  await soloTitolareTracciato(
+    request.auth.uid,
+    RUOLI_VALIDI.includes(role) ? `cambiare il ruolo in «${role}»` : "cambiare il ruolo",
+    targetUserId
+  );
   if (!targetUserId || !role) {
     throw new HttpsError("invalid-argument", "targetUserId e role sono obbligatori.");
   }
 
-  const validRoles = ["owner", "manager", "collaborator", "student", "academy_student"];
-  if (!validRoles.includes(role)) {
+  if (!RUOLI_VALIDI.includes(role)) {
     throw new HttpsError("invalid-argument", "Ruolo non valido.");
   }
 
@@ -397,6 +444,12 @@ export const setUserClaims = onCall({region: "europe-west1"}, async (request) =>
   } catch (err) {
     throw comeHttpsError(err, "Non sono riuscito ad assegnare il ruolo");
   }
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    bersaglio: targetUserId,
+    dettaglio: `ruolo nel token: «${role}»`,
+  });
   return {success: true};
 });
 
@@ -404,7 +457,7 @@ export const migrateUserClaims = onCall({region: "europe-west1"}, async (request
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
+  await soloTitolareTracciato(request.auth.uid, "riallineare i ruoli di tutti");
 
   let usersSnapshot;
   try {
@@ -427,6 +480,11 @@ export const migrateUserClaims = onCall({region: "europe-west1"}, async (request
     }
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    dettaglio: `ruoli riallineati nel token per ${migrated} accessi`,
+  });
   return {success: true, migrated};
 });
 
@@ -434,7 +492,7 @@ export const cleanManagedPasswords = onCall({region: "europe-west1"}, async (req
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Devi essere autenticato.");
   }
-  await verifyOwner(request.auth.uid);
+  await soloTitolareTracciato(request.auth.uid, "ripulire le password salvate");
 
   let cleaned = 0;
   try {
@@ -453,5 +511,10 @@ export const cleanManagedPasswords = onCall({region: "europe-west1"}, async (req
     throw comeHttpsError(err, "Non sono riuscito a ripulire le password salvate");
   }
 
+  await tracciaAccesso({
+    chi: request.auth.uid,
+    azione: "modificato",
+    dettaglio: `password salvate ripulite da ${cleaned} schede`,
+  });
   return {success: true, cleaned};
 });

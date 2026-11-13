@@ -395,6 +395,22 @@ export interface PosturalAssessment {
   aiRecommendations?: string[];
   aiExerciseProgram?: string[];
   comparisonNotes?: string;
+  /** scheletro schematico ricostruito dalle foto (domain/posture3d.ts) */
+  modello3d?: import('../domain/posture3d').Modello3D;
+  /** quali segmenti le misure hanno segnato, al momento della valutazione */
+  modello3dTinte?: import('../domain/posture3d').Tinte;
+  /** le misure di quel giorno, con di quanto hanno oscillato */
+  misure3d?: import('../domain/posture').PostureMetrics[];
+  /** com'è stata presa ogni foto: serve a rifarla uguale la volta dopo */
+  inquadrature3d?: Partial<Record<
+    'frontale' | 'posteriore' | 'lateraleSx' | 'lateraleDx',
+    import('../domain/inquadratura').Inquadratura
+  >>;
+  linee3d?: import('../domain/lineeMiofasciali').LetturaLinea[];
+  /** quale modello di lettura ha lavorato: 'accurato' o 'standard' */
+  motore3d?: 'accurato' | 'standard';
+  /** quante volte è stata letta ogni foto */
+  letture3d?: number;
 }
 
 export interface PosturalFinding {
@@ -556,7 +572,8 @@ export type NotificationType =
   | 'new_content'
   | 'workout_renewal'
   | 'custom_alert'
-  | 'badge_milestone';
+  | 'badge_milestone'
+  | 'nutrition_request';
 
 export interface AppNotification {
   id: string;

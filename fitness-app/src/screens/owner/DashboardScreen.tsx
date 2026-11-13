@@ -36,6 +36,7 @@ import { printStaffReport, printOwnerReport } from '../../utils/printUtils';
 import { generateWeeklySummary, ensureAIApiKey } from '../../services/aiService';
 import { generateAndSendRemindersForAllStudents, generatePaymentReminders, sendWhatsAppReminder } from '../../services/paymentReminderService';
 import { getAllTodayChecks, WellnessCheck } from '../../services/wellnessService';
+import { ricavoRegistrato, chiNonRegistra } from '../../domain/ricaviCollaboratore';
 
 const toSafeDate = (d: unknown): Date => {
   if (d instanceof Date) return d;
@@ -143,18 +144,16 @@ export const DashboardScreen: React.FC = () => {
 
   // Grafico ricavi per collaboratore
   const getRevenueByCoach = (): BarData[] => {
+    // Qui c'era `coachIncome > 0 ? coachIncome : assignedStudents.length * 150`:
+    // chi non registrava niente aveva comunque una barra, alta quanti
+    // allievi gli erano stati assegnati. Adesso quello che non è stato
+    // registrato vale zero, e si vede.
     return collaborators.map((collab) => {
-      const coachIncome = transactions
-        .filter((t) => t.type === 'income' && t.collaboratorId === collab.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      const estimatedRevenue = coachIncome > 0
-        ? coachIncome
-        : collab.assignedStudents.length * 150;
-
+      const r = ricavoRegistrato(transactions, collab.id);
       return {
         label: `${collab.name} ${collab.surname?.charAt(0) || ''}.`,
-        value: estimatedRevenue,
-        color: colors.collaboratorBadge,
+        value: r.importo,
+        color: r.movimenti === 0 ? colors.border : colors.collaboratorBadge,
       };
     });
   };

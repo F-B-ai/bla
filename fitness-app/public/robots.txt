@@ -1,0 +1,9 @@
+# ESSĒRE — Mind Movement Lab, Gragnano
+# Il sito è fatto di pagine pubbliche; l'applicazione dello studio sta
+# sotto la radice e non ha niente da indicizzare, ma nemmeno niente da
+# nascondere: si apre solo con un accesso.
+User-agent: *
+Allow: /
+
+# Quando il dominio definitivo sarà collegato, qui va la riga:
+# Sitemap: https://<dominio>/sitemap.xml

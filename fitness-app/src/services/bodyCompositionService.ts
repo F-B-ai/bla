@@ -14,6 +14,7 @@ import { db, storage } from '../config/firebase';
 import { BodyCompositionEstimate } from '../types';
 import { emitTwinEvent } from './twinEventService';
 import { CONFIDENCE } from '../domain/twinEvents';
+import { senzaIndefiniti } from '../domain/salvataggio';
 
 const COLLECTION_NAME = 'bodyCompositionEstimates';
 
@@ -45,11 +46,14 @@ export const uploadBodyCompImage = async (
 export const saveEstimate = async (
   estimate: Omit<BodyCompositionEstimate, 'id'>
 ): Promise<string> => {
-  const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+  // Un valore non stimato non si scrive: Firestore rifiuta i campi
+  // senza valore e farebbe cadere tutto il salvataggio. Vedi
+  // domain/salvataggio.ts.
+  const docRef = await addDoc(collection(db, COLLECTION_NAME), senzaIndefiniti({
     ...estimate,
     date: Timestamp.fromDate(estimate.date instanceof Date ? estimate.date : new Date(estimate.date)),
     createdAt: Timestamp.fromDate(estimate.createdAt instanceof Date ? estimate.createdAt : new Date(estimate.createdAt)),
-  });
+  }));
 
   // Dual-write twin (M3): stima AI = la sorgente più incerta (02 §3.1),
   // sempre range/tendenza, mai verità. Il dettaglio resta nel doc legacy.

@@ -181,6 +181,8 @@ export const PricingScreen: React.FC = () => {
   const gymTiers = TIERS.filter(t => t.category === 'gym');
   const premiumTiers = TIERS.filter(t => t.category === 'premium');
   const personalTiers = TIERS.filter(t => t.category === 'personal');
+  const gruppoTiers = TIERS.filter(t => t.category === 'gruppo');
+  const affiancamentoTiers = TIERS.filter(t => t.category === 'affiancamento');
   const posturalTier = TIERS.find(t => t.category === 'postural')!;
 
   return (
@@ -227,6 +229,44 @@ export const PricingScreen: React.FC = () => {
         </View>
 
         {personalTiers.map(t => (
+          <PlanCard key={t.id} tier={t} onCreatePlan={openCreateModal} />
+        ))}
+
+        {/* --- Personal di gruppo ---
+             La quota a testa scende e l'ora rende di più: è la cosa da
+             dire a chi guarda solo la quota e pensa che si stia
+             svendendo. I numeri vengono dal listino, qui non se ne
+             scrive nessuno a mano. */}
+        <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+          <Ionicons name="people" size={22} color={ACCENT} />
+          <Text style={styles.sectionTitle}>Personal di gruppo</Text>
+        </View>
+        <View style={styles.registrationNote}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+          <Text style={styles.registrationText}>
+            Ognuno ha il suo programma e paga la sua quota. In agenda si crea
+            un appuntamento per ciascuno.
+          </Text>
+        </View>
+
+        {gruppoTiers.map(t => (
+          <PlanCard key={t.id} tier={t} onCreatePlan={openCreateModal} />
+        ))}
+
+        {/* --- Affiancamento --- */}
+        <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+          <Ionicons name="hand-left" size={22} color={ACCENT} />
+          <Text style={styles.sectionTitle}>Affiancamento</Text>
+        </View>
+        <View style={styles.registrationNote}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+          <Text style={styles.registrationText}>
+            Si allena da solo e viene seguito. Lo conduce un istruttore, un manager
+            o il direttore tecnico: il prezzo è lo stesso.
+          </Text>
+        </View>
+
+        {affiancamentoTiers.map(t => (
           <PlanCard key={t.id} tier={t} onCreatePlan={openCreateModal} />
         ))}
 

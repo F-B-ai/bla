@@ -40,10 +40,26 @@ export const APERTURA = '09:00';
 export const ULTIMO_INIZIO = '17:30';
 /** Ultima ora in cui si può cominciare, per eccezione. */
 export const ULTIMO_INIZIO_ECCEZIONE = '19:30';
-/** La griglia: gli appuntamenti stanno sulle mezz'ore. */
-export const PASSO_MINUTI = 30;
+/**
+ * La griglia degli appuntamenti.
+ *
+ * Era mezz'ora. Dal 3 ottobre 2026 è un quarto d'ora: un allievo che
+ * può solo alle 10:15 prima andava spostato alle 10:00 o alle 10:30,
+ * e spesso quello spostamento era il motivo per cui non veniva.
+ *
+ * Il numero sta QUI e in nessun altro posto. Prima la lista degli
+ * orari era scritta a mano in quattro schermate diverse, ognuna con
+ * contenuti suoi: cambiare il passo avrebbe voluto dire toccarne
+ * quattro e dimenticarne una — e quella dimenticata sarebbe rimasta a
+ * mezz'ora per mesi senza che nessuno se ne accorgesse.
+ */
+export const PASSO_MINUTI = 15;
 /** Quanto dura una seduta, se non si dice altro. */
 export const DURATA_STANDARD = 60;
+
+/** Il primo e l'ultimo orario che compaiono nella griglia da scegliere. */
+export const GRIGLIA_DA = '07:00';
+export const GRIGLIA_A = '22:00';
 
 // ------------------------------------------------------------
 // Ore e minuti
@@ -110,6 +126,60 @@ const sovrappone = (a: Impegno, ini: number, fin: number): boolean => {
  * Non guarda chi siano gli impegni né di chi: prende gli orari
  * occupati e restituisce quelli liberi. Non scrive niente.
  */
+/**
+ * Tutti gli orari selezionabili, dal primo all'ultimo.
+ *
+ * È l'unica lista di orari dell'applicazione: la usano l'agenda, la
+ * prenotazione dell'allievo e la schermata della nutrizione. Generata,
+ * non scritta: una lista scritta a mano prima o poi perde una riga, e
+ * quell'ora smette di esistere per tutti senza che nessuno capisca
+ * perché.
+ */
+export const grigliaOrari = (
+  da: string = GRIGLIA_DA,
+  a: string = GRIGLIA_A,
+  passo: number = PASSO_MINUTI
+): string[] => {
+  const p = passo > 0 ? passo : PASSO_MINUTI;
+  const fine = inMinuti(a);
+  const orari: string[] = [];
+  for (let m = inMinuti(da); m <= fine; m += p) orari.push(inOra(m));
+  return orari;
+};
+
+/** È un'ora piena? Serve a dare un appiglio all'occhio in una lista lunga. */
+export const oraPiena = (ora: string): boolean => inMinuti(ora) % 60 === 0;
+
+/**
+ * La fine che segue l'inizio: un'ora dopo.
+ *
+ * Chiesta dal titolare il 19 ottobre 2026. Fino a oggi l'ora di fine
+ * si sceglieva a mano ogni volta, scorrendo una seconda lista di
+ * sessantuno orari — per scrivere quasi sempre lo stesso numero, cioè
+ * l'inizio più sessanta minuti. Un gesto ripetuto dieci volte al
+ * giorno che non decide niente: il posto esatto in cui, una volta su
+ * venti, si tocca la riga sbagliata.
+ *
+ * Resta una PROPOSTA: la fine è ancora un campo che si cambia. Una
+ * seduta di novanta minuti si fa, e si continua a fare come prima.
+ *
+ * Non si esce mai dalla griglia: se l'inizio è così tardi che un'ora
+ * dopo cadrebbe oltre l'ultimo orario, si propone l'ultimo — meglio
+ * un orario che esiste di uno che la lista non contiene, perché
+ * quello non si potrebbe nemmeno correggere.
+ */
+export const fineProposta = (
+  inizio: string,
+  durata: number = DURATA_STANDARD,
+  limite: string = GRIGLIA_A
+): string => {
+  const da = inMinuti(inizio);
+  if (isNaN(da)) return '';
+  const max = inMinuti(limite);
+  const fine = da + (durata > 0 ? durata : DURATA_STANDARD);
+  return inOra(isNaN(max) ? fine : Math.min(fine, max));
+};
+
 export const slotLiberi = (r: RichiestaSlot): Slot[] => {
   const durata = r.durata && r.durata > 0 ? r.durata : DURATA_STANDARD;
   const primo = inMinuti(APERTURA);

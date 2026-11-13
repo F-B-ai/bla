@@ -215,3 +215,225 @@ describe('vista laterale — piano sagittale', () => {
     expect(find(m.findings, 'forward_head').value_deg).toBeCloseTo(15, 0);
   });
 });
+
+// ============================================================
+// 10 novembre 2026 — GLI ANGOLI NON ERANO «REALI»
+// ------------------------------------------------------------
+// MediaPipe dà x in frazioni della LARGHEZZA e y in frazioni
+// dell'ALTEZZA: due righelli diversi. Su una foto verticale da
+// telefono gli angoli calcolati su quei numeri uscivano storti, e la
+// scheda li chiamava «angoli reali».
+//
+// Qui costruisco la persona in PIXEL, con un angolo che decido io,
+// la metto in una foto 3:4 e chiedo l'angolo. Senza raddrizzare esce
+// sbagliato (lo dimostro); raddrizzando esce giusto.
+// ============================================================
+
+import { raddrizza } from '../posture';
+
+describe('le foto non sono quadrate: prima si raddrizza, poi si misura', () => {
+  const W = 750;
+  const H = 1000; // 3:4, il formato di un telefono in verticale
+
+  /** Profilo con la testa avanti di un angolo NOTO, in pixel veri. */
+  const profilo = (gradiVeri: number): Landmark[] => {
+    const lm = base();
+    const spalla = { x: 375, y: 300 };
+    const su = 120; // l'orecchio è 120 px sopra la spalla
+    const avanti = su * Math.tan((gradiVeri * Math.PI) / 180);
+    const px = (x: number, y: number) => ({ x: x / W, y: y / H });
+    set(lm, 7, px(spalla.x + avanti, spalla.y - su).x, px(0, spalla.y - su).y);
+    set(lm, LM.L_SHOULDER, px(spalla.x, 0).x, px(0, spalla.y).y);
+    set(lm, LM.L_HIP, px(spalla.x, 0).x, px(0, 600).y);
+    set(lm, LM.L_ANKLE, px(spalla.x, 0).x, px(0, 950).y);
+    // lato destro coperto
+    [8, LM.R_SHOULDER, LM.R_HIP, LM.R_ANKLE].forEach((i) => set(lm, i, 0.5, 0.5, 0.1));
+    return lm;
+  };
+
+  /** Spalle inclinate di un angolo NOTO, in pixel veri. */
+  const frontale = (gradiVeri: number): Landmark[] => {
+    const lm = base();
+    const mezza = 110;
+    const dy = mezza * Math.tan((gradiVeri * Math.PI) / 180);
+    set(lm, LM.L_SHOULDER, (375 + mezza) / W, (300 - dy) / H);
+    set(lm, LM.R_SHOULDER, (375 - mezza) / W, (300 + dy) / H);
+    set(lm, LM.L_HIP, (375 + 60) / W, 600 / H);
+    set(lm, LM.R_HIP, (375 - 60) / W, 600 / H);
+    set(lm, LM.L_ANKLE, (375 + 60) / W, 950 / H);
+    set(lm, LM.R_ANKLE, (375 - 60) / W, 950 / H);
+    set(lm, LM.NOSE, 375 / W, 180 / H);
+    return lm;
+  };
+
+  it('SENZA raddrizzare, la testa in avanti esce gonfiata (il difetto)', () => {
+    const storto = find(computePostureMetrics(profilo(45), 'laterale').findings, 'forward_head');
+    expect(storto.value_deg!).toBeGreaterThan(52); // 45° veri letti ~53°
+  });
+
+  it('raddrizzando, la testa in avanti è quella vera', () => {
+    for (const veri of [10, 20, 30, 45]) {
+      const f = find(
+        computePostureMetrics(raddrizza(profilo(veri), W, H), 'laterale').findings,
+        'forward_head'
+      );
+      expect(f.value_deg!).toBeCloseTo(veri, 0);
+    }
+  });
+
+  it('SENZA raddrizzare, le spalle escono schiacciate (il difetto)', () => {
+    const storto = find(computePostureMetrics(frontale(4), 'frontale').findings, 'shoulder_tilt');
+    expect(storto.value_deg!).toBeLessThan(3.2); // 4° veri letti ~3°
+  });
+
+  it('raddrizzando, l\'inclinazione delle spalle è quella vera', () => {
+    for (const veri of [2, 4, 6]) {
+      const f = find(
+        computePostureMetrics(raddrizza(frontale(veri), W, H), 'frontale').findings,
+        'shoulder_tilt'
+      );
+      expect(f.value_deg!).toBeCloseTo(veri, 0);
+    }
+  });
+
+  it('su una foto quadrata raddrizzare non cambia niente', () => {
+    const lm = profilo(20);
+    expect(raddrizza(lm, 800, 800)).toEqual(lm);
+  });
+
+  it('con dimensioni mancanti restituisce i punti com\'erano, senza rompersi', () => {
+    const lm = profilo(20);
+    expect(raddrizza(lm, 0, 1000)).toBe(lm);
+    expect(raddrizza(lm, 750, NaN)).toBe(lm);
+  });
+
+  it('non tocca la visibilità né la y', () => {
+    const r = raddrizza(profilo(20), W, H);
+    const o = profilo(20);
+    r.forEach((p, i) => {
+      expect(p.y).toBe(o[i].y);
+      expect(p.visibility).toBe(o[i].visibility);
+    });
+  });
+});
+
+// ============================================================
+// 10 novembre 2026 — LEGGERE PIÙ VOLTE, E DIRE DI QUANTO SI OSCILLA
+// ============================================================
+
+import {
+  mediana, dispersione, fondiLetture, misuraRipetuta, cambiamento, cambiamenti,
+  MARGINE_MINIMO_GRADI, PostureMetrics,
+} from '../posture';
+
+describe('letture ripetute della stessa foto', () => {
+  /** Frontale isotropa con spalle inclinate di `gradi`. */
+  const spalle = (gradi: number): Landmark[] => {
+    const lm = base();
+    const [l, r] = tiltedPair(0.5, 0.3, 0.1, gradi, true);
+    lm[LM.L_SHOULDER] = l; lm[LM.R_SHOULDER] = r;
+    set(lm, LM.L_HIP, 0.44, 0.6); set(lm, LM.R_HIP, 0.56, 0.6);
+    set(lm, LM.L_ANKLE, 0.44, 0.95); set(lm, LM.R_ANKLE, 0.56, 0.95);
+    set(lm, LM.NOSE, 0.5, 0.18);
+    return lm;
+  };
+
+  it('mediana e dispersione fanno il loro mestiere', () => {
+    expect(mediana([3, 1, 2])).toBe(2);
+    expect(mediana([4, 1, 2, 3])).toBe(2.5);
+    expect(dispersione([5, 5, 5, 5])).toBe(0);
+    expect(dispersione([1])).toBe(0);
+    expect(dispersione([1, 2, 3, 4, 5])).toBeCloseTo(1.4826, 3);
+  });
+
+  it('un punto che SALTA in una lettura non sposta lo scheletro fuso', () => {
+    const letture = [spalle(4), spalle(4), spalle(4), spalle(4), spalle(4)];
+    letture[2] = letture[2].slice();
+    letture[2][LM.L_SHOULDER] = { x: 0.9, y: 0.9, visibility: 0.9 }; // salto enorme
+    const fuso = fondiLetture(letture)!;
+    expect(fuso[LM.L_SHOULDER].x).toBeCloseTo(spalle(4)[LM.L_SHOULDER].x, 6);
+    const m = misuraRipetuta(letture, 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').value_deg!).toBeCloseTo(4, 0);
+  });
+
+  it('letture identiche: oscillazione zero, e lo scrive', () => {
+    const m = misuraRipetuta([spalle(4), spalle(4), spalle(4)], 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').tolerance).toBe(0);
+    expect(m.quality_notes.join(' ')).toMatch(/letta 3 volte/);
+  });
+
+  it('letture che tremano: il valore è al centro e l\'oscillazione è dichiarata', () => {
+    const m = misuraRipetuta([spalle(3), spalle(3.5), spalle(4), spalle(4.5), spalle(5)], 'frontale');
+    const f = find(m.findings, 'shoulder_tilt');
+    expect(f.value_deg!).toBeCloseTo(4, 0);
+    expect(f.tolerance!).toBeGreaterThan(0.4);
+    expect(f.tolerance!).toBeLessThan(1.2);
+  });
+
+  it('con meno di tre letture non finge di conoscere l\'oscillazione', () => {
+    const m = misuraRipetuta([spalle(4), spalle(4.4)], 'frontale');
+    expect(find(m.findings, 'shoulder_tilt').tolerance).toBeUndefined();
+  });
+
+  it('nessuna lettura buona: insufficiente, senza rompersi', () => {
+    expect(misuraRipetuta([], 'frontale').quality).toBe('insufficiente');
+    expect(fondiLetture([])).toBeNull();
+  });
+
+  it('i rilievi notevoli portano la stessa oscillazione dell\'elenco', () => {
+    const m = misuraRipetuta([spalle(5), spalle(5.4), spalle(5.8), spalle(6.2)], 'frontale');
+    const n = m.notable.find((x) => x.key === 'shoulder_tilt')!;
+    expect(n.tolerance).toBe(find(m.findings, 'shoulder_tilt').tolerance);
+  });
+});
+
+describe('un cambiamento conta solo se supera il margine', () => {
+  const f = (v: number, tol?: number): PostureFinding => ({
+    key: 'forward_head', label: 'Testa in avanti', value_deg: v, severity: 'lieve', tolerance: tol,
+  });
+
+  it('una differenza grande è una riduzione vera', () => {
+    const c = cambiamento(f(30, 0.8), f(18, 0.6), 'laterale')!;
+    expect(c.delta).toBe(-12);
+    expect(c.esito).toBe('ridotta');
+    expect(c.unita).toBe('°');
+  });
+
+  it('sotto i due gradi non è un miglioramento: è rumore', () => {
+    const c = cambiamento(f(14, 0.2), f(12.5, 0.2))!;
+    expect(c.margine).toBe(MARGINE_MINIMO_GRADI);
+    expect(c.esito).toBe('entro il margine');
+  });
+
+  it('letture che oscillano molto alzano il margine', () => {
+    const c = cambiamento(f(20, 2), f(16, 2))!; // 4° di differenza, ma ±2 e ±2
+    expect(c.margine).toBeGreaterThan(5);
+    expect(c.esito).toBe('entro il margine');
+  });
+
+  it('un aumento oltre il margine si chiama aumento', () => {
+    expect(cambiamento(f(10, 0.3), f(16, 0.3))!.esito).toBe('aumentata');
+  });
+
+  it('le percentuali hanno il loro margine minimo', () => {
+    const p = (v: number): PostureFinding => ({ key: 'sagittal_plumb', label: 'Filo', value_pct: v, severity: 'lieve' });
+    expect(cambiamento(p(10), p(8))!.esito).toBe('entro il margine');
+    expect(cambiamento(p(16), p(9))!.esito).toBe('ridotta');
+    expect(cambiamento(p(16), p(9))!.unita).toBe('%');
+  });
+
+  it('misure diverse o mancanti non si confrontano', () => {
+    expect(cambiamento(f(10), { ...f(8), key: 'shoulder_tilt' })).toBeNull();
+    expect(cambiamento(undefined, f(8))).toBeNull();
+  });
+
+  it('confronta vista per vista, e salta quelle non leggibili', () => {
+    const vista = (view: 'frontale' | 'laterale', v: number, quality: 'ok' | 'insufficiente' = 'ok'): PostureMetrics => ({
+      version: 4, view, findings: [f(v, 0.5)], notable: [], quality, quality_notes: [],
+    });
+    const c = cambiamenti([vista('laterale', 30), vista('frontale', 9)], [vista('laterale', 18), vista('frontale', 9, 'insufficiente')]);
+    expect(c).toHaveLength(1);
+    expect(c[0].view).toBe('laterale');
+    expect(cambiamenti(null, [vista('laterale', 18)])).toHaveLength(0);
+  });
+});

@@ -16,6 +16,20 @@ import {defineSecret} from "firebase-functions/params";
 //     ad alto volume) e registra token/costi in aiUsage/
 // ============================================================
 
+// La chiave vive in Secret Manager del progetto essere-3fe6f, MAI nel
+// codice e mai nel client. Le funzioni la leggono all'avvio: dopo aver
+// caricato una versione nuova del segreto vanno riavviate, altrimenti
+// continuano a usare quella vecchia finché non si spengono da sole.
+//
+// RUOTARE LA CHIAVE (12 ottobre 2026, la prima è scaduta dopo un anno):
+//   1. console.anthropic.com → API keys → crea la chiave SENZA SCADENZA;
+//   2. Secret Manager → ANTHROPIC_API_KEY → nuova versione;
+//   3. deploy delle funzioni, con [deploy] e [deploy-functions] nella
+//      prima riga del messaggio di commit;
+//   4. verificata la risposta, si disattiva la versione vecchia.
+//
+// Senza, si fermano tutte insieme: composizione corporea, cammino,
+// squat, valutazione Mind Movement, assistente e segreteria.
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 const db = () => admin.firestore();
@@ -111,8 +125,22 @@ export const aiMessages = onRequest(
   {
     region: "europe-west1",
     secrets: [ANTHROPIC_API_KEY],
-    timeoutSeconds: 120,
-    memory: "256MiB",
+    // 27 settembre 2026, 19:16, con un allievo davanti: «errore 502»
+    // sull'analisi posturale.
+    //
+    // 502 vuol dire che la funzione è MORTA, non che ha risposto male.
+    // Qui c'erano 256 MiB. Quattro foto posturali arrivano a 1-2 MB
+    // l'una (la qualità è già al 50%, ma non c'è ridimensionamento), e
+    // in base64 crescono di un terzo. Node le tiene in memoria più
+    // volte — il corpo grezzo, l'oggetto letto, la richiesta in uscita
+    // verso Anthropic — e a quel punto 256 MiB finiscono.
+    //
+    // Il costo di questo cambio è trascurabile: le analisi posturali
+    // sono poche al giorno, e si paga a memoria-per-secondo solo
+    // mentre girano. Il costo di NON farlo era un errore davanti a un
+    // allievo.
+    timeoutSeconds: 300,
+    memory: "1GiB",
     cors: true, // PWA same-origin via rewrite; native app cross-origin
   },
   async (req, res) => {

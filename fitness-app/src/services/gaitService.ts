@@ -268,6 +268,154 @@ const getImageLandmarker = async (
   return _imageLandmarker;
 };
 
+// ------------------------------------------------------------
+// 10 novembre 2026 — IL MOTORE ACCURATO, PER LE FOTO
+// ------------------------------------------------------------
+// Per le foto della postura si usa il modello più grande (30 MB
+// contro 6): sulla stessa foto riletta sedici volte i suoi punti
+// tremano circa la metà e non «saltano» mai. È più lento, ma una foto
+// non è un video: mezzo secondo in più non lo nota nessuno.
+//
+// Se non si scarica o il dispositivo non lo regge si torna al modello
+// leggero — e chi chiama lo viene a sapere (`motore`), così lo
+// schermo non spaccia una lettura standard per una accurata.
+// ------------------------------------------------------------
+
+export type MotoreFoto = 'accurato' | 'standard';
+
+let _preciso: { landmarker: any; motore: MotoreFoto } | null = null;
+
+const getLandmarkerAccurato = async (
+  onStatus?: (s: GaitStatus) => void
+): Promise<{ landmarker: any; motore: MotoreFoto }> => {
+  if (_preciso) return _preciso;
+  if (Platform.OS !== 'web') {
+    throw new Error("L'analisi su foto è disponibile solo dalla web app (PWA).");
+  }
+  onStatus?.('engine');
+  try {
+    const vision = await withTimeout(
+      nativeImport('/wasm/vision_bundle.mjs'),
+      60000,
+      'Il motore di analisi non si scarica: controlla la connessione e riprova.'
+    );
+    const fileset = await vision.FilesetResolver.forVisionTasks('/wasm');
+    const make = (delegate: 'GPU' | 'CPU') =>
+      withTimeout(
+        vision.PoseLandmarker.createFromOptions(fileset, {
+          baseOptions: { modelAssetPath: '/models/pose_landmarker_heavy.task', delegate },
+          runningMode: 'IMAGE',
+          numPoses: 1,
+        }),
+        // 30 MB la prima volta (poi resta in memoria del telefono):
+        // oltre questo tempo si passa al modello leggero senza far
+        // aspettare nessuno davanti a una rotellina.
+        delegate === 'GPU' ? 75000 : 45000,
+        'MOTORE_ACCURATO_NON_PARTITO'
+      );
+    let landmarker: any;
+    try {
+      landmarker = await make('GPU');
+    } catch {
+      landmarker = await make('CPU');
+    }
+    _preciso = { landmarker, motore: 'accurato' };
+  } catch {
+    // Non è un errore da mostrare: c'è il modello leggero.
+    _preciso = { landmarker: await getImageLandmarker(onStatus), motore: 'standard' };
+  }
+  return _preciso;
+};
+
+/** Una foto letta più volte. */
+export interface PosaRipetuta {
+  /** ogni lettura: 33 punti, riportati sulle coordinate della foto */
+  letture: { x: number; y: number; visibility?: number }[][];
+  larghezza: number;
+  altezza: number;
+  motore: MotoreFoto;
+}
+
+// Le variazioni con cui si rilegge la stessa foto: piccoli spostamenti
+// e riduzioni, MAI rotazioni (la verticale della foto è un dato) e mai
+// specchi (scambierebbero destra e sinistra). La prima è la foto
+// com'è. Valori fissi: la stessa foto dà sempre le stesse letture.
+const VARIAZIONI: Array<{ s: number; dx: number; dy: number }> = [
+  { s: 1, dx: 0, dy: 0 },
+  { s: 0.96, dx: 0.012, dy: -0.010 },
+  { s: 0.93, dx: -0.015, dy: 0.012 },
+  { s: 0.98, dx: -0.008, dy: -0.014 },
+  { s: 0.95, dx: 0.014, dy: 0.009 },
+  { s: 0.97, dx: 0.004, dy: 0.015 },
+];
+
+export const LETTURE_PER_FOTO = VARIAZIONI.length;
+
+/**
+ * Legge la stessa foto più volte, ogni volta appena spostata, e
+ * riporta ogni lettura sulle coordinate della foto originale. Così
+ * il dominio può tenere la mediana dei punti e dire di quanto
+ * oscillano (posture.ts → `fondiLetture`, `misuraRipetuta`).
+ * Ritorna null se in nessuna lettura si riconosce una persona.
+ */
+export const leggiPosaRipetuta = async (
+  uri: string,
+  onStatus?: (s: GaitStatus) => void
+): Promise<PosaRipetuta | null> => {
+  const { landmarker, motore } = await getLandmarkerAccurato(onStatus);
+  onStatus?.('analyzing');
+  const doc = (globalThis as any).document;
+  const img: any = doc.createElement('img');
+  img.crossOrigin = 'anonymous';
+  img.decoding = 'async';
+  await withTimeout(
+    new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Foto non leggibile. Usa un formato standard (jpg/png).'));
+      img.src = uri;
+    }),
+    20000,
+    'La foto non si apre: riprova o scegli un altro file.'
+  );
+
+  const scale = Math.min(1, 1080 / Math.max(img.naturalWidth || 1080, img.naturalHeight || 1080));
+  const W = Math.max(1, Math.round((img.naturalWidth || 1080) * scale));
+  const H = Math.max(1, Math.round((img.naturalHeight || 1080) * scale));
+  const canvas = doc.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+
+  const letture: PosaRipetuta['letture'] = [];
+  for (const v of VARIAZIONI) {
+    // punto della foto (x, y) → punto sulla tela (x', y'):
+    //   x' = ex + s·x     y' = ey + s·y
+    const ex = W / 2 + v.dx * W - v.s * (W / 2);
+    const ey = H / 2 + v.dy * H - v.s * (H / 2);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = 'gray';
+    ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(v.s, 0, 0, v.s, ex, ey);
+    ctx.drawImage(img, 0, 0, W, H);
+    let lm: any[] | undefined;
+    try {
+      lm = landmarker.detect(canvas)?.landmarks?.[0];
+    } catch {
+      lm = undefined; // una lettura fallita non ferma le altre
+    }
+    if (!lm || lm.length < 33) continue;
+    letture.push(lm.map((p: any) => ({
+      x: (p.x * W - ex) / v.s / W,
+      y: (p.y * H - ey) / v.s / H,
+      visibility: p.visibility,
+    })));
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (!letture.length) return null;
+  return { letture, larghezza: W, altezza: H, motore };
+};
+
 /**
  * Estrae i 33 landmark scheletrici da una SINGOLA foto (data URI o
  * URL), interamente on-device. Ritorna null se non riconosce una
@@ -278,6 +426,29 @@ export const extractLandmarksFromImage = async (
   uri: string,
   onStatus?: (s: GaitStatus) => void
 ): Promise<{ x: number; y: number; visibility?: number }[] | null> => {
+  const posa = await leggiPosa(uri, onStatus);
+  return posa ? posa.landmarks : null;
+};
+
+/** I landmark di una foto INSIEME alle sue dimensioni. */
+export interface PosaFoto {
+  /** 33 punti, x in frazioni della larghezza e y dell'altezza */
+  landmarks: { x: number; y: number; visibility?: number }[];
+  /** dimensioni della tela su cui si è misurato, in pixel */
+  larghezza: number;
+  altezza: number;
+}
+
+/**
+ * Come `extractLandmarksFromImage`, ma restituisce anche larghezza e
+ * altezza della foto. Servono SEMPRE: x e y dei landmark sono su due
+ * righelli diversi, e senza le dimensioni nessun angolo è vero
+ * (vedi `raddrizza` in domain/posture.ts).
+ */
+export const leggiPosa = async (
+  uri: string,
+  onStatus?: (s: GaitStatus) => void
+): Promise<PosaFoto | null> => {
   const landmarker = await getImageLandmarker(onStatus);
   onStatus?.('analyzing');
   const doc = (globalThis as any).document;
@@ -306,7 +477,11 @@ export const extractLandmarksFromImage = async (
   const res = landmarker.detect(canvas);
   const lm = res?.landmarks?.[0];
   if (!lm || lm.length < 33) return null;
-  return lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility }));
+  return {
+    landmarks: lm.map((p: any) => ({ x: p.x, y: p.y, visibility: p.visibility })),
+    larghezza: canvas.width,
+    altezza: canvas.height,
+  };
 };
 
 // ------------------------------------------------------------

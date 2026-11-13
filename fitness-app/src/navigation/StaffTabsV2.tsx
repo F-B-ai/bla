@@ -46,6 +46,9 @@ import { FinancialScreen } from '../screens/owner/FinancialScreen';
 import { PricingScreen } from '../screens/owner/PricingScreen';
 import { PaymentPlanScreen } from '../screens/owner/PaymentPlanScreen';
 import { StorageManagementScreen } from '../screens/owner/StorageManagementScreen';
+import { RegistroScreen } from '../screens/owner/RegistroScreen';
+import { RapportoMattinoScreen } from '../screens/owner/RapportoMattinoScreen';
+import { ControlloAccessiScreen } from '../screens/owner/ControlloAccessiScreen';
 import { ComunicazioniScreen } from '../screens/owner/ComunicazioniScreen';
 import { EarningsScreen } from '../screens/collaborator/EarningsScreen';
 
@@ -164,12 +167,15 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
     {
       title: 'Gestione',
       rows: [
+        { icon: 'sunny-outline', title: 'Rapporto del mattino', route: 'RapportoMattino' },
         { icon: 'speedometer-outline', title: 'Dashboard completa', route: 'DashboardCompleta' },
         { icon: 'cash-outline', title: 'Finanza', route: 'Finanza' },
         { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
         { icon: 'pricetags-outline', title: 'Listino', route: 'Listino' },
         { icon: 'card-outline', title: 'Piani di pagamento', route: 'Pagamenti' },
         { icon: 'people-circle-outline', title: 'Team', route: 'Team' },
+        { icon: 'document-text-outline', title: 'Registro attività', route: 'Registro' },
+        { icon: 'key-outline', title: 'Controllo accessi', route: 'ControlloAccessi' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
         { icon: 'server-outline', title: 'Spazio di archiviazione', route: 'Spazio' },
         { icon: 'hardware-chip-outline', title: 'Impostazioni AI', route: 'ImpostazioniAI' },
@@ -182,10 +188,14 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
   ],
   manager: [
     {
-      title: 'Gestione',
+      title: 'Il mio lavoro',
+      // 9 novembre 2026, scelta A del titolare: «Nessuno nei manager,
+      // nei nutrizionisti, nei collaboratori deve vedere niente. Solo
+      // io». Un manager è Giuseppe. Via «Dashboard completa» (i ricavi
+      // di tutta la sua squadra) e «Analytics» (le analisi dello
+      // studio): sono le attività commerciali che il titolare tiene
+      // per sé. Resta «I tuoi ricavi» — i SUOI, cioè i suoi conteggi.
       rows: [
-        { icon: 'speedometer-outline', title: 'Dashboard completa', route: 'DashboardCompleta' },
-        { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
         { icon: 'wallet-outline', title: 'I tuoi ricavi', route: 'Guadagni' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
       ],
@@ -197,9 +207,15 @@ const groupsByRole: Record<StaffRole, HubGroup[]> = {
   collaborator: [
     {
       title: 'Il mio lavoro',
+      // 9 novembre 2026. Il titolare: «loro devono eseguire solamente,
+      // segnare la lezione e vedere i loro conteggi e i loro allievi.
+      // Le mie analisi no». «Analytics» mostra i ricavi di tutto lo
+      // studio: i soldi il database glieli negava già (sono di owner e
+      // manager), ma la VOCE restava nel menu e tentava la lettura.
+      // Un collaboratore vede i SUOI guadagni, non le analisi dello
+      // studio. Tolta.
       rows: [
         { icon: 'wallet-outline', title: 'I miei guadagni', route: 'Guadagni' },
-        { icon: 'stats-chart-outline', title: 'Analytics', route: 'Analytics' },
         { icon: 'grid-outline', title: 'Contenuti', route: 'Contenuti' },
         { icon: 'hardware-chip-outline', title: 'Impostazioni AI', route: 'ImpostazioniAI' },
       ],
@@ -281,6 +297,9 @@ const buildNavigators = (role: StaffRole) => {
           <StudioStack.Screen name="Listino" component={PricingScreen} options={inner('Listino')} />
           <StudioStack.Screen name="Pagamenti" component={PaymentPlanScreen} options={inner('Piani di pagamento')} />
           <StudioStack.Screen name="Team" component={ManageUsersScreen} options={inner('Team')} />
+          <StudioStack.Screen name="Registro" component={RegistroScreen} options={inner('Registro attività')} />
+          <StudioStack.Screen name="RapportoMattino" component={RapportoMattinoScreen} options={inner('Rapporto del mattino')} />
+          <StudioStack.Screen name="ControlloAccessi" component={ControlloAccessiScreen} options={inner('Controllo accessi')} />
           <StudioStack.Screen name="Spazio" component={StorageManagementScreen} options={inner('Spazio di archiviazione')} />
           <StudioStack.Screen name="Comunicazioni" component={ComunicazioniScreen} options={inner('Comunicazioni')} />
           <StudioStack.Screen name="ImpostazioniAI" component={AISettingsScreen} options={inner('Impostazioni AI')} />
