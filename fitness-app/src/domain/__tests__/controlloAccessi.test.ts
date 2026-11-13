@@ -66,6 +66,24 @@ describe('quello che non torna', () => {
     expect(c.righe[0].segnalazioni[0].testo).toMatch(/non corrisponde a nessuna persona/);
   });
 
+  // 13 novembre 2026: è il segno che accende «Elimina accesso» sullo
+  // schermo. Deve essere vero SOLO per chi non ha scheda: una persona
+  // vera, staff o allievo, non deve mai vedersi offrire quel pulsante.
+  it('senzaScheda è vero solo per l\'accesso che non ha scheda', () => {
+    const a = accounts().concat([{ uid: 'ignoto', email: 'x@altro.it', creato: giorniFa(4) }]);
+    const c = analizza(a);
+    expect(c.righe.filter((r) => r.senzaScheda).map((r) => r.uid)).toEqual(['ignoto']);
+    for (const r of c.righe) expect(r.senzaScheda).toBe(r.uid === 'ignoto');
+  });
+
+  it('una scheda disattivata o senza nome non è «senza scheda»', () => {
+    const s = schede().concat([{ id: 'muto', role: 'student', name: '', surname: '', email: 'm@mail.it', isActive: false }]);
+    const a = accounts().concat([{ uid: 'muto', email: 'm@mail.it', creato: giorniFa(4) }]);
+    const r = riga('muto', a, s);
+    expect(r.nome).toBe('Senza nome');
+    expect(r.senzaScheda).toBe(false);
+  });
+
   // È il segno lasciato da un cambio d'email fatto senza aggiornare la
   // scheda: l'accesso è passato a un indirizzo che lo studio non conosce.
   it('l\'email con cui entra non è quella della scheda: grave se è staff', () => {

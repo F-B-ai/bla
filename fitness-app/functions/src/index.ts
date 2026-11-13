@@ -379,6 +379,16 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
     throw new HttpsError("invalid-argument", "targetUserId è obbligatorio.");
   }
 
+  // L'email si legge PRIMA di eliminare: dopo non esiste più, e per un
+  // accesso senza scheda è l'unica cosa che dice nel Registro quale
+  // accesso è stato tolto.
+  let email = "";
+  try {
+    email = (await authAdmin.getUser(targetUserId)).email || "";
+  } catch {
+    // nessun accesso: lo dice già il ramo qui sotto
+  }
+
   let cera = true;
   try {
     await authAdmin.deleteUser(targetUserId);
@@ -398,7 +408,9 @@ export const adminDeleteUser = onCall({region: "europe-west1"}, async (request) 
     chi: request.auth.uid,
     azione: "eliminato",
     bersaglio: targetUserId,
-    dettaglio: cera ? "accesso eliminato" : "nessun accesso da eliminare (la persona non era mai entrata)",
+    dettaglio: cera ?
+      (email ? `accesso eliminato (${email})` : "accesso eliminato") :
+      "nessun accesso da eliminare (la persona non era mai entrata)",
   });
   return {success: true};
 });

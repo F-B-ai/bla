@@ -6,7 +6,10 @@ import {
 import { colors, spacing, fontSize, borderRadius } from '../../config/theme';
 import { ControlloAccessi, Gravita, RigaAccesso } from '../../domain/controlloAccessi';
 import { VoceRegistro, descriviVoce, filtraRegistro } from '../../domain/registro';
-import { leggiControlloAccessi, spiegaErroreControllo } from '../../services/controlloAccessiService';
+import {
+  leggiControlloAccessi, spiegaErroreControllo, eliminaAccessoSenzaScheda,
+} from '../../services/controlloAccessiService';
+import { crossAlert } from '../../utils/alert';
 import { leggiRegistro } from '../../services/registroService';
 
 // ============================================================
@@ -37,7 +40,22 @@ const quando = (iso: string | null): string => {
   });
 };
 
-const Riga: React.FC<{ r: RigaAccesso }> = ({ r }) => (
+// Il pulsante c'è solo per un accesso senza scheda: una persona vera
+// si toglie da Team, dove si cancellano scheda e accesso insieme.
+const EliminaAccesso: React.FC<{ r: RigaAccesso; inCorso: boolean; onElimina: (r: RigaAccesso) => void }> = ({ r, inCorso, onElimina }) =>
+  r.senzaScheda === true ? (
+    <TouchableOpacity
+      style={styles.elimina}
+      onPress={() => onElimina(r)}
+      disabled={inCorso}
+      accessibilityRole="button"
+      accessibilityLabel={`Elimina accesso ${r.emailAccesso}`}
+    >
+      <Text style={styles.eliminaTesto}>{inCorso ? 'Sto eliminando…' : 'Elimina accesso'}</Text>
+    </TouchableOpacity>
+  ) : null;
+
+const Riga: React.FC<{ r: RigaAccesso; inCorso: boolean; onElimina: (r: RigaAccesso) => void }> = ({ r, inCorso, onElimina }) => (
   <View style={styles.voce}>
     <View style={styles.riga}>
       <Text style={styles.nome}>{r.nome}</Text>
@@ -55,6 +73,7 @@ const Riga: React.FC<{ r: RigaAccesso }> = ({ r }) => (
     {r.segnalazioni.map((s, i) => (
       <Text key={i} style={[styles.segnalazione, { color: COLORE[s.gravita] }]}>· {s.testo}</Text>
     ))}
+    <EliminaAccesso r={r} inCorso={inCorso} onElimina={onElimina} />
   </View>
 );
 
@@ -64,6 +83,7 @@ export const ControlloAccessiScreen: React.FC = () => {
   const [caricando, setCaricando] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
   const [tutti, setTutti] = useState(false);
+  const [eliminando, setEliminando] = useState<string | null>(null);
 
   const carica = useCallback(async () => {
     setCaricando(true);
@@ -78,6 +98,34 @@ export const ControlloAccessiScreen: React.FC = () => {
   }, []);
 
   useEffect(() => { void carica(); }, [carica]);
+
+  const elimina = useCallback((r: RigaAccesso) => {
+    const email = r.emailAccesso || 'senza email';
+    crossAlert(
+      'Elimina accesso',
+      `Elimino l'accesso ${email}? Non ha nessuna scheda in anagrafica. Chi lo usava non potrà più entrare. L'operazione non si annulla e resta scritta nel Registro.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            setEliminando(r.uid);
+            try {
+              await eliminaAccessoSenzaScheda(r.uid);
+              crossAlert('Fatto', `Accesso ${email} eliminato.`);
+              await carica();
+            } catch (err: unknown) {
+              const e = err as { message?: string } | undefined;
+              crossAlert('Non eliminato', e?.message || `Non sono riuscito a eliminare l'accesso ${email}.`);
+            } finally {
+              setEliminando(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [carica]);
 
   const righe = dati ? dati.righe.filter((r) => tutti || r.staff || r.segnalazioni.some((s) => s.gravita === 'alta')) : [];
   const generali = dati?.generali || [];
@@ -121,9 +169,13 @@ export const ControlloAccessiScreen: React.FC = () => {
             {conProblemi.map((r) => (
               <View key={r.uid} style={styles.voce}>
                 <Text style={styles.nome}>{r.nome} · {r.ruolo}</Text>
+                {r.senzaScheda && r.emailAccesso ? (
+                  <Text style={styles.dato} selectable>Entra con: {r.emailAccesso}</Text>
+                ) : null}
                 {r.segnalazioni.filter((s) => s.gravita !== 'bassa').map((s, i) => (
                   <Text key={i} style={[styles.segnalazione, { color: COLORE[s.gravita] }]}>· {s.testo}</Text>
                 ))}
+                <EliminaAccesso r={r} inCorso={eliminando === r.uid} onElimina={elimina} />
               </View>
             ))}
             {dati.staffSenzaAccesso.length > 0 ? (
@@ -164,7 +216,7 @@ export const ControlloAccessiScreen: React.FC = () => {
               {' '}«Sessioni valide dal» cambia quando la password viene cambiata o le sessioni
               vengono chiuse.
             </Text>
-            {righe.map((r) => <Riga key={r.uid} r={r} />)}
+            {righe.map((r) => <Riga key={r.uid} r={r} inCorso={eliminando === r.uid} onElimina={elimina} />)}
           </View>
         </>
       ) : null}
@@ -201,6 +253,12 @@ const styles = StyleSheet.create({
   segnalazione: { fontSize: fontSize.sm, lineHeight: 18, marginTop: 4, fontWeight: '600' },
   nota: { fontSize: fontSize.xs, color: colors.textLight, lineHeight: 15, marginTop: 4 },
   interruttore: { fontSize: fontSize.sm, color: colors.primary, fontWeight: '600' },
+  elimina: {
+    marginTop: spacing.sm, alignSelf: 'flex-start',
+    paddingVertical: 6, paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.round, borderWidth: 1, borderColor: colors.error,
+  },
+  eliminaTesto: { fontSize: fontSize.sm, color: colors.error, fontWeight: '600' },
   erroreTitolo: { fontSize: fontSize.xl, fontWeight: '600', color: colors.error, marginBottom: 6 },
   fondo: { height: 40 },
 });

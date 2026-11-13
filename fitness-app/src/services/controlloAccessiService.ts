@@ -1,5 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, functions } from '../config/firebase';
+import { adminDeleteAuthUser } from './adminAuthService';
 import { ControlloAccessi } from '../domain/controlloAccessi';
 
 // ============================================================
@@ -28,4 +30,24 @@ export const spiegaErroreControllo = (err: unknown): string => {
     return 'Il server non risponde: controlla la connessione e riprova.';
   }
   return e?.message || 'Non sono riuscito a leggere gli accessi.';
+};
+
+/**
+ * Elimina un accesso che non ha nessuna scheda in anagrafica.
+ *
+ * La fotografia può essere vecchia di qualche minuto: prima di
+ * eliminare si guarda di nuovo se, nel frattempo, a quell'accesso è
+ * stata collegata una scheda. Se c'è, non si elimina niente da qui:
+ * una persona vera si toglie da Team, non da questo schermo.
+ *
+ * L'eliminazione la fa il server (adminDeleteUser): solo il titolare
+ * attivo può chiederla, e ogni eliminazione resta nel Registro.
+ */
+export const eliminaAccessoSenzaScheda = async (uid: string): Promise<void> => {
+  if (!uid) throw new Error('Accesso non indicato.');
+  const scheda = await getDoc(doc(db, 'users', uid));
+  if (scheda.exists()) {
+    throw new Error('Nel frattempo questo accesso è stato collegato a una scheda: non lo elimino da qui.');
+  }
+  await adminDeleteAuthUser(uid);
 };

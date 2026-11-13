@@ -62,6 +62,13 @@ export interface RigaAccesso {
   disabilitato: boolean;
   /** la scheda dice che la persona non è più attiva */
   schedaDisattivata: boolean;
+  /**
+   * l'accesso non ha nessuna scheda in anagrafica: è l'unico caso in
+   * cui lo schermo offre «Elimina accesso». Facoltativo perché una
+   * fotografia fatta da un server più vecchio non lo porta: assente
+   * vale «no», e il pulsante non compare.
+   */
+  senzaScheda?: boolean;
   staff: boolean;
   segnalazioni: Segnalazione[];
 }
@@ -201,6 +208,7 @@ export const analizzaAccessi = (
     const nome = scheda ? `${scheda.name || ''} ${scheda.surname || ''}`.trim() : '';
     righe.push({
       uid: a.uid,
+      senzaScheda: !scheda,
       nome: nome || (scheda ? 'Senza nome' : 'Non in anagrafica'),
       ruolo: NOME_RUOLO[ruolo] || (ruolo ? ruolo : 'nessuno'),
       emailAccesso: a.email || '',
